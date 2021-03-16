@@ -41,3 +41,14 @@ pip install -r requirements.txt
 Check it works with `python` and then `from speech_tech import *`
 
 
+## Make dirs for input and result files
+```
+mkdir inputs
+mkdir results
+```
+
+## Test modules
+
+```
+pytest
+```
