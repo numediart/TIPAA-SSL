@@ -1,0 +1,53 @@
+w1 [w1_4] W AH1 T S
+w1 [w1_5] HH W AH1 T S
+w2 [w2_3] Y AO1 R
+w2 [w2_3] Y UH1 R
+w2 [w2_2] Y AO1
+w3 [w3_6] F EY1 V ER0 IH0 T
+w3 [w3_7] F EY1 V ER0 IH0 T AH0
+w3 [w3_6] F AE1 V ER0 IH0 T
+w3 [w3_7] F AE1 V ER0 IH0 T AH0
+w3 [w3_6] F EY1 V ER0 IY0 T
+w3 [w3_7] F EY1 V ER0 IY0 T AH0
+w3 [w3_6] F AE1 V ER0 IY0 T
+w3 [w3_7] F AE1 V ER0 IY0 T AH0
+w3 [w3_6] F EY0 V ER0 IH1 T
+w3 [w3_7] F EY0 V ER0 IH1 T AH0
+w3 [w3_6] F AE0 V ER0 IH1 T
+w3 [w3_7] F AE0 V ER0 IH1 T AH0
+w3 [w3_6] F EY0 V ER0 IY1 T
+w3 [w3_7] F EY0 V ER0 IY1 T AH0
+w3 [w3_6] F AE0 V ER0 IY1 T
+w3 [w3_7] F AE0 V ER0 IY1 T AH0
+w3 [w3_6] F EY2 V ER0 IH1 T
+w3 [w3_7] F EY2 V ER0 IH1 T AH0
+w3 [w3_6] F AE2 V ER0 IH1 T
+w3 [w3_7] F AE2 V ER0 IH1 T AH0
+w3 [w3_6] F EY2 V ER0 IY1 T
+w3 [w3_7] F EY2 V ER0 IY1 T AH0
+w3 [w3_6] F AE2 V ER0 IY1 T
+w3 [w3_7] F AE2 V ER0 IY1 T AH0
+p1 [p1] M
+p2 [p2] UW1
+p3 [p3] V
+p4 [p4_*l] IY1
+p4 [p4_*s] IH1
+p4 [p4_*l] IY2
+p4 [p4_*s] IH2
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5
+*err [*err1] AA2
+*err [*err2] AE2
+*err [*err3] AH2
+*err [*err4] AO2
+*err [*err5] AW2
+*err [*err6] AY2
+*err [*err7] OW2
+*err [*err8] OY2
+*err [*err9] UH2
+*err [*err10] UW2

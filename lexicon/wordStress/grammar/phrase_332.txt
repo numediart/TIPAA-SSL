@@ -1,0 +1,7 @@
+$bla = [o4 o4 o4 o4 o4 o4];
+$inv = (d23 d22 d21 d20) | (d20 d19 d18 d17) | (d16 d15 d14 d13) | (d12 d11 d10 d9) | (d8 d7 d6 d5) | (d4 d3 d2 d1) | (d23 d22 d21 d20 d19 d18 d17 d16 d15 d14 d13 d12 d11 d10 d9 d8 d7 d6 d5 d4 d3 d2 d1);
+$phrase = (d1 d2 d3 sp d4 d5 d6 sp d7 sp d8 d9 d10 sp d11 d12 sp d13 d14 d15 sp d16 d17 d18 d19 d20 d21 d22 d23) | $inv | {$bla};
+
+(
+([sil] | sp) $phrase ([sil] | sp)
+)

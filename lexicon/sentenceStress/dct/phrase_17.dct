@@ -1,0 +1,36 @@
+w1 [w1_2] N OW1
+w1 [w1_2] N AO1
+w2 [w2_3] IH1 T S
+w2 [w2_3] AH0 T S
+w2 [w2_4] IH1 T IH1 S
+w3 [w3_2] DH AH0
+w3 [w3_2] DH AH1
+w3 [w3_2] DH EH1
+w3 [w3_2] DH IY0
+w3 [w3_2] D AH0
+w3 [w3_2] D AH1
+w3 [w3_2] D EH1
+w3 [w3_2] D IY0
+w3 [w3_2] Z AH0
+w3 [w3_2] Z AH1
+w3 [w3_2] Z EH1
+w3 [w3_2] Z IY0
+w4 [w4_7] K AE1 P AH0 T AH0 L
+w4 [w4_7] K AE1 P IH2 T AH2 L
+w5 [w5_2] AH1 V
+w5 [w5_2] AH1 F
+w5 [w5_2] AH0 V
+w5 [w5_2] AH0 F
+w5 [w5_2] AO0 V
+w5 [w5_2] AO0 F
+w6 [w6_5] JH AH0 P AE1 N
+w6 [w6_5] JH AE2 P AE1 N
+w6 [w6_5] ZH AH0 P AE1 N
+w6 [w6_5] ZH AE2 P AE1 N
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5

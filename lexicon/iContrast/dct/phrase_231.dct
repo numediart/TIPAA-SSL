@@ -1,0 +1,29 @@
+w1 [w1_3] D IH1 D
+w2 [w2_2] HH IY1
+w3 [w3_3] F AO1 L
+w3 [w3_3] F AA1 L
+p1 [p1] AH0
+p2 [p2] S
+p3 [p3] L
+p4 [p4_*l] IY1
+p4 [p4_*s] IH1
+p4 [p4_*l] IY2
+p4 [p4_*s] IH2
+p5 [p5_uv] P
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5
+*err [*err1] AA2
+*err [*err2] AE2
+*err [*err3] AH2
+*err [*err4] AO2
+*err [*err5] AW2
+*err [*err6] AY2
+*err [*err7] OW2
+*err [*err8] OY2
+*err [*err9] UH2
+*err [*err10] UW2

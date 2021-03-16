@@ -1,0 +1,7 @@
+$bla = [o4 o4 o4 o4 o4 o4 o4 o4];
+$blabla = (w4 sp w3 sp w2 sp w1);
+$phrase = ((w1 sp w2 sp w3 sp w4 sp ((p1 (p2 | *err) p3 p4) | $bla)) | ({$bla} | $blabla));
+
+(
+[sil] $phrase [sil]
+)

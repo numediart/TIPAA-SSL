@@ -1,0 +1,9 @@
+$other = o1 | o2 | o3 | o4 | o5;
+$other_pho =  o2 | o3 | o4 | o5;
+$blabla = (w2 sp w1);
+$blabla_pho = (p6 sp p5 sp p4) | (p3 sp p2 sp p1);
+$phrase = ((((p1 p2 p3 p4 p5 p6) | {sp $other_pho | $blabla_pho}) sp w1 sp w2) | {sp ($other | $blabla)});
+
+(
+({sil} | sp) $phrase ({sil} | sp)
+)

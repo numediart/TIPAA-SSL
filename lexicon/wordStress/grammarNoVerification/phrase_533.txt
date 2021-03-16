@@ -1,0 +1,5 @@
+$phrase = (d1 d2 sp d3 d4 sp d5 d6 d7 d8 d9 sp d10 d11 d12 d13);
+
+(
+([sil] | sp) $phrase ([sil] | sp)
+)

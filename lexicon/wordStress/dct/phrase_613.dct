@@ -1,0 +1,19 @@
+d1 [w1_g1_1] W
+d1 [w1_g1_1] V
+d2 [w1_v1_0] EH0
+d2 [w1_v1_1] EH1
+d2 [w1_v1_2] EH2
+d3 [w1_g2_2] R HH
+d3 [w1_g2_1] R
+d4 [w1_v2_0] AW0
+d4 [w1_v2_1] AW1
+d4 [w1_v2_2] AW2
+d5 [w1_g3_1] S
+d5 [w1_g3_1] Z
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5

@@ -1,0 +1,20 @@
+d1 [w1_g1_1] K
+d2 [w1_v1_0] AA0
+d2 [w1_v1_1] AA1
+d2 [w1_v1_2] AA2
+d2 [w1_v1_0] AO0
+d2 [w1_v1_1] AO1
+d2 [w1_v1_2] AO2
+d3 [w1_g2_3] N T R
+d4 [w1_v2_0] AE0
+d4 [w1_v2_1] AE1
+d4 [w1_v2_2] AE2
+d5 [w1_g3_2] K T
+d5 [w1_g3_3] K T AH0
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5

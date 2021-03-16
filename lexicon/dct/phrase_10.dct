@@ -1,0 +1,60 @@
+w1 [w1_1] AY1
+w2 [w2_5] S T AH1 D IY0
+w2 [w2_5] S T AH1 D IH0
+w3 [w3_6] B IH1 Z N AH0 S
+w3 [w3_6] B IH1 Z N IH0 S
+w3 [w3_6] B IH1 S N AH0 S
+w3 [w3_6] B IH1 S N IH0 S
+w3 [w3_6] B UH1 Z N AH0 S
+w3 [w3_6] B UH1 Z N IH0 S
+w3 [w3_6] B UH1 S N AH0 S
+w3 [w3_6] B UH1 S N IH0 S
+w3 [w3_7] B IH1 Z IH2 N AH0 S
+w3 [w3_7] B IH1 Z IH2 N IH0 S
+w3 [w3_7] B IH1 S IH2 N AH0 S
+w3 [w3_7] B IH1 S IH2 N IH0 S
+w3 [w3_7] B UH1 Z IH2 N AH0 S
+w3 [w3_7] B UH1 Z IH2 N IH0 S
+w3 [w3_7] B UH1 S IH2 N AH0 S
+w3 [w3_7] B UH1 S IH2 N IH0 S
+w3 [w3_6] B IH0 Z N AH1 S
+w3 [w3_6] B IH0 Z N IH1 S
+w3 [w3_6] B IH0 S N AH1 S
+w3 [w3_6] B IH0 S N IH1 S
+w3 [w3_6] B UH0 Z N AH1 S
+w3 [w3_6] B UH0 Z N IH1 S
+w3 [w3_6] B UH0 S N AH1 S
+w3 [w3_6] B UH0 S N IH1 S
+w3 [w3_7] B IH0 Z IH2 N AH1 S
+w3 [w3_7] B IH0 Z IH2 N IH1 S
+w3 [w3_7] B IH0 S IH2 N AH1 S
+w3 [w3_7] B IH0 S IH2 N IH1 S
+w3 [w3_7] B UH0 Z IH2 N AH1 S
+w3 [w3_7] B UH0 Z IH2 N IH1 S
+w3 [w3_7] B UH0 S IH2 N AH1 S
+w3 [w3_7] B UH0 S IH2 N IH1 S
+w3 [w3_7] B IH2 Z IH1 N AH0 S
+w3 [w3_7] B IH2 Z IH1 N IH0 S
+w3 [w3_7] B IH2 S IH1 N AH0 S
+w3 [w3_7] B IH2 S IH1 N IH0 S
+w3 [w3_7] B UH2 Z IH1 N AH0 S
+w3 [w3_7] B UH2 Z IH1 N IH0 S
+w3 [w3_7] B UH2 S IH1 N AH0 S
+w3 [w3_7] B UH2 S IH1 N IH0 S
+w4 [w4_3] AH0 N D
+w4 [w4_3] AE1 N D
+w5 [w5_8] M AA1 R K AH0 T IH0 NG
+w5 [w5_9] M AA1 R K AH0 T IH0 NG AH0
+w5 [w5_8] M AA1 R K IH0 T IH0 NG
+w5 [w5_9] M AA1 R K IH0 T IH0 NG AH0
+w5 [w5_7] M AA1 K IH0 T IH0 NG
+w5 [w5_8] M AA1 K IH0 T IH0 NG AH0
+w5 [w5_7] M AA1 K AH0 T IH0 NG
+w5 [w5_8] M AA1 K AH0 T IH0 NG AH0
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5

@@ -1,0 +1,27 @@
+d1 [w1_g1_1] K
+d2 [w1_v1_0] AH0
+d2 [w1_v1_1] AH1
+d2 [w1_v1_2] AH2
+d2 [w1_v1_0] AO0
+d2 [w1_v1_1] AO1
+d2 [w1_v1_2] AO2
+d3 [w1_g2_2] N S
+d4 [w1_v2_0] UW0
+d4 [w1_v2_1] UW1
+d4 [w1_v2_2] UW2
+d4 [w1_v2_0] IH0 UW0
+d4 [w1_v2_1] IH0 UW1
+d4 [w1_v2_2] IH0 UW2
+d4 [w1_v2_1] IH1 UW0
+d4 [w1_v2_2] IH2 UW0
+d5 [w1_g3_1] M
+d6 [w1_v3_0] ER0
+d6 [w1_v3_1] ER1
+d6 [w1_v3_2] ER2
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5

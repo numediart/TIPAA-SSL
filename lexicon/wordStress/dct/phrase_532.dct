@@ -1,0 +1,70 @@
+d1 [w1_g1_1] HH
+d2 [w1_v1_0] UW0
+d2 [w1_v1_1] UW1
+d2 [w1_v1_2] UW2
+d3 [w2_v1_0] IH0
+d3 [w2_v1_1] IH1
+d3 [w2_v1_2] IH2
+d4 [w2_g1_1] Z
+d5 [w3_g1_1] DH
+d5 [w3_g1_1] D
+d5 [w3_g1_1] Z
+d6 [w3_v1_0] IY0
+d6 [w3_v1_1] IY1
+d6 [w3_v1_2] IY2
+d6 [w3_v1_0] EH0
+d6 [w3_v1_1] EH1
+d6 [w3_v1_2] EH2
+d6 [w3_v1_0] AH0
+d6 [w3_v1_1] AH1
+d6 [w3_v1_2] AH2
+d7 [w4_g1_2] P R
+d8 [w4_v1_0] AA0
+d8 [w4_v1_1] AA1
+d8 [w4_v1_2] AA2
+d9 [w4_g2_1] S
+d10 [w4_v2_0] IH0
+d10 [w4_v2_1] IH1
+d10 [w4_v2_2] IH2
+d10 [w4_v2_0] EH0
+d10 [w4_v2_1] EH1
+d10 [w4_v2_2] EH2
+d11 [w4_g3_2] K Y
+d11 [w4_g3_1] K
+d12 [w4_v3_0] UW0
+d12 [w4_v3_1] UW1
+d12 [w4_v3_2] UW2
+d12 [w4_v3_0] IH0 UW0
+d12 [w4_v3_1] IH0 UW1
+d12 [w4_v3_2] IH0 UW2
+d13 [w4_g4_1] T
+d14 [w4_v4_0] ER0
+d14 [w4_v4_1] ER1
+d14 [w4_v4_2] ER2
+d14 [w4_v4_0] AA0 R
+d14 [w4_v4_1] AA1 R
+d14 [w4_v4_2] AA2 R
+d15 [w5_v1_0] IH0
+d15 [w5_v1_1] IH1
+d15 [w5_v1_2] IH2
+d16 [w5_g1_1] N
+d16 [w5_g1_2] N AH0
+d17 [w6_g1_1] DH
+d17 [w6_g1_1] D
+d17 [w6_g1_1] Z
+d18 [w6_v1_0] IH0
+d18 [w6_v1_1] IH1
+d18 [w6_v1_2] IH2
+d19 [w6_g2_1] S
+d20 [w7_g1_1] K
+d21 [w7_v1_0] EY0
+d21 [w7_v1_1] EY1
+d21 [w7_v1_2] EY2
+d22 [w7_g2_1] S
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5

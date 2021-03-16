@@ -1,0 +1,36 @@
+p1 [p1] AE0
+p1 [p1] AH0
+p2 [p2] K
+p3 [p3] S
+p4 [p4] EH1
+p5 [p5] P
+p6 [p6_*err1] T
+p6 [p6_*err2] D
+p6 [p6_*err3] T AH0
+p6 [p6_*err4] D AH0
+p6 [p6_*cor5] T AH0 D
+p6 [p6_*cor6] T IH0 D
+p6 [p6_*cor7] T IH2 D
+p6 [p6_*cor8] T IH1 D
+p6 [p6_*err9] T AH0 D AH1
+p6 [p6_*err10] T IH0 D AH1
+p6 [p6_*err11] T IH2 D AH1
+p6 [p6_*err12] T IH1 D AH1
+p6 [p6_*err13] T EH1 D
+p6 [p6_*err14] T EH2 D
+p6 [p6_*err15] T IH2 D IH2 D
+p6 [p6_*err16] T IH2 D EH2 D
+p6 [p6_*err17] T EH2 D IH2 D
+p6 [p6_*err18] T EH2 D EH2 D
+w1 [w1_2] DH AH0
+w1 [w1_2] DH AH1
+w1 [w1_2] DH IY0
+w2 [w2_3] AO1 F ER0
+w2 [w2_4] AO1 F EH0 R
+sp sp
+sil sil
+o1 gs1
+o2 gss2
+o3 gss3
+o4 gss4
+o5 gss5

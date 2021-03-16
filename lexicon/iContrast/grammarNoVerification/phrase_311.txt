@@ -1,0 +1,5 @@
+$phrase = (p1 p2 p3);
+
+(
+[sil] $phrase [sil]
+)
