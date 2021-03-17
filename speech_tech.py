@@ -372,8 +372,7 @@ def sentenceStress():
     
     return binResult
         
-def wordStress():
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
+def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')):
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
@@ -601,12 +600,32 @@ def get_cmudict_info(word='university'):
 
 
 if __name__ == "__main__":
+    # execute only if run as a script
 
     # Test performance of wordStress module
 
     d=get_data()
-    d[d.analysisId==232][d.focusType=='wordstress']
+    #d[d.analysisId==232][d.focusType=='wordstress']
 
-    # execute only if run as a script
+    a=get_wordStress_annotation()
+
+    audio_path="../audio-with-analysis-ids/audio/"
+
+    for id,bin in a.items():
+        print(bin)
+        row=d[d.analysisId==id][d.focusType=='wordstress']
+        ground_truth=a[id]
+        path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
+        p=set_params(sentenceID=id, waveFileAddress=path, module='wordStress')
+        try:
+            pred=wordStress(p)
+            print('Ground truth:')
+            print(ground_truth)
+            print('prediction:')
+            print(pred)
+        except:
+            print('Error with:')
+            print(row)
+
     wordStress()
     clean_temp_files()
