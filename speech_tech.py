@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import pyworld as pw
 import matplotlib.pyplot as plt
+import cmudict
 
 def clean_temp_files():
     os.system('rm inputs/*')
@@ -539,7 +540,73 @@ def edAnalysis():
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
+# Data processing
+def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
+    """Get a dataframe containing info of audio recordings with sentence ids
+
+    Args:
+        path_to_json (str, optional): [description]. Defaults to '../audio-with-analysis-ids/data.json'.
+
+    Returns:
+        DataFrame: [description]
+    """
+    data=pd.read_json(path_to_json)
+    return data
+
+def get_wordStress_annotation(path='../audio-with-analysis-ids/wordStress_annotations.csv'):
+    d=get_data()
+    d=d[d.focusType=="wordstress"]
+
+    df=pd.read_csv(path)
+
+    wordStress_annotations={}
+    for i,r in d.iterrows():
+        analysisId=r.analysisId
+        first_digit=int(analysisId/100)
+
+        if first_digit>0:
+            col=df[str(first_digit)]
+
+            text=d[d.analysisId==analysisId].text.values[0]
+
+            col_idx=df.columns.tolist().index(str(first_digit))
+            match=col[col==text]
+
+            if len(match)>0:
+                row_idx=match.index[0]
+
+                bin_annotation=df.iloc[row_idx,col_idx+3]
+                bin_annotation_list=[int(el) for el in bin_annotation.split('-')]
+
+                wordStress_annotations[analysisId]=bin_annotation_list
+            else:
+                print('Text not found')
+                print(r)
+        else:
+            print('index with less than 3 digits')
+            print(r)
+    
+    return wordStress_annotations
+
+def get_cmudict_info(word='university'):
+    """get the first possible phonetisation of a word from cmudict
+
+    Args:
+        word (str, optional): input. Defaults to 'university'.
+    Returns:
+        list: phonemes and a number for each vowle indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
+    """
+    return cmudict.dict()[word][0]
+
+
 
 if __name__ == "__main__":
+
+    # Test performance of wordStress module
+
+    d=get_data()
+    d[d.analysisId==232][d.focusType=='wordstress']
+
     # execute only if run as a script
     wordStress()
+    clean_temp_files()
