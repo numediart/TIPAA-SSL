@@ -3,3 +3,5 @@ librosa
 pandas
 pyworld
 scipy
+pytest
+cmudict
