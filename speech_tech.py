@@ -253,6 +253,18 @@ def normalize(x):
     y=x-min(x)
     return y/max(y)
 
+
+
+from audiotsm import phasevocoder
+from audiotsm.io.wav import WavReader, WavWriter
+
+def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_slow.wav', speed_rate=0.7):
+    with WavReader(input_filename) as reader:
+        with WavWriter(output_filename, reader.channels, reader.samplerate) as writer:
+            tsm = phasevocoder(reader.channels, speed=speed_rate)
+            tsm.run(reader, writer)
+
+
 # Modules
 def chunking():
     p=set_params(module='chunking')
@@ -274,8 +286,7 @@ def chunking():
 
     status=0
 
-def sentenceStress():
-    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
+def sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')):
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
@@ -341,9 +352,9 @@ def sentenceStress():
     rateThreshold = 1.01
     nWords=len(textgridData)
     binResult = np.zeros(nWords)
-
-    # plt.plot(weighted_score)
-    # plt.show()
+    
+    plt.plot(weighted_score)
+    plt.savefig('sentence_curve.png')
 
     if nWords == 1:
         binResult[0] = 1
@@ -391,8 +402,8 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
             line=r.values[0].split(' ')
             phone=line[0]
             info=line[1][1:-1]
-            print(phone)
-            print(info)
+            # print(phone)
+            # print(info)
             dict_phones[info]=phone
 
     phone_seq=[dict_phones[r[2]] for i,r in textgridData.iterrows()]
@@ -401,6 +412,7 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     count_unique = len(phone_set)
 
     # TODO: use these for verification 
+
 
     #extract the number of words by taking the index of the last one
     nWords=int(textgridData[2].iloc[-1].split('_')[0][1:])
@@ -429,6 +441,33 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     # TODO: check words duration
     # TODO: check acoustic scores
 
+    
+
+    # % check words duration
+    # potErrors = 0;
+    # grosErrors = 0;
+    # for i = 1:nEntries
+    #     if (textgridData{2}(i) - textgridData{1}(i) < 0.040*phoPerEntry(i)) || (textgridData{2}(i) - textgridData{1}(i) > 0.230*phoPerEntry(i))
+    #         potErrors = potErrors + 1;
+    #     end
+    #     if textgridData{2}(i) - textgridData{1}(i) > 0.450*phoPerEntry(i)
+    #         grosErrors = grosErrors + 1;
+    #     end
+    # end
+    # if doVerification == 1 && (potErrors > 0.5*nEntries || grosErrors > 0)
+    #     status = -500;
+    #     result = createJSON(binResult, status, rand_fileName);
+    #     return;
+    # end
+
+    # % check acoustic scores
+    # if doVerification == 1 && mean(textgridData{4}) < 8.5
+    #     status = -600;
+    #     result = createJSON(binResult, status, rand_fileName);
+    #     return;
+    # end
+
+
     f0Samples=getIntonation(s, fs)
     intensity=getIntensity(s, fs)
 
@@ -437,11 +476,9 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     # each word start and end position expressed in samples
     startPositions_samples = (round(fs*textgridData.iloc[:,0])+1).astype(int).tolist()
     stopPositions_samples = round(fs*textgridData.iloc[:,1]).astype(int).tolist()
-
     
     # to make sure we don t go beyond the end of the signal
     assert stopPositions_samples[-1]<len(s), "The end of the last phoneme should be inside the signal"
-
 
     Dur=(textgridData.iloc[:,1]-textgridData.iloc[:,0])/(np.array(nVowelsPerWord)+1)  # +1 assuming stressed phonemes = 2*other phonemes
     Dur=np.array(Dur.tolist())
@@ -478,7 +515,8 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     # combine the features
     weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur + 0.4*sylType)/3.6  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
 
-    
+    plt.plot(weighted_score)
+    plt.savefig('word_curve.png')
     # chose prominent vowel per word
     binResult=np.zeros(len(weighted_score))
     for i in range(nWords):
@@ -498,8 +536,9 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     
     return binResult
 
-def iConstrast():
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
+def iConstrast(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
+    
+    #p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
@@ -533,6 +572,15 @@ def iConstrast():
                 binResult=0
     
     return binResult
+
+def oConstrast():#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
+    s,fs = load_audio(p['waveFileAddress'])
+    textgridData, cmdout2=get_textgrid_data(s,fs,p)
+
 
 def edAnalysis():
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
@@ -597,8 +645,6 @@ def get_cmudict_info(word='university'):
     """
     return cmudict.dict()[word][0]
 
-
-
 if __name__ == "__main__":
     # execute only if run as a script
 
@@ -611,21 +657,28 @@ if __name__ == "__main__":
 
     audio_path="../audio-with-analysis-ids/audio/"
 
+    preds=[]
+    GTs=[]
     for id,bin in a.items():
-        print(bin)
+        # print(bin)
         row=d[d.analysisId==id][d.focusType=='wordstress']
         ground_truth=a[id]
         path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
         p=set_params(sentenceID=id, waveFileAddress=path, module='wordStress')
         try:
             pred=wordStress(p)
-            print('Ground truth:')
-            print(ground_truth)
-            print('prediction:')
-            print(pred)
+            # print('Ground truth:')
+            # print(ground_truth)
+            # print('prediction:')
+            # print(pred)
+            preds.append(pred)
+            GTs.append(ground_truth)
         except:
             print('Error with:')
             print(row)
+    
+    print(preds)
+    print(GTs)
 
-    wordStress()
+    # wordStress()
     clean_temp_files()
