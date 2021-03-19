@@ -7,6 +7,8 @@ import pandas as pd
 import pyworld as pw
 import matplotlib.pyplot as plt
 import cmudict
+import pytsmod as tsm
+import soundfile as sf
 
 def clean_temp_files():
     os.system('rm inputs/*')
@@ -253,16 +255,65 @@ def normalize(x):
     y=x-min(x)
     return y/max(y)
 
-
-
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 
-def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_slow.wav', speed_rate=0.7):
+def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_slow2.wav', fs=1600, speed_rate=0.7):
+    
+    # Note: don't know why, but this commented approach does not work...
+    # x,fs=librosa.load(input_filename, sr=fs)
+    # path=np.array([[0,len(x)],[0,int(len(x)/speed_rate)]])
+    # x_speed_rate = tsm.wsola(x, path)
+    # sf.write(output_filename, x_speed_rate,  fs)
+    
     with WavReader(input_filename) as reader:
         with WavWriter(output_filename, reader.channels, reader.samplerate) as writer:
             tsm = phasevocoder(reader.channels, speed=speed_rate)
             tsm.run(reader, writer)
+
+
+
+def align_audios(reference, recording, fs=16000):
+    """Performs Dynamic Time Warping on the mel-spectrograms of a reference audio and a recording
+    from a user. It computes a path of alignments of timings. This path is then used 
+    for a time stretching of the user resording. The 2 audio can then be summed to have a resulting audio
+    in which we can hear both voices at the same time
+
+    Args:
+        reference (numpy array): waveform of reference
+        recording (numpy array): waveform of user recording
+        fs (int, optional): frequency of sampling. Defaults to 16000.
+
+    Returns:
+        numpy array: waveform of the merged audio that are time-aligned
+    """
+
+    # reference,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', sr=16000)
+    # recording,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', sr=16000)
+
+    # reference=normalize(reference)*0.7
+    # recording=normalize(recording)*0.7
+    ref_mel=librosa.feature.melspectrogram(y=reference, sr=fs)
+    rec_mel=librosa.feature.melspectrogram(y=recording, sr=fs)
+    D, wp = librosa.sequence.dtw(X=ref_mel, Y=rec_mel)
+
+    s_ap=(wp[::-1].T*len(reference)/ref_mel.shape[-1]).astype(int)
+
+    recording_aligned = tsm.wsola(recording, s_ap[::-1])
+
+    max_len=max(len(recording_aligned), len(reference))
+
+    def pad_zeros_to_len(a, length):
+        return np.pad(a, (0, (length-len(a))), 'constant', constant_values=(0, 0))
+    
+    reference=pad_zeros_to_len(reference, max_len)
+    recording_aligned=pad_zeros_to_len(recording_aligned, max_len)
+    out=recording_aligned+reference
+
+    # sf.write('audio_recordings/SS_1_i_would_love_to_go_to_ireland_merge.wav', out,  fs)
+
+    return out
+
 
 
 # Modules
