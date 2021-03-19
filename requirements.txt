@@ -5,3 +5,5 @@ pyworld
 scipy
 pytest
 cmudict
+audiotsm
+pytsmod
