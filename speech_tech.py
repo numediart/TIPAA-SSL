@@ -11,12 +11,14 @@ import pytsmod as tsm
 import soundfile as sf
 
 def clean_temp_files():
+    """Clean the files generated for and by the HTK model (as it uses input and output files)
+    """
     os.system('rm inputs/*')
     os.system('rm results/*')
 
 def set_params(
     # waveFileAddress='/root/flowchase/sent.wav',
-    waveFileAddress="/media/adminpc/DATA/databases/AmuS_clean/SpkA/neutral/wav/SpkA_pr_0001.wav",
+    waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
     sentenceID=1,
     keep_logs = 0, # 1 if we want to keep logs of all processed files (e.g., for troubleshooting), 0 otherwise
     fs_target = 16000, # the target sampling frequency
@@ -258,7 +260,7 @@ def normalize(x):
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 
-def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_slow2.wav', fs=1600, speed_rate=0.7):
+def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_0.8.wav', speed_rate=0.8):
     
     # Note: don't know why, but this commented approach does not work...
     # x,fs=librosa.load(input_filename, sr=fs)
@@ -271,6 +273,13 @@ def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_fi
             tsm = phasevocoder(reader.channels, speed=speed_rate)
             tsm.run(reader, writer)
 
+def slow_down_pytsmod(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_pytsmod_0.8.wav', speed_rate=0.8):
+    x, sr = sf.read(input_filename)
+    x = x.T
+    x_length = x.shape[-1]  # length of the audio sequence x.
+    s_fixed = 1/speed_rate  # stretch the audio signal 1.3x times.
+    x_s_fixed = tsm.wsola(x, s_fixed)
+    sf.write(output_filename,x_s_fixed, sr)
 
 
 def align_audios(reference, recording, fs=16000):
@@ -583,6 +592,15 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     
     return binResult
 
+
+def number_and_indices(textgridData, char='w'):
+    #take index when the first character is char
+    idxs=[i if el[0]==char else np.nan for i,el in enumerate(textgridData.iloc[:,2].tolist())]
+    # remove nans (x=nan is the only value such that x!=x)
+    idxs = [x for x in idxs if x==x]
+    n=len(idxs)
+    return n, idxs
+
 def iConstrast(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
     
     #p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
@@ -595,17 +613,10 @@ def iConstrast(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC
     # l=[el.split('_') for el in textgridData.iloc[:,2].tolist()]
     # phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
 
-    def number_and_indices(char='w'):
-        #take index when the first character is char
-        idxs=[i if el[0]==char else np.nan for i,el in enumerate(textgridData.iloc[:,2].tolist())]
-        # remove nans (x=nan is the only value such that x!=x)
-        idxs = [x for x in idxs if x==x]
-        n=len(idxs)
-        return n, idxs
     # TODO: this is for the verification and it is not finished
-    nWords, indxWords = number_and_indices('w')
-    nPho, indxPho = number_and_indices('p')
-    nSil, indxSil = number_and_indices('s')
+    nWords, indxWords = number_and_indices(textgridData, 'w')
+    nPho, indxPho = number_and_indices(textgridData, 'p')
+    nSil, indxSil = number_and_indices(textgridData, 's')
 
     # TODO: weird, he does a loop for every phoneme, check if it is a short or long, and repeat, but does not record results.
     # only the last result will be kept (maybe it works because there is only one vowel that needs to be checked)
@@ -633,6 +644,23 @@ def edAnalysis():
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
+
+    
+    # TODO: this is for the verification and it is not finished
+    nWords, indxWords = number_and_indices(textgridData, 'w')
+    nPho, indxPho = number_and_indices(textgridData, 'p')
+    nSil, indxSil = number_and_indices(textgridData, 's')
+
+    
+    # check pronunciation
+    for i in range(nPho):
+        if '*cor' in textgridData[2][indxPho[i]]:
+            status = 0
+            binResult = 2
+        elif '*err' in textgridData[2][indxPho[i]]:
+            status = 0
+            binResult = 1
+    
 
 # Data processing
 def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
