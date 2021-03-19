@@ -28,7 +28,7 @@ conda create -n flowspeech python=3
 conda activate flowspeech
 ```
 
-This is needed for pyworld library:
+This is needed for pyworld library (f0 extraction):
 ```
 sudo apt install g++
 ```
@@ -40,6 +40,10 @@ pip install -r requirements.txt
 
 Check it works with `python` and then `from speech_tech import *`
 
+To be able to use mp3 files with librosa library:
+```
+conda install -c conda-forge ffmpeg
+```
 
 ## Make dirs for input and result files
 ```
@@ -52,3 +56,11 @@ mkdir results
 ```
 pytest
 ```
+
+## Data
+```
+cd ..
+git clone https://github.com/flowchase/audio-with-analysis-ids
+```
+
+You can use ```get_data()``` function.
