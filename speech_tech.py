@@ -439,7 +439,6 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
     # TODO: verification of alignment
-
     # TODO: check if all phonemes were found in the speech signal
     nEntries = len(textgridData)
 
@@ -486,7 +485,7 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     indxVowels = [i for i, val in enumerate(is_vowel) if val] 
     nVowels=len(indxVowels)
 
-    # this corresponds to the integer at the end of "w1_v1_1"
+    # TODO: I do not know what this is but this is set to 1 when vowel ELSE corresponds to the integer at the end of "w1_v1_1"
     phoPerEntry=[int(r[2].split('_')[-1]) for i,r in textgridData.iterrows()]
     
     # TODO: check words duration
@@ -530,9 +529,6 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     
     # to make sure we don t go beyond the end of the signal
     assert stopPositions_samples[-1]<len(s), "The end of the last phoneme should be inside the signal"
-
-    Dur=(textgridData.iloc[:,1]-textgridData.iloc[:,0])/(np.array(nVowelsPerWord)+1)  # +1 assuming stressed phonemes = 2*other phonemes
-    Dur=np.array(Dur.tolist())
 
     Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
     sylType=np.zeros(nVowels)
@@ -706,13 +702,16 @@ if __name__ == "__main__":
 
     a=get_wordStress_annotation()
 
+    d=d[d.focusType=='wordstress']
     audio_path="../audio-with-analysis-ids/audio/"
 
     preds=[]
     GTs=[]
+    errors=[]
+    p_errors=[]
     for id,bin in a.items():
         # print(bin)
-        row=d[d.analysisId==id][d.focusType=='wordstress']
+        row=d[d.analysisId==id]  #[d.focusType=='wordstress']
         ground_truth=a[id]
         path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
         p=set_params(sentenceID=id, waveFileAddress=path, module='wordStress')
@@ -727,9 +726,12 @@ if __name__ == "__main__":
         except:
             print('Error with:')
             print(row)
+            errors.append(row)
+            p_errors.append(p)
+            # import pdb;pdb.set_trace()
     
     print(preds)
     print(GTs)
+    errors=pd.concat(errors)
 
-    # wordStress()
     clean_temp_files()
