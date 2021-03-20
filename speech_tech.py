@@ -4,11 +4,11 @@ import librosa
 import numpy as np
 import os
 import pandas as pd
-import pyworld as pw
 import matplotlib.pyplot as plt
 import cmudict
-import pytsmod as tsm
-import soundfile as sf
+
+from audio_processing import *
+from htk_utils import *
 
 def clean_temp_files():
     """Clean the files generated for and by the HTK model (as it uses input and output files)
@@ -83,257 +83,21 @@ def load_audio(waveFileAddress):
     s,fs=librosa.load(waveFileAddress, sr=16000)
 
     #trim silences
-    s, index = librosa.effects.trim(s, top_db=20)
+    # s, index = librosa.effects.trim(s, top_db=20)
     # remove DC
     s = s - s[int(0.15*len(s)):int(0.85*len(s))].mean() # we exclude 15% at each side that might contain buffer initialization/release noises
     # normalization
     s = 0.90*s/max(abs(s))
     return s, fs
 
-# HTK related functions
-def process_grammar(inputGrammar, rand_fileName):
-    """process grammar of a sentence
-
-    Args:
-        inputGrammar (string): path of grammar file
-        rand_fileName (string): filename of the output of HParse
-
-    Returns:
-        int: 0 if success, -1 otherwise
-    """    
-    cmd1 = 'HParse ' +inputGrammar +' ./inputs/'+ rand_fileName +'.net'
-    a=os.system(cmd1)
-    return a
-
-def htk_recognition(modelName, rand_fileName, inputPhoneticTranscription):
-    """This function uses an HMM model to do speech recognition or forced alignment. 
-    It uses an HTK command that output a result file, then reads this file and filter some information.
-
-    Args:
-        modelName (string): name of HMM model
-        rand_fileName (string): temp filname
-        inputPhoneticTranscription (string): input phonetic transcription for forced alignment (I think)
-
-    Returns:
-        dataframe: timings of start and end of phonemes (or words ?)
-        out2: std output of the command
-    """
-    cmd2 = 'HVite -A -T 1 -a -C ./model/' +modelName+ '/Align.cfg -H ./model/' +modelName+ '/hmm-mono -H \
-    ./model/generalSpeech/hmm-gs_1 -H ./model/generalSpeech/hmm-gss_2 -H ./model/generalSpeech/hmm-gss_3 -H ./model/generalSpeech/hmm-gss_4 \
-    -H ./model/generalSpeech/hmm-gss_5 -w ./inputs/'+ rand_fileName+ '.net -l ./results -o N ' +inputPhoneticTranscription+ ' ./model/' +modelName+ '/monophones \
-    ./inputs/' +rand_fileName+ '.wav'
-
-    # r='/home/adminpc/Dropbox/contracts_info/flowchase/CONFIDENTIAL_Flowchase_transfer/CONFIDENTIAL_Flowchase_transfer/octave_analysis_modules/sentenceStress'
-    # rand_fileName2='oct-tGp3LF'
-
-    # cmd2 = 'HVite -A -T 1 -a -C ./model/' +modelName+ '/Align.cfg -H ./model/' +modelName+ '/hmm-mono -H \
-    # ./model/generalSpeech/hmm-gs_1 -H ./model/generalSpeech/hmm-gss_2 -H ./model/generalSpeech/hmm-gss_3 -H ./model/generalSpeech/hmm-gss_4 \
-    # -H ./model/generalSpeech/hmm-gss_5 -w ./inputs/'+ rand_fileName+ '.net -l ./results -o N ' +inputPhoneticTranscription+ ' ./model/' +modelName+ '/monophones \
-    # '+r+'/inputs/' +rand_fileName2+ '.wav'
-
-    # cmd2 = 'HVite -A -T 1 -a -C ./model/' +modelName+ '/Align.cfg -H ./model/' +modelName+ '/hmm-mono -H \
-    # ./model/generalSpeech/hmm-gs_1 -H ./model/generalSpeech/hmm-gss_2 -H ./model/generalSpeech/hmm-gss_3 -H ./model/generalSpeech/hmm-gss_4 \
-    # -H ./model/generalSpeech/hmm-gss_5 -w ./inputs/'+ rand_fileName+ '.net -l ./results -o N ./inputs/' +rand_fileName+ '.dct ./model/' +modelName+ '/monophones \
-    # ./inputs/' +rand_fileName+ '.wav'
-
-
-    # cmd2 = 'HVite -A -T 1 -a -C '+r+'/model/' +modelName+ '/Align.cfg -H '+r+'/model/'+ modelName+ '/hmm-mono -H \
-    # '+r+'/model/generalSpeech/hmm-gs_1 -H '+r+'/model/generalSpeech/hmm-gss_2 -H '+r+'/model/generalSpeech/hmm-gss_3 -H '+r+'/model/generalSpeech/hmm-gss_4 \
-    # -H '+r+'/model/generalSpeech/hmm-gss_5 -w '+r+'/inputs/'+ rand_fileName2 +'.net -l '+r+'/results -o N '+r+'/'+ inputPhoneticTranscription +' '+r+'/model/'+ modelName+ \
-    # '/monophones '+r+'/inputs/' +rand_fileName2+ '.wav'
-
-    out2 = os.popen(cmd2).read()
-
-    # out2=os.system(cmd2)
-    print('out2', out2)
-
-    # read rec file (i.e., the alignment outcome)
-    textgridData = pd.read_csv('./results/'+ rand_fileName +'.rec', sep=' ', header=None)
-
-    # convert timings in seconds
-    textgridData.iloc[:,0]/=10000000
-    textgridData.iloc[:,1]/=10000000
-
-    # remove phones with zero duration (e.g., sp)
-    textgridData=textgridData[textgridData.iloc[:,0]!=textgridData.iloc[:,1]]
-
-    # compensate a 10ms biased in the results
-    if (textgridData.iloc[:,1].iloc[-1]-textgridData.iloc[:,0].iloc[-1])>0.01:
-        textgridData.iloc[:,0].iloc[1:] += 0.01
-        textgridData.iloc[:,1].iloc[:-1] += 0.01
-
-    return textgridData, out2
-
-def get_textgrid_data(s,fs,p):
-    """This function write necessary files to then call HMM model (htk_recognition) and the filter out silences
-
-    Args:
-        s (numpy array): signal waveform of the audio recording
-        fs (int): frequency of sampling of s
-        p (dict): parameters (paths of grammar, phonetics and files etc.)
-
-    Returns:
-        DataFrame: data of duration and phonetic characteristics of words or phonemes 
-    """    
-    rand_fileName = str(uuid.uuid4())
-    write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
-
-    process_grammar(p['inputGrammar'], rand_fileName)
-
-    textgridData, out2=htk_recognition(p['modelName'], rand_fileName, p['inputPhoneticTranscription'])
-
-    # filter out silences
-    textgridData=textgridData[(textgridData.iloc[:,2]!='sil')&(textgridData.iloc[:,2]!='sp')]
-
-    # reset indices of dataframe
-    textgridData.index=range(len(textgridData))
-
-    return textgridData, out2
-
-
-# signal processing (pitch, instensity, normalization...)
-def getIntonation(s, fs):
-    #  the /2**15  is for converting 16bit PCM to double between -1 and 1
-    f0, sp, ap = pw.wav2world(s.astype(np.float64)/2**15, fs)
-
-    # convert in semitones
-    f0Frames=40*np.log10(f0)
-
-    # replace any inf due to the log operation with nan (which are treaded below)
-    f0Frames[f0Frames==-np.inf]=np.nan
-
-    from scipy.interpolate import interp1d
-
-    x=np.arange(len(f0Frames))
-    f = interp1d(x, f0Frames, kind='linear')
-
-    xnew = np.floor(np.arange(len(s))/len(s)*len(f0Frames))
-    f0Samples = f(xnew)
-
-    # replace nans with minimum value
-    f0Samples=np.nan_to_num(f0Samples, nan= np.nanmin(f0Samples))
-
-    # from scipy import signal
-    # ynew = signal.resample(f0Frames, len(s))
-
-    return f0Samples
-
-def smooth(x,beta, window_len=11):
-    """ kaiser window smoothing """
-    # from https://dzone.com/articles/computing-convolution-using
-
-    # extending the data at beginning and at the end
-    # to apply the window at the borders
-    s = np.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
-    w = np.kaiser(window_len,beta)
-    y = np.convolve(w/w.sum(),s,mode='valid')
-    # return y[5:len(y)-5]
-    
-    # replace nans with minimum value
-    y=np.nan_to_num(y, nan= np.nanmin(y))
-
-    return y[int(window_len/2):-int(window_len/2)+1]
-
-def getIntensity(s, fs):
-
-    # this is done similarly to praat:
-    minimum_pitch = 70; # in Hz
-    analysis_win = round((3.2/minimum_pitch)*fs)
-
-    # smoothing the signal power using a moving average
-    #  the /2**15  is for converting 16bit PCM to double between -1 and 1
-
-    intensity=smooth((s/2**15)**2, 20, 2*analysis_win)
-
-    # convert in db
-    intensity = intensity / 4.0e-10
-    int_db = 10*np.log10(intensity)
-
-    #  remove any inf due to the log operation and replace them with the minimum value of intensity
-    # int_db(isinf(int_db)) = min(int_db(~isinf(int_db)));
-    return int_db
-
-def normalize(x):
-    y=x-min(x)
-    return y/max(y)
-
-from audiotsm import phasevocoder
-from audiotsm.io.wav import WavReader, WavWriter
-
-def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_0.8.wav', speed_rate=0.8):
-    
-    # Note: don't know why, but this commented approach does not work...
-    # x,fs=librosa.load(input_filename, sr=fs)
-    # path=np.array([[0,len(x)],[0,int(len(x)/speed_rate)]])
-    # x_speed_rate = tsm.wsola(x, path)
-    # sf.write(output_filename, x_speed_rate,  fs)
-    
-    with WavReader(input_filename) as reader:
-        with WavWriter(output_filename, reader.channels, reader.samplerate) as writer:
-            tsm = phasevocoder(reader.channels, speed=speed_rate)
-            tsm.run(reader, writer)
-
-def slow_down_pytsmod(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_pytsmod_0.8.wav', speed_rate=0.8):
-    x, sr = sf.read(input_filename)
-    x = x.T
-    x_length = x.shape[-1]  # length of the audio sequence x.
-    s_fixed = 1/speed_rate  # stretch the audio signal 1.3x times.
-    x_s_fixed = tsm.wsola(x, s_fixed)
-    sf.write(output_filename,x_s_fixed, sr)
-
-
-def align_audios(reference, recording, fs=16000):
-    """Performs Dynamic Time Warping on the mel-spectrograms of a reference audio and a recording
-    from a user. It computes a path of alignments of timings. This path is then used 
-    for a time stretching of the user resording. The 2 audio can then be summed to have a resulting audio
-    in which we can hear both voices at the same time
-
-    Args:
-        reference (numpy array): waveform of reference
-        recording (numpy array): waveform of user recording
-        fs (int, optional): frequency of sampling. Defaults to 16000.
-
-    Returns:
-        numpy array: waveform of the merged audio that are time-aligned
-    """
-
-    # reference,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', sr=16000)
-    # recording,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', sr=16000)
-
-    # reference=normalize(reference)*0.7
-    # recording=normalize(recording)*0.7
-    ref_mel=librosa.feature.melspectrogram(y=reference, sr=fs)
-    rec_mel=librosa.feature.melspectrogram(y=recording, sr=fs)
-    D, wp = librosa.sequence.dtw(X=ref_mel, Y=rec_mel)
-
-    s_ap=(wp[::-1].T*len(reference)/ref_mel.shape[-1]).astype(int)
-
-    recording_aligned = tsm.wsola(recording, s_ap[::-1])
-
-    max_len=max(len(recording_aligned), len(reference))
-
-    def pad_zeros_to_len(a, length):
-        return np.pad(a, (0, (length-len(a))), 'constant', constant_values=(0, 0))
-    
-    reference=pad_zeros_to_len(reference, max_len)
-    recording_aligned=pad_zeros_to_len(recording_aligned, max_len)
-    out=recording_aligned+reference
-
-    # sf.write('audio_recordings/SS_1_i_would_love_to_go_to_ireland_merge.wav', out,  fs)
-
-    return out
-
-
-
 # Modules
-def chunking():
+def chunking(
     p=set_params(module='chunking')
-
+    ):
     s,fs = load_audio(p['waveFileAddress'])
 
     rand_fileName = str(uuid.uuid4())
-    # write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
-    write('./inputs/'+ rand_fileName+ '.wav', fs, s)
+    write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
 
     process_grammar(p['inputGrammar'], rand_fileName)
 
@@ -344,9 +108,10 @@ def chunking():
     silence_durations=textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,1]-textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,0]
     idx_to_filter=silence_durations[silence_durations>minSilDur].index
 
-    status=0
+def sentenceStress(
+    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
+    ):
 
-def sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')):
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
@@ -443,7 +208,9 @@ def sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/
     
     return binResult
         
-def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')):
+def wordStress(
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
+    ):
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
@@ -592,7 +359,6 @@ def wordStress(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS
     
     return binResult
 
-
 def number_and_indices(textgridData, char='w'):
     #take index when the first character is char
     idxs=[i if el[0]==char else np.nan for i,el in enumerate(textgridData.iloc[:,2].tolist())]
@@ -601,7 +367,9 @@ def number_and_indices(textgridData, char='w'):
     n=len(idxs)
     return n, idxs
 
-def iConstrast(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
+def iConstrast(
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
+    ):
     
     #p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
     s,fs = load_audio(p['waveFileAddress'])
@@ -639,19 +407,17 @@ def oConstrast():#p=set_params(sentenceID=111, waveFileAddress='audio_recordings
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
 
-
-def edAnalysis():
-    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
+def edAnalysis(
+    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_acceptEED.wav', module="edAnalysis")
+    ):
     s,fs = load_audio(p['waveFileAddress'])
     textgridData, cmdout2=get_textgrid_data(s,fs,p)
-
     
     # TODO: this is for the verification and it is not finished
     nWords, indxWords = number_and_indices(textgridData, 'w')
     nPho, indxPho = number_and_indices(textgridData, 'p')
     nSil, indxSil = number_and_indices(textgridData, 's')
 
-    
     # check pronunciation
     for i in range(nPho):
         if '*cor' in textgridData[2][indxPho[i]]:

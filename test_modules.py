@@ -8,3 +8,9 @@ def test_sentenceStress():
 
 def test_iConstrast():
     iConstrast()
+
+def test_chunking():
+    chunking()
+
+def test_edAnalysis():
+    edAnalysis()
