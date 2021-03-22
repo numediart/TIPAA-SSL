@@ -7,3 +7,4 @@ pytest
 cmudict
 audiotsm
 pytsmod
+flask
