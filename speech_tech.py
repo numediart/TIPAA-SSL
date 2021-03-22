@@ -70,7 +70,7 @@ def createJSON(binResult, status, rand_fileName):
     
     return res
     
-def load_audio(waveFileAddress):
+def load_audio(waveFileAddress, fs=16000):
     """Load audio, remove DC and normalize waveform
 
     Args:
@@ -80,7 +80,7 @@ def load_audio(waveFileAddress):
         numpy array, int: waveform signal and frequency of sampling
     """
     # fs, s = read(waveFileAddress)
-    s,fs=librosa.load(waveFileAddress, sr=16000)
+    s,fs=librosa.load(waveFileAddress, sr=fs)
 
     #trim silences
     # s, index = librosa.effects.trim(s, top_db=20)
@@ -91,20 +91,27 @@ def load_audio(waveFileAddress):
     return s, fs
 
 # Modules
+
+def get_annotated_signal(p=set_params()):
+    if os.path.exists(p['waveFileAddress']):
+        s,fs = load_audio(p['waveFileAddress'], fs=p['fs_target'])
+    else:
+        return "error: "+p['waveFileAddress']+" could not be loaded", None, None
+    try:
+        textgridData, cmdout2=get_textgrid_data(s,fs,p)
+    except Exception as e: 
+        print(e)
+        return "error: could not get textgridData (check htk errors)", None, None
+    return 0, textgridData, s
+
 def chunking(
     p=set_params(module='chunking')
     ):
-    s,fs = load_audio(p['waveFileAddress'])
-
-    rand_fileName = str(uuid.uuid4())
-    write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
-
-    process_grammar(p['inputGrammar'], rand_fileName)
-
-    textgridData, out2=htk_recognition(p['modelName'], rand_fileName, p['inputPhoneticTranscription'])
+    status, textgridData, s = get_annotated_signal(p)
+    if textgridData is None:
+        return statut, []
 
     minSilDur = 0.090 # we ask for at least 90ms of silence
-
     silence_durations=textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,1]-textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,0]
     idx_to_filter=silence_durations[silence_durations>minSilDur].index
 
@@ -112,8 +119,9 @@ def sentenceStress(
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
     ):
 
-    s,fs = load_audio(p['waveFileAddress'])
-    textgridData, cmdout2=get_textgrid_data(s,fs,p)
+    status, textgridData, s = get_annotated_signal(p)
+    if textgridData is None:
+        return statut, []
 
     # find the number of words and phonemes per word in the input phrase
     # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
@@ -122,17 +130,17 @@ def sentenceStress(
     phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
 
     # each word start and end position expressed in samples
-    startPositions_samples = (round(fs*textgridData.iloc[:,0])+1).astype(int)
-    stopPositions_samples = round(fs*textgridData.iloc[:,1]).astype(int)
+    startPositions_samples = (round(p['fs_target']*textgridData.iloc[:,0])+1).astype(int)
+    stopPositions_samples = round(p['fs_target']*textgridData.iloc[:,1]).astype(int)
 
     # to make sure we don t go beyond the end of the signal
     assert stopPositions_samples.iloc[-1]<len(s), "The end of the last phoneme should be inside the signal"
 
     # TODO: verification of alignment
 
-    # f0Samples=getIntonation(s, fs)
-    f0Samples=getIntonation(s.astype(np.float64), fs)
-    intensity=getIntensity(s, fs)
+    # f0Samples=getIntonation(s, p['fs_target'])
+    f0Samples=getIntonation(s.astype(np.float64), p['fs_target'])
+    intensity=getIntensity(s, p['fs_target'])
 
     # plt.plot(f0Samples)
     # plt.show()
@@ -206,13 +214,15 @@ def sentenceStress(
                 if (weighted_score[i] > rateThreshold*max(weighted_score[[i-1, i+1]])) and (weighted_score[i] > meanScore):
                     binResult[i] = 1
     
-    return binResult
+    return "success", binResult
         
 def wordStress(
     p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
     ):
-    s,fs = load_audio(p['waveFileAddress'])
-    textgridData, cmdout2=get_textgrid_data(s,fs,p)
+    status, textgridData, s = get_annotated_signal(p)
+    if textgridData is None:
+        return statut, []
 
     # TODO: verification of alignment
     # TODO: check if all phonemes were found in the speech signal
@@ -294,14 +304,14 @@ def wordStress(
     # end
 
 
-    f0Samples=getIntonation(s, fs)
-    intensity=getIntensity(s, fs)
+    f0Samples=getIntonation(s, p['fs_target'])
+    intensity=getIntensity(s, p['fs_target'])
 
     # extract features
 
     # each word start and end position expressed in samples
-    startPositions_samples = (round(fs*textgridData.iloc[:,0])+1).astype(int).tolist()
-    stopPositions_samples = round(fs*textgridData.iloc[:,1]).astype(int).tolist()
+    startPositions_samples = (round(p['fs_target']*textgridData.iloc[:,0])+1).astype(int).tolist()
+    stopPositions_samples = round(p['fs_target']*textgridData.iloc[:,1]).astype(int).tolist()
     
     # to make sure we don t go beyond the end of the signal
     assert stopPositions_samples[-1]<len(s), "The end of the last phoneme should be inside the signal"
@@ -357,7 +367,7 @@ def wordStress(
             else:
                 binResult[syl_id[j]] = 0
     
-    return binResult
+    return "success", binResult
 
 def number_and_indices(textgridData, char='w'):
     #take index when the first character is char
@@ -372,8 +382,9 @@ def iConstrast(
     ):
     
     #p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
-    s,fs = load_audio(p['waveFileAddress'])
-    textgridData, cmdout2=get_textgrid_data(s,fs,p)
+    status, textgridData, s = get_annotated_signal(p)
+    if textgridData is None:
+        return statut, []
 
     # find the number of words and phonemes per word in the input phrase
     # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
@@ -397,27 +408,30 @@ def iConstrast(
             if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
                 binResult=0
     
-    return binResult
+    return "success", binResult
 
 def oConstrast():#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
     p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
-    s,fs = load_audio(p['waveFileAddress'])
-    textgridData, cmdout2=get_textgrid_data(s,fs,p)
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
+    status, textgridData, s = get_annotated_signal(p)
+    if textgridData is None:
+        return statut, []
 
 def edAnalysis(
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_acceptEED.wav', module="edAnalysis")
     ):
-    s,fs = load_audio(p['waveFileAddress'])
-    textgridData, cmdout2=get_textgrid_data(s,fs,p)
+    status, textgridData, s = get_annotated_signal(p)
+    if textgridData is None:
+        return statut, []
     
     # TODO: this is for the verification and it is not finished
     nWords, indxWords = number_and_indices(textgridData, 'w')
     nPho, indxPho = number_and_indices(textgridData, 'p')
     nSil, indxSil = number_and_indices(textgridData, 's')
 
+    binResult = 0
     # check pronunciation
     for i in range(nPho):
         if '*cor' in textgridData[2][indxPho[i]]:
@@ -427,6 +441,8 @@ def edAnalysis(
             status = 0
             binResult = 1
     
+    return "success", binResult
+
 
 # Data processing
 def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
@@ -486,6 +502,47 @@ def get_cmudict_info(word='university'):
     """
     return cmudict.dict()[word][0]
 
+import re
+
+def remove_special_characters(sentence="Where's the best place to have coffee ?"):
+    chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
+    # from https://huggingface.co/blog/fine-tune-wav2vec2-english
+    sentence = re.sub(chars_to_ignore_regex, '', sentence).lower()
+    return sentence
+
+def phonetics_from_sentence(sentence="Where's the best place to have coffee ?"):
+    sentence=remove_special_characters(sentence)
+    words=sentence.split(' ')
+    # drop empty strings
+    words = list(filter(None, words))
+    words_phones=[]
+    for w in words:
+        phones=get_cmudict_info(w)
+        words_phones.append(phones)
+    return words_phones
+
+def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
+    binResult=[]
+    for p in phonetics:
+        try:
+            stress_info=int(p[-1])
+            if stress_info==1: #primary stress
+                binResult.append(1)
+            else:
+                binResult.append(0)
+        except:
+            # it's not a vowel if last character is not a number
+            pass
+    return binResult
+
+def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
+    phonetics=phonetics_from_sentence(sentence) #return a list of phoneme list (by word)
+    result = []
+    for el in phonetics:
+        result+=el
+    binResult=word_stress_from_cmu(result)
+    return binResult
+
 if __name__ == "__main__":
     # execute only if run as a script
 
@@ -501,6 +558,7 @@ if __name__ == "__main__":
 
     preds=[]
     GTs=[]
+    GTs_from_phonetics=[]
     errors=[]
     p_errors=[]
     for id,bin in a.items():
@@ -510,13 +568,14 @@ if __name__ == "__main__":
         path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
         p=set_params(sentenceID=id, waveFileAddress=path, module='wordStress')
         try:
-            pred=wordStress(p)
+            _, pred=wordStress(p)
             # print('Ground truth:')
             # print(ground_truth)
             # print('prediction:')
             # print(pred)
             preds.append(pred)
             GTs.append(ground_truth)
+            GTs_from_phonetics.append(word_stress_from_text(row.text.values[0]))
         except:
             print('Error with:')
             print(row)
@@ -526,6 +585,20 @@ if __name__ == "__main__":
     
     print(preds)
     print(GTs)
-    errors=pd.concat(errors)
+    print(GTs_from_phonetics)
+    print(errors)
+    stress_error_rate=stress_error/total_n_vowel
+    print('stress error rate:', stress_error_rate)
+    # errors=pd.concat(errors)
+
+    diffs=[]
+    total_n_vowel=0
+    stress_error=0
+    for i,pred in enumerate(preds):
+        diff=abs(pred-GTs_from_phonetics[i])
+        diffs.append(diff)
+        total_n_vowel+=len(pred)
+        stress_error+=diff.sum()
+    stress_error_rate=stress_error/total_n_vowel
 
     clean_temp_files()
