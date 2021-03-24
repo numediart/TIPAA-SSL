@@ -64,3 +64,26 @@ git clone https://github.com/flowchase/audio-with-analysis-ids
 ```
 
 You can use ```get_data()``` function.
+
+## Server
+
+A Flask API is provided to access the modules.
+Run ```sh run_server.sh``` to launch it.
+The process is in two steps:
+
+- Upload an audio file
+- call a module with the filename that will return a result
+
+Create a folder set to receive the uploaded files:
+```
+mkdir upload_files
+```
+
+
+
+## Docker application
+You can also build the Dockerfile that will install everything and serve the application with Flask
+```
+docker build -t flowspeech:1.0 .
+docker run -d -p 5000:5000 flowspeech:1.0
+```
