@@ -7,6 +7,27 @@ import pytsmod as tsm
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 
+def load_audio(waveFileAddress, fs=16000):
+    """Load audio, remove DC and normalize waveform
+
+    Args:
+        waveFileAddress (string): wav file address
+
+    Returns:
+        numpy array, int: waveform signal and frequency of sampling
+    """
+    # fs, s = read(waveFileAddress)
+    s,fs=librosa.load(waveFileAddress, sr=fs)
+
+    #trim silences
+    # s, index = librosa.effects.trim(s, top_db=20)
+    # remove DC
+    s = s - s[int(0.15*len(s)):int(0.85*len(s))].mean() # we exclude 15% at each side that might contain buffer initialization/release noises
+    # normalization
+    s = 0.90*s/max(abs(s))
+    return s, fs
+
+
 # signal processing (pitch, instensity, normalization...)
 def getIntonation(s, fs):
     """Uses pyworld vocoder to extract fundamental frequency of the signal in Hz 
@@ -130,10 +151,18 @@ def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_fi
     x_s_fixed = tsm.wsola(x, s_fixed)
     sf.write(output_filename,x_s_fixed, sr)
 
-def align_audios(reference, recording, fs=16000):
+def align_audios(
+    reference_path='../audio-with-analysis-ids/audio/dbb2b8be-50f6-4b69-8ec1-a53a4bb307bf.wav', 
+    # recording_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', 
+    recording_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
+    fs=16000
+    ):
     """Performs Dynamic Time Warping on the mel-spectrograms of a reference audio and a recording
     from a user. It computes a path of alignments of timings. This path is then used 
-    for a time stretching of the user resording. The 2 audio can then be summed to have a resulting audio
+    for a time stretching of the user resording. I use pytsmod, but sometimes it produces errors.
+    So maybe I should either find another ola library, or use a deep learning based vocoder on warped mel spectrogram.
+    
+    The 2 audio can then be summed to have a resulting audio
     in which we can hear both voices at the same time
 
     Args:
@@ -147,16 +176,37 @@ def align_audios(reference, recording, fs=16000):
 
     # reference,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', sr=16000)
     # recording,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', sr=16000)
+    
+    
+    # reference,fs=load_audio(reference_path)
+    # recording,fs=load_audio(recording_path)
+    reference,fs=librosa.load(reference_path, sr=fs)
+    recording,fs=librosa.load(recording_path, sr=fs)
+    
+    # reference/=max(abs(reference))
+    # reference*=0.7
+    # recording/=max(abs(recording))
+    # recording*=0.8
 
-    # reference=normalize(reference)*0.7
-    # recording=normalize(recording)*0.7
+    # reference=(2*normalize(reference)-1)*0.9
+    # recording=(2*normalize(recording)-1)*0.9
     ref_mel=librosa.feature.melspectrogram(y=reference, sr=fs)
     rec_mel=librosa.feature.melspectrogram(y=recording, sr=fs)
+
+    
+    # from dtw import *
+    # alignment = dtw(rec_mel.T, ref_mel.T, keep_internals=True)
     D, wp = librosa.sequence.dtw(X=ref_mel, Y=rec_mel)
 
-    s_ap=(wp[::-1].T*len(reference)/ref_mel.shape[-1]).astype(int)
+    # from fastdtw import fastdtw
+    # distance, path = fastdtw(ref_mel.T, rec_mel.T)#, dist=euclidean)
 
-    recording_aligned = tsm.wsola(recording, s_ap[::-1])
+    # s, index = librosa.effects.trim(s, top_db=20)
+
+    s_ap=(wp[::-1].T*len(reference)/ref_mel.shape[-1]).astype(int)
+    # s_ap=(np.array(path).T*len(reference)/ref_mel.shape[-1]).astype(int)
+
+    recording_aligned = tsm.ola(recording, s_ap[::-1])
 
     max_len=max(len(recording_aligned), len(reference))
 
@@ -167,7 +217,7 @@ def align_audios(reference, recording, fs=16000):
     recording_aligned=pad_zeros_to_len(recording_aligned, max_len)
     out=recording_aligned+reference
 
-    # sf.write('audio_recordings/SS_1_i_would_love_to_go_to_ireland_merge.wav', out,  fs)
+    sf.write('audio_recordings/SS_1_i_would_love_to_go_to_ireland_merge.wav', out,  fs)
 
     return out
 
