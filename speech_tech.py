@@ -7,6 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import cmudict
 
+from tqdm import tqdm
+
 from audio_processing import *
 from htk_utils import *
 
@@ -49,48 +51,27 @@ def set_params(
 
     return params
 
-def createJSON(binResult, status, rand_fileName):
-    """prepare json output message
+# def createJSON(binResult, status, rand_fileName):
+#     """prepare json output message
 
-    Args:
-        binResult (): Result to send
-        status (int): 0 if nothing went wrong, other values (negative) if not
-        rand_fileName (string): random filename for temp files
+#     Args:
+#         binResult (): Result to send
+#         status (int): 0 if nothing went wrong, other values (negative) if not
+#         rand_fileName (string): random filename for temp files
 
-    Returns:
-        string: JSON string
-    """
+#     Returns:
+#         string: JSON string
+#     """
     
-    if status != 0:
-        res = '{"status": "%d"}'% status
-        '%s%d.dct' % (inputPhoneticTranscription_base, sentenceID)
-    else:
-        oneString = '%d,' % binResult # string with all values separated by a comma
-        res = '{"status": "%d", "sequence of words and pauses (marked as zeros)": "%s"}'% (status, oneString[:-1]) # (end-1): strip final comma
+#     if status != 0:
+#         res = '{"status": "%d"}'% status
+#         '%s%d.dct' % (inputPhoneticTranscription_base, sentenceID)
+#     else:
+#         oneString = '%d,' % binResult # string with all values separated by a comma
+#         res = '{"status": "%d", "sequence of words and pauses (marked as zeros)": "%s"}'% (status, oneString[:-1]) # (end-1): strip final comma
     
-    return res
-    
-def load_audio(waveFileAddress, fs=16000):
-    """Load audio, remove DC and normalize waveform
-
-    Args:
-        waveFileAddress (string): wav file address
-
-    Returns:
-        numpy array, int: waveform signal and frequency of sampling
-    """
-    # fs, s = read(waveFileAddress)
-    s,fs=librosa.load(waveFileAddress, sr=fs)
-
-    #trim silences
-    # s, index = librosa.effects.trim(s, top_db=20)
-    # remove DC
-    s = s - s[int(0.15*len(s)):int(0.85*len(s))].mean() # we exclude 15% at each side that might contain buffer initialization/release noises
-    # normalization
-    s = 0.90*s/max(abs(s))
-    return s, fs
-
-# Modules
+#     return res
+#     # Modules
 
 def get_annotated_signal(p=set_params()):
     if os.path.exists(p['waveFileAddress']):
@@ -111,8 +92,8 @@ def get_annotated_signal(p=set_params()):
 
     if is_out_of_vocabulary.product():
         return "error: all of the elements were out of vocabulary", None, None
-    if is_out_of_vocabulary.sum():
-        return "error: at least one element was out of vocabulary", None, None
+    # if is_out_of_vocabulary.sum():
+    #     return "error: at least one element was out of vocabulary", None, None
 
     return 0, textgridData, s
 
@@ -259,8 +240,8 @@ def sentenceStress(
     return "success", binResult
         
 def wordStress(
-    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
     ):
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
@@ -419,17 +400,41 @@ def iConstrast(
     
     return "success", binResult
 
-def oConstrast():#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
+def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
+    ):
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
         return status, []
+    
+    phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None)
+    dict_phones={}
+    for i,r in phonetics.iterrows():
+        #lines starting by d correspond to phonemes
+        if r[0][0]=='d':
+            line=r.values[0].split(' ')
+            phone=line[0]
+            info=line[1][1:-1]
+            # print(phone)
+            # print(info)
+            dict_phones[info]=phone
+        elif r[0][0]=='o' or r[0][0]=='s':
+            dict_phones[r[0].split(' ')[0]]=r[0].split(' ')[0]
+        else:
+            dict_phones[r[0].split(' ')[1][1:-1]]=r[0].split(' ')[-1]
+
+    for i,r in textgridData.iterrows():
+        print(r[2])
+        print(dict_phones[r[2]])
 
 def edAnalysis(
-    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_acceptEED.wav', module="edAnalysis")
+    # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
+    # p=set_params(sentenceID=2, waveFileAddress='audio_recordings/turned_around.mp3', module="edAnalysis")
+    p=set_params(sentenceID=2, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
     ):
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
@@ -439,6 +444,7 @@ def edAnalysis(
     nWords, indxWords = number_and_indices(textgridData, 'w')
     nPho, indxPho = number_and_indices(textgridData, 'p')
     nSil, indxSil = number_and_indices(textgridData, 's')
+    nOutOfVoc, indxOutOfVoc = number_and_indices(textgridData, 'o')
 
     binResult = 0
     # check pronunciation
@@ -450,7 +456,7 @@ def edAnalysis(
             status = 0
             binResult = 1
     
-    return "success", binResult
+    return "success", [binResult]
 
 
 # Data processing
@@ -479,18 +485,14 @@ def get_wordStress_annotation(path='../audio-with-analysis-ids/wordStress_annota
 
         if first_digit>0:
             col=df[str(first_digit)]
-
             text=d[d.analysisId==analysisId].text.values[0]
-
             col_idx=df.columns.tolist().index(str(first_digit))
             match=col[col==text]
 
             if len(match)>0:
                 row_idx=match.index[0]
-
                 bin_annotation=df.iloc[row_idx,col_idx+3]
                 bin_annotation_list=[int(el) for el in bin_annotation.split('-')]
-
                 wordStress_annotations[analysisId]=bin_annotation_list
             else:
                 print('Text not found')
@@ -510,6 +512,21 @@ def get_cmudict_info(word='university'):
         list: phonemes and a number for each vowle indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
     """
     return cmudict.dict()[word][0]
+
+def get_sentenceStress_annotation(path='../audio-with-analysis-ids/learning_content_for_analysis.xlsx'):
+    xls = pd.ExcelFile(path)
+    # df1 = pd.read_excel(xls, 'Sheet1')
+    df2 = pd.read_excel(xls, 'Sheet3')
+    df=df2[['SentenceID', 'Sentence stress' , 'binResult']].dropna()
+    df.index=df['SentenceID'].astype(int)
+
+    binDict={}
+    textDict={}
+    for i,r in df.iterrows():
+        binDict[i]=[int(el) for el in r['binResult'].split(' ')]
+        textDict[i]=r['Sentence stress']
+    
+    return binDict, textDict
 
 import re
 
@@ -544,24 +561,18 @@ def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
     binResult=word_stress_from_cmu(result)
     return binResult
 
-if __name__ == "__main__":
-    # execute only if run as a script
-    # Test performance of wordStress module
 
+# Performance tests
+def wordStress_performance_test():
     d=get_data()
     #d[d.analysisId==232][d.focusType=='wordstress']
-
     a=get_wordStress_annotation()
 
     d=d[d.focusType=='wordstress']
     audio_path="../audio-with-analysis-ids/audio/"
-    preds=[]
-    statuss=[]
-    GTs=[]
+    preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
     GTs_from_phonetics=[]
-    errors=[]
-    p_errors=[]
-    for id,bin in a.items():
+    for id,bin in tqdm(a.items()):
         # print(bin)
         row=d[d.analysisId==id]  #[d.focusType=='wordstress']
         ground_truth=a[id]
@@ -570,10 +581,6 @@ if __name__ == "__main__":
         try:
             status, pred=wordStress(p)
             statuss.append(status)
-            # print('Ground truth:')
-            # print(ground_truth)
-            # print('prediction:')
-            # print(pred)
             preds.append(pred)
             GTs.append(ground_truth)
             GTs_from_phonetics.append(word_stress_from_text(row.text.values[0]))
@@ -588,19 +595,90 @@ if __name__ == "__main__":
     print(GTs)
     print(GTs_from_phonetics)
     print(errors)
-    # stress_error_rate=stress_error/total_n_vowel
-    # print('stress error rate:', stress_error_rate)
-    # errors=pd.concat(errors)
 
     diffs=[]
     total_n_vowel=0
     stress_error=0
+    n_example_error=0
     for i,pred in enumerate(preds):
         diff=abs(pred-GTs_from_phonetics[i])
         diffs.append(diff)
         total_n_vowel+=len(pred)
         stress_error+=diff.sum()
-    stress_error_rate=stress_error/total_n_vowel
+        if diff.sum()>0: n_example_error+=1
+    
+    stress_error_rate=stress_error/total_n
+    example_error_rate=n_example_error/len(preds)
     print('stress error rate:', stress_error_rate)
+    print('example error rate:', example_error_rate)
+    clean_temp_files()
+
+    return preds, GTs, GTs_from_phonetics, errors
+
+def sentenceStress_performance_test():
+    d=get_data()
+    #d[d.analysisId==232][d.focusType=='wordstress']
+    a,textDict=get_sentenceStress_annotation()
+    focusType='sentencestress'
+    d=d[d.focusType==focusType]
+    audio_path="../audio-with-analysis-ids/audio/"
+    preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
+    GTs_from_phonetics=[]
+
+    for i,r in d.iterrows():
+        d=d.replace(d.loc[i].text,remove_special_characters(r.text))
+
+    for id,bin in a.items():
+        # print(bin)
+        row=d[d.text==remove_special_characters(textDict[id])]
+        if len(row)>0:
+            # print(remove_special_characters(textDict[id]))
+            # row=d[d.analysisId==id]  #[d.focusType=='wordstress']
+            ground_truth=a[id]
+            path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
+            p=set_params(sentenceID=id, waveFileAddress=path, module='sentenceStress')
+            try:
+                status, pred=sentenceStress(p)
+                statuss.append(status)
+                preds.append(pred)
+                GTs.append(ground_truth)
+                # GTs_from_phonetics.append(word_stress_from_text(row.text.values[0]))
+            except:
+                print('Error with:')
+                print(row)
+                errors.append(row)
+                p_errors.append(p)
+                # import pdb;pdb.set_trace()
+    
+    print(preds)
+    print(GTs)
+    # print(GTs_from_phonetics)
+    print(errors)
+
+    diffs=[]
+    total_n=0
+    stress_error=0
+    mismatches={}
+    n_example_error=0
+    for i,pred in enumerate(preds):
+        if len(pred)==len(GTs[i]):
+            diff=abs(pred-GTs[i])
+            diffs.append(diff)
+            total_n+=len(pred)
+            stress_error+=diff.sum()
+
+            if diff.sum()>0: n_example_error+=1
+        else:
+            mismatches[i]=(pred,GTs[i])
+    stress_error_rate=stress_error/total_n
+    example_error_rate=n_example_error/len(preds)
+    print('stress error rate:', stress_error_rate)
+    print('example error rate:', example_error_rate)
 
     clean_temp_files()
+
+
+if __name__ == "__main__":
+    # execute only if run as a script
+    # Test performance of wordStress module
+    wordStress_performance_test()
