@@ -1,6 +1,25 @@
 from speech_tech import *
-
+from label_data_processing import *
+from text_processing import *
+from glob import glob
+import os
+import pandas as pd
 # Performance tests
+
+
+def rename_underscore_to_dash(files=glob("/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/*/*/*")):
+    """Replace all "-" with "_" in filenames because I had incinnsistent namings. This could be generalized if needed 
+    (put symbol1='-' and symbol2='_' as parameters)
+
+    Args:
+        files (list, optional): list of paths (using glob is convenient). Defaults to glob("/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/*/*/*").
+    """
+    for f in files:
+        base, filename=os.path.split(f)
+        if '_' in filename:
+            new='-'.join(filename.split('_'))
+            os.system('mv "'+f+'" "'+os.path.join(base,new)+'"')
+            
 
 def compute_errors(preds, GTs):
     diffs=[]
@@ -14,7 +33,6 @@ def compute_errors(preds, GTs):
             diffs.append(diff)
             total_n+=len(pred)
             stress_error+=diff.sum()
-
             if diff.sum()>0: n_example_error+=1
         else:
             mismatches[i]=(pred,GTs[i])
@@ -30,7 +48,7 @@ module_name_to_focus_type={'wordStress':'wordstress',
     'sentenceStress':'sentencestress',
     'iContrast':'shortIlongI'}
 def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis-ids/audio/"):
-    """This function works for wordStress and sentenceStress. It uses the data.json file containing information 
+    """This function works for wordStress? sentenceStress and iContrast. It uses the data.json file containing information 
     from dynamoDB: (audio, text, sentenceID, module), and get the corresponding dct files to run prediction of a module on it.
 
     Args:
@@ -55,7 +73,7 @@ def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis
             ground_truth=a[id]
             path=os.path.join(audio_path, row.primaryKey+'.wav')
             p=set_params(sentenceID=id, waveFileAddress=path, module=module)
-            pdb.set_trace()
+            # pdb.set_trace()
             status, textgridData, s = get_annotated_signal(p)
             try:
                 # this calls the function with the name of the module
@@ -89,18 +107,15 @@ def wordStress_performance_test():
     focus='wordstress'
     # audio_path="../audio-with-analysis-ids/audio/"
     d=d[d.focusType==focus]
-
     a={}
     for i,row in tqdm(d.iterrows()):
         a[row.analysisId]=word_stress_from_text(row.text) 
         print(row)
         print(a[row.analysisId])
-    
     preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
     compute_errors(preds,GTs)
 
     clean_temp_files()
-
 
 def sentenceStress_performance_test():
     d=get_data()
@@ -113,11 +128,9 @@ def sentenceStress_performance_test():
     preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
     GTs_from_phonetics=[]
 
-
     for i,r in d.iterrows():
         d=d.replace(d.loc[i].text,remove_special_characters(r.text))
     # d=d[d.text.isin(set([remove_special_characters(el) for el in textDict.values()]))]
-
 
     for id,bin in a.items():
         # print(bin)
@@ -156,51 +169,52 @@ def iContrast_performance_test():
     focus=module_name_to_focus_type[module]
     # audio_path="../audio-with-analysis-ids/audio/"
     d=d[d.focusType==focus]
-    a={}
-    for i,row in tqdm(d.iterrows()):
-        # p=set_params(sentenceID=row.analysisId, module="iContrast")
-        
-        # # get the line showing phoneme sequence
-        # phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None)
-
-        # dict_phones={}
-        # for i,r in phonetics.iterrows():
-        #     #lines starting by d correspond to phonemes
-        #     if r[0][0]=='p':
-        #         line=r.values[0].split(' ')
-        #         phone=line[-1]
-        #         info=line[1][1:-1]
-        #         print(phone)
-        #         print(info)
-        #         dict_phones[info]=phone
-        #     if r[0][0]=='w':
-        #         line=r.values[0].split(' ')
-        #         phone=line[-1]
-        #         info=line[1][1:-1]
-        #         print(phone)
-        #         print(info)
-        #         dict_phones[info]=phone
-
-        # dummy labels for now
-        a[row.analysisId]=0
-        phonetics_from_sentence(row.text)
-        # a[row.analysisId]=word_stress_from_text(row.text) 
-        print(row)
-        print(a[row.analysisId])
+    a=get_iContrast_annotations()
     
     preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
 
     diff=[abs(el[0]-el[1]) for el in zip(preds,GTs) if el[0]!=[]]
     sum(diff)
-
     
     mismatch_rate=(len(preds)-len(diff))/len(preds)
-    bin_error_rate=stress_error/total_n
-    example_error_rate=n_example_error/(len(preds)-len(mismatches.keys()))
+    # bin_error_rate=stress_error/total_n
+    example_error_rate=sum(diff)/(len(diff))
     print('n of examples:', len(preds))
     print('mismatch_rate:',mismatch_rate)
-    print('bin error rate:', bin_error_rate)
+    # print('bin error rate:', bin_error_rate)
     print('example error rate:', example_error_rate)
+
+    clean_temp_files()
+
+def edAnalysis_performance_test():
+    files=glob("/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/*/*/*wav")
+    xls='/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/20 words - research/20 problems-research.xlsx'
+    a=pd.read_excel(xls)
+    path='audio_recordings/edAnalysis'
+    ed_sentenceID=pd.read_csv(os.path.join('./lexicon/edAnalysis/dct','ed_sentenceID.csv'))
+    results, tgs, analyzed_files=[],[],[]
+    for i,r in ed_sentenceID.iterrows():
+        text=r[0].split('.')[0]
+        text_dashed='-'.join(text.split(' '))
+        print(text_dashed)
+        for f in files:
+            if text_dashed in os.path.split(f)[-1]:
+                sentence_id_from_text=ed_sentenceID[ed_sentenceID['Unnamed: 0'].str.contains(text)]['Unnamed: 1'].values[0]
+                p=set_params(sentenceID=sentence_id_from_text, waveFileAddress=f, module="edAnalysis")
+                # p['inputPhoneticTranscription']='./lexicon/edAnalysis/dct/'+text+'.dct'
+                # p['inputGrammar']='./lexicon/edAnalysis/grammar/'+text+'.txt'
+                status, textgridData, s = get_annotated_signal(p)
+                results.append(edAnalysis(p)) 
+                tgs.append(textgridData)
+                analyzed_files.append(f)
+
+    df_results=pd.DataFrame()
+    df_results['wav']=[os.path.split(f)[-1] for f in analyzed_files]
+    df_results['prediction']=pd.DataFrame(results).iloc[:,1]
+    df_results[df_results.wav.str.contains('F1')]
+    df_results[df_results.wav.str.contains('F2')]
+    df_results[df_results.wav.str.contains('M1')]
+    df_results[df_results.wav.str.contains('M2')]
 
     clean_temp_files()
 
