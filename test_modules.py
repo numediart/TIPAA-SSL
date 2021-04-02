@@ -22,8 +22,17 @@ from label_data_processing import *
 def test_label_data_processing():
     get_wordStress_annotation()
     get_sentenceStress_annotation()
-    ed_make_grammars()
+    # ed_make_grammars()
 
 from text_processing import word_stress_from_text
 def test_text_processing():
     word_stress_from_text()
+
+from module_performance import *
+def test_performance_tests():
+    iContrast_performance_test()
+    sentenceStress_performance_test()
+
+    # this one lasts more beacause it looks for everyword in cmudict to have ground truth
+    # wordStress_performance_test()
+
