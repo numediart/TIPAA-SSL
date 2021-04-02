@@ -1,5 +1,10 @@
 import pandas as pd
 import numpy as np
+import pdb
+from glob import glob
+from shutil import copy
+
+from text_processing import phonetics_from_sentence
 
 # Data processing
 def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
@@ -13,6 +18,15 @@ def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
     """
     data=pd.read_json(path_to_json)
     return data
+
+def get_iContrast_annotations(path='../audio-with-analysis-ids/iContrast_data.csv'):
+    d=get_data()
+    d=d[d.focusType=="shortIlongI"]
+    df=pd.read_csv(path)
+    annot={}
+    for i,r in df.iterrows():
+        annot[r.analysisId]=r['response (short=0, long=1)']
+    return annot
 
 def get_wordStress_annotation(path='../audio-with-analysis-ids/wordStress_annotations.csv'):
     d=get_data()
@@ -60,8 +74,35 @@ def get_sentenceStress_annotation(path='../audio-with-analysis-ids/learning_cont
     
     return binDict, textDict
 
-import pdb
-from glob import glob
+def make_generic_dct_from_text(sentence="Where's the best place to have coffee ?", word_id=None, path='test.dct'):
+
+    hmm_phones=pd.read_csv('model/libri/monophones', header=None)
+    phonetics=phonetics_from_sentence(sentence)
+    words=['w'+str(i)+' '+' '.join(word) for i,word in enumerate(phonetics)]
+    
+    phoneme_list=[]
+    for el in phonetics:
+        phoneme_list+=el
+    phonemes=['p'+str(i)+' '+p for i,p in enumerate(phoneme_list)]
+
+    # hmm_phones[~hmm_phones.isin(phoneme_list)].dropna()
+    other_phones=hmm_phones[~hmm_phones.isin(phoneme_list)].dropna().iloc[:,0].tolist()
+    other_phones=[el+' '+el for el in other_phones]
+
+    all_phones=phonemes+other_phones
+
+    
+    with open(path.split('.')[0]+'.txt', "w") as text_file:
+        text_file.write("\n".join(all_phones))
+
+    # if word_id is None:
+
+    # elif word_id<len(phonetics):
+        
+    # else:
+    #     print('error: word id is greater than number of words')
+
+
 def make_grammar_from_dct(path='/mnt/c/Users/noe_t/Downloads/edAnalysis-20210330T115859Z-001/edAnalysis/he decided to go back to spain.dct.txt'):
     """For edAnalysis, make a grammar file from a dct file (may be generalizable in the future if useful)
 
@@ -116,7 +157,7 @@ $other_pho =  o2 | o3 | o4 | o5;"
 ({sil} | sp) $phrase ({sil} | sp)\
 )"
     # with open(p['inputGrammar'], "w") as text_file:
-    with open(path.split('.')[0]+'.txt', "w") as text_file:
+    with open(path, "w") as text_file:
         text_file.write("\n".join([str1,str2,str3]))
     return "\n".join([str1,str2,str3])
 
@@ -125,7 +166,6 @@ def ed_make_grammars(path='/mnt/c/Users/noe_t/Downloads/edAnalysis-20210330T1158
         make_grammar_from_dct(el)
     IDs=pd.read_csv(path+'/ed_sentenceID.csv')
 
-    from shutil import copy
     for i,r in IDs.iterrows(): 
         copy(path+'/'+r[0].split('.')[0]+'.dct', path+'/phrase_'+str(r[1])+'.dct')
         copy(path+'/'+r[0].split('.')[0]+'.txt', path+'/phrase_'+str(r[1])+'.txt')
