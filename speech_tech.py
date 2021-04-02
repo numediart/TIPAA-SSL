@@ -14,6 +14,8 @@ from htk_utils import process_grammar, htk_recognition, get_textgrid_data
 
 def clean_temp_files():
     """Clean the files generated for and by the HTK model (as it uses input and output files)
+    TODO: This is probably dangerous when we use it in parallel, multithreading... 
+    In the future, just delete the specific files after processing, by putting name in parameters (inputs and results files)
     """
     os.system('rm inputs/*')
     os.system('rm results/*')
@@ -24,11 +26,23 @@ def set_params(
     sentenceID=1,
     keep_logs = 0, # 1 if we want to keep logs of all processed files (e.g., for troubleshooting), 0 otherwise
     fs_target = 16000, # the target sampling frequency
-    binResult = [],
-    status = -1,
-    result = [],
+    # binResult = [],
+    # status = -1,
+    # result = [],
     modelName = 'libri',
     module='sentenceStress'):
+    """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
+
+    Args:
+        waveFileAddress (str, optional): [description]. Defaults to 'audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'.
+        sentenceID (int, optional): [description]. Defaults to 1.
+        keep_logs (int, optional): [description]. Defaults to 0.
+        fs_target (int, optional): [description]. Defaults to 16000.
+        module (str, optional): [description]. Defaults to 'sentenceStress'.
+
+    Returns:
+        dict
+    """
 
     inputPhoneticTranscription_base = './lexicon/'+module+'/dct/phrase_'
     inputGrammar_base = './lexicon/'+module+'/grammar/phrase_'
@@ -37,14 +51,14 @@ def set_params(
     inputPhoneticTranscription = '%s%d.dct' % (inputPhoneticTranscription_base, sentenceID)
     params={}
     params['waveFileAddress']=waveFileAddress
-    params['sentenceID']=sentenceID
-    params['keep_logs']=keep_logs
+    # params['sentenceID']=sentenceID
+    # params['keep_logs']=keep_logs
     params['fs_target']=fs_target
-    params['inputPhoneticTranscription_base']=inputPhoneticTranscription_base
-    params['inputGrammar_base']=inputGrammar_base
-    params['binResult']=binResult
-    params['status']=status
-    params['result']=result
+    # params['inputPhoneticTranscription_base']=inputPhoneticTranscription_base
+    # params['inputGrammar_base']=inputGrammar_base
+    # params['binResult']=binResult
+    # params['status']=status
+    # params['result']=result
     params['inputPhoneticTranscription']=inputPhoneticTranscription
     params['inputGrammar']=inputGrammar
     params['modelName']=modelName
@@ -52,6 +66,17 @@ def set_params(
     return params
 
 def get_annotated_signal(p=set_params()):
+    """Load audio file and annotation files corresponding to parameters, 
+    and calls "textgridData" to obtain htk predictions of phonemes and
+    their timings
+
+    Args:
+        p (dictionary, optional): global parameters (wav, dct, grammar file paths, ). Defaults to set_params().
+
+    Returns:
+        status, textgridData, s (int, DataFrame, np array): textgridData contains phonetic predictions 
+        from htk model with their timings and log probability
+    """
     if os.path.exists(p['waveFileAddress']):
         s,fs = load_audio(p['waveFileAddress'], fs=p['fs_target'])
     else:
@@ -62,7 +87,8 @@ def get_annotated_signal(p=set_params()):
         print(e)
         return "error: could not get textgridData (check htk errors)", None, None
     
-    if textgridData.iloc[:,3].mean()<8.5:
+    # if textgridData.iloc[:,3].mean()<8.5:
+    if textgridData.iloc[:,3].mean()<5:
         return "error: low posterior probability, the model is not confident with the recognition", None, None
     
     # each row is True if out of vocabulary, False if it is a detected phoneme or word
@@ -76,6 +102,7 @@ def get_annotated_signal(p=set_params()):
     return 0, textgridData, s
 
 def verification_n_of_phoneme(textgridData, p):
+
     # TODO: check if all phonemes were found in the speech signal
     # TODO: this assume every phoneme of the exercise are different... As I implemented 
     # the detection of out of vocabulary elements, maybe I can remove this
@@ -107,6 +134,15 @@ def verification_n_of_phoneme(textgridData, p):
 def chunking(
     p=set_params(module='chunking')
     ):
+    """The goal of this module is to find pauses in a longer sequence such as a read paragraph.
+    TODO: get_textgrid_data function filter out silences, so it won't work. Start from htk_recognition function in htk_utils
+
+    Args:
+        p ([type], optional): [description]. Defaults to set_params(module='chunking').
+
+    Returns:
+        [type]: [description]
+    """
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
         return status, []
@@ -119,7 +155,15 @@ def sentenceStress(
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
     # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='sentenceStress')
     ):
+    """Use textgridData to have the timings of words and compute prosody features (intesity, pitch) to compute 
+    a value by word representing a stress intensity
 
+    Args:
+        p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
+
+    Returns:
+        string, list of binaries: status, stress results by word (0=no stress,  1=stress)
+    """
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
         return status, []
@@ -221,6 +265,15 @@ def wordStress(
     p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
     ):
+    """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
+    a value by vowel representing a stress intensity
+
+    Args:
+        p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
+
+    Returns:
+        string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
+    """
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
         return status, []
@@ -338,6 +391,15 @@ def wordStress(
     return "success", binResult
 
 def number_and_indices(textgridData, char='w'):
+    """get total number and indices of entries starting with char 
+
+    Args:
+        textgridData (DataFrame): phonetic prediction of htk model with timings and log probabilities
+        char (str, optional): Defaults to 'w'.
+
+    Returns:
+        int, list of int: number and list of indices
+    """
     #take index when the first character is char
     idxs=[i if el[0]==char else np.nan for i,el in enumerate(textgridData.iloc[:,2].tolist())]
     # remove nans (x=nan is the only value such that x!=x)
@@ -348,7 +410,14 @@ def number_and_indices(textgridData, char='w'):
 def iContrast(
     p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
     ):
-    
+    """Use textgridData to have the timings of vowels and check if the vowel detected is a short or long vowel.
+
+    Args:
+        p ([type], optional): [description]. Defaults to set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast").
+
+    Returns:
+        int: 0 if short, 1 if long
+    """
     #p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
@@ -410,9 +479,11 @@ def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_record
         print(dict_phones[r[2]])
 
 def edAnalysis(
+    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/edAnalysis/1_err.wav', module="edAnalysis")
+    # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/edAnalysis/1_corr.wav', module="edAnalysis")
     # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
     # p=set_params(sentenceID=2, waveFileAddress='audio_recordings/turned_around.mp3', module="edAnalysis")
-    p=set_params(sentenceID=2, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
+    # p=set_params(sentenceID=2, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
     ):
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
@@ -435,7 +506,7 @@ def edAnalysis(
         elif '*err' in textgridData[2][indxPho[i]]:
             status = 0
             binResult = 1
-    
+        
     return "success", [binResult]
 
 if __name__ == "__main__":
