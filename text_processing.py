@@ -13,7 +13,6 @@ def get_cmudict_info(word='university'):
     """
     return cmudict.dict()[word][0]
 
-
 def remove_special_characters(sentence="Where's the best place to have coffee ?"):
     chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
     # from https://huggingface.co/blog/fine-tune-wav2vec2-english
@@ -44,3 +43,37 @@ def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
         result+=el
     binResult=word_stress_from_cmu(result)
     return binResult
+
+
+def x_in_y(query, base):
+    # from https://stackoverflow.com/questions/33392219/how-to-check-subsequence-exists-in-a-list
+    try:
+        l = len(query)
+    except TypeError:
+        l = 1
+        query = type(base)((query,))
+
+    for i in range(len(base)):
+        if base[i:i+l] == query:
+            return True
+    return False
+
+def get_words_that_end_with(phones=['IH0', 'D']):
+    # cmudict_first_alternatives={}
+    selection={}
+    for k,v in cmudict.dict().items():
+        # cmudict_first_alternatives[k]=v[0]
+        if len(v[0])>=len(phones):
+            if v[0][-len(phones):]==phones:
+                selection[k]=v[0]
+    return selection
+
+def words_that_contains(phones=['IH0', 'D']):
+    selection={}
+    for k,v in cmudict.dict().items():
+        # cmudict_first_alternatives[k]=v[0]
+        if len(v[0])>=len(phones):
+            if x_in_y(phones, v[0]):
+                selection[k]=v[0]
+    return selection
+    
