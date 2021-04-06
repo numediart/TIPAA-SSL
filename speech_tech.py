@@ -24,7 +24,8 @@ def set_params(
     # waveFileAddress='/root/flowchase/sent.wav',
     waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
     sentenceID=1,
-    keep_logs = 0, # 1 if we want to keep logs of all processed files (e.g., for troubleshooting), 0 otherwise
+    basename='phrase_',
+    # keep_logs = 0, # 1 if we want to keep logs of all processed files (e.g., for troubleshooting), 0 otherwise
     fs_target = 16000, # the target sampling frequency
     # binResult = [],
     # status = -1,
@@ -36,7 +37,6 @@ def set_params(
     Args:
         waveFileAddress (str, optional): [description]. Defaults to 'audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'.
         sentenceID (int, optional): [description]. Defaults to 1.
-        keep_logs (int, optional): [description]. Defaults to 0.
         fs_target (int, optional): [description]. Defaults to 16000.
         module (str, optional): [description]. Defaults to 'sentenceStress'.
 
@@ -44,11 +44,15 @@ def set_params(
         dict
     """
 
-    inputPhoneticTranscription_base = './lexicon/'+module+'/dct/phrase_'
-    inputGrammar_base = './lexicon/'+module+'/grammar/phrase_'
+    inputPhoneticTranscription_base = './lexicon/'+module+'/dct/'+basename
+    inputGrammar_base = './lexicon/'+module+'/grammar/'+basename
     
-    inputGrammar = '%s%d.txt' % (inputGrammar_base, sentenceID)
-    inputPhoneticTranscription = '%s%d.dct' % (inputPhoneticTranscription_base, sentenceID)
+    if not (sentenceID is None):
+        inputGrammar = '%s%d.txt' % (inputGrammar_base, sentenceID)
+        inputPhoneticTranscription = '%s%d.dct' % (inputPhoneticTranscription_base, sentenceID)
+    else:
+        inputGrammar = '%s.txt' % (inputGrammar_base)
+        inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
     params={}
     params['waveFileAddress']=waveFileAddress
     # params['sentenceID']=sentenceID
