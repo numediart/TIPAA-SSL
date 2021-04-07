@@ -46,6 +46,15 @@ def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
 
 
 def x_in_y(query, base):
+    """Check if a (query) is a subsequence of another list (base)
+
+    Args:
+        query (list): subsequence to find
+        base (list): main list
+
+    Returns:
+        Boolean: True if subsequence found in list, else False
+    """
     # from https://stackoverflow.com/questions/33392219/how-to-check-subsequence-exists-in-a-list
     try:
         l = len(query)
@@ -59,6 +68,14 @@ def x_in_y(query, base):
     return False
 
 def get_words_that_end_with(phones=['IH0', 'D']):
+    """Goes through cmudict items and those who end by "phones"
+
+    Args:
+        phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
+
+    Returns:
+        dict: words that end by phones
+    """
     # cmudict_first_alternatives={}
     selection={}
     for k,v in cmudict.dict().items():
@@ -69,6 +86,14 @@ def get_words_that_end_with(phones=['IH0', 'D']):
     return selection
 
 def words_that_contains(phones=['IH0', 'D']):
+    """Goes through cmudict items and those who end by "phones"
+
+    Args:
+        phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
+
+    Returns:
+        dict: words that end by phones
+    """
     selection={}
     for k,v in cmudict.dict().items():
         # cmudict_first_alternatives[k]=v[0]
