@@ -4,6 +4,8 @@ from text_processing import *
 from glob import glob
 import os
 import pandas as pd
+from libri_phonetization_data import *
+from tqdm import tqdm
 # Performance tests
 
 
@@ -217,4 +219,58 @@ def edAnalysis_performance_test():
     df_results[df_results.wav.str.contains('M2')]
 
     clean_temp_files()
+
+def edAnalysis_from_audiobook_data():
+    libri_words_df=build_librispeech_words_df()
+    
+    selection=libri_words_df[libri_words_df.phones.str.endswith('T IH0 D')]
+
+    detected_transcriptions=[]
+    statuss=[]
+    match=[]
+    result_records=[]
+    for i,row in tqdm(selection.iterrows()):
+        # row=libri_words_df[libri_words_df.phones.str.endswith('T IH0 D')].iloc[1,:]
+
+        sentence=get_sentence(row.path)
+        # retrieve phonetics by word that ins not available directly from textgrids, but can be extracted from the dataframe
+        # as I already extracted phonemes for each word using overlapping in timings
+        phonetics=[]
+        for w in sentence.split(' '):
+            phonetics.append(libri_words_df[libri_words_df.word==w].iloc[0,:].phones)
+
+        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, termination='IH0 D', path='./lexicon/edAnalysis/dct/test.dct')
+        make_grammar_from_dct(path_dct='./lexicon/edAnalysis/dct/test.dct',path_grammar='./lexicon/edAnalysis/grammar/test.txt')
+
+        p=set_params(
+            waveFileAddress=row.wav_path,
+            sentenceID=None,
+            basename='test',
+            module='edAnalysis')
+
+        status, results= phonemeConstrast(p)
+        # status, textgridData, s=get_annotated_signal(p)
+        statuss.append(status)
+        if results!=[]:
+            textgridData=results[0]
+            detected_transcription=results[1]
+
+            # phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None)
+            match.append(row.phones==' '.join(detected_transcription))
+
+            d={'detected_transcription':' '.join(detected_transcription), 'status':status}
+            detected_transcriptions.append(detected_transcription)
+        else:
+            detected_transcriptions.append([])
+            match.append(False)
+            d={'detected_transcription':'', 'status':status}
+        result_records.append(d)
+    results_df=pd.DataFrame.from_records(result_records)
+
+            
+    selection
+    len0=len(results_df[results_df.detected_transcription.str.endswith('T IH0 D')])
+    len1=len(results_df[results_df.detected_transcription.str.endswith('T IH1 D')])
+    rate=(len0+len1)/len(results_df)
+ 
 
