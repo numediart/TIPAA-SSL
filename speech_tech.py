@@ -108,7 +108,7 @@ def get_annotated_signal(p=set_params()):
 def verification_n_of_phoneme(textgridData, p):
 
     # TODO: check if all phonemes were found in the speech signal
-    # TODO: this assume every phoneme of the exercise are different... As I implemented 
+    # TODO: this assumes every phoneme of the exercise are different... As I implemented 
     # the detection of out of vocabulary elements, maybe I can remove this
 
     nEntries = len(textgridData)
@@ -462,25 +462,36 @@ def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_record
     if textgridData is None:
         return status, []
     
-    phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None)
-    dict_phones={}
-    for i,r in phonetics.iterrows():
-        #lines starting by d correspond to phonemes
-        if r[0][0]=='d':
-            line=r.values[0].split(' ')
-            phone=line[0]
-            info=line[1][1:-1]
-            # print(phone)
-            # print(info)
-            dict_phones[info]=phone
-        elif r[0][0]=='o' or r[0][0]=='s':
-            dict_phones[r[0].split(' ')[0]]=r[0].split(' ')[0]
-        else:
-            dict_phones[r[0].split(' ')[1][1:-1]]=r[0].split(' ')[-1]
+    phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
 
-    for i,r in textgridData.iterrows():
-        print(r[2])
-        print(dict_phones[r[2]])
+    detected_transcription=[]
+    detected_phonemes=textgridData.iloc[:,2][textgridData.iloc[:,2].str[0]=='p']
+    for r in detected_phonemes:
+        detected_transcription.append(phonetics[phonetics.iloc[:,2]==r][4].values[0])
+    
+    return "success", [textgridData, detected_transcription]
+
+    # phonetics[phonetics[0].str[0]=='p'].apply(lambda r:r.str.split(' '))
+    # pd.DataFrame(phonetics[phonetics[0].str[0]=='p'].apply(lambda r:r.str.split(' ')).iloc[:,0].tolist())
+    # for i,r in phonetics[phonetics[0].str[0]=='p'].iterrows():
+    # dict_phones={}
+    # for i,r in phonetics.iterrows():
+    #     #lines starting by d correspond to phonemes
+    #     if r[0][0]=='p':
+    #         line=r.values[0].split(' ')
+    #         phone=line[0]
+    #         info=line[1][1:-1]
+    #         # print(phone)
+    #         # print(info)
+    #         dict_phones[info]=phone
+    #     elif r[0][0]=='o' or r[0][0]=='s':
+    #         dict_phones[r[0].split(' ')[0]]=r[0].split(' ')[0]
+    #     else:
+    #         dict_phones[r[0].split(' ')[1][1:-1]]=r[0].split(' ')[-1]
+
+    # for i,r in textgridData.iterrows():
+    #     print(r[2])
+    #     print(dict_phones[r[2]])
 
 def edAnalysis(
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/edAnalysis/1_err.wav', module="edAnalysis")
