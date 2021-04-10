@@ -24,15 +24,29 @@ def get_phone_timings(f='librispeech_alignments/dev-clean/8842/304647/8842-30464
     filter=[tg[0][word_idx].overlaps(el) for el in tg[1]]
     return list(compress(tg[1], filter))
 
+def get_sentence(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
+    tg = textgrid.TextGrid.fromFile(f)
+    words=[el.mark for el in tg[0]]
+    # drop empty strings
+    words = [x for x in words if x]
+    return ' '.join(words)
+
+# def get_phonetics(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
+
+
 def build_librispeech_words_df(
-                            data_set='dev-clean',
-                            path=os.path.join('librispeech_alignments', data_set),
-                            audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/',
-                            files = glob(path+'/*/*/*.TextGrid')):
+        data_set='dev-clean',
+        basepath='librispeech_alignments',
+        audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/'
+        ):
+    path=os.path.join(basepath, data_set)
+    files = glob(path+'/*/*/*.TextGrid')
     records=[]
     for f_idx,f in tqdm(enumerate(files)):
         tg = textgrid.TextGrid.fromFile(f)
         tg_words=tg[0]
+        # filter out None words
+        tg_words=[el for el in tg_words if el.mark]
         tg_phones=tg[1]
         for i,el in enumerate(tg_words):
             # this takes all phonemes that overlap with the word. I found overlap function in Interval class:
@@ -43,7 +57,10 @@ def build_librispeech_words_df(
             word=el.mark
             start=el.minTime
             end=el.maxTime
-            d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f}
+            wav_path=os.path.join(audio_path,'/'.join(f.split('/')[1:]).split('.')[0]+'.flac')
+            d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f, 'wav_path':wav_path}
+            # d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f, 'sentence':get_sentence(f)}
+
             records.append(d)
     libri_words_df=pd.DataFrame.from_records(records)
     return libri_words_df
@@ -73,28 +90,31 @@ def cmu_ascii_mappings():
     
     return ascii_encoding, ascii_decoding
 
-libri_words_df=build_librispeech_words_df()
 
-libri_words_df[libri_words_df.word=='moved']
-libri_words_df[libri_words_df.phones.str.endswith('IH0 D')]
-libri_words_df[libri_words_df.phones.str.endswith('T IH0 D')]
-libri_words_df[libri_words_df.phones.str.endswith('D IH0 D')]
-libri_words_df[libri_words_df.phones.str.endswith('V D')]
-libri_words_df[libri_words_df.phones.str.endswith('M D')]
-libri_words_df[libri_words_df.phones.str.endswith('AO1')]
+if __name__ == "__main__":
+    libri_words_df=build_librispeech_words_df()
 
-libri_words_df[libri_words_df.phones.str.endswith('P T') & libri_words_df.word.str.endswith('ped')]
-libri_words_df[libri_words_df.phones.str.endswith('K T') & libri_words_df.word.str.endswith('ked')]
-libri_words_df[libri_words_df.phones.str.endswith('SH T')]
+    libri_words_df[libri_words_df.word=='moved']
+    libri_words_df[libri_words_df.phones.str.endswith('IH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith('T IH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith('T EH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith('D IH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith('V D')]
+    libri_words_df[libri_words_df.phones.str.endswith('M D')]
+    libri_words_df[libri_words_df.phones.str.endswith('AO1')].word.unique()
 
-selection=libri_words_df[libri_words_df.phones.str.endswith('P T') & libri_words_df.word.str.endswith('ped')]
+    libri_words_df[libri_words_df.phones.str.endswith('P T') & libri_words_df.word.str.endswith('ped')]
+    libri_words_df[libri_words_df.phones.str.endswith('K T') & libri_words_df.word.str.endswith('ked')]
+    libri_words_df[libri_words_df.phones.str.endswith('SH T')]
 
-example=selection.iloc[0,:]
+    selection=libri_words_df[libri_words_df.phones.str.endswith('P T') & libri_words_df.word.str.endswith('ped')]
 
-get_phone_timings(f=example.path, word_idx=example.word_idx)
+    example=selection.iloc[0,:]
+
+    get_phone_timings(f=example.path, word_idx=example.word_idx)
 
 
-# tg[0] -> words
-# tg[1] -> phones
-words=[el.mark for el in tg[0]]
-phones=[el.mark for el in tg[1]]
+    # tg[0] -> words
+    # tg[1] -> phones
+    words=[el.mark for el in tg[0]]
+    phones=[el.mark for el in tg[1]]
