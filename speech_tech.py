@@ -25,11 +25,7 @@ def set_params(
     waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
     sentenceID=1,
     basename='phrase_',
-    # keep_logs = 0, # 1 if we want to keep logs of all processed files (e.g., for troubleshooting), 0 otherwise
     fs_target = 16000, # the target sampling frequency
-    # binResult = [],
-    # status = -1,
-    # result = [],
     modelName = 'libri',
     module='sentenceStress'):
     """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
@@ -43,9 +39,10 @@ def set_params(
     Returns:
         dict
     """
-
     inputPhoneticTranscription_base = './lexicon/'+module+'/dct/'+basename
     inputGrammar_base = './lexicon/'+module+'/grammar/'+basename
+
+    
     
     if not (sentenceID is None):
         inputGrammar = '%s%d.txt' % (inputGrammar_base, sentenceID)
@@ -55,17 +52,11 @@ def set_params(
         inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
     params={}
     params['waveFileAddress']=waveFileAddress
-    # params['sentenceID']=sentenceID
-    # params['keep_logs']=keep_logs
     params['fs_target']=fs_target
-    # params['inputPhoneticTranscription_base']=inputPhoneticTranscription_base
-    # params['inputGrammar_base']=inputGrammar_base
-    # params['binResult']=binResult
-    # params['status']=status
-    # params['result']=result
     params['inputPhoneticTranscription']=inputPhoneticTranscription
     params['inputGrammar']=inputGrammar
     params['modelName']=modelName
+    params['rand_fileName']=str(uuid.uuid4())
 
     return params
 
@@ -248,7 +239,7 @@ def sentenceStress(
         if sWS_val[0] > rateThreshold*sWS_val[1]:
             binResult[sWS_id[0]] = 1
     else:
-        #TODO : this mean score has to be adapted because he use a normalization that led to values in a small range such
+        #TODO : this mean score has to be adapted because he uses a normalization that led to values in a small range 
         # meanScore = 0.90*max(weighted_score)
         # meanScore= weighted_score.mean()
         meanScore=0.2
@@ -307,7 +298,7 @@ def wordStress(
     indxVowels = [i for i, val in enumerate(is_vowel) if val] 
     nVowels=len(indxVowels)
 
-    # TODO: I do not know what this is but this is set to 1 when vowel ELSE corresponds to the integer at the end of "w1_v1_1"
+    # number of phoneme per entry in dct file this is set to 1 when vowel ELSE corresponds to the integer at the end of "w1_v1_1"
     phoPerEntry=[int(r[2].split('_')[-1]) for i,r in textgridData.iterrows()]
     
     # TODO: check words duration
@@ -355,7 +346,7 @@ def wordStress(
 
         Dur.append(textgridData[1].iloc[indxVowels[i]]-textgridData[0].iloc[indxVowels[i]])
 
-        textgridData[2].iloc[indxVowels[i]]
+        # textgridData[2].iloc[indxVowels[i]]
 
         syltype_phone=int(phone_df[2].iloc[indxVowels[i]])
         if syltype_phone == 2:  # the sylType is 0 for unstressed, 0.5 for secondary stressed syllables and 1 for primary stressed syllables
@@ -451,6 +442,35 @@ def iContrast(
     
     return "success", binResult
 
+
+def prosody_by_phone(p):
+    status, textgridData, s = get_annotated_signal(p)
+
+    f0Samples=getIntonation(s, p['fs_target'])
+    intensity=getIntensity(s, p['fs_target'])
+    detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='p']
+    Imax,Imean,Fmax,Fmean,Dur,voicing=[],[],[],[],[],[]
+    for i,r in detected_phonemes.iterrows():
+        start=round(p['fs_target']*r[0])
+        end=round(p['fs_target']*r[1])
+        F_phone=f0Samples[start:end]
+        I_phone=intensity[start:end]
+        Fmax.append(max(F_phone))
+        Imax.append(max(I_phone))
+        Fmean.append(np.mean(F_phone))
+        Imean.append(np.mean(I_phone))
+        Dur.append(end-start)
+        voicing.append(sum(F_phone.astype(bool))/len(F_phone))
+    d={}
+    Imax=d['Imax']
+    Imean=d['Imean']
+    Fmax=d['Fmax']
+    Fmean=d['Fmean']
+    Dur=d['Dur']
+    voicing=d['voicing']
+    return "success", [textgridData, d]
+
+
 def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
@@ -465,9 +485,9 @@ def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_record
     phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
 
     detected_transcription=[]
-    detected_phonemes=textgridData.iloc[:,2][textgridData.iloc[:,2].str[0]=='p']
-    for r in detected_phonemes:
+    for r in detected_phonemes.iloc[:,2]:
         detected_transcription.append(phonetics[phonetics.iloc[:,2]==r][4].values[0])
+        
     
     return "success", [textgridData, detected_transcription]
 

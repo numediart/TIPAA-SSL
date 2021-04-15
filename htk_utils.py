@@ -5,6 +5,14 @@ import os
 import pandas as pd
 
 
+def clean_htk_files(p):
+    """Clean the files generated for and by the HTK model (as it uses input and output files)
+    TODO: This is probably dangerous when we use it in parallel, multithreading... 
+    In the future, just delete the specific files after processing, by putting name in parameters (inputs and results files)
+    """
+    os.system('rm inputs/'+p['rand_fileName']+'*')
+    os.system('rm results/'+p['rand_fileName']+'*')
+
 # HTK related functions
 def process_grammar(inputGrammar, rand_fileName):
     """process grammar of a sentence
@@ -71,7 +79,7 @@ def get_textgrid_data(s,fs,p):
     Returns:
         DataFrame: data of duration and phonetic characteristics of words or phonemes 
     """    
-    rand_fileName = str(uuid.uuid4())
+    rand_fileName = p['rand_fileName']
     write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
 
     process_grammar(p['inputGrammar'], rand_fileName)
@@ -83,6 +91,6 @@ def get_textgrid_data(s,fs,p):
 
     # reset indices of dataframe
     textgridData.index=range(len(textgridData))
-
+    clean_htk_files(p)
     return textgridData, out2
 
