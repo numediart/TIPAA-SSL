@@ -6,6 +6,7 @@ import os
 import pandas as pd
 from libri_phonetization_data import *
 from tqdm import tqdm
+import pickle
 # Performance tests
 
 
@@ -220,18 +221,14 @@ def edAnalysis_performance_test():
 
     clean_temp_files()
 
-def edAnalysis_from_audiobook_data():
-    libri_words_df=build_librispeech_words_df()
-    
-    selection=libri_words_df[libri_words_df.phones.str.endswith('T IH0 D')]
 
+
+def compute_prediction_results(selection, libri_words_df, termination='IH0 D'):
     detected_transcriptions=[]
     statuss=[]
     match=[]
     result_records=[]
     for i,row in tqdm(selection.iterrows()):
-        # row=libri_words_df[libri_words_df.phones.str.endswith('T IH0 D')].iloc[1,:]
-
         sentence=get_sentence(row.path)
         # retrieve phonetics by word that ins not available directly from textgrids, but can be extracted from the dataframe
         # as I already extracted phonemes for each word using overlapping in timings
@@ -239,38 +236,176 @@ def edAnalysis_from_audiobook_data():
         for w in sentence.split(' '):
             phonetics.append(libri_words_df[libri_words_df.word==w].iloc[0,:].phones)
 
-        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, termination='IH0 D', path='./lexicon/edAnalysis/dct/test.dct')
-        make_grammar_from_dct(path_dct='./lexicon/edAnalysis/dct/test.dct',path_grammar='./lexicon/edAnalysis/grammar/test.txt')
+        # set params and make label files for phonetics and grammar
+        p=set_params(waveFileAddress=row.wav_path, sentenceID=None, basename='test', module='edAnalysis')
+        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, termination=termination, path=p['inputPhoneticTranscription'])
+        make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
 
-        p=set_params(
-            waveFileAddress=row.wav_path,
-            sentenceID=None,
-            basename='test',
-            module='edAnalysis')
-
+        # run phonemeContrast module
         status, results= phonemeConstrast(p)
         # status, textgridData, s=get_annotated_signal(p)
         statuss.append(status)
         if results!=[]:
             textgridData=results[0]
             detected_transcription=results[1]
-
             # phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None)
             match.append(row.phones==' '.join(detected_transcription))
-
-            d={'detected_transcription':' '.join(detected_transcription), 'status':status}
+            d={'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'status':status, 'path':row.path, 'wav_path':row.wav_path}
             detected_transcriptions.append(detected_transcription)
         else:
             detected_transcriptions.append([])
             match.append(False)
-            d={'detected_transcription':'', 'status':status}
+            d={'phones':row.phones, 'detected_transcription':'', 'status':status, 'path':row.path, 'wav_path':row.wav_path}
         result_records.append(d)
     results_df=pd.DataFrame.from_records(result_records)
+    return results_df
 
+def compute_score(results_df, correct_terminations=['T IH0 D', 'T IH1 D', 'T IH2 D']):
+    n_corr=0
+    for el in correct_terminations: 
+        n_corr+=len(results_df[results_df.detected_transcription.str.endswith(el)])
+    rate=n_corr/len(results_df)
+    print('rate :', rate)
+    return rate
+
+def get_rest(results_df, correct_terminations=['T IH0 D', 'T IH1 D', 'T IH2 D']):
+    rest=results_df
+    for el in correct_terminations:
+        rest=rest[~rest.detected_transcription.str.endswith(el)]
+    return rest
+
+def performance_test(selection, results_df, correct_terminations, termination):
+    # print(rate)
+    rate=compute_score(results_df, correct_terminations=correct_terminations)
+    rest=get_rest(results_df, correct_terminations=correct_terminations)
+    selection.index=results_df.index
+    # selection.loc[rest.index]
+    rest=pd.concat([selection.loc[rest.index][['word','phones']],rest], axis=1)
+    print(rest)
+    return rate, rest
+
+def get_phone_termination_dict():
+    """Get rules of terminations for -ed module (maybe to be generalized)
+
+    Returns:
+        dicts: associates phoneme to the correct termination and accepted alternatives
+    """
+    consonants=[p for p in cmudict.phones() if p[-1][0]!='vowel']
+    consonants_not_D_T=[p for p in consonants if p[0] not in ['D','T']]
+    liquid=[p for p in consonants if p[-1][0]=='liquid']
+    semivowel=[p for p in consonants if p[-1][0]=='semivowel']
+    nasal=[p for p in consonants if p[-1][0]=='nasal']
+
+    others=[p for p in consonants if (p[-1][0]!='nasal' and  p[-1][0]!='liquid' and  p[-1][0]!='semivowel')]
+
+    vuv_dict={'B':'v',
+            'CH':'uv',
+            'D':'v',
+            'DH':'v',
+            'F':'uv',
+            'G':'v',
+            'HH':'uv',
+            'JH':'v',
+            'K':'uv',
+            'P':'uv',
+            'S':'uv',
+            'SH':'uv',
+            'T':'uv',
+            'TH':'uv',
+            'V':'v',
+            'Z':'v',
+            'ZH':'v'}
+    
+    for el in liquid: vuv_dict[el[0]]='v'
+    for el in nasal: vuv_dict[el[0]]='v'
+    for el in semivowel: vuv_dict[el[0]]='v'
+
+    vuv_termination_dict={'v':'D', 'uv':'T'}
+
+    phone_termination_dict={}
+    for p,vuv in vuv_dict.items(): phone_termination_dict[p]=vuv_termination_dict[vuv]
+    phone_termination_dict['T']= 'IH0 D'
+    phone_termination_dict['D']= 'IH0 D'
+    
+    correct_alternatives={}
+    correct_alternatives['IH0 D']=['IH0 D', 'IH1 D', 'IH2 D']
+    correct_alternatives['D']=['D', 'D AH0']
+    correct_alternatives['T']=['T', 'T AH0']
+
+    return phone_termination_dict, correct_alternatives
+
+def edAnalysis_from_audiobook_data(data_set='dev-clean'):
+    libri_words_df=build_librispeech_words_df(data_set=data_set)
+    phone_termination_dict, correct_alternatives=get_phone_termination_dict()
+
+    results_dfs={}
+    rests_dfs={}
+    performances={}
+
+    for pretermination, termination in tqdm(phone_termination_dict.items()):
+        full_termination=' '+' '.join([pretermination,termination])
+        correct_terminations=[' '+' '.join([pretermination,el]) for el in correct_alternatives[termination]]
+        selection=libri_words_df[libri_words_df.phones.str.endswith(full_termination)]
+
+        if len(selection)>0:
+            results_df=compute_prediction_results(selection, libri_words_df, termination=termination)
+            rate, rest=performance_test(selection, results_df, correct_terminations, termination)
+
+            results_dfs[pretermination]=results_df
+            rests_dfs[pretermination]=rest
+            performances[pretermination]=rate
+    
+    pickle.dump({'results_dfs':results_dfs, 'rests_dfs':rests_dfs,  'performances':performances}, open('ed_performance_'+data_set+'.p', 'wb'))
+
+def show_summary(data_set='dev-clean'):
+    ed_performance=pickle.load(open('ed_performance_'+data_set+'.p','rb'))
+    performances=ed_performance['performances']
+    results_dfs=ed_performance['results_dfs']
+    rests_dfs=ed_performance['rests_dfs']
+    lens={}
+    for k,el in results_dfs.items(): lens[k]=len(el)
+
+    phone_termination_dict, correct_alternatives=get_phone_termination_dict()
+    summary=pd.DataFrame.from_records([phone_termination_dict, lens, performances]).T
+    summary.columns=['termination', 'n of examples', 'performances']
+
+    print(summary)
+
+    # bad performances are mostly with D terminations
+    print(summary[summary.performances<0.78])
+    print(summary[summary.performances>0.78])
+
+    print(summary.sort_values('performances').dropna())
+
+    weighted_score=0
+    tot=0
+    for k in lens.keys():
+        tot+=lens[k]
+        weighted_score+=performances[k]*lens[k]
+    weighted_score/=tot
+
+    print('weighted_score:', weighted_score)
+    
+    # save examples of wrong detection
+    def make_dir(path):
+        if not os.path.exists(path): os.makedirs(path)
+    
+    file_selection_path='file_selection'
+
+    # phonemes=rests_dfs.keys()
+    phonemes=['DH','JH','Z','V','L']
+
+    make_dir(file_selection_path)
+    for k in phonemes:
+        rests_df=rests_dfs[k]
+        folder_copy_path=os.path.join(file_selection_path,k)
+        make_dir(folder_copy_path)
+        for i,r in tqdm(rests_df.iterrows()):
+            # copy_path=os.path.join(folder_copy_path,os.path.split(r.wav_path)[-1])
+            copy_path=os.path.join(folder_copy_path,r.detected_transcription+'.flac')
+
+            if os.path.exists(r.wav_path) and not os.path.exists(copy_path):
+                shutil.copy(r.wav_path, copy_path)
             
-    selection
-    len0=len(results_df[results_df.detected_transcription.str.endswith('T IH0 D')])
-    len1=len(results_df[results_df.detected_transcription.str.endswith('T IH1 D')])
-    rate=(len0+len1)/len(results_df)
- 
+
 
