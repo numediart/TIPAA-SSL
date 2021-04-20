@@ -7,7 +7,7 @@ from tqdm import tqdm
 import pandas as pd
 import os
 from glob import glob
-
+import shutil
 
 def get_phone_timings(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid',word_idx=8):
     """Uses the (start,end) of a word and (starts,ends) of phonemes to retrieve phonemes corresponding to a word
@@ -94,20 +94,36 @@ def cmu_ascii_mappings():
 if __name__ == "__main__":
     libri_words_df=build_librispeech_words_df()
 
-    libri_words_df[libri_words_df.word=='moved']
-    libri_words_df[libri_words_df.phones.str.endswith('IH0 D')]
-    libri_words_df[libri_words_df.phones.str.endswith('T IH0 D')]
-    libri_words_df[libri_words_df.phones.str.endswith('T EH0 D')]
-    libri_words_df[libri_words_df.phones.str.endswith('D IH0 D')]
-    libri_words_df[libri_words_df.phones.str.endswith('V D')]
-    libri_words_df[libri_words_df.phones.str.endswith('M D')]
+    libri_words_df[libri_words_df.word=='low']
+    libri_words_df[libri_words_df.phones.str.endswith(' IH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith(' T IH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith(' T EH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith(' D IH0 D')]
+
+    libri_words_df[libri_words_df.phones.str.endswith(' V D')]
+    libri_words_df[libri_words_df.phones.str.endswith(' M D')]
+    libri_words_df[libri_words_df.phones.str.endswith(' NG D')]
+    selection=libri_words_df[libri_words_df.phones.str.endswith(' DH D')]
+
+    # if not os.path.exists('file_selection'): os.makedirs('file_selection')
+    # for i,r in selection.iterrows():
+    #     shutil.copy(r.wav_path, 'file_selection')
+
     libri_words_df[libri_words_df.phones.str.endswith('AO1')].word.unique()
+    libri_words_df[libri_words_df.phones.str.contains('AO1')].word.unique()
+    libri_words_df[libri_words_df.phones.str.contains('AO1')]
+    libri_words_df[libri_words_df.phones.str.contains('OW1')]
+    libri_words_df[libri_words_df.phones.str.endswith(' B D') & libri_words_df.word.str.endswith('bed')]
+    libri_words_df[libri_words_df.phones.str.endswith(' D') & libri_words_df.word.str.endswith('ied')]
 
-    libri_words_df[libri_words_df.phones.str.endswith('P T') & libri_words_df.word.str.endswith('ped')]
-    libri_words_df[libri_words_df.phones.str.endswith('K T') & libri_words_df.word.str.endswith('ked')]
-    libri_words_df[libri_words_df.phones.str.endswith('SH T')]
 
-    selection=libri_words_df[libri_words_df.phones.str.endswith('P T') & libri_words_df.word.str.endswith('ped')]
+    libri_words_df[libri_words_df.phones.str.endswith(' P T') & libri_words_df.word.str.endswith('ped')]
+    libri_words_df[libri_words_df.phones.str.endswith(' K T') & libri_words_df.word.str.endswith('ked')]
+    libri_words_df[libri_words_df.phones.str.endswith(' SH T')]
+    libri_words_df[libri_words_df.phones.str.endswith(' F T')]
+
+
+    selection=libri_words_df[libri_words_df.phones.str.endswith(' P T') & libri_words_df.word.str.endswith('ped')]
 
     example=selection.iloc[0,:]
 
