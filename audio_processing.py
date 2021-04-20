@@ -29,7 +29,7 @@ def load_audio(waveFileAddress, fs=16000):
 
 
 # signal processing (pitch, instensity, normalization...)
-def getIntonation(s, fs):
+def getf0Samples(s, fs):
     """Uses pyworld vocoder to extract fundamental frequency of the signal in Hz 
     and converts it in semitones. And then upsample up to signal length
 
@@ -57,12 +57,15 @@ def getIntonation(s, fs):
     xnew = np.floor(np.arange(len(s))/len(s)*len(f0Frames))
     f0Samples = f(xnew)
 
-    # replace nans with minimum value
-    f0Samples=np.nan_to_num(f0Samples, nan= np.nanmin(f0Samples))
-
     # from scipy import signal
     # ynew = signal.resample(f0Frames, len(s))
 
+    return f0Samples
+
+def getIntonation(s, fs):
+    f0Samples=getf0Samples(s,fs)
+    # replace nans with minimum value
+    f0Samples=np.nan_to_num(f0Samples, nan= np.nanmin(f0Samples))
     return f0Samples
 
 def smooth(x,beta, window_len=11):
@@ -110,7 +113,7 @@ def getIntensity(s, fs):
     intensity=smooth((s/2**15)**2, 20, 2*analysis_win)
 
     # convert in db
-    intensity = intensity / 4.0e-10
+    intensity /= 4.0e-10
     int_db = 10*np.log10(intensity)
 
     #  remove any inf due to the log operation and replace them with the minimum value of intensity
