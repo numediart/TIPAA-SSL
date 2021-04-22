@@ -7,11 +7,11 @@ import pandas as pd
 
 def clean_htk_files(p):
     """Clean the files generated for and by the HTK model (as it uses input and output files)
-    TODO: This is probably dangerous when we use it in parallel, multithreading... 
     In the future, just delete the specific files after processing, by putting name in parameters (inputs and results files)
     """
-    os.system('rm inputs/'+p['rand_fileName']+'*')
-    os.system('rm results/'+p['rand_fileName']+'*')
+    os.system('rm inputs/'+p['rand_fileName']+'.net')
+    os.system('rm inputs/'+p['rand_fileName']+'.wav')
+    os.system('rm results/'+p['rand_fileName']+'.rec')
 
 # HTK related functions
 def process_grammar(inputGrammar, rand_fileName):
@@ -49,7 +49,7 @@ def htk_recognition(modelName, rand_fileName, inputPhoneticTranscription):
     out2 = os.popen(cmd2).read()
 
     # out2=os.system(cmd2)
-    print('out2', out2)
+    # print('out2', out2)
 
     # read rec file (i.e., the alignment outcome)
     textgridData = pd.read_csv('./results/'+ rand_fileName +'.rec', sep=' ', header=None)
