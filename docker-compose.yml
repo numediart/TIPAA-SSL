@@ -1,0 +1,20 @@
+version: '2'
+services:
+  flask_server:
+    restart: always
+    build: .
+    command: gunicorn -w 4 --bind :5000 flask_server:app
+    # CMD ["gunicorn"  , "-b", "0.0.0.0:80", "flask_server:app"]
+    expose:
+     - "5000"
+    ports:
+     - "5000:5000"
+  nginx:
+    restart: always
+    build: ./nginx
+    links:
+     - "flask_server"
+    expose:
+     - "80" 
+    ports:
+     - "80:80" 

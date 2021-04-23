@@ -69,21 +69,33 @@ You can use ```get_data()``` function.
 
 A Flask API is provided to access the modules.
 Run ```sh run_server.sh``` to launch it.
-The process is in two steps:
+The process is in two steps (post requests)
 
-- Upload an audio file
-- call a module with the filename that will return a result
+- Upload an audio file (see index.html for an example of post request)
+- call a module with the filename that will return a result (see dummy_client.py for an example of post request)
 
 Create a folder set to receive the uploaded files:
 ```
 mkdir upload_files
 ```
 
-
-
 ## Docker application
-You can also build the Dockerfile that will install everything and serve the application with Flask
+You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
+I used this info to do that: https://github.com/ram-ch/Building-microservices-with-docker-on-AWS
+
 ```
+sudo docker-compose up -d
+```
+
+On AWS, change the line of nginx/web.conf
+"	proxy_pass  http://aws.server.ip.here:5000/;"
+
+
+<!-- ```
 docker build -t flowspeech:1.0 .
 docker run -d -p 5000:5000 flowspeech:1.0
 ```
+```
+docker build -t flowspeech .
+docker run -d flowspeech
+``` -->
