@@ -8,3 +8,6 @@ cmudict
 audiotsm
 pytsmod
 flask
+tqdm
+git+https://github.com/huggingface/datasets
+gunicorn

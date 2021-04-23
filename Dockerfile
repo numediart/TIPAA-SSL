@@ -65,5 +65,7 @@ WORKDIR $HOME/
 # CMD [ "/root/run_server.sh" ]
 
 # https://gist.github.com/pangyuteng/f5b00fe63ac31a27be00c56996197597
-ENTRYPOINT ["python", "flask_server.py"]
+# ENTRYPOINT ["python", "flask_server.py"]
+# ENTRYPOINT ["gunicorn", "flask_server:app"]
+CMD ["gunicorn"  , "-b", "0.0.0.0:5000", "flask_server:app"]
 EXPOSE 5000
