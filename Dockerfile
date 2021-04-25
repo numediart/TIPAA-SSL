@@ -68,4 +68,4 @@ WORKDIR $HOME/
 # ENTRYPOINT ["python", "flask_server.py"]
 # ENTRYPOINT ["gunicorn", "flask_server:app"]
 # CMD ["gunicorn"  , "-b", "0.0.0.0:8000", "flask_server:app"]
-# EXPOSE 8000
+EXPOSE 8000
