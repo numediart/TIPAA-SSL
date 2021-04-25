@@ -6,45 +6,11 @@ services:
     command: gunicorn -w 4 --bind 0.0.0.0:8000 flask_server:app
     container_name: flaskapp
     network_mode: host
-    # expose:
-    #   - "8000" 
-    # ports: 
-    #   - "8000:8000"
 
   nginx:
     build: ./nginx
     container_name: nginx
     environment:
-      - SERVER_NAME=0.0.0.0
+      - SERVER_NAME=0.0.0.0  # This is to be change by the public AWS IP !!!!
     restart: always
     network_mode: host
-    # links:
-    #   - "flaskapp"
-    # expose:
-    #   - "80" 
-    # ports: 
-    #   - "80:80"
-
-
-# version: '3'
-# services:
-#   flaskapp:
-#     build: ./
-#     command: gunicorn -w 4 --bind 0.0.0.0:8000 flask_server:app
-#     container_name: flaskapp
-#     networks:
-#       - backend
-
-#   nginx:
-#     build: ./nginx
-#     environment:
-#       - SERVER_NAME=0.0.0.0
-#     restart: always
-#     ports:
-#       - "80:80"
-#     networks:
-#       - backend
-
-# networks:
-#   backend:
-#     driver: bridge
