@@ -3,7 +3,7 @@ version: '3'
 services:
   flaskapp:
     build: ./
-    command: gunicorn -w 4 --bind 0.0.0.0:8000 flask_server:app
+    # command: gunicorn -b 0.0.0.0:8000 flask_server:app
     container_name: flaskapp
     network_mode: host
 
@@ -11,6 +11,6 @@ services:
     build: ./nginx
     container_name: nginx
     environment:
-      - SERVER_NAME=0.0.0.0  # This is to be change by the public AWS IP !!!!
+      - SERVER_NAME=0.0.0.0 # This is to be change by the public AWS IP !!!!
     restart: always
     network_mode: host
