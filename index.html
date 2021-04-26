@@ -1,13 +1,53 @@
 <!doctype html>
 <html>
   <head>
+      <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+      <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+      <meta name="robots" content="noindex, nofollow">
+      <meta name="googlebot" content="noindex, nofollow">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <script type="text/javascript" src="//code.jquery.com/jquery-1.8.3.js"></script>
+      <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.9.2/themes/base/jquery-ui.css">
+      <script type="text/javascript" src="http://code.jquery.com/ui/1.9.2/jquery-ui.js"></script>
     <title>File Upload</title>
   </head>
   <body>
+    <script>
+  function q(selector) {return document.querySelector(selector)}
+
+  $(document).ready(function() {
+    $("#jsonp2").click(function() {
+      url= "/flowspeech/sentenceStress"
+      data= {"filename":q('#filename').value,"sentenceID":q('#sentenceID').value}
+      $.ajax({
+        url: url,
+        type: 'POST',
+        ContentType: 'application/json',
+        data: {'data': data}
+      }).done(function(response){
+        alert("Data from Server:" + JSON.stringify(response));
+      }).fail(function(jqXHR, textStatus, errorThrown){
+        alert('FAILED! ERROR: ' + errorThrown);
+      });
+    });
+  });
+
+  </script>
     <h1>File Upload</h1>
     <form method="POST" action="" enctype="multipart/form-data">
       <p><input type="file" name="file"></p>
       <p><input type="submit" value="Submit"></p>
     </form>
+
+    <h1>Call module</h1>
+
+    <form action=""  name="myForm">
+      <p><label for="filename">filename:</label>
+      <input type="text" name="filename" id="filename"></p>
+      <p><label for="sentenceID">sentenceID:</label>
+      <input type="number" id="sentenceID" name="sentenceID" min="1" max="5">
+  </form>
+  <button id="jsonp2" type="button" class="btn btn-info">Get feedback</button>
+
   </body>
 </html>

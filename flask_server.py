@@ -24,11 +24,16 @@ def upload_file():
   
 @app.route('/flowspeech/<module>', methods=['GET', 'POST'])
 def add_message(module):
-    content = request.json
-    print(content['sentenceID'])
-    print(content['filename'])
+    content = request.form
+    # import pdb;pdb.set_trace()
+    print(request.__dict__)
+    print(content)
+    print(content['data[sentenceID]'])
+    print(content['data[filename]'])
     # return jsonify({"uuid":uuid})
-    p=set_params(sentenceID=content['sentenceID'], waveFileAddress=upload_path+content['filename'], module=module)
+    filename=content['data[filename]']
+    sentenceID=content['data[sentenceID]']
+    p=set_params(sentenceID=int(sentenceID), waveFileAddress=upload_path+filename, module=module)
     try:
       method_to_call = getattr(speech_tech, module)
     except:
