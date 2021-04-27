@@ -6,10 +6,11 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import cmudict
+from time import time
 
 from tqdm import tqdm
 
-from audio_processing import load_audio, getIntonation, getIntensity, normalize
+from audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
 from htk_utils import process_grammar, htk_recognition, get_textgrid_data
 
 def clean_temp_files():
@@ -84,13 +85,13 @@ def get_annotated_signal(p=set_params()):
     
     # if textgridData.iloc[:,3].mean()<8.5:
     if textgridData.iloc[:,3].mean()<5:
-        return "error: low posterior probability, the model is not confident with the recognition", None, None
+        return "success: low posterior probability, the model is not confident with the recognition", None, None
     
     # each row is True if out of vocabulary, False if it is a detected phoneme or word
     is_out_of_vocabulary=textgridData.iloc[:,2].str[:1].str.contains('o')
 
     if is_out_of_vocabulary.product():
-        return "error: all of the elements were out of vocabulary", None, None
+        return "success: all of the elements were out of vocabulary", None, None
     # if is_out_of_vocabulary.sum():
     #     return "error: at least one element was out of vocabulary", None, None
 
@@ -257,7 +258,7 @@ def sentenceStress(
     return "success", binResult
         
 def wordStress(
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
+    p=set_params(sentenceID=112, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
     ):
     """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
@@ -432,7 +433,7 @@ def iContrast(
     # TODO: weird, he does a loop for every phoneme, check if it is a short or long, and repeat, but does not record results.
     # only the last result will be kept (maybe it works because there is only one vowel that needs to be checked)
     for i,el in enumerate(textgridData.iloc[:,2].tolist()):
-        print(el[-2:])
+        # print(el[-2:])
         if el[-2:]=='*s':
             binResult=0
         elif el[-2:]=='*l':
@@ -447,6 +448,8 @@ def prosody_by_phone(p):
     status, textgridData, s = get_annotated_signal(p)
 
     f0Samples=getIntonation(s, p['fs_target'])
+    vuv=np.nan_to_num(getf0Samples(s, p['fs_target']), nan=0).astype(bool)
+
     intensity=getIntensity(s, p['fs_target'])
     detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='p']
     Imax,Imean,Fmax,Fmean,Dur,voicing=[],[],[],[],[],[]
@@ -455,23 +458,24 @@ def prosody_by_phone(p):
         end=round(p['fs_target']*r[1])
         F_phone=f0Samples[start:end]
         I_phone=intensity[start:end]
+        vuv_phone=vuv[start:end]
         Fmax.append(max(F_phone))
         Imax.append(max(I_phone))
         Fmean.append(np.mean(F_phone))
         Imean.append(np.mean(I_phone))
         Dur.append(end-start)
-        voicing.append(sum(F_phone.astype(bool))/len(F_phone))
+        voicing.append(sum(vuv_phone)/len(vuv_phone))
     d={}
-    Imax=d['Imax']
-    Imean=d['Imean']
-    Fmax=d['Fmax']
-    Fmean=d['Fmean']
-    Dur=d['Dur']
-    voicing=d['voicing']
+    d['Imax']=Imax
+    d['Imean']=Imean
+    d['Fmax']=Fmax
+    d['Fmean']=Fmean
+    d['Dur']=Dur
+    d['voicing']=voicing
     return "success", [textgridData, d]
 
 
-def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
+def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
@@ -482,12 +486,12 @@ def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_record
     if textgridData is None:
         return status, []
     
+    detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='p']    
     phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
 
     detected_transcription=[]
     for r in detected_phonemes.iloc[:,2]:
         detected_transcription.append(phonetics[phonetics.iloc[:,2]==r][4].values[0])
-        
     
     return "success", [textgridData, detected_transcription]
 
@@ -514,9 +518,9 @@ def phonemeConstrast(#p=set_params(sentenceID=111, waveFileAddress='audio_record
     #     print(dict_phones[r[2]])
 
 def edAnalysis(
-    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/edAnalysis/1_err.wav', module="edAnalysis")
+    # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/edAnalysis/1_err.wav', module="edAnalysis")
     # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/edAnalysis/1_corr.wav', module="edAnalysis")
-    # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
+    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
     # p=set_params(sentenceID=2, waveFileAddress='audio_recordings/turned_around.mp3', module="edAnalysis")
     # p=set_params(sentenceID=2, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
     ):
@@ -524,7 +528,7 @@ def edAnalysis(
     if textgridData is None:
         return status, []
     
-    print(textgridData)
+    # print(textgridData)
     
     # TODO: this is for the verification and it is not finished
     nWords, indxWords = number_and_indices(textgridData, 'w')
@@ -544,7 +548,71 @@ def edAnalysis(
         
     return "success", [binResult]
 
+def timing_test(module='wordStress', n=100, p=None):
+    times=[]
+    for i in range(n):
+        start=time()
+        # wordStress()
+        if p is not None:
+            globals()[module](p)
+        else:
+            globals()[module]()
+        times.append(time()-start)
+    print(np.mean(times))
+    return np.mean(times)
+    
 if __name__ == "__main__":
     # execute only if run as a script
     # Test performance of wordStress module
+
+    start=time()
     wordStress()
+    print(time()-start)
+
+    modules=['edAnalysis','phonemeContrast','iContrast','wordStress','sentenceStress']
+    timings=[timing_test(el) for el in modules]
+    print(np.round(timings,2))
+
+    get_annotated_signal_timing=timing_test('get_annotated_signal')
+
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
+    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
+
+
+    get_annotated_signal_timing2=timing_test('get_annotated_signal', p=p)
+    iContrast_timing=timing_test('iContrast')
+    wordStress_timing=timing_test('wordStress')
+
+    start=time();get_annotated_signal(p);print(time()-start)
+    start=time();s,fs = load_audio(p['waveFileAddress'], fs=p['fs_target']);print(time()-start) #0.08
+    start=time();s,fs=librosa.load(p['waveFileAddress'], sr=p['fs_target']);print(time()-start) #0.08
+
+    from scipy.io.wavfile import read, write
+    import soundfile as sf
+
+    # start=time();fs,s = read(p['waveFileAddress']);print(time()-start)
+    start=time();s,fs = sf.read(p['waveFileAddress']);print(time()-start) # 0.006
+    start=time();s = s.T;print(time()-start)
+    start=time();s = librosa.resample(s, fs, p['fs_target']);print(time()-start)  # 0.05
+
+    start=time();get_textgrid_data(s,fs,p);print(time()-start)
+
+    # inside get_textgrid_data
+    rand_fileName = p['rand_fileName']
+    start=time();write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16));print(time()-start)
+    start=time();process_grammar(p['inputGrammar'], rand_fileName);print(time()-start)
+    start=time();textgridData, out2=htk_recognition(p['modelName'], rand_fileName, p['inputPhoneticTranscription']);print(time()-start)
+    start=time();textgridData=textgridData[(textgridData.iloc[:,2]!='sil')&(textgridData.iloc[:,2]!='sp')];print(time()-start)
+
+    # Inside htk_recognition
+    cmd2 = 'HVite -A -T 1 -a -C ./model/' +p['modelName']+ '/Align.cfg -H ./model/' +p['modelName']+ '/hmm-mono -H \
+    ./model/generalSpeech/hmm-gs_1 -H ./model/generalSpeech/hmm-gss_2 -H ./model/generalSpeech/hmm-gss_3 -H ./model/generalSpeech/hmm-gss_4 \
+    -H ./model/generalSpeech/hmm-gss_5 -w ./inputs/'+ p['rand_fileName']+ '.net -l ./results -o N ' +p['inputPhoneticTranscription']+ ' ./model/' +p['modelName']+ '/monophones \
+    ./inputs/' +p['rand_fileName']+ '.wav'
+    start=time();out2 = os.popen(cmd2).read();print(time()-start)
+
+    # out2=os.system(cmd2)
+    # print('out2', out2)
+
+    # read rec file (i.e., the alignment outcome)
+    textgridData = pd.read_csv('./results/'+ rand_fileName +'.rec', sep=' ', header=None)
