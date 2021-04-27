@@ -212,8 +212,8 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
 
 def make_grammar_from_dct(path_dct='test.dct',
                         path_grammar='test.txt'):
-    """Make a grammar file from a dct file. We assume that we are studying one word in the sentence. I.e., one word is
-    segmented in phonemes
+    """Make a grammar file from a dct file. We assume that we are studying one word in the sentence, i.e., one word is
+    segmented in phonemes OR  zero word, i.e., no word is segmented in phonemes (this the case for sentenceStress)
 
     Args:
         p (dict): params from set_params function
