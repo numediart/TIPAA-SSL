@@ -11,6 +11,9 @@ def test_sentenceStress():
 def test_iContrast():
     iContrast()
 
+def test_pContrast():
+    phonemeContrast()
+
 def test_chunking():
     chunking()
 
@@ -36,3 +39,16 @@ def test_performance_tests():
     # this one lasts more beacause it looks for everyword in cmudict to have ground truth
     # wordStress_performance_test()
 
+from label_data_processing import *
+def test_label_data_processing():
+    # get_data()
+    make_generic_dct_from_text()
+    make_generic_dct_from_phonetics()
+    make_grammar_from_dct()
+
+from libri_phonetization_data import *
+def test_libri_phonetization_data():
+    libri_words_df=build_librispeech_words_df()
+
+    libri_words_df[libri_words_df.word=='low']
+    libri_words_df[libri_words_df.phones.str.endswith(' IH0 D')]
