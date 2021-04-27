@@ -3,6 +3,7 @@ import numpy as np
 import pdb
 from glob import glob
 from shutil import copy
+import cmudict
 
 from text_processing import phonetics_from_sentence, remove_special_characters
 
@@ -136,29 +137,67 @@ def make_generic_dct_from_text(sentence="I accepted to go to spain", word_id=1, 
 
 def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'], word_id=1, termination='IH0 D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
+    """This function builds a dct file needed for htk model. It consists of a list of words and for one word a list of phoneme.
+    Each line is either a word or phoneme (or in fact several phoneme). More generally each line is just one or several phoneme. But 
+    in our case, one word of the sentence is detailed in one phoneme or group of phoneme (e.g. IH0 D for the termination -ed). And other words
+    are in one line.
 
-    # phonetics=[cmudict.dict()[el] for el in remove_special_characters(sentence).split(' ')]
-    # phonetics=phonetics_from_sentence(sentence)
-    # words=['w'+str(i)+' '+' '.join(word) for i,word in enumerate(phonetics)]
+    For one phoneme, we put alternatives that can be confuse by english learners so that htk model can choose what he recognizes. 
+    E.g. AO1, OW1, or the default set for -ed termination
 
+    Args:
+        phonetics (list, optional): [description]. Defaults to ['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'].
+        word_id (int, optional): [description]. Defaults to 1.
+        termination (str, optional): [description]. Defaults to 'IH0 D'.
+        alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
+        path (str, optional): [description]. Defaults to 'test.dct'.
+    """
     lines=[]
     for i,word in enumerate(phonetics):
-        # print(alternatives)
+        # Here we are at the level of a word of the sentence
         if i!=word_id:
-            # for j,word in enumerate(alternative_words):
-            # print(word)
+            # In case it is not the word we want to detail in several lines, we just put its phonetics in one line
             lines.append('w'+str(i)+' ['+'w'+str(i)+'_'+str(0)+'] '+word)
         else:
-            # we detail phonemes for the target word
-            # TODO: I take the first alternaitve, may be I should extract different alternatives for each phoneme... complicated, 
-            # we are not even sure it is always the same number of phonemes
-            phoneme_list=word.split(' ')
-            # we list the phonemes up to the termanation
-            phonemes=['p'+str(i)+' ['+'p'+str(i)+']'+' '+p for i,p in enumerate(phoneme_list)][:-len(termination.split(' '))]
-            # we list alternatives
-            alternative_phonemes=['p'+str(len(phonemes))+' ['+'p'+str(len(phonemes))+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
-            all_phones=phonemes+alternative_phonemes
-            lines+=all_phones
+            # Here we want to detail this specific word
+            # split the word to detail in phonemes with the piece with several alternatives
+            # e.g., "B L A H B L A H B L A H".split('A H')   -> ['B L ', ' B L ', ' B L ', '']
+            phoneme_lists=word.split(termination)
+
+            p_idx=0
+            if word==termination:
+                # a particular case fort which the word is only one phoneme and it is the one we study
+                alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
+                p_idx+=1
+                lines+=alternative_phonemes
+            else:
+                for phoneme_list in phoneme_lists:
+                    if phoneme_list!='':
+                        # we detail phonemes for the target word
+                        phoneme_list=list(filter(None, phoneme_list.split(' ')))
+                        # print(phoneme_list)
+                        # we list the phonemes
+                        # print(p_idx)
+                        phonemes=['p'+str(i+p_idx)+' ['+'p'+str(i+p_idx)+']'+' '+p for i,p in enumerate(phoneme_list) if p !='']
+                        # print(phonemes)
+                        # we list alternatives
+                        p_idx+=len(phonemes)
+                        # print(p_idx)
+                        alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
+                        p_idx+=1
+
+                        # print(alternative_phonemes)
+                        # print(p_idx)
+                        all_phones=phonemes+alternative_phonemes
+                        lines+=all_phones
+                    # if we just want tu put Alternative phones between Sequences, we remove the last time  S A S A S -> S S S -> S A S A S A -> S A S A S
+                    # else we let it    S A S A S A -> S S S -> S A S A S A 
+                try:
+                    if len(phoneme_list)>0:
+                        if phoneme_list[-1]!='':
+                            lines=lines[:-len(alternative_phonemes)]
+                except NameError:
+                    pass
     # adding silences and out of vocabulary possibilities
     sil_oov=["sp sp",
         "sil sil",
@@ -171,9 +210,10 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
     with open(path, "w") as text_file:
         text_file.write("\n".join(lines)+"\n")
 
-def make_grammar_from_dct(path_dct='/mnt/c/Users/noe_t/Downloads/edAnalysis-20210330T115859Z-001/edAnalysis/he decided to go back to spain.dct.txt',
+def make_grammar_from_dct(path_dct='test.dct',
                         path_grammar='test.txt'):
-    """For edAnalysis, make a grammar file from a dct file (may be generalizable in the future if useful)
+    """Make a grammar file from a dct file. We assume that we are studying one word in the sentence. I.e., one word is
+    segmented in phonemes
 
     Args:
         p (dict): params from set_params function
@@ -192,7 +232,9 @@ def make_grammar_from_dct(path_dct='/mnt/c/Users/noe_t/Downloads/edAnalysis-2021
     symbols=df.apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
 
     try:
-        ps=df[p_list].apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
+        ps=df[p_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)
+        if len(ps)>0:
+            ps=ps.unique()
     except:
         pdb.set_trace()
     ws=df[w_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)#.unique()
@@ -235,7 +277,11 @@ def make_grammar_from_dct(path_dct='/mnt/c/Users/noe_t/Downloads/edAnalysis-2021
     # str1=' | '.join(os)+';\n'
     str1="$other = o1 | o2 | o3 | o4 | o5;\n\
 $other_pho =  o2 | o3 | o4 | o5;"
-    str2 ="$phrase = (("+' sp '.join(ws1)+" sp (("+' '.join(ps)+") | {sp $other_pho }) sp "+' sp '.join(ws2)+") | {sp ($other )});"
+    if len(ps)>0:
+        str2 ="$phrase = (("+' sp '.join(ws1)+" sp (("+' '.join(ps)+") | {sp $other_pho }) sp "+' sp '.join(ws2)+") | {sp ($other )});"
+    else:
+        str2 ="$phrase = (("+' sp '.join(ws1)+" sp "+' sp '.join(ws2)+") | {sp ($other )});"
+
     str3="\
 (\n\
 ({sil} | sp) $phrase ({sil} | sp)\
@@ -254,3 +300,11 @@ def ed_make_grammars(path='/mnt/c/Users/noe_t/Downloads/edAnalysis-20210330T1158
         copy(path+'/'+r[0].split('.')[0]+'.dct', path+'/phrase_'+str(r[1])+'.dct')
         copy(path+'/'+r[0].split('.')[0]+'.txt', path+'/phrase_'+str(r[1])+'.txt')
 
+def sentenceStress_make_grammars(path_dct='lexicon/sentenceStress/dct', path_grammar='lexicon/sentenceStress/grammar'):
+    for el in glob(path+'/*.dct'):
+        gram=os.path.join(path_grammar,os.path.split(el)[-1].split('.')[0]+'.txt')
+        make_grammar_from_dct(el,gram)
+
+def wordStress_make_dcts(path_dct='lexicon/wordStress/dct', path_grammar='lexicon/wordStress/grammar'):
+    d=get_data()
+    d=d[d.focusType=="wordstress"]
