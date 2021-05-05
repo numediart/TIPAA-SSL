@@ -33,13 +33,14 @@ def compute_errors(preds, GTs):
     stress_error=0
     mismatches={}
     n_example_error=0
+    example_errors=[]
     for i,pred in enumerate(preds):
         if len(pred)==len(GTs[i]):
             diff=abs(pred-GTs[i])
             diffs.append(diff)
             total_n+=len(pred)
             stress_error+=diff.sum()
-            if diff.sum()>0: n_example_error+=1
+            if diff.sum()>0: n_example_error+=1; example_errors.append(i)
         else:
             mismatches[i]=(pred,GTs[i])
     mismatch_rate=len(mismatches.keys())/len(preds)
@@ -50,11 +51,13 @@ def compute_errors(preds, GTs):
     print('bin error rate:', bin_error_rate)
     print('example error rate:', example_error_rate)
 
+    return example_errors
+
 module_name_to_focus_type={'wordStress':'wordstress',
     'sentenceStress':'sentencestress',
     'iContrast':'shortIlongI'}
 def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis-ids/audio/"):
-    """This function works for wordStress? sentenceStress and iContrast. It uses the data.json file containing information 
+    """This function works for wordStress, sentenceStress and iContrast. It uses the data.json file containing information 
     from dynamoDB: (audio, text, sentenceID, module), and get the corresponding dct files to run prediction of a module on it.
 
     Args:
@@ -80,7 +83,7 @@ def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis
             path=os.path.join(audio_path, row.primaryKey+'.wav')
             p=set_params(sentenceID=id, waveFileAddress=path, module=module)
             # pdb.set_trace()
-            status, textgridData, s = get_annotated_signal(p)
+            # status, textgridData, s = get_annotated_signal(p)
             try:
                 # this calls the function with the name of the module
                 status, pred=globals()[module](p)
@@ -119,7 +122,18 @@ def wordStress_performance_test():
         print(row)
         print(a[row.analysisId])
     preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
-    compute_errors(preds,GTs)
+    example_errors=compute_errors(preds,GTs)
+
+    # row=d[d.analysisId==422].iloc[0]
+    # audio_path="../audio-with-analysis-ids/audio/"
+    # path=os.path.join(audio_path, row.primaryKey+'.wav')
+    # p=set_params(sentenceID=row.analysisId, waveFileAddress=path, module=module)
+    # status, textgridData, s = get_annotated_signal(p)
+    # wordStress(p)
+
+    # os.system('cat '+p['inputPhoneticTranscription'])
+    # os.system('cat ./lexicon/wordStress/dct_old/'+os.path.split(p['inputPhoneticTranscription'])[-1])
+    # os.system('cat '+p['inputGrammar'])
 
 def sentenceStress_performance_test():
     d=get_data()
@@ -130,15 +144,16 @@ def sentenceStress_performance_test():
     d=d[d.focusType==focusType]
     audio_path="../audio-with-analysis-ids/audio/"
     preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
-    GTs_from_phonetics=[]
 
     for i,r in d.iterrows():
         d=d.replace(d.loc[i].text,remove_special_characters(r.text))
     # d=d[d.text.isin(set([remove_special_characters(el) for el in textDict.values()]))]
 
+    analysed_ids=[]
     for id,bin in a.items():
         # print(bin)
         row=d[d.text==remove_special_characters(textDict[id])]
+        # if len(row)==0:print(id)
         if len(row)>0:
             # print(remove_special_characters(textDict[id]))
             # row=d[d.analysisId==id]  #[d.focusType=='wordstress']
@@ -150,7 +165,7 @@ def sentenceStress_performance_test():
                 statuss.append(status)
                 preds.append(pred)
                 GTs.append(ground_truth)
-                # GTs_from_phonetics.append(word_stress_from_text(row.text.values[0]))
+                analysed_ids.append(id)
             except:
                 print('Error with:')
                 print(row)
@@ -161,7 +176,73 @@ def sentenceStress_performance_test():
     print(preds)
     print(GTs)
     # print(GTs_from_phonetics)
+    all_zero_baseline=[np.zeros(len(el)) for el in GTs]
     print(errors)
+    print("all zero baseline")
+    compute_errors(all_zero_baseline, GTs)
+
+    print("algo performance")
+    compute_errors(preds, GTs)
+
+
+def sentenceStress_automatic_annot_performance_test():
+    d=get_data()
+    #d[d.analysisId==232][d.focusType=='wordstress']
+    a,textDict=get_sentenceStress_annotation()
+    module='sentenceStress'
+    focusType='sentencestress'
+    d=d[d.focusType==focusType]
+    audio_path="../audio-with-analysis-ids/audio/"
+    preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
+
+    for i,r in d.iterrows():
+        d=d.replace(d.loc[i].text,remove_special_characters(r.text))
+    # d=d[d.text.isin(set([remove_special_characters(el) for el in textDict.values()]))]
+
+    analysed_ids=[]
+    for id,bin in a.items():
+        # print(bin)
+        row=d[d.text==remove_special_characters(textDict[id])]
+        # if len(row)==0:print(id)
+        if len(row)>0:
+            # print(remove_special_characters(textDict[id]))
+            # row=d[d.analysisId==id]  #[d.focusType=='wordstress']
+            ground_truth=a[id]
+            path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
+            p=set_params(sentenceID=id, waveFileAddress=path, module='sentenceStress')
+            make_dct_all_phones_from_text(row.text.values[0])
+            make_grammar_from_all_phones_dct()
+
+            p['inputPhoneticTranscription']='test.dct'
+            p['inputGrammar']='test.txt'
+
+            try:
+                status, scores_by_word=vowel_stresses(p)
+                max_scores_by_word=[max(el) for el in scores_by_word]
+                binResult=np.zeros(len(max_scores_by_word))
+                binResult[np.argmax(max_scores_by_word)]=1
+
+                # status, pred=sentenceStress(p)
+                statuss.append(status)
+                preds.append(binResult)
+                GTs.append(ground_truth)
+                analysed_ids.append(id)
+            except:
+                print('Error with:')
+                print(row)
+                errors.append(row)
+                p_errors.append(p)
+                # import pdb;pdb.set_trace()
+    
+    print(preds)
+    print(GTs)
+    # print(GTs_from_phonetics)
+    all_zero_baseline=[np.zeros(len(el)) for el in GTs]
+    print(errors)
+    print("all zero baseline")
+    compute_errors(all_zero_baseline, GTs)
+
+    print("algo performance")
     compute_errors(preds, GTs)
 
 def iContrast_performance_test():
@@ -364,11 +445,9 @@ def get_phone_termination_dict():
 
 def pContrast_from_audiobook_data(data_set='dev-clean', contrasted_phonemes=['AO1', 'OW1'], alternatives=['AO1', 'OW1', 'AW1'], module="oContrast"):
     libri_words_df=build_librispeech_words_df(data_set=data_set)
-
     results_dfs={}
     failure_dfs={}
     performances={}
-
     for contrasted_phone in tqdm(contrasted_phonemes):
         # full_termination=' '+' '.join([pretermination,termination])
         # correct_terminations=[' '+' '.join([pretermination,el]) for el in correct_alternatives[termination]]
@@ -383,6 +462,7 @@ def pContrast_from_audiobook_data(data_set='dev-clean', contrasted_phonemes=['AO
             # results_df.phones=results_df.phones.str.replace('OW0','OW1')
             # results_df.phones=results_df.phones.str.replace('OW0','OW1')
 
+            # with this measure, I actually do not know if the mistake is the confusion or not
             success=results_df[results_df.phones==results_df.detected_transcription]
             failure=results_df[results_df.phones!=results_df.detected_transcription]
             success_rate=len(success)/(len(success)+len(failure))
@@ -392,7 +472,6 @@ def pContrast_from_audiobook_data(data_set='dev-clean', contrasted_phonemes=['AO
             performances[contrasted_phone]=success_rate
     
     pickle.dump({'results_dfs':results_dfs, 'failure_dfs':failure_dfs,  'performances':performances}, open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p', 'wb'))
-
 
 
 def edAnalysis_from_audiobook_data(data_set='dev-clean'):
@@ -434,11 +513,11 @@ def show_summary(data_set='dev-clean', contrasted_phonemes=['AO1', 'OW1'], modul
     summary=pd.DataFrame.from_records([lens, performances]).T
     summary.columns=['n of examples', 'performances']
 
-    print(summary)
+    # print(summary)
 
     # bad performances are mostly with D terminations
-    print(summary[summary.performances<0.78])
-    print(summary[summary.performances>0.78])
+    # print(summary[summary.performances<0.78])
+    # print(summary[summary.performances>0.78])
 
     print(summary.sort_values('performances').dropna())
 
@@ -475,11 +554,12 @@ def show_summary(data_set='dev-clean', contrasted_phonemes=['AO1', 'OW1'], modul
 
 if __name__ == "__main__":
     pContrast_from_audiobook_data(contrasted_phonemes=['DH', 'TH'], alternatives=['DH', 'TH'], module="thContrast")
-    show_summary(contrasted_phonemes=['DH', 'TH'],  module="thContrast")
+    show_summary(contrasted_phonemes=['DH', 'TH'], module="thContrast")
+    show_summary(contrasted_phonemes=['IY1', 'IH1'], module="iContrast")
+    show_summary()
 
     # pContrast_from_audiobook_data(contrasted_phonemes=['IY1', 'IH1'], alternatives=['IY1', 'IH1'], module="iContrast")
     # pContrast_from_audiobook_data()
-
     # edAnalysis_from_audiobook_data(data_set='test-other')
 
     results_df=compute_prediction_results(selection, libri_words_df, termination=contrasted_phone, alternatives=alternatives, module=module)
