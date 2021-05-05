@@ -59,7 +59,7 @@ def build_librispeech_words_df(
             end=el.maxTime
             wav_path=os.path.join(audio_path,'/'.join(f.split('/')[1:]).split('.')[0]+'.flac')
             d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f, 'wav_path':wav_path}
-            # d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f, 'sentence':get_sentence(f)}
+            # d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f, 'wav_path':wav_path, 'sentence':get_sentence(f)}
 
             records.append(d)
     libri_words_df=pd.DataFrame.from_records(records)
@@ -98,7 +98,9 @@ if __name__ == "__main__":
     libri_words_df[libri_words_df.phones.str.endswith(' IH0 D')]
     libri_words_df[libri_words_df.phones.str.endswith(' T IH0 D')]
     libri_words_df[libri_words_df.phones.str.endswith(' T EH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith(' T AH0 D')]
     libri_words_df[libri_words_df.phones.str.endswith(' D IH0 D')]
+    libri_words_df[libri_words_df.phones.str.endswith(' D AH0 D')]
 
     libri_words_df[libri_words_df.phones.str.endswith(' V D')]
     libri_words_df[libri_words_df.phones.str.endswith(' M D')]
@@ -124,6 +126,21 @@ if __name__ == "__main__":
 
 
     selection=libri_words_df[libri_words_df.phones.str.endswith(' P T') & libri_words_df.word.str.endswith('ped')]
+
+    libri_words_df[libri_words_df.phones.str.contains(' EH1 ') & libri_words_df.word.str.contains('ea')]
+    libri_words_df[libri_words_df.phones.str.contains(' IY1 ') & libri_words_df.word.str.contains('ea')]
+    libri_words_df[libri_words_df.phones.str.contains(' UH1 ') & libri_words_df.word.str.contains('oo')]
+    libri_words_df[libri_words_df.phones.str.contains(' UW1 ') & libri_words_df.word.str.contains('oo')]
+    libri_words_df[libri_words_df.phones.str.contains(' AW1 ') & libri_words_df.word.str.contains('ou')]
+    libri_words_df[libri_words_df.phones.str.contains(' UW1 ') & libri_words_df.word.str.contains('ou')]
+
+    
+    selection=libri_words_df[libri_words_df.word=='public']
+
+    sents=[]
+    for i,r in selection.iterrows():
+        sents.append(get_sentence(r.path))
+
 
     example=selection.iloc[0,:]
 
