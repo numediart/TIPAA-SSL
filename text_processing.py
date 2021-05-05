@@ -3,6 +3,8 @@ import re
 import cmudict
 from tqdm import tqdm
 
+cmudict_dict=cmudict.dict()
+
 def get_cmudict_info(word='university'):
     """get the first possible phonetisation of a word from cmudict
 
@@ -11,7 +13,7 @@ def get_cmudict_info(word='university'):
     Returns:
         list: phonemes and a number for each vowle indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
     """
-    return cmudict.dict()[word][0]
+    return cmudict_dict[word][0]
 
 def remove_special_characters(sentence="Where's the best place to have coffee ?"):
     chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
