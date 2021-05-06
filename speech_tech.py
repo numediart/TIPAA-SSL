@@ -197,6 +197,7 @@ def sentenceStress(
     startPositions_samples=startPositions_samples.tolist()
     stopPositions_samples=stopPositions_samples.tolist()
     
+    # this
     Imax=np.zeros(len(textgridData))
     Fmax=np.zeros(len(textgridData))
     for i in range(len(textgridData)):
@@ -222,85 +223,78 @@ def sentenceStress(
 
     # combine the features into a final result
     # weighted_score = (0.6*zImax + 0.4*zFmax + 0.2*zDur)/1.2;
-    weighted_score = (0.6*zImax + 0.4*zFmax)/1.0 # needs fine-tuning once enough user data are available - in the long term consider additional futures and train a classifier with annotated user data
+    # weighted_score = (0.6*zImax + 0.4*zFmax)/1.0 # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
+    # weighted_score = zImax*zFmax # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
+    weighted_score=zImax
+
+    weighted_score=normalize(weighted_score)
+
     rateThreshold = 1.01
     nWords=len(textgridData)
     binResult = np.zeros(nWords)
     
+    fig=plt.figure()
     plt.plot(weighted_score)
+    # plt.plot(zFmax)
     plt.savefig('sentence_curve.png')
 
-    if nWords == 1:
-        binResult[0] = 1
-    elif nWords == 2:
-        sWS_id=np.argsort(weighted_score)[::-1]
-        sWS_val=weighted_score[sWS_id]
-        # TODO : I have to check if this make any sense. 
-        # in the case with only two words, we ckeck if the higher is at least 1% higher than the other and put 1 there... (why this 1% ?)
-        if sWS_val[0] > rateThreshold*sWS_val[1]:
-            binResult[sWS_id[0]] = 1
-    else:
-        #TODO : this mean score has to be adapted because he uses a normalization that led to values in a small range 
-        # meanScore = 0.90*max(weighted_score)
-        # meanScore= weighted_score.mean()
-        meanScore=0.2
-        if (weighted_score[0] > rateThreshold*weighted_score[1]) and (weighted_score[0] > meanScore):
+    # The original method from georgious does something with the evolution of the weighted_score
+    # and then does a threshold. If the threshold is very high (0.98), with my normalization, 
+    # it is almost the same (exactly the same for the examples I have) as just taking the max.
+
+    # The second is thus a lot more simple: put one at the max of weighted_score
+    if False:
+        if nWords == 1:
             binResult[0] = 1
-        elif (weighted_score[1] > rateThreshold*max(weighted_score[[0, 2]])) and (weighted_score[1] > meanScore):
-            binResult[1] = 1
-        elif (weighted_score[-1] > rateThreshold*weighted_score[-2]) and (weighted_score[-1] > meanScore):
-            binResult[-1] = 1
-        if nWords > 3:
-            for i in range(2,nWords-1):
-                if (weighted_score[i] > rateThreshold*max(weighted_score[[i-1, i+1]])) and (weighted_score[i] > meanScore):
-                    binResult[i] = 1
-    
+        elif nWords == 2:
+            sWS_id=np.argsort(weighted_score)[::-1]
+            sWS_val=weighted_score[sWS_id]
+            # TODO : I have to check if this make any sense. 
+            # in the case with only two words, we ckeck if the higher is at least 1% higher than the other and put 1 there... (why this 1% ?)
+            if sWS_val[0] > rateThreshold*sWS_val[1]:
+                binResult[sWS_id[0]] = 1
+        else:
+            #TODO : this mean score has to be adapted because he uses a normalization that led to values in a small range 
+            # meanScore = 0.90*max(weighted_score)
+            # meanScore= weighted_score.mean()
+            meanScore=0.98
+
+            if (weighted_score[0] > rateThreshold*weighted_score[1]) and (weighted_score[0] > meanScore):
+                binResult[0] = 1
+            elif (weighted_score[1] > rateThreshold*max(weighted_score[[0, 2]])) and (weighted_score[1] > meanScore):
+                binResult[1] = 1
+            elif (weighted_score[-1] > rateThreshold*weighted_score[-2]) and (weighted_score[-1] > meanScore):
+                binResult[-1] = 1
+            if nWords > 3:
+                for i in range(2,nWords-1):
+                    if (weighted_score[i] > rateThreshold*max(weighted_score[[i-1, i+1]])) and (weighted_score[i] > meanScore):
+                        binResult[i] = 1
+    else:
+        binResult[np.argmax(weighted_score)]=1
+
     return "success", binResult
-        
-def wordStress(
-    p=set_params(sentenceID=112, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
-    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
-    ):
-    """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
-    a value by vowel representing a stress intensity
 
-    Args:
-        p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
 
-    Returns:
-        string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
-    """
-    status, textgridData, s = get_annotated_signal(p)
-    if textgridData is None:
-        return status, []
 
-    # TODO: use these for verification 
-    # if verification_n_of_phoneme(textgridData, p):
-    #     return "error: inconsistent number of detected phonemes", []
-
-    #extract the number of words by taking the index of the last one
-    nWords=int(textgridData[2].iloc[-1].split('_')[0][1:])
-
-    # for each entry, the second column is something like "w1_v1_1" or "w1_g1_1". the v is for vowel.
+def vowels(textgridData):
+    # for each entry, the second column is something like "w1_v1_1" or "w1_c1_1". the v is for vowel.
     # I tranform that to a table
     phone_df=pd.DataFrame([r[2].split('_') for i,r in textgridData.iterrows()])
+    vowels_df=phone_df[phone_df.apply(lambda r:r[1][0]=='v', axis=1)]
+    indxVowels=vowels_df.index.tolist()
 
-    nVowelsPerWord=np.zeros(nWords, dtype=int)
-    # for each entry of textgridData, we look at the word index, and if the phone is a vowel, we increment its number of vowels
-    for i,r in phone_df.iterrows():
-        word_index=int(r[0][1:])-1
-        phone_type=r[1][0]
-        # print(word_index)
-        # print(phone_type)
-        if phone_type=='v':
-            nVowelsPerWord[word_index]+=1
+    #extract the number of words by taking the index of the last one
+    # nWords=int(textgridData[2].iloc[-1].split('_')[0][1:])+1
+    nWords=len(phone_df.iloc[:,0].unique())
+    nVowelsPerWord=[]
+    for w in phone_df.iloc[:,0].unique():
+        nVowelsPerWord.append(len(vowels_df[vowels_df.iloc[:,0]==w]))
+    return indxVowels, nVowelsPerWord
 
-    is_vowel=[r[2].split('_')[1][0]=='v' for i,r in textgridData.iterrows()]
-    indxVowels = [i for i, val in enumerate(is_vowel) if val] 
-    nVowels=len(indxVowels)
-
+def check_words_duration():
+    pass
     # number of phoneme per entry in dct file this is set to 1 when vowel ELSE corresponds to the integer at the end of "w1_v1_1"
-    phoPerEntry=[int(r[2].split('_')[-1]) for i,r in textgridData.iterrows()]
+    # phoPerEntry=[int(r[2].split('_')[-1]) for i,r in textgridData.iterrows()]
     
     # TODO: check words duration
 
@@ -320,20 +314,20 @@ def wordStress(
     #     return;
     # end
 
-
-    f0Samples=getIntonation(s, p['fs_target'])
-    intensity=getIntensity(s, p['fs_target'])
+def compute_stress_score(textgridData, s, fs, indxVowels, nVowelsPerWord):
+    f0Samples=getIntonation(s, fs)
+    intensity=getIntensity(s, fs)
 
     # extract features
-
     # each word start and end position expressed in samples
-    startPositions_samples = (round(p['fs_target']*textgridData.iloc[:,0])+1).astype(int).tolist()
-    stopPositions_samples = round(p['fs_target']*textgridData.iloc[:,1]).astype(int).tolist()
+    startPositions_samples = (round(fs*textgridData.iloc[:,0])+1).astype(int).tolist()
+    stopPositions_samples = round(fs*textgridData.iloc[:,1]).astype(int).tolist()
     
     # to make sure we don t go beyond the end of the signal
     assert stopPositions_samples[-1]<len(s), "The end of the last phoneme should be inside the signal"
 
     Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
+    nVowels=len(indxVowels)
     sylType=np.zeros(nVowels)
     for i in range(nVowels):
         range_vowel=range(startPositions_samples[indxVowels[i]], stopPositions_samples[indxVowels[i]])
@@ -348,7 +342,9 @@ def wordStress(
         Dur.append(textgridData[1].iloc[indxVowels[i]]-textgridData[0].iloc[indxVowels[i]])
 
         # textgridData[2].iloc[indxVowels[i]]
-
+        
+        phone_df=pd.DataFrame([r[2].split('_') for i,r in textgridData.iterrows()])
+        # here we use the prediction of HMM model as an indication, as it has to classify 0, 1 or 2
         syltype_phone=int(phone_df[2].iloc[indxVowels[i]])
         if syltype_phone == 2:  # the sylType is 0 for unstressed, 0.5 for secondary stressed syllables and 1 for primary stressed syllables
             sylType[i] = 0.5
@@ -364,25 +360,62 @@ def wordStress(
 
     # combine the features
     weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur + 0.4*sylType)/3.6  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
+    # weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur)/3.2  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
+    return weighted_score
 
+def vowel_stresses(
+        p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
+        ):
+    status, textgridData, s = get_annotated_signal(p)
+    if textgridData is None:
+        return status, []
+
+    # TODO: use these for verification 
+    # if verification_n_of_phoneme(textgridData, p):
+    #     return "error: inconsistent number of detected phonemes", []
+
+    indxVowels, nVowelsPerWord=vowels(textgridData)
+    weighted_score=compute_stress_score(textgridData, s,  p['fs_target'], indxVowels, nVowelsPerWord)
+    print(weighted_score)
+    fig=plt.figure()
     plt.plot(weighted_score)
     plt.savefig('word_curve.png')
     # chose prominent vowel per word
-    binResult=np.zeros(len(weighted_score))
-    for i in range(nWords):
-        # make the indices range of syllables (or vowels) in the sentence
-        if i == 0:
-            syl_id = np.arange(nVowelsPerWord[i])
-        else:
-            syl_id = np.arange(nVowelsPerWord[i])+sum(nVowelsPerWord[:i])
-        maxscore = max(weighted_score[syl_id]) # the max score over a word
-        for j in range(len(syl_id)):
-            if weighted_score[syl_id[j]] == maxscore:
-                binResult[syl_id[j]] = 1
-            elif weighted_score[syl_id[j]] >= 0.98*maxscore: # syllables close to the max score (i.e., 98% of its value) are also considered as stressed
-                binResult[syl_id[j]] = 1
-            else:
-                binResult[syl_id[j]] = 0
+
+    assert sum(nVowelsPerWord)==len(weighted_score)
+
+    weighted_score_by_word=[]
+    syl_start=0
+    for w_i,n_v in enumerate(nVowelsPerWord):
+        weighted_score_by_word.append(weighted_score[syl_start:syl_start+n_v])
+        syl_start+=n_v
+    
+    return status, weighted_score_by_word
+
+def wordStress(
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
+    ):
+    """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
+    a value by vowel representing a stress intensity
+
+    Args:
+        p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
+
+    Returns:
+        string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
+    """
+    
+    status, weighted_score_by_word=vowel_stresses(p)
+
+    def max_by_line(a):
+        a_max=[]
+        for el in a:
+            a_max.append((el == el.max()).astype(int))
+        return a_max
+
+    bin_score_by_word=max_by_line(weighted_score_by_word)
+    binResult=np.concatenate(bin_score_by_word)
     
     return "success", binResult
 
