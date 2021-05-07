@@ -11,6 +11,14 @@ import speech_tech
 def index():
     return send_from_directory( '.','index.html')
 
+@app.route('/phonemeContrast.html')
+def phonemeContrast_html():
+    return send_from_directory( '.','phonemeContrast.html')
+
+@app.route('/vowel_stresses.html')
+def vowel_stresses_html():
+    return send_from_directory( '.','vowel_stresses.html')
+
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 upload_path="./upload_files/"
@@ -28,11 +36,11 @@ def add_message(module):
     # import pdb;pdb.set_trace()
     print(request.__dict__)
     print(content)
-    print(content['data[sentenceID]'])
-    print(content['data[filename]'])
+    print(content['sentenceID'])
+    print(content['filename'])
     # return jsonify({"uuid":uuid})
-    filename=content['data[filename]']
-    sentenceID=content['data[sentenceID]']
+    filename=content['filename']
+    sentenceID=content['sentenceID']
     p=set_params(sentenceID=int(sentenceID), waveFileAddress=upload_path+filename, module=module)
     try:
       method_to_call = getattr(speech_tech, module)
@@ -49,5 +57,65 @@ def add_message(module):
     response=json.dumps(d)
     return response
   
+
+  
+@app.route('/vowel_stresses', methods=['GET', 'POST'])
+def vowel_stresses_api():
+    content = request.form
+    # import pdb;pdb.set_trace()
+    print(request.__dict__)
+    print(content)
+    print(content['text'])
+    print(content['filename'])
+    filename=content['filename']
+    text=content['text']
+    p=set_params(waveFileAddress=upload_path+filename)
+    p=make_all_phones_annotation_files(p,text)
+    status,result=vowel_stresses(p)
+    print('result:',result)
+    if not isinstance(result, list):
+      print('result:',result)
+      result=result.tolist()
+    d={'status':status, 'result':result}
+    response=json.dumps(d)
+    return response
+
+import ast
+@app.route('/phonemeContrast', methods=['GET', 'POST'])
+def phoneme_contrast_api():
+    content = request.form
+    # import pdb;pdb.set_trace()
+    print(request.__dict__)
+    print(content)
+    print(content['text'])
+    print(content['filename'])
+    print(content['word_id'])
+    filename=content['filename']
+    text=content['text']
+    word_id=content['word_id']
+    alternatives=ast.literal_eval(content['alternatives'])
+    print(alternatives)
+    
+    p=set_params(waveFileAddress=upload_path+filename)
+    p=make_pContrast_annotation_files(p,text=text,word_id=int(word_id), termination='D', 
+                alternatives=alternatives)
+    status,result=phonemeContrast(p)
+    print('status:',status)
+    print('result:',result)
+    if not isinstance(result, list):
+      result=result.tolist()
+      print('result:',result)
+
+    if result!=[]:  
+      phonetic_transcript=result[-1]
+    else:
+      phonetic_transcript=result
+    d={'status':status, 'result':phonetic_transcript}
+    response=json.dumps(d)
+    return response
+
+def run_app():
+  app.run(debug=True, host='0.0.0.0')
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    run_app()
