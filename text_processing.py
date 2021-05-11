@@ -11,7 +11,7 @@ def get_cmudict_info(word='university'):
     Args:
         word (str, optional): input. Defaults to 'university'.
     Returns:
-        list: phonemes and a number for each vowle indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
+        list: phonemes and a number for each vowel indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
     """
     return cmudict_dict[word][0]
 
