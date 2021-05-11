@@ -84,7 +84,7 @@ def make_all_phones_annotation_files(
     return p
 
 def make_pContrast_annotation_files(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
-                text="turned around",word_id=0, termination='D', 
+                text="turned around",word_id=0, target_phones='D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
@@ -92,7 +92,7 @@ def make_pContrast_annotation_files(p=set_params(sentenceID=111, waveFileAddress
     # make_grammar_from_all_phones_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     phonetics=phonetics_from_sentence(text)
     phonetics=[' '.join(w) for w in phonetics]
-    make_generic_dct_from_phonetics(phonetics=phonetics, word_id=word_id, termination=termination, alternatives=alternatives, path=p['inputPhoneticTranscription'])
+    make_generic_dct_from_phonetics(phonetics=phonetics, word_id=word_id, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
@@ -664,7 +664,20 @@ def timing_test(module='wordStress', n=100, p=None):
         times.append(time()-start)
     print(np.mean(times))
     return np.mean(times)
-    
+
+def phonemeContrast_from_text_audio(text, audio_path, word_id, target_phones, alternatives):
+    p=set_params(waveFileAddress=audio_path)
+    p=make_pContrast_annotation_files(p,text=text, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
+    status,result=phonemeContrast(p)
+    return status, result
+
+def vowel_stresses_from_text_audio(text, audio_path):
+    p=set_params(waveFileAddress=audio_path)
+    p=make_all_phones_annotation_files(p,text)
+    status,result=vowel_stresses(p)
+    return status, result
+
+
 if __name__ == "__main__":
     # execute only if run as a script
     # Test performance of wordStress module

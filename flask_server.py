@@ -69,9 +69,11 @@ def vowel_stresses_api():
     print(content['filename'])
     filename=content['filename']
     text=content['text']
-    p=set_params(waveFileAddress=upload_path+filename)
-    p=make_all_phones_annotation_files(p,text)
-    status,result=vowel_stresses(p)
+    # p=set_params(waveFileAddress=upload_path+filename)
+    # p=make_all_phones_annotation_files(p,text)
+    # status,result=vowel_stresses(p)
+
+    status,result=vowel_stresses_from_text_audio(text,upload_path+filename)
     print('result:',result)
     if not isinstance(result, list):
       print('result:',result)
@@ -86,7 +88,7 @@ def phoneme_contrast_api():
     content = request.form
     # import pdb;pdb.set_trace()
     print(request.__dict__)
-    print(content)
+    # print(content)
     print(content['text'])
     print(content['filename'])
     print(content['word_id'])
@@ -96,10 +98,11 @@ def phoneme_contrast_api():
     alternatives=ast.literal_eval(content['alternatives'])
     print(alternatives)
     
-    p=set_params(waveFileAddress=upload_path+filename)
-    p=make_pContrast_annotation_files(p,text=text,word_id=int(word_id), termination='D', 
-                alternatives=alternatives)
-    status,result=phonemeContrast(p)
+    # p=set_params(waveFileAddress=upload_path+filename)
+    # p=make_pContrast_annotation_files(p,text=text,word_id=int(word_id), target_phones='D', 
+    #             alternatives=alternatives)
+    # status,result=phonemeContrast(p)
+    status,result=phonemeContrast_from_text_audio(text, upload_path+filename, int(word_id), 'D', alternatives)
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):
