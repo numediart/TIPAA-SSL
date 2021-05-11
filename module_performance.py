@@ -209,15 +209,11 @@ def sentenceStress_automatic_annot_performance_test():
             # row=d[d.analysisId==id]  #[d.focusType=='wordstress']
             ground_truth=a[id]
             path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
-            p=set_params(sentenceID=id, waveFileAddress=path, module='sentenceStress')
-            make_dct_all_phones_from_text(row.text.values[0])
-            make_grammar_from_all_phones_dct()
-
-            p['inputPhoneticTranscription']='test.dct'
-            p['inputGrammar']='test.txt'
+            # p=set_params(sentenceID=id, waveFileAddress=path, module='sentenceStress')
 
             try:
-                status, scores_by_word=vowel_stresses(p)
+                # status, scores_by_word=vowel_stresses(p)
+                status, scores_by_word=vowel_stresses_from_text_audio(row.text.values[0], path)
                 max_scores_by_word=[max(el) for el in scores_by_word]
                 binResult=np.zeros(len(max_scores_by_word))
                 binResult[np.argmax(max_scores_by_word)]=1
@@ -231,7 +227,7 @@ def sentenceStress_automatic_annot_performance_test():
                 print('Error with:')
                 print(row)
                 errors.append(row)
-                p_errors.append(p)
+                # p_errors.append(p)
                 # import pdb;pdb.set_trace()
     
     print(preds)
@@ -258,7 +254,7 @@ def iContrast_performance_test():
     preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
 
     diff=[abs(el[0]-el[1]) for el in zip(preds,GTs) if el[0]!=[]]
-    sum(diff)
+    # sum(diff)
     
     mismatch_rate=(len(preds)-len(diff))/len(preds)
     # bin_error_rate=stress_error/total_n
@@ -267,6 +263,33 @@ def iContrast_performance_test():
     print('mismatch_rate:',mismatch_rate)
     # print('bin error rate:', bin_error_rate)
     print('example error rate:', example_error_rate)
+
+
+# def iContrast_automatic_annot_performance_test():
+#     d=get_data()
+#     #d[d.analysisId==232][d.focusType=='wordstress']
+#     # a=get_wordStress_annotation()
+#     module='iContrast'
+#     focus=module_name_to_focus_type[module]
+#     # audio_path="../audio-with-analysis-ids/audio/"
+#     d=d[d.focusType==focus]
+#     a=get_iContrast_annotations()
+    
+#     preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
+
+#     phonemeContrast_from_text_audio(text, audio_path, word_id, target_phones, alternatives)
+
+#     diff=[abs(el[0]-el[1]) for el in zip(preds,GTs) if el[0]!=[]]
+#     # sum(diff)
+    
+#     mismatch_rate=(len(preds)-len(diff))/len(preds)
+#     # bin_error_rate=stress_error/total_n
+#     example_error_rate=sum(diff)/(len(diff))
+#     print('n of examples:', len(preds))
+#     print('mismatch_rate:',mismatch_rate)
+#     # print('bin error rate:', bin_error_rate)
+#     print('example error rate:', example_error_rate)
+
 
 
 def edAnalysis_performance_test():
@@ -301,7 +324,7 @@ def edAnalysis_performance_test():
 
 
 
-def compute_voicings(selection, libri_words_df, termination='IH0 D'):
+def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
     prosodies=[]
     for i,row in tqdm(selection.iterrows()):
         sentence=get_sentence(row.path)
@@ -313,11 +336,11 @@ def compute_voicings(selection, libri_words_df, termination='IH0 D'):
 
         # set params and make label files for phonetics and grammar
         p=set_params(waveFileAddress=row.wav_path, sentenceID=None, basename='test', module='edAnalysis')
-        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, termination=termination, path=p['inputPhoneticTranscription'])
+        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, target_phones=target_phones, path=p['inputPhoneticTranscription'])
         make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
         prosodies.append(prosody_by_phone(p))
 
-def compute_prediction_results(selection, libri_words_df, termination='IH0 D', 
+def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D', 
                             alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], module='edAnalysis'):
     detected_transcriptions=[]
     statuss=[]
@@ -340,17 +363,13 @@ def compute_prediction_results(selection, libri_words_df, termination='IH0 D',
 
         make_dir(os.path.split(p['inputPhoneticTranscription'])[0])
         make_dir(os.path.split(p['inputGrammar'])[0])
-        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, termination=termination, alternatives=alternatives, path=p['inputPhoneticTranscription'])
-        
-        # df=pd.read_csv(p['inputPhoneticTranscription'], header=None)
-        # p_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='p', axis=1)
-
-        # if not p_list.sum(): import pdb;pdb.set_trace()
-
+        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
         make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
 
         # run phonemeContrast module
         status, results= phonemeContrast(p)
+
+        # status, results=phonemeContrast_from_text_audio(sentence, row.wav_path, row.word_idx, target_phones, alternatives)
         # prosody=prosody_by_phone(p)
         # status, textgridData, s=get_annotated_signal(p)
         statuss.append(status)
@@ -383,7 +402,7 @@ def get_rest(results_df, correct_terminations=['T IH0 D', 'T IH1 D', 'T IH2 D'])
         rest=rest[~rest.detected_transcription.str.endswith(el)]
     return rest
 
-def performance_test(selection, results_df, correct_terminations, termination):
+def performance_test(selection, results_df, correct_terminations, target_phones):
     # print(rate)
     rate=compute_score(results_df, correct_terminations=correct_terminations)
     rest=get_rest(results_df, correct_terminations=correct_terminations)
@@ -443,8 +462,11 @@ def get_phone_termination_dict():
 
     return phone_termination_dict, correct_alternatives
 
-def pContrast_from_audiobook_data(data_set='dev-clean', contrasted_phonemes=['AO1', 'OW1'], alternatives=['AO1', 'OW1', 'AW1'], module="oContrast"):
+
+def pContrast_from_audiobook_data(data_set='dev-clean', contrasted_phonemes=['AO1', 'OW1'], alternatives=['AO1', 'OW1', 'AW1'], module="oContrast", n=None):
     libri_words_df=build_librispeech_words_df(data_set=data_set)
+    if n is not None: libri_words_df=libri_words_df.iloc[:n,:]
+
     results_dfs={}
     failure_dfs={}
     performances={}
@@ -454,7 +476,7 @@ def pContrast_from_audiobook_data(data_set='dev-clean', contrasted_phonemes=['AO
         selection=libri_words_df[libri_words_df.phones.str.contains(contrasted_phone)]
 
         if len(selection)>0:
-            results_df=compute_prediction_results(selection, libri_words_df, termination=contrasted_phone, alternatives=alternatives, module=module)
+            results_df=compute_prediction_results(selection, libri_words_df, target_phones=contrasted_phone, alternatives=alternatives, module=module)
             # rate, rest=performance_test(selection, results_df, correct_terminations, termination)
 
             # results_df.detected_transcription=results_df.detected_transcription.str.replace('OW2','OW1')
@@ -470,12 +492,18 @@ def pContrast_from_audiobook_data(data_set='dev-clean', contrasted_phonemes=['AO
             results_dfs[contrasted_phone]=results_df
             failure_dfs[contrasted_phone]=failure
             performances[contrasted_phone]=success_rate
-    
-    pickle.dump({'results_dfs':results_dfs, 'failure_dfs':failure_dfs,  'performances':performances}, open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p', 'wb'))
 
+    all_results={'results_dfs':results_dfs, 'failure_dfs':failure_dfs,  'performances':performances}
+    if n is None:
+        pickle.dump(all_results, open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p', 'wb'))
+    else:
+        pickle.dump(all_results, open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'_from_'+str(n)+'egs.p', 'wb'))
+    return all_results
 
-def edAnalysis_from_audiobook_data(data_set='dev-clean'):
+def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
     libri_words_df=build_librispeech_words_df(data_set=data_set)
+    if n is not None: libri_words_df=libri_words_df.iloc[:n,:]
+
     phone_termination_dict, correct_alternatives=get_phone_termination_dict()
 
     results_dfs={}
@@ -488,20 +516,26 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean'):
         selection=libri_words_df[libri_words_df.phones.str.endswith(full_termination)]
 
         if len(selection)>0:
-            results_df=compute_prediction_results(selection, libri_words_df, termination=termination)
+            results_df=compute_prediction_results(selection, libri_words_df, target_phones=termination)
             rate, rest=performance_test(selection, results_df, correct_terminations, termination)
 
             results_dfs[pretermination]=results_df
             rests_dfs[pretermination]=rest
             performances[pretermination]=rate
     
-    pickle.dump({'results_dfs':results_dfs, 'rests_dfs':rests_dfs,  'performances':performances}, open('ed_performance_'+data_set+'.p', 'wb'))
-
+    all_results={'results_dfs':results_dfs, 'rests_dfs':rests_dfs,  'performances':performances}
+    if n is None:
+        pickle.dump(all_results, open('ed_performance_'+data_set+'.p', 'wb'))
+    else:
+        pickle.dump(all_results, open('ed_performance_'+data_set+'_from_'+str(n)+'egs.p', 'wb'))
+    return all_results
+    
 def show_summary(data_set='dev-clean', contrasted_phonemes=['AO1', 'OW1'], module="oContrast"):
-    ed_performance=pickle.load(open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p','rb'))
-    performances=ed_performance['performances']
-    results_dfs=ed_performance['results_dfs']
-    failure_dfs=ed_performance['failure_dfs']
+    # performance=pickle.load(open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p','rb'))
+    performance=pickle.load(open('ed_performance_'+data_set+'.p','rb'))
+    performances=performance['performances']
+    results_dfs=performance['results_dfs']
+    failure_dfs=performance['failure_dfs']
     lens={}
     for k,el in results_dfs.items(): lens[k]=len(el)
 
@@ -556,10 +590,11 @@ if __name__ == "__main__":
     pContrast_from_audiobook_data(contrasted_phonemes=['DH', 'TH'], alternatives=['DH', 'TH'], module="thContrast")
     show_summary(contrasted_phonemes=['DH', 'TH'], module="thContrast")
     show_summary(contrasted_phonemes=['IY1', 'IH1'], module="iContrast")
+    show_summary(contrasted_phonemes=['AO1', 'OW1'], module="oContrast")
     show_summary()
 
     # pContrast_from_audiobook_data(contrasted_phonemes=['IY1', 'IH1'], alternatives=['IY1', 'IH1'], module="iContrast")
     # pContrast_from_audiobook_data()
     # edAnalysis_from_audiobook_data(data_set='test-other')
 
-    results_df=compute_prediction_results(selection, libri_words_df, termination=contrasted_phone, alternatives=alternatives, module=module)
+    results_df=compute_prediction_results(selection, libri_words_df, target_phones=contrasted_phone, alternatives=alternatives, module=module)

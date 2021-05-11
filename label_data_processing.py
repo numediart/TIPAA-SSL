@@ -74,66 +74,6 @@ def get_sentenceStress_annotation(path='../audio-with-analysis-ids/learning_cont
         textDict[i]=r['Sentence stress']
     
     return binDict, textDict
-
-def make_generic_dct_from_text(sentence="I accepted to go to spain", word_id=1, termination='IH0 D', 
-                alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
-
-    phonetics=[cmudict.dict()[el] for el in remove_special_characters(sentence).split(' ')]
-    # phonetics=phonetics_from_sentence(sentence)
-    # words=['w'+str(i)+' '+' '.join(word) for i,word in enumerate(phonetics)]
-
-    lines=[]
-    for i,alternative_words in enumerate(phonetics):
-        # print(alternatives)
-        if i!=word_id:
-            for j,word in enumerate(alternative_words):
-                # print(word)
-                lines.append('w'+str(i)+' ['+'w'+str(i)+'_'+str(j)+'] '+' '.join(word))
-        else:
-            # we detail phonemes for the target word
-            # TODO: I take the first alternaitve, may be I should extract different alternatives for each phoneme... complicated, 
-            # we are not even sure it is always the same number of phonemes
-            phoneme_list=phonetics[word_id][0]
-            # we list the phonemes up to the termanation
-            phonemes=['p'+str(i)+' ['+'p'+str(i)+']'+' '+p for i,p in enumerate(phoneme_list)][:-len(termination.split(' '))]
-            # we list alternatives
-            alternative_phonemes=['p'+str(len(phonemes))+' ['+'p'+str(len(phonemes))+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
-            all_phones=phonemes+alternative_phonemes
-            lines+=all_phones
-    # adding silences and out of vocabulary possibilities
-    sil_oov=["sp sp",
-        "sil sil",
-        "o1 gs1",
-        "o2 gss2",
-        "o3 gss3",
-        "o4 gss4",
-        "o5 gss5"]
-    lines+=sil_oov
-    with open(path, "w") as text_file:
-        text_file.write("\n".join(lines))
-
-    # # we details phonemes for the target word
-    # phoneme_list=phonetics[word_id]
-
-    # # we list the phonemes up to the termanation
-    # phonemes=['p'+str(i)+' '+p for i,p in enumerate(phoneme_list)][:-len(termination.split(' '))]
-    # # we list alternatives
-    # alternative_phonemes=['p'+str(i+len(phonemes))+' '+p for i,p in enumerate(alternatives)]
-    # all_phones=phonemes+alternative_phonemes
-    # line_sequence=words[:word_id]+all_phones+words[word_id+1:]
-
-    # hmm_phones=pd.read_csv('model/libri/monophones', header=None)
-    # hmm_phones[~hmm_phones.isin(phoneme_list)].dropna()
-    # other_phones=hmm_phones[~hmm_phones.isin(phoneme_list)].dropna().iloc[:,0].tolist()
-    # other_phones=[el+' '+el for el in other_phones]
-    # all_phones=phonemes+other_phones
-    
-    # if word_id is None:
-    # elif word_id<len(phonetics):
-        
-    # else:
-    #     print('error: word id is greater than number of words')
-
 def make_dct_all_phones_from_phonetics(phonetics, path='test.dct'):
     """This functions generates a dct file for the wordStress module. Phonemes are detailed
     For vowels, the three possibilities of stressed are put as alternatives (0,1,2)
@@ -233,7 +173,52 @@ def make_grammar_from_all_phones_dct(path_dct='test.dct',path_grammar='test.txt'
         text_file.write("\n".join([str1,str2,str3]))
     return "\n".join([str1,str2,str3])
 
-def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'], word_id=1, termination='IH0 D', 
+
+def make_generic_dct_from_text(sentence="I accepted to go to spain", word_id=1, target_phones='IH0 D', 
+                alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
+
+    phonetics=[cmudict.dict()[el] for el in remove_special_characters(sentence).split(' ')]
+    # phonetics=phonetics_from_sentence(sentence)
+    # words=['w'+str(i)+' '+' '.join(word) for i,word in enumerate(phonetics)]
+
+    lines=[]
+    for i,alternative_words in enumerate(phonetics):
+        # print(alternatives)
+        if i!=word_id:
+            for j,word in enumerate(alternative_words):
+                # print(word)
+                lines.append('w'+str(i)+' ['+'w'+str(i)+'_'+str(j)+'] '+' '.join(word))
+        else:
+            # we detail phonemes for the target word
+            # TODO: I take the first alternative, may be I should extract different alternatives for each phoneme... complicated, 
+            # we are not even sure it is always the same number of phonemes
+            phoneme_list=phonetics[word_id][0]
+            # we list the phonemes up to the termanation
+            phonemes=['p'+str(i)+' ['+'p'+str(i)+']'+' '+p for i,p in enumerate(phoneme_list)][:-len(target_phones.split(' '))]
+            # we list alternatives
+            alternative_phonemes=['p'+str(len(phonemes))+' ['+'p'+str(len(phonemes))+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
+            all_phones=phonemes+alternative_phonemes
+            lines+=all_phones
+    # adding silences and out of vocabulary possibilities
+    sil_oov=["sp sp",
+        "sil sil",
+        "o1 gs1",
+        "o2 gss2",
+        "o3 gss3",
+        "o4 gss4",
+        "o5 gss5"]
+    lines+=sil_oov
+    with open(path, "w") as text_file:
+        text_file.write("\n".join(lines))
+
+    # hmm_phones=pd.read_csv('model/libri/monophones', header=None)
+    # hmm_phones[~hmm_phones.isin(phoneme_list)].dropna()
+    # other_phones=hmm_phones[~hmm_phones.isin(phoneme_list)].dropna().iloc[:,0].tolist()
+    # other_phones=[el+' '+el for el in other_phones]
+    # all_phones=phonemes+other_phones
+    
+
+def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'], word_id=1, target_phones='IH0 D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
     """This function builds a dct file needed for htk model. It consists of a list of words and for one word a list of phoneme.
     Each line is either a word or phoneme (or in fact several phoneme). More generally each line is just one or several phoneme. But 
@@ -246,7 +231,7 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
     Args:
         phonetics (list, optional): [description]. Defaults to ['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'].
         word_id (int, optional): [description]. Defaults to 1.
-        termination (str, optional): [description]. Defaults to 'IH0 D'.
+        target_phones (str, optional): [description]. Defaults to 'IH0 D'.
         alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
         path (str, optional): [description]. Defaults to 'test.dct'.
     """
@@ -260,9 +245,9 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
             # Here we want to detail this specific word
             # split the word to detail in phonemes with the piece with several alternatives
             # e.g., "B L A H B L A H B L A H".split('A H')   -> ['B L ', ' B L ', ' B L ', '']
-            phoneme_lists=word.split(termination)
+            phoneme_lists=word.split(target_phones)
             p_idx=0
-            if word==termination:
+            if word==target_phones:
                 # a particular case fort which the word is only one phoneme and it is the one we study
                 alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
                 p_idx+=1
