@@ -9,9 +9,19 @@ def clean_htk_files(p):
     """Clean the files generated for and by the HTK model (as it uses input and output files)
     In the future, just delete the specific files after processing, by putting name in parameters (inputs and results files)
     """
-    os.system('rm inputs/'+p['rand_fileName']+'.net')
-    os.system('rm inputs/'+p['rand_fileName']+'.wav')
-    os.system('rm results/'+p['rand_fileName']+'.rec')
+    print('rand_fileName',p['rand_fileName'])
+    input_extensions=['.net', '.wav', '.rec', '.dct', '.txt']
+    output_extensions=['.rec']
+
+    for ext in input_extensions:
+        f='inputs/'+p['rand_fileName']+ext
+        if os.path.exists(f):
+            os.system('rm '+f)
+    for ext in output_extensions:
+        f='results/'+p['rand_fileName']+ext
+        if os.path.exists(f):
+            os.system('rm '+f)
+
 
 # HTK related functions
 def process_grammar(inputGrammar, rand_fileName):
@@ -91,6 +101,18 @@ def get_textgrid_data(s,fs,p):
 
     # reset indices of dataframe
     textgridData.index=range(len(textgridData))
+    
+    phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
+
+    detected_transcription=[]
+    for r in textgridData.iloc[:,2]:
+        corresponding_transcription=phonetics[phonetics.iloc[:,2]==r][4]
+        if len(corresponding_transcription)>0:
+            detected_transcription.append(corresponding_transcription.values[0])
+        else:
+            print('out of vocabulary: no transcription')
+    
+    textgridData['detected_transcription']=detected_transcription
     clean_htk_files(p)
     return textgridData, out2
 
