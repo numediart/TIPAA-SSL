@@ -11,18 +11,10 @@ from time import time
 from tqdm import tqdm
 
 from audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
-from htk_utils import process_grammar, htk_recognition, get_textgrid_data
+from htk_utils import process_grammar, htk_recognition, get_textgrid_data, clean_htk_files
 
-from label_data_processing import make_dct_all_phones_from_text, make_grammar_from_all_phones_dct, make_generic_dct_from_phonetics, make_grammar_from_dct
+from label_data_processing import make_dct_all_phones_from_text, make_generic_dct_from_phonetics, make_grammar_from_dct
 from text_processing import phonetics_from_sentence
-
-def clean_temp_files():
-    """Clean the files generated for and by the HTK model (as it uses input and output files)
-    TODO: This is probably dangerous when we use it in parallel, multithreading... 
-    In the future, just delete the specific files after processing, by putting name in parameters (inputs and results files)
-    """
-    os.system('rm inputs/*')
-    os.system('rm results/*')
 
 def set_params(
     # waveFileAddress='/root/flowchase/sent.wav',
@@ -80,7 +72,7 @@ def make_all_phones_annotation_files(
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     make_dct_all_phones_from_text(text, path=p['inputPhoneticTranscription'])
-    make_grammar_from_all_phones_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
+    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
 def make_pContrast_annotation_files(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
@@ -116,6 +108,7 @@ def get_annotated_signal(p=set_params()):
         textgridData, cmdout2=get_textgrid_data(s,fs,p)
     except Exception as e: 
         print(e)
+        clean_htk_files(p)
         return "error: could not get textgridData (check htk errors)", None, None
     
     # if textgridData.iloc[:,3].mean()<8.5:
@@ -181,6 +174,8 @@ def chunking(
     minSilDur = 0.090 # we ask for at least 90ms of silence
     silence_durations=textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,1]-textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,0]
     idx_to_filter=silence_durations[silence_durations>minSilDur].index
+
+    #clean_htk_files(p)
 
 def sentenceStress(
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
@@ -307,6 +302,7 @@ def sentenceStress(
     else:
         binResult[np.argmax(weighted_score)]=1
 
+    #clean_htk_files(p)
     return "success", binResult
 
 def vowels(textgridData):
@@ -451,7 +447,7 @@ def vowel_stresses(
     for w_i,n_v in enumerate(nVowelsPerWord):
         weighted_score_by_word.append(weighted_score[syl_start:syl_start+n_v].tolist())
         syl_start+=n_v
-    
+    #clean_htk_files(p)
     return status, weighted_score_by_word
 
 def wordStress(
@@ -536,9 +532,9 @@ def iContrast(
             binResult=0
         elif el[-2:]=='*l':
             binResult=1
-            if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
-                binResult=0
-    
+            # if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
+            #     binResult=0
+    #clean_htk_files(p)
     return "success", binResult
 
 
@@ -571,6 +567,8 @@ def prosody_by_phone(p):
     d['Fmean']=Fmean
     d['Dur']=Dur
     d['voicing']=voicing
+
+    #clean_htk_files(p)
     return "success", [textgridData, d]
 
 
@@ -579,7 +577,8 @@ def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordi
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
-    p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
+    # p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
+    p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turned_around.mp3', module="edAnalysis")
     ):
     """[summary]
 
@@ -590,36 +589,17 @@ def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordi
     if textgridData is None:
         return status, []
     
-    detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='p']    
-    phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
+    # detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='p']    
+    # phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
 
-    detected_transcription=[]
-    for r in detected_phonemes.iloc[:,2]:
-        detected_transcription.append(phonetics[phonetics.iloc[:,2]==r][4].values[0])
+    # detected_transcription=[]
+    # for r in detected_phonemes.iloc[:,2]:
+    #     detected_transcription.append(phonetics[phonetics.iloc[:,2]==r][4].values[0])
     
+    detected_transcription=textgridData[textgridData.iloc[:,2].str[0]=='p']['detected_transcription'].tolist()
+    #clean_htk_files(p)
     return "success", [textgridData, detected_transcription]
 
-    # phonetics[phonetics[0].str[0]=='p'].apply(lambda r:r.str.split(' '))
-    # pd.DataFrame(phonetics[phonetics[0].str[0]=='p'].apply(lambda r:r.str.split(' ')).iloc[:,0].tolist())
-    # for i,r in phonetics[phonetics[0].str[0]=='p'].iterrows():
-    # dict_phones={}
-    # for i,r in phonetics.iterrows():
-    #     #lines starting by d correspond to phonemes
-    #     if r[0][0]=='p':
-    #         line=r.values[0].split(' ')
-    #         phone=line[0]
-    #         info=line[1][1:-1]
-    #         # print(phone)
-    #         # print(info)
-    #         dict_phones[info]=phone
-    #     elif r[0][0]=='o' or r[0][0]=='s':
-    #         dict_phones[r[0].split(' ')[0]]=r[0].split(' ')[0]
-    #     else:
-    #         dict_phones[r[0].split(' ')[1][1:-1]]=r[0].split(' ')[-1]
-
-    # for i,r in textgridData.iterrows():
-    #     print(r[2])
-    #     print(dict_phones[r[2]])
 
 def edAnalysis(
     # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/edAnalysis/1_err.wav', module="edAnalysis")
@@ -649,7 +629,8 @@ def edAnalysis(
         elif '*err' in textgridData[2][indxPho[i]]:
             status = 0
             binResult = 1
-        
+    
+    #clean_htk_files(p)
     return "success", [binResult]
 
 def timing_test(module='wordStress', n=100, p=None):
@@ -665,13 +646,18 @@ def timing_test(module='wordStress', n=100, p=None):
     print(np.mean(times))
     return np.mean(times)
 
-def phonemeContrast_from_text_audio(text, audio_path, word_id, target_phones, alternatives):
+def phonemeContrast_from_text_audio(
+                    text='turned around', 
+                    audio_path='audio_recordings/turned_around.mp3', 
+                    word_id=0, 
+                    target_phones='D', 
+                    alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     p=set_params(waveFileAddress=audio_path)
     p=make_pContrast_annotation_files(p,text=text, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
     status,result=phonemeContrast(p)
     return status, result
 
-def vowel_stresses_from_text_audio(text, audio_path):
+def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
     p=set_params(waveFileAddress=audio_path)
     p=make_all_phones_annotation_files(p,text)
     status,result=vowel_stresses(p)
@@ -680,6 +666,16 @@ def vowel_stresses_from_text_audio(text, audio_path):
 
 if __name__ == "__main__":
     # execute only if run as a script
+
+    # examples:
+    status, result=phonemeContrast_from_text_audio()
+    status, result=phonemeContrast_from_text_audio(text='Did he fall asleep?',
+                    audio_path='../audio-with-analysis-ids/audio/5deb3ea1-1c0f-4a2b-a2ca-36e0e856c11d.wav', 
+                    word_id=0, 
+                    target_phones='IH1', 
+                    alternatives=['IH0', 'IH2', 'IY0', 'IY1', 'IY2'])
+
+    phonetics=phonetics_from_sentence('Did he fall asleep?')
     # Test performance of wordStress module
 
     start=time()
