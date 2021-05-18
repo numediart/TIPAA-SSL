@@ -21,13 +21,18 @@ def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
     return data
 
 def get_iContrast_annotations(path='../audio-with-analysis-ids/iContrast_data.csv'):
-    d=get_data()
-    d=d[d.focusType=="shortIlongI"]
     df=pd.read_csv(path)
+
+    # only those with analysisID in 3 digits have a manual annotation
+    df=df[df.analysisId>100]
     annot={}
+    word_id={}
+    syl_id={}
     for i,r in df.iterrows():
-        annot[r.analysisId]=r['response (short=0, long=1)']
-    return annot
+        annot[r.primaryKey]=r['response']
+        word_id[r.analysisId]=r['word_id']
+        syl_id[r.analysisId]=r['syl_id']
+    return annot,word_id,syl_id
 
 def get_wordStress_annotation(path='../audio-with-analysis-ids/wordStress_annotations.csv'):
     d=get_data()
@@ -66,14 +71,13 @@ def get_sentenceStress_annotation(path='../audio-with-analysis-ids/learning_cont
     df2 = pd.read_excel(xls, 'Sheet3')
     df=df2[['SentenceID', 'Sentence stress' , 'binResult']].dropna()
     df.index=df['SentenceID'].astype(int)
-
     binDict={}
     textDict={}
     for i,r in df.iterrows():
         binDict[i]=[int(el) for el in r['binResult'].split(' ')]
         textDict[i]=r['Sentence stress']
-    
     return binDict, textDict
+
 def make_dct_all_phones_from_phonetics(phonetics, path='test.dct'):
     """This functions generates a dct file for the wordStress module. Phonemes are detailed
     For vowels, the three possibilities of stressed are put as alternatives (0,1,2)
@@ -129,51 +133,6 @@ def make_dct_all_phones_from_text(sentence="shopping centre", path='test.dct'):
     phonetics=phonetics_from_sentence(sentence)
     make_dct_all_phones_from_phonetics(phonetics, path=path)
 
-def make_grammar_from_all_phones_dct(path_dct='test.dct',path_grammar='test.txt'):
-    """making grammar files corresponding to dct generated with aboive function
-
-    Args:
-        path_dct (str, optional): [description]. Defaults to 'test.dct'.
-        path_grammar (str, optional): [description]. Defaults to 'test.txt'.
-
-    Returns:
-        [type]: [description]
-    """
-    df=pd.read_csv(path_dct, header=None)
-    # symbols=df.apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
-    o_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='o', axis=1)
-    p_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='p', axis=1)
-    w_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='w', axis=1)
-
-    ps=df[p_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)
-    if len(ps)>0:
-        ps=ps.unique()
-
-    # This complicated line extract the index of the word in which is the phoneme (after selecting only phonemes and not silences and o4...)
-    # e.g., for a line "p16 [w5_v16_0] AH0", it extract the 5
-    w_indxs=df[df.iloc[:,0].str.contains('\[w')].apply(lambda r:r.str.split(' ')[0][1].split('_')[0][-1], axis=1)
-    p_indxs=df[df.iloc[:,0].str.contains('\[w')].apply(lambda r:r.str.split(' ')[0][0][1:], axis=1)
-
-    # to int and get diff to have locations where it switch to next word
-    diff=w_indxs.apply(lambda r:int(r)).diff()
-    step_ups=diff[diff==1].index
-    p_step_ups=p_indxs[step_ups].tolist()
-
-    # create a list of ps qith "sp" inserted between phonemes of different words
-    ps_sp=[]
-    for i,p in enumerate(ps):
-        if str(i) in p_step_ups:ps_sp.append('sp')
-        ps_sp.append(p)
-
-    str1="$bla = [o4 o4 o4 o4 o4 o4];"
-    str2="$phrase = ("+' '.join(ps_sp)+") | {$bla};"
-    str3="(({sil} | sp) $phrase ({sil} | sp))"
-    # with open(p['inputGrammar'], "w") as text_file:
-    with open(path_grammar, "w") as text_file:
-        text_file.write("\n".join([str1,str2,str3]))
-    return "\n".join([str1,str2,str3])
-
-
 def make_generic_dct_from_text(sentence="I accepted to go to spain", word_id=1, target_phones='IH0 D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
 
@@ -218,6 +177,9 @@ def make_generic_dct_from_text(sentence="I accepted to go to spain", word_id=1, 
     # all_phones=phonemes+other_phones
     
 
+# def make_phone_lines(word):
+#     word.split(' ')
+
 def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'], word_id=1, target_phones='IH0 D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
     """This function builds a dct file needed for htk model. It consists of a list of words and for one word a list of phoneme.
@@ -253,6 +215,10 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
                 p_idx+=1
                 lines+=alternative_phonemes
             else:
+                alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
+                p_idx+=1
+                # lines+=alternative_phonemes
+                all_phones=alternative_phonemes
                 for phoneme_list in phoneme_lists:
                     if phoneme_list!='':
                         # we detail phonemes for the target word
@@ -267,19 +233,21 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
                         # print(p_idx)
                         alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
                         p_idx+=1
-
-                        # print(alternative_phonemes)
-                        # print(p_idx)
-                        all_phones=phonemes+alternative_phonemes
-                        lines+=all_phones
-                    # if we just want tu put Alternative phones between Sequences, we remove the last time  S A S A S -> S S S -> S A S A S A -> S A S A S
-                    # else we let it    S A S A S A -> S S S -> S A S A S A 
+                        all_phones+=(phonemes+alternative_phonemes)
+                        
                 try:
-                    if len(phoneme_list)>0:
-                        if phoneme_list[-1]!='':
-                            lines=lines[:-len(alternative_phonemes)]
+                    # if we just want tu put Alternative phones between Sequences, we remove the last (first) time  
+                    # S A S A S -> S S S -> S A S A S A -> S A S A S
+                    # else we let it/them (first, last or both)    A S A S A S A -> S S S -> A S A S A S A 
+                    # import pdb;pdb.set_trace()
+                    if len(phoneme_lists)>0:
+                        if phoneme_lists[-1]!='':
+                            all_phones=all_phones[:-len(alternative_phonemes)]
+                        if phoneme_lists[0]!='':
+                            all_phones=all_phones[len(alternative_phonemes):]
                 except NameError:
                     pass
+                lines+=all_phones
     # adding silences and out of vocabulary possibilities
     sil_oov=["sp sp",
         "sil sil",
@@ -290,7 +258,12 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
         "o5 gss5"]
     lines+=sil_oov
     with open(path, "w") as text_file:
-        text_file.write("\n".join(lines)+"\n")
+        try:
+            text_file.write("\n".join(lines)+"\n")
+        except TypeError:
+            import pdb;pdb.set_trace()
+
+
 
 def make_grammar_from_dct(path_dct='test.dct',
                         path_grammar='test.txt'):
@@ -298,6 +271,7 @@ def make_grammar_from_dct(path_dct='test.dct',
     -we are studying one word in the sentence, i.e., one word is
     segmented in phonemes 
     -OR  zero word, i.e., no word is segmented in phonemes (this the case for sentenceStress)
+    -OR we work with a sequence of phonemes (that can in fact be one or several words, that does not matter)
 
     Args:
         p (dict): params from set_params function
@@ -358,12 +332,12 @@ def make_grammar_from_dct(path_dct='test.dct',
         os=df[o_list].apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
     except:
         pdb.set_trace()
-    # str1=' | '.join(os)+';\n'
-    str1="$other = o1 | o2 | o3 | o4 | o5;\n$other_pho =  o2 | o3 | o4 | o5;"
+
+    str1="$bla = [o4 o4 o4 o4 o4 o4];"
     if len(ps)>0:
-        str2 ="$phrase = (("+' sp '.join(ws1)+" sp (("+' '.join(ps)+") | {sp $other_pho }) sp "+' sp '.join(ws2)+") | {sp ($other )});"
+        str2 ="$phrase = (("+' sp '.join(ws1)+" sp (("+' '.join(ps)+") | $bla) sp "+' sp '.join(ws2)+") | ({$bla}));"
     else:
-        str2 ="$phrase = (("+' sp '.join(ws1)+" sp "+' sp '.join(ws2)+") | {sp ($other )});"
+        str2 ="$phrase = (("+' sp '.join(ws1)+" sp "+' sp '.join(ws2)+") | ({$bla}));"
     str3="(({sil} | sp) $phrase ({sil} | sp))"
     # with open(p['inputGrammar'], "w") as text_file:
     with open(path_grammar, "w") as text_file:
@@ -374,7 +348,6 @@ def ed_make_grammars(path='/mnt/c/Users/noe_t/Downloads/edAnalysis-20210330T1158
     for el in glob(path+'/*.dct'):
         make_grammar_from_dct(el)
     IDs=pd.read_csv(path+'/ed_sentenceID.csv')
-
     for i,r in IDs.iterrows(): 
         copy(path+'/'+r[0].split('.')[0]+'.dct', path+'/phrase_'+str(r[1])+'.dct')
         copy(path+'/'+r[0].split('.')[0]+'.txt', path+'/phrase_'+str(r[1])+'.txt')
@@ -389,13 +362,145 @@ def wordStress_make_dcts_grammars(path_dct='lexicon/wordStress/dct', path_gramma
     d=d[d.focusType=="wordstress"]
     for i,r in d.iterrows():
         make_dct_all_phones_from_text(r.text, path=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'))
-        make_grammar_from_all_phones_dct(path_dct=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'),  path_grammar=os.path.join(path_grammar, 'phrase_'+str(r.analysisId)+'.txt'))
+        make_grammar_from_dct(path_dct=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'),  path_grammar=os.path.join(path_grammar, 'phrase_'+str(r.analysisId)+'.txt'))
 
-def wordStress_correct_grammars(path_grammar='lexicon/wordStress/grammar'):
-    """This functions modifies the manual grammars of wordStress module to remove the "$inv" possibility from the "$phrase"
-    """
-    for el in glob(path_grammar+'/*.txt'):
-        gram=os.path.join(path_grammar,os.path.split(el)[-1].split('.')[0]+'.txt')
-        df=pd.read_csv(gram, header=None)
-        df.iloc[2,0]=df.iloc[2,0].replace('| $inv ','')
-        df.to_csv(gram, index=None, header=None)
+
+
+
+if 0:
+    # These two are now generalized with above function "make_grammar_from_dct"
+    def make_grammar_from_all_phones_dct(path_dct='test.dct',path_grammar='test.txt'):
+        """making grammar files corresponding to dct generated with above function
+
+        Args:
+            path_dct (str, optional): [description]. Defaults to 'test.dct'.
+            path_grammar (str, optional): [description]. Defaults to 'test.txt'.
+
+        Returns:
+            [type]: [description]
+        """
+        df=pd.read_csv(path_dct, header=None)
+        # symbols=df.apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
+        o_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='o', axis=1)
+        p_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='p', axis=1)
+        w_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='w', axis=1)
+
+        ps=df[p_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)
+        if len(ps)>0:
+            ps=ps.unique()
+
+        # This complicated line extract the index of the word in which is the phoneme (after selecting only phonemes and not silences and o4...)
+        # e.g., for a line "p16 [w5_v16_0] AH0", it extract the 5
+        w_indxs=df[df.iloc[:,0].str.contains('\[w')].apply(lambda r:r.str.split(' ')[0][1].split('_')[0][-1], axis=1)
+        p_indxs=df[df.iloc[:,0].str.contains('\[w')].apply(lambda r:r.str.split(' ')[0][0][1:], axis=1)
+
+        # to int and get diff to have locations where it switch to next word
+        diff=w_indxs.apply(lambda r:int(r)).diff()
+        step_ups=diff[diff==1].index
+        p_step_ups=p_indxs[step_ups].tolist()
+
+        # create a list of ps qith "sp" inserted between phonemes of different words
+        ps_sp=[]
+        for i,p in enumerate(ps):
+            if str(i) in p_step_ups:ps_sp.append('sp')
+            ps_sp.append(p)
+
+        str1="$bla = [o4 o4 o4 o4 o4 o4];"
+        str2="$phrase = ("+' '.join(ps_sp)+") | {$bla};"
+        str3="(({sil} | sp) $phrase ({sil} | sp))"
+        # with open(p['inputGrammar'], "w") as text_file:
+        with open(path_grammar, "w") as text_file:
+            text_file.write("\n".join([str1,str2,str3]))
+        return "\n".join([str1,str2,str3])
+    # old version with o1 | o2 | o3  kind of format, that was in 1 example of edAnalysis 
+    def make_grammar_from_dct_old(path_dct='test.dct',
+                            path_grammar='test.txt'):
+        """Make a grammar file from a dct file. We assume that 
+        -we are studying one word in the sentence, i.e., one word is
+        segmented in phonemes 
+        -OR  zero word, i.e., no word is segmented in phonemes (this the case for sentenceStress)
+
+        Args:
+            p (dict): params from set_params function
+        """
+        print(path_dct)
+        # dct=p['inputPhoneticTranscription']
+        df=pd.read_csv(path_dct, header=None)
+        # symbols=df.apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
+        o_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='o', axis=1)
+        p_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='p', axis=1)
+        w_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='w', axis=1)
+
+        # drop consecutive duplicates to see if the are phonemes between words
+        # word_spots=w_list.loc[w_list.shift() != w_list]
+
+        symbols=df.apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
+
+        try:
+            ps=df[p_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)
+            if len(ps)>0:
+                ps=ps.unique()
+        except:
+            pdb.set_trace()
+        ws=df[w_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)#.unique()
+        
+        # the diff evaluates if there is a jump of indices, meaning that there are phoneme between words: words -> phonemes -> words
+        listA=np.diff(ws.index)-1
+        # this locates where is the jump (we assume here there is one or zero)
+        res = [i for i, val in enumerate(listA) if val]
+        if len(res)>0:
+            # this is the case : words -> phonemes -> words
+            ws1=ws.iloc[:res[0]+1].unique()
+            ws2=ws.iloc[res[0]+1:].unique()
+        else:
+            # This is the case  phonemes -> words   OR    words -> phonemes
+
+            if symbols[0][0]=='w':
+                # This is the case : words -> phonemes
+                ws2=[]
+                try:
+                    if len(ws)>0:
+                        ws1=ws.unique()
+                    else:
+                        ws1=[]
+                except:
+                    pdb.set_trace()
+            else:
+                # This is the case : phonemes -> words
+                ws1=[]
+                try:
+                    if len(ws)>0:
+                        ws2=ws.unique()
+                    else:
+                        ws2=[]
+                except:
+                    pdb.set_trace()
+        try:
+            os=df[o_list].apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
+        except:
+            pdb.set_trace()
+        # str1=' | '.join(os)+';\n'
+        
+        # str1="$bla = [o4 o4 o4 o4 o4 o4];"
+        # str2="$phrase = ("+' '.join(ps_sp)+") | {$bla};"
+
+        str1="$other = o1 | o2 | o3 | o4 | o5;\n$other_pho =  o2 | o3 | o4 | o5;"
+        if len(ps)>0:
+            str2 ="$phrase = (("+' sp '.join(ws1)+" sp (("+' '.join(ps)+") | {sp $other_pho }) sp "+' sp '.join(ws2)+") | {sp ($other )});"
+        else:
+            str2 ="$phrase = (("+' sp '.join(ws1)+" sp "+' sp '.join(ws2)+") | {sp ($other )});"
+        str3="(({sil} | sp) $phrase ({sil} | sp))"
+        # with open(p['inputGrammar'], "w") as text_file:
+        with open(path_grammar, "w") as text_file:
+            text_file.write("\n".join([str1,str2,str3]))
+        return "\n".join([str1,str2,str3])
+
+    # This is not needed anymore as I have now a function generating grammars
+    def wordStress_correct_grammars(path_grammar='lexicon/wordStress/grammar'):
+        """This functions modifies the manual grammars of wordStress module to remove the "$inv" possibility from the "$phrase"
+        """
+        for el in glob(path_grammar+'/*.txt'):
+            gram=os.path.join(path_grammar,os.path.split(el)[-1].split('.')[0]+'.txt')
+            df=pd.read_csv(gram, header=None)
+            df.iloc[2,0]=df.iloc[2,0].replace('| $inv ','')
+            df.to_csv(gram, index=None, header=None)
