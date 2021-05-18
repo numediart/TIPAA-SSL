@@ -35,12 +35,11 @@ def test_performance_tests():
     iContrast_performance_test()
     sentenceStress_performance_test()
 
-    # this one lasts more beacause it looks for everyword in cmudict to have ground truth
     wordStress_performance_test()
     sentenceStress_automatic_annot_performance_test()
     edAnalysis_performance_test()
-    edAnalysis_from_audiobook_data(data_set='dev-clean', n=1000)
-    pContrast_from_audiobook_data(n=1000)
+    edAnalysis_from_audiobook_data(data_set='dev-clean', n=100)
+    pContrast_from_audiobook_data(n=100)
 
 from label_data_processing import *
 def test_label_data_processing():
