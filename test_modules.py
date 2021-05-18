@@ -48,9 +48,3 @@ def test_label_data_processing():
     make_generic_dct_from_text()
     make_generic_dct_from_phonetics()
     make_grammar_from_dct()
-
-# from libri_phonetization_data import *
-# def test_libri_phonetization_data():
-#     libri_words_df=build_librispeech_words_df()
-#     libri_words_df[libri_words_df.word=='low']
-#     libri_words_df[libri_words_df.phones.str.endswith(' IH0 D')]
