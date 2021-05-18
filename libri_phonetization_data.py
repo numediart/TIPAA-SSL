@@ -31,16 +31,15 @@ def get_sentence(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-001
     words = [x for x in words if x]
     return ' '.join(words)
 
-# def get_phonetics(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
-
-
 def build_librispeech_words_df(
         data_set='dev-clean',
         basepath='librispeech_alignments',
-        audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/'
+        audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/',
+        n=None
         ):
     path=os.path.join(basepath, data_set)
     files = glob(path+'/*/*/*.TextGrid')
+    if n is not None: files=files[:n]
     records=[]
     for f_idx,f in tqdm(enumerate(files)):
         tg = textgrid.TextGrid.fromFile(f)
@@ -95,7 +94,7 @@ if __name__ == "__main__":
     libri_words_df=build_librispeech_words_df()
 
     libri_words_df[libri_words_df.word=='low']
-    libri_words_df[libri_words_df.phones.str.endswith(' IH0 D')]
+    selection=libri_words_df[libri_words_df.phones.str.endswith(' IH0 D')]
     libri_words_df[libri_words_df.phones.str.endswith(' T IH0 D')]
     libri_words_df[libri_words_df.phones.str.endswith(' T EH0 D')]
     libri_words_df[libri_words_df.phones.str.endswith(' T AH0 D')]
