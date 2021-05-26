@@ -29,12 +29,12 @@
   $(document).ready(function() {
     $("#jsonp2").click(function() {
       url= "/flowspeech/"+q('#module').value
-      data= {"filename":q('#filename').value,"sentenceID":q('#sentenceID').value}
+      data= {"sentenceID":q('#sentenceID').value, "filename":q('#filename').value}
       $.ajax({
         url: url,
         type: 'POST',
         ContentType: 'application/json',
-        data: {'data': data}
+        data:  data
       }).done(function(response){
         alert("Data from Server:" + JSON.stringify(response));
       }).fail(function(jqXHR, textStatus, errorThrown){
