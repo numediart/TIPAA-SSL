@@ -8,6 +8,11 @@ def test_sentenceStress():
     sentenceStress()
     sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='sentenceStress'))
 
+def test_audio_formats():
+    sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', module='sentenceStress'))
+    sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a', module='sentenceStress'))
+    sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland_stereo.m4a', module='sentenceStress'))
+
 def test_iContrast():
     iContrast()
 
