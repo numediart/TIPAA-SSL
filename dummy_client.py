@@ -3,15 +3,43 @@ def send_audio(path='audio_recordings/WS_111_toothpaste.wav', url = 'http://loca
     with open(path, 'rb') as file:
         files = {'file': file}
         req = requests.post(url, files=files)
+        # print(req.__dict__['_content'])
+    return req
 
 def call_module(module='sentenceStress', filename='SS_1_i_would_love_to_go_to_ireland.wav', sentenceID=1):
-    res = requests.post('http://localhost:5000/flowspeech/'+module, {"sentenceID":str(sentenceID), 'filename':filename})
+    res = requests.post(url='http://localhost:5000/flowspeech/'+module, data={"sentenceID":str(sentenceID), 'filename':filename})
     print(res.__dict__['_content'])
+    return res.__dict__['_content']
+
 
 def call_vowel_stresses(filename='SS_1_i_would_love_to_go_to_ireland.wav', text='I would love to go to ireland !'):
-    res = requests.post('http://localhost:5000/vowel_stresses/', {"text":text, 'filename':filename})
+    res = requests.post(url='http://localhost:5000/vowel_stresses', data={"text":text, 'filename':filename})
     print(res.__dict__['_content'])
+    return res.__dict__['_content']
 
-def call_phoneme_contrast(filename='turned_around.mp3', text='turned around', word_id=0):
-    res = requests.post('http://localhost:5000/phonemeContrast/', {"text":text, 'filename':filename, 'word_id':word_id})
+
+def call_phoneme_contrast(filename='turned_around.mp3', text='turned around', word_id=0, target='D', alternatives="['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']"):
+    res = requests.post(url='http://localhost:5000/phonemeContrast', data={"text":text, 'filename':filename, 'word_id':word_id, 'alternatives':alternatives, 'target':target})
     print(res.__dict__['_content'])
+    return res.__dict__['_content']
+
+if __name__ == "__main__":
+    send_audio()
+    call_module()
+    call_module(module='wordStress', filename='WS_111_toothpaste.wav', sentenceID=111)
+
+    send_audio(path='audio_recordings/iC_111_slip.wav')
+
+    call_module(sentenceID=111, filename='iC_111_slip.wav', module="iContrast")
+    call_vowel_stresses()
+
+    send_audio('audio_recordings/turned_around.mp3')
+    call_phoneme_contrast()
+
+    send_audio('audio_recordings/Laaw_MP3.mp3')
+    alternatives="['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2']"
+    call_phoneme_contrast(filename='Laaw_MP3.mp3', text='law',  word_id=0, target='AO1', alternatives=alternatives)
+
+    send_audio('audio_recordings/iC_112_leave.wav')
+    alternatives="['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2']"
+    call_phoneme_contrast(filename='iC_112_leave.wav', text='leave',  word_id=0, alternatives=alternatives)

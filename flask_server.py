@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, request, redirect, url_for
 from flask import send_from_directory
 
 app = Flask(__name__)
@@ -50,7 +50,7 @@ def add_message(module):
       return response
 
     status,result=method_to_call(p)
-    if not isinstance(result, list):
+    if isinstance(result, np.ndarray):
       print('result:',result)
       result=result.tolist()
     d={'status':status, 'result':result}
@@ -95,6 +95,7 @@ def phoneme_contrast_api():
     filename=content['filename']
     text=content['text']
     word_id=content['word_id']
+    target=content['target']
     alternatives=ast.literal_eval(content['alternatives'])
     print(alternatives)
     
@@ -102,7 +103,7 @@ def phoneme_contrast_api():
     # p=make_pContrast_annotation_files(p,text=text,word_id=int(word_id), target_phones='D', 
     #             alternatives=alternatives)
     # status,result=phonemeContrast(p)
-    status,result=phonemeContrast_from_text_audio(text, upload_path+filename, int(word_id), 'D', alternatives)
+    status,result=phonemeContrast_from_text_audio(text, upload_path+filename, int(word_id), target, alternatives)
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):
@@ -113,7 +114,8 @@ def phoneme_contrast_api():
       phonetic_transcript=result[-1]
     else:
       phonetic_transcript=result
-    d={'status':status, 'result':phonetic_transcript}
+    phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
+    d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
     response=json.dumps(d)
     return response
 
