@@ -32,6 +32,14 @@ def phonetics_from_sentence(sentence="Where's the best place to have coffee ?"):
         words_phones.append(phones)
     return words_phones
 
+
+def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
+    l=[]
+    for el in transcription:
+        if el[-1] in str([0,1,2]): l.append(el[:-1])
+        else: l.append(el)
+    return l
+
 def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
     # cmu vowels end by a number : 0, 1 or 2.   0= no stress, 1 = primary stress, 2 = secondary stress
     # consonants do not end by a number
