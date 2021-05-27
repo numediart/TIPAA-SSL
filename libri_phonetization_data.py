@@ -7,7 +7,6 @@ from tqdm import tqdm
 import pandas as pd
 import os
 from glob import glob
-import shutil
 
 def get_phone_timings(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid',word_idx=8):
     """Uses the (start,end) of a word and (starts,ends) of phonemes to retrieve phonemes corresponding to a word
@@ -30,6 +29,25 @@ def get_sentence(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-001
     # drop empty strings
     words = [x for x in words if x]
     return ' '.join(words)
+
+
+def phonetics_for_row(row, libri_words_df):
+    # retrieve phonetics by word that is not available directly from textgrids, but can be extracted from the dataframe
+    # as I already extracted phonemes for each word using overlapping in timings
+    # it is important to use file_idx to be sure that the phonetic transcription of a word is correct. Because
+    # words can have several phonetic transcriptions depending on the context. e.g., the -> DH AH0, DH IY0
+    # I fact, even doing that may lead to some mistake, if the word is several times in the same sentence with different pronunciations...
+
+    sentence=get_sentence(row.path)
+    phonetics=[]
+    for w_idx,w in enumerate(sentence.split(' ')):
+        try:
+            phonetics.append(libri_words_df[(libri_words_df.file_idx==row.file_idx) &(libri_words_df.word_idx==w_idx) & (libri_words_df.word==w)].iloc[0,:].phones)
+        except IndexError:
+            import pdb;pdb.set_trace()
+    return phonetics
+
+
 
 def build_librispeech_words_df(
         data_set='dev-clean',

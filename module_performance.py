@@ -381,56 +381,47 @@ def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
         make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
         prosodies.append(prosody_by_phone(p))
 
+def compute_prediction_for_row(row, phonetics, target_phones='IH0 D', 
+                            alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+    # set params and make label files for phonetics and grammar
+    p=set_params(waveFileAddress=row.wav_path)
+
+    p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
+    p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
+    make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
+    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
+
+    # run phonemeContrast module
+    status, results= phonemeContrast(p)
+    return status, results
+
 def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D', 
                             alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     detected_transcriptions=[]
     statuss=[]
-    match=[]
+    # match=[]
     result_records=[]
     for i,row in tqdm(selection.iterrows()):
         sentence=get_sentence(row.path)
-        # retrieve phonetics by word that is not available directly from textgrids, but can be extracted from the dataframe
-        # as I already extracted phonemes for each word using overlapping in timings
-        # it is important to use file_idx to be sure that the phonetic transcription of a word is correct. Because
-        # words can have several phonetic transcriptions depending on the context. e.g., the -> DH AH0, DH IY0
-        # I fact, even doing that may lead to some mistake, if the word is several times in the same sentence with different pronunciations...
-
-        phonetics=[]
-        for w in sentence.split(' '):
-            try:
-                phonetics.append(libri_words_df[(libri_words_df.file_idx==row.file_idx) & (libri_words_df.word==w)].iloc[0,:].phones)
-            except IndexError:
-                import pdb;pdb.set_trace()
-
-        # set params and make label files for phonetics and grammar
-        p=set_params(waveFileAddress=row.wav_path)
-
-        # make_dir(os.path.split(p['inputPhoneticTranscription'])[0])
-        # make_dir(os.path.split(p['inputGrammar'])[0])
-
-        p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-        p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
-        make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
-        make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-
-        # run phonemeContrast module
-        status, results= phonemeContrast(p)
+        
+        phonetics=phonetics_for_row(row, libri_words_df)
+        status, results = compute_prediction_for_row(row, phonetics, target_phones=target_phones, alternatives=alternatives)
 
         # status, results=phonemeContrast_from_text_audio(sentence, row.wav_path, row.word_idx, target_phones, alternatives)
         # prosody=prosody_by_phone(p)
         # status, textgridData, s=get_annotated_signal(p)
         statuss.append(status)
         if results!=[]:
-            # textgridData=results[0]
             detected_transcription=results[1]
             # phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None)
-            match.append(row.phones==' '.join(detected_transcription))
-            d={'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_id':row.word_idx}
+            # match.append(remove_stress_annots(row.phones.split(' '))==remove_stress_annots(detected_transcription))
+            d={'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
             detected_transcriptions.append(detected_transcription)
+
         else:
             detected_transcriptions.append([])
-            match.append(False)
-            d={'phones':row.phones, 'detected_transcription':'', 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_id':row.word_idx}
+            # match.append(False)
+            d={'phones':row.phones, 'detected_transcription':'', 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
         result_records.append(d)
     results_df=pd.DataFrame.from_records(result_records)
     return results_df
@@ -515,32 +506,19 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alt
 
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
-    # if n is not None: libri_words_df=libri_words_df.iloc[:n,:]
 
-    # results_dfs={}
-    # failure_dfs={}
-    # performances={}
-    # for contrasted_phone in tqdm(contrasted_phonemes):
-    # full_termination=' '+' '.join([pretermination,termination])
-    # correct_terminations=[' '+' '.join([pretermination,el]) for el in correct_alternatives[termination]]
     selection=libri_words_df[libri_words_df.phones.str.contains(target_phones)]
-
     if len(selection)>0:
         results_df=compute_prediction_results(selection, libri_words_df, target_phones=target_phones, alternatives=alternatives)
-        # rate, rest=performance_test(selection, results_df, correct_terminations, termination)
-
-        # results_df.detected_transcription=results_df.detected_transcription.str.replace('OW2','OW1')
-        # results_df.detected_transcription=results_df.detected_transcription.str.replace('OW0','OW1')
-        # results_df.phones=results_df.phones.str.replace('OW0','OW1')
-        # results_df.phones=results_df.phones.str.replace('OW0','OW1')
-
-        # with this measure, I actually do not know if the mistake is the confusion or not
-        success=results_df[results_df.phones==results_df.detected_transcription]
-        failure=results_df[results_df.phones!=results_df.detected_transcription]
-        success_rate=len(success)/(len(success)+len(failure))
-
-
-    all_results={'results_df':results_df, 'failure':failure,  'performance':success_rate}
+        match=[]
+        for i,row in results_df.iterrows():
+            # if row.phones=='': import pdb;pdb.set_trace()
+            if row.detected_transcription!='': #import pdb;pdb.set_trace()
+                match.append(remove_stress_annots(row.phones.split(' '))==remove_stress_annots(row.detected_transcription.split(' ')))
+            else:
+                match.append(False)
+        success_rate=sum(match)/len(match)
+    all_results={'results_df':results_df, 'failure':results_df[[not el for el in match]],  'performance':success_rate}
     if n is None:
         pickle.dump(all_results, open('performance_results/pContrast_performance_'+data_set+'_'+target_phones+'.p', 'wb'))
     else:
@@ -548,6 +526,7 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alt
     return all_results
 
 def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
+
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
@@ -578,70 +557,72 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
     else:
         pickle.dump(all_results, open('performance_results/ed_performance_'+data_set+'_from_'+str(n)+'egs.p', 'wb'))
     return all_results
-    
-# This is obsolete and probably not workin anymore
-def show_summary(data_set='dev-clean', target='AO1'):
-    # performance=pickle.load(open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p','rb'))
-    performance=pickle.load(open('ed_performance_'+data_set+'.p','rb'))
-    performances=performance['performances']
-    results_dfs=performance['results_dfs']
-    failure_dfs=performance['failure_dfs']
-    lens={}
-    for k,el in results_dfs.items(): lens[k]=len(el)
 
-    phone_termination_dict, correct_alternatives=get_phone_termination_dict()
 
-    # summary=pd.DataFrame.from_records([phone_termination_dict, lens, performances]).T
-    # summary.columns=['termination', 'n of examples', 'performances']
+if 0:
+    # This is obsolete and probably not working anymore
+    def show_summary(data_set='dev-clean', target='AO1'):
+        # performance=pickle.load(open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p','rb'))
+        performance=pickle.load(open('ed_performance_'+data_set+'.p','rb'))
+        performances=performance['performances']
+        results_dfs=performance['results_dfs']
+        failure_dfs=performance['failure_dfs']
+        lens={}
+        for k,el in results_dfs.items(): lens[k]=len(el)
 
-    summary=pd.DataFrame.from_records([lens, performances]).T
-    summary.columns=['n of examples', 'performances']
+        phone_termination_dict, correct_alternatives=get_phone_termination_dict()
 
-    # print(summary)
+        # summary=pd.DataFrame.from_records([phone_termination_dict, lens, performances]).T
+        # summary.columns=['termination', 'n of examples', 'performances']
 
-    # bad performances are mostly with D terminations
-    # print(summary[summary.performances<0.78])
-    # print(summary[summary.performances>0.78])
+        summary=pd.DataFrame.from_records([lens, performances]).T
+        summary.columns=['n of examples', 'performances']
 
-    print(summary.sort_values('performances').dropna())
+        # print(summary)
 
-    weighted_score=0
-    tot=0
-    for k in lens.keys():
-        tot+=lens[k]
-        weighted_score+=performances[k]*lens[k]
-    weighted_score/=tot
+        # bad performances are mostly with D terminations
+        # print(summary[summary.performances<0.78])
+        # print(summary[summary.performances>0.78])
 
-    print('weighted_score:', weighted_score)
-    
-    # save examples of wrong detection
-    
-    # file_selection_path='file_selection'
+        print(summary.sort_values('performances').dropna())
 
-    # # phonemes=rests_dfs.keys()
-    # phonemes=['DH','JH','Z','V','L']
+        weighted_score=0
+        tot=0
+        for k in lens.keys():
+            tot+=lens[k]
+            weighted_score+=performances[k]*lens[k]
+        weighted_score/=tot
 
-    # make_dir(file_selection_path)
-    # for k in phonemes:
-    #     if k in rests_dfs.keys():
-    #         rests_df=rests_dfs[k]
-    #         folder_copy_path=os.path.join(file_selection_path,k)
-    #         make_dir(folder_copy_path)
-    #         for i,r in tqdm(rests_df.iterrows()):
-    #             # copy_path=os.path.join(folder_copy_path,os.path.split(r.wav_path)[-1])
-    #             copy_path=os.path.join(folder_copy_path,r.detected_transcription+'.flac')
+        print('weighted_score:', weighted_score)
+        
+        # save examples of wrong detection
+        
+        # file_selection_path='file_selection'
 
-    #             if os.path.exists(r.wav_path) and not os.path.exists(copy_path):
-    #                 shutil.copy(r.wav_path, copy_path)
-            
+        # # phonemes=rests_dfs.keys()
+        # phonemes=['DH','JH','Z','V','L']
+
+        # make_dir(file_selection_path)
+        # for k in phonemes:
+        #     if k in rests_dfs.keys():
+        #         rests_df=rests_dfs[k]
+        #         folder_copy_path=os.path.join(file_selection_path,k)
+        #         make_dir(folder_copy_path)
+        #         for i,r in tqdm(rests_df.iterrows()):
+        #             # copy_path=os.path.join(folder_copy_path,os.path.split(r.wav_path)[-1])
+        #             copy_path=os.path.join(folder_copy_path,r.detected_transcription+'.flac')
+
+        #             if os.path.exists(r.wav_path) and not os.path.exists(copy_path):
+        #                 shutil.copy(r.wav_path, copy_path)
+                
 
 
 if __name__ == "__main__":
     # pContrast_from_audiobook_data(contrasted_phonemes=['DH', 'TH'], alternatives=['DH', 'TH'], module="thContrast")
-    show_summary(contrasted_phonemes=['DH', 'TH'], module="thContrast")
-    show_summary(contrasted_phonemes=['IY1', 'IH1'], module="iContrast")
-    show_summary(contrasted_phonemes=['AO1', 'OW1'], module="oContrast")
-    show_summary()
+    # show_summary(contrasted_phonemes=['DH', 'TH'], module="thContrast")
+    # show_summary(contrasted_phonemes=['IY1', 'IH1'], module="iContrast")
+    # show_summary(contrasted_phonemes=['AO1', 'OW1'], module="oContrast")
+    # show_summary()
 
     # pContrast_from_audiobook_data()
     # edAnalysis_from_audiobook_data(data_set='test-other')
@@ -651,7 +632,11 @@ if __name__ == "__main__":
     pContrast_from_audiobook_data(target_phones='IY1', alternatives=['IH1', 'IY1'], n=100)
     pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1'], n=100)
 
-    pContrast_from_audiobook_data(target_phones='DH', alternatives=['DH', 'TH'], n=100)
+    results=pContrast_from_audiobook_data(target_phones='DH', alternatives=['DH', 'TH'], n=100)
+    row=results['failure'].iloc[1]
+
+    compute_prediction_for_row(row,row.phonetics,target_phones='DH', alternatives=['DH', 'TH'])
+
     pContrast_from_audiobook_data(target_phones='DH', alternatives=['DH', 'Z'], n=100)
     results=pContrast_from_audiobook_data(target_phones='TH', alternatives=['DH', 'TH'], n=100)
     # results=pContrast_from_audiobook_data(contrasted_phonemes=contrasted_phonemes, alternatives=alternatives, module="thContrast", n=100)
