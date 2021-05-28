@@ -1,20 +1,15 @@
 import uuid
-from scipy.io.wavfile import read, write
+from scipy.io.wavfile import write
 import librosa
 import numpy as np
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import cmudict
 from time import time
-
-from tqdm import tqdm
-
 from audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
 from htk_utils import process_grammar, htk_recognition, get_textgrid_data, clean_htk_files
-
-from label_data_processing import make_dct_all_phones_from_text, make_generic_dct_from_phonetics, make_grammar_from_dct
-from text_processing import phonetics_from_sentence
+from label_data_processing import make_dct_all_phones_from_text, make_generic_dct_from_phonetics, make_grammar_from_dct, get_sentenceStress_annotation, get_data
+from text_processing import phonetics_from_sentence, remove_special_characters
 
 def set_params(
     # waveFileAddress='/root/flowchase/sent.wav',
@@ -51,6 +46,7 @@ def set_params(
     params['inputGrammar']=inputGrammar
     params['modelName']=modelName
     params['rand_fileName']=str(uuid.uuid4())
+    params['sentenceID']=sentenceID
 
     return params
 
@@ -177,134 +173,6 @@ def chunking(
 
     #clean_htk_files(p)
 
-def sentenceStress(
-    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
-    # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='sentenceStress')
-    ):
-    """Use textgridData to have the timings of words and compute prosody features (intesity, pitch) to compute 
-    a value by word representing a stress intensity
-
-    Args:
-        p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
-
-    Returns:
-        string, list of binaries: status, stress results by word (0=no stress,  1=stress)
-    """
-    status, textgridData, s = get_annotated_signal(p)
-    if textgridData is None:
-        return status, []
-
-    # find the number of words and phonemes per word in the input phrase
-    # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
-    # if there is no '_', it is e.g. "o4". We put 1 in that case and else, the number of phonemes
-    l=[el.split('_') for el in textgridData.iloc[:,2].tolist()]
-    phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
-
-    # each word start and end position expressed in samples
-    startPositions_samples = (round(p['fs_target']*textgridData.iloc[:,0])+1).astype(int)
-    stopPositions_samples = round(p['fs_target']*textgridData.iloc[:,1]).astype(int)
-
-    # to make sure we don t go beyond the end of the signal
-    assert stopPositions_samples.iloc[-1]<len(s), "The end of the last phoneme should be inside the signal"
-
-    # TODO: verification of alignment
-
-    # f0Samples=getIntonation(s, p['fs_target'])
-    f0Samples=getIntonation(s.astype(np.float64), p['fs_target'])
-    intensity=getIntensity(s, p['fs_target'])
-
-    # plt.plot(f0Samples)
-    # plt.show()
-    
-    # plt.plot(intensity)
-    # plt.show()
-
-    Dur=(textgridData.iloc[:,1]-textgridData.iloc[:,0])/(np.array(phonemesPerWord)+1)  # +1 assuming stressed phonemes = 2*other phonemes
-    Dur=np.array(Dur.tolist())
-    # plt.plot(Dur)
-    # plt.show()
-
-    startPositions_samples=startPositions_samples.tolist()
-    stopPositions_samples=stopPositions_samples.tolist()
-    
-    # this
-    Imax=np.zeros(len(textgridData))
-    Fmax=np.zeros(len(textgridData))
-    for i in range(len(textgridData)):
-        if phonemesPerWord[i] == 1:
-            Dur[i] = 0.6 * Dur[i]
-        elif phonemesPerWord[i] == 2:
-            Dur[i] = 0.8 * Dur[i]
-        temp_sort = sorted(intensity[startPositions_samples[i]:stopPositions_samples[i]], reverse = True)
-        Imax[i] = np.median(temp_sort[0:np.round(0.05*len(temp_sort)).astype(int)])
-        temp_sort = sorted(f0Samples[startPositions_samples[i]:stopPositions_samples[i]], reverse = True)
-        Fmax[i] = np.median(temp_sort[0:np.round(0.05*len(temp_sort)).astype(int)])
-    
-    # normalization of features (projection to [0 1] range)
-    zImax = normalize(Imax)
-    zFmax = normalize(Fmax)
-    zDur = normalize(Dur)
-
-    # plt.plot(zImax)
-    # plt.show()
-    
-    # plt.plot(zFmax)
-    # plt.show()
-
-    # combine the features into a final result
-    # weighted_score = (0.6*zImax + 0.4*zFmax + 0.2*zDur)/1.2;
-    # weighted_score = (0.6*zImax + 0.4*zFmax)/1.0 # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
-    # weighted_score = zImax*zFmax # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
-    weighted_score=zImax
-
-    weighted_score=normalize(weighted_score)
-
-    rateThreshold = 1.01
-    nWords=len(textgridData)
-    binResult = np.zeros(nWords)
-    
-    fig=plt.figure()
-    plt.plot(weighted_score)
-    # plt.plot(zFmax)
-    plt.savefig('sentence_curve.png')
-
-    # The original method from georgious does something with the evolution of the weighted_score
-    # and then does a threshold. If the threshold is very high (0.98), with my normalization, 
-    # it is almost the same (exactly the same for the examples I have) as just taking the max.
-
-    # The second is thus a lot more simple: put one at the max of weighted_score
-    if False:
-        if nWords == 1:
-            binResult[0] = 1
-        elif nWords == 2:
-            sWS_id=np.argsort(weighted_score)[::-1]
-            sWS_val=weighted_score[sWS_id]
-            # TODO : I have to check if this make any sense. 
-            # in the case with only two words, we ckeck if the higher is at least 1% higher than the other and put 1 there... (why this 1% ?)
-            if sWS_val[0] > rateThreshold*sWS_val[1]:
-                binResult[sWS_id[0]] = 1
-        else:
-            #TODO : this mean score has to be adapted because he uses a normalization that led to values in a small range 
-            # meanScore = 0.90*max(weighted_score)
-            # meanScore= weighted_score.mean()
-            meanScore=0.98
-
-            if (weighted_score[0] > rateThreshold*weighted_score[1]) and (weighted_score[0] > meanScore):
-                binResult[0] = 1
-            elif (weighted_score[1] > rateThreshold*max(weighted_score[[0, 2]])) and (weighted_score[1] > meanScore):
-                binResult[1] = 1
-            elif (weighted_score[-1] > rateThreshold*weighted_score[-2]) and (weighted_score[-1] > meanScore):
-                binResult[-1] = 1
-            if nWords > 3:
-                for i in range(2,nWords-1):
-                    if (weighted_score[i] > rateThreshold*max(weighted_score[[i-1, i+1]])) and (weighted_score[i] > meanScore):
-                        binResult[i] = 1
-    else:
-        binResult[np.argmax(weighted_score)]=1
-
-    #clean_htk_files(p)
-    return "success", binResult
-
 def vowels(textgridData):
     """extract vowels among phonemes in textgridData
 
@@ -390,8 +258,6 @@ def compute_stress_score(textgridData, s, fs, indxVowels, nVowelsPerWord):
         Fmean.append(np.mean(Fvowel))
 
         Dur.append(textgridData[1].iloc[indxVowels[i]]-textgridData[0].iloc[indxVowels[i]])
-
-        # textgridData[2].iloc[indxVowels[i]]
         
         phone_df=pd.DataFrame([r[2].split('_') for i,r in textgridData.iterrows()])
         # here we use the prediction of HMM model as an indication, as it has to classify 0, 1 or 2
@@ -416,13 +282,15 @@ def compute_stress_score(textgridData, s, fs, indxVowels, nVowelsPerWord):
 def vowel_stresses(
         p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
         ):
-    """[summary]
+    """vowels_stresses() computes prosody features (intesity, pitch, ...) to compute 
+    a value by vowel, located thanks to textgridData, representing a stress intensity.
+    It also plots a curve representing the stress evolution.
 
     Args:
         p ([type], optional): [description]. Defaults to set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress').
 
     Returns:
-        [type]: [description]
+        string, list of float list: status, stress intensities by word
     """
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
@@ -480,6 +348,43 @@ def wordStress(
     
     return "success", binResult
 
+def sentenceStress(
+    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
+    ):
+    """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
+    a value by vowel representing a stress intensity, and 
+    -take the max by word 
+    -take the max of these max to have the most stressed word
+    and build a binary vector with a one on this word index
+
+
+    Args:
+        p ([type], optional): [description]. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
+
+    Returns:
+        string, list of binaries: status, stress results by word (0=no stress,  1=stress)
+    """
+
+    d=get_data()
+    #d[d.analysisId==232][d.focusType=='wordstress']
+    a,textDict=get_sentenceStress_annotation()
+    module='sentenceStress'
+    focusType='sentencestress'
+    d=d[d.focusType==focusType]
+
+    for i,r in d.iterrows():
+        d=d.replace(d.loc[i].text,remove_special_characters(r.text))
+    # d=d[d.text.isin(set([remove_special_characters(el) for el in textDict.values()]))]
+
+    row=d[d.text==remove_special_characters(textDict[p['sentenceID']])]
+    p=make_all_phones_annotation_files(p,row.text.values[0])
+    status, weighted_score_by_word=vowel_stresses(p)
+    max_scores_by_word=[max(el) for el in weighted_score_by_word]
+    binResult=np.zeros(len(max_scores_by_word)).astype(int)
+    binResult[np.argmax(max_scores_by_word)]=1
+
+    return "success", binResult
+
 def number_and_indices(textgridData, char='w'):
     """get total number and indices of entries starting with char 
 
@@ -500,7 +405,8 @@ def number_and_indices(textgridData, char='w'):
 def iContrast(
     p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
     ):
-    """Use textgridData to have the timings of vowels and check if the vowel detected is a short or long vowel.
+    """Use textgridData to have the timings of vowels 
+    (and check if the vowel detected is a short or long vowel. -> I removed that part with no noticeable change in performance)
 
     Args:
         p ([type], optional): [description]. Defaults to set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast").
@@ -580,21 +486,16 @@ def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordi
     # p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
     p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turned_around.mp3', module="edAnalysis")
     ):
-    """[summary]
+    """This functions uses textgridData that now has information of all detected phonetic transcriptions.
+    It returns textgridData and the phonetics of the studied word.
+    This is to be used with automatically generated dct and grammar files, because it uses the conventions chosen for their generation.
 
     Returns:
-        [type]: [description]
+        string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
     """
     status, textgridData, s = get_annotated_signal(p)
     if textgridData is None:
         return status, []
-    
-    # detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='p']    
-    # phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
-
-    # detected_transcription=[]
-    # for r in detected_phonemes.iloc[:,2]:
-    #     detected_transcription.append(phonetics[phonetics.iloc[:,2]==r][4].values[0])
     
     detected_transcription=textgridData[textgridData.iloc[:,2].str[0]=='p']['detected_transcription'].tolist()
     #clean_htk_files(p)
@@ -652,16 +553,174 @@ def phonemeContrast_from_text_audio(
                     word_id=0, 
                     target_phones='D', 
                     alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+    """This uses text to get phonetics, and target phones as well as alternatives to build annotation files for htk.
+    Then it calls phonemeContrast module with this information. It also prints where are the differences in the phonetic entries
+    between ground truth and predictions (might be returned in the future)
+
+    Args:
+        text (str, optional): [description]. Defaults to 'turned around'.
+        audio_path (str, optional): [description]. Defaults to 'audio_recordings/turned_around.mp3'.
+        word_id (int, optional): [description]. Defaults to 0.
+        target_phones (str, optional): [description]. Defaults to 'D'.
+        alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
+
+    Returns:
+        string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
+    """
     p=set_params(waveFileAddress=audio_path)
     p=make_pContrast_annotation_files(p,text=text, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
     status,result=phonemeContrast(p)
+    phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
+    print('difference between ground truth and prediction:', [int(el[0]==el[1]) for el in zip(result[-1], phonetic_GT)])
     return status, result
 
 def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
+    """This uses text to get phonetics, to build annotation files for htk.
+    Then it calls vowel_stresses module with this information.
+
+    Args:
+        text (str, optional): [description]. Defaults to 'I would love to go to Ireland !'.
+        audio_path (str, optional): [description]. Defaults to 'audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'.
+
+    Returns:
+        string, list of float list: status, stress intensities by word
+    """
     p=set_params(waveFileAddress=audio_path)
     p=make_all_phones_annotation_files(p,text)
     status,result=vowel_stresses(p)
     return status, result
+
+
+# obsolete functions backup
+if False:
+    def sentenceStress_old(
+        p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
+        # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='sentenceStress')
+        ):
+        """Use textgridData to have the timings of words and compute prosody features (intesity, pitch) to compute 
+        a value by word representing a stress intensity
+
+        Args:
+            p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
+
+        Returns:
+            string, list of binaries: status, stress results by word (0=no stress,  1=stress)
+        """
+        status, textgridData, s = get_annotated_signal(p)
+        if textgridData is None:
+            return status, []
+
+        # find the number of words and phonemes per word in the input phrase
+        # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
+        # if there is no '_', it is e.g. "o4". We put 1 in that case and else, the number of phonemes
+        l=[el.split('_') for el in textgridData.iloc[:,2].tolist()]
+        phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
+
+        # each word start and end position expressed in samples
+        startPositions_samples = (round(p['fs_target']*textgridData.iloc[:,0])+1).astype(int)
+        stopPositions_samples = round(p['fs_target']*textgridData.iloc[:,1]).astype(int)
+
+        # to make sure we don t go beyond the end of the signal
+        assert stopPositions_samples.iloc[-1]<len(s), "The end of the last phoneme should be inside the signal"
+
+        # TODO: verification of alignment
+
+        # f0Samples=getIntonation(s, p['fs_target'])
+        f0Samples=getIntonation(s.astype(np.float64), p['fs_target'])
+        intensity=getIntensity(s, p['fs_target'])
+
+        # plt.plot(f0Samples)
+        # plt.show()
+        
+        # plt.plot(intensity)
+        # plt.show()
+
+        Dur=(textgridData.iloc[:,1]-textgridData.iloc[:,0])/(np.array(phonemesPerWord)+1)  # +1 assuming stressed phonemes = 2*other phonemes
+        Dur=np.array(Dur.tolist())
+        # plt.plot(Dur)
+        # plt.show()
+
+        startPositions_samples=startPositions_samples.tolist()
+        stopPositions_samples=stopPositions_samples.tolist()
+        
+        # this
+        Imax=np.zeros(len(textgridData))
+        Fmax=np.zeros(len(textgridData))
+        for i in range(len(textgridData)):
+            if phonemesPerWord[i] == 1:
+                Dur[i] = 0.6 * Dur[i]
+            elif phonemesPerWord[i] == 2:
+                Dur[i] = 0.8 * Dur[i]
+            temp_sort = sorted(intensity[startPositions_samples[i]:stopPositions_samples[i]], reverse = True)
+            Imax[i] = np.median(temp_sort[0:np.round(0.05*len(temp_sort)).astype(int)])
+            temp_sort = sorted(f0Samples[startPositions_samples[i]:stopPositions_samples[i]], reverse = True)
+            Fmax[i] = np.median(temp_sort[0:np.round(0.05*len(temp_sort)).astype(int)])
+        
+        # normalization of features (projection to [0 1] range)
+        zImax = normalize(Imax)
+        zFmax = normalize(Fmax)
+        zDur = normalize(Dur)
+
+        # plt.plot(zImax)
+        # plt.show()
+        
+        # plt.plot(zFmax)
+        # plt.show()
+
+        # combine the features into a final result
+        # weighted_score = (0.6*zImax + 0.4*zFmax + 0.2*zDur)/1.2;
+        # weighted_score = (0.6*zImax + 0.4*zFmax)/1.0 # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
+        # weighted_score = zImax*zFmax # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
+        weighted_score=zImax
+
+        weighted_score=normalize(weighted_score)
+
+        rateThreshold = 1.01
+        nWords=len(textgridData)
+        binResult = np.zeros(nWords)
+        
+        fig=plt.figure()
+        plt.plot(weighted_score)
+        # plt.plot(zFmax)
+        plt.savefig('sentence_curve.png')
+
+        # The original method from georgious does something with the evolution of the weighted_score
+        # and then does a threshold. If the threshold is very high (0.98), with my normalization, 
+        # it is almost the same (exactly the same for the examples I have) as just taking the max.
+
+        # The second is thus a lot more simple: put one at the max of weighted_score
+        if False:
+            if nWords == 1:
+                binResult[0] = 1
+            elif nWords == 2:
+                sWS_id=np.argsort(weighted_score)[::-1]
+                sWS_val=weighted_score[sWS_id]
+                # TODO : I have to check if this make any sense. 
+                # in the case with only two words, we ckeck if the higher is at least 1% higher than the other and put 1 there... (why this 1% ?)
+                if sWS_val[0] > rateThreshold*sWS_val[1]:
+                    binResult[sWS_id[0]] = 1
+            else:
+                #TODO : this mean score has to be adapted because he uses a normalization that led to values in a small range 
+                # meanScore = 0.90*max(weighted_score)
+                # meanScore= weighted_score.mean()
+                meanScore=0.98
+
+                if (weighted_score[0] > rateThreshold*weighted_score[1]) and (weighted_score[0] > meanScore):
+                    binResult[0] = 1
+                elif (weighted_score[1] > rateThreshold*max(weighted_score[[0, 2]])) and (weighted_score[1] > meanScore):
+                    binResult[1] = 1
+                elif (weighted_score[-1] > rateThreshold*weighted_score[-2]) and (weighted_score[-1] > meanScore):
+                    binResult[-1] = 1
+                if nWords > 3:
+                    for i in range(2,nWords-1):
+                        if (weighted_score[i] > rateThreshold*max(weighted_score[[i-1, i+1]])) and (weighted_score[i] > meanScore):
+                            binResult[i] = 1
+        else:
+            binResult[np.argmax(weighted_score)]=1
+
+        #clean_htk_files(p)
+        return "success", binResult
+
 
 
 if __name__ == "__main__":
