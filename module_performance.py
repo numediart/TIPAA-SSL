@@ -14,7 +14,7 @@ def make_dir(path):
     if not os.path.exists(path): os.makedirs(path)
 
 def rename_underscore_to_dash(files=glob("/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/*/*/*")):
-    """Replace all "-" with "_" in filenames because I had incinnsistent namings. This could be generalized if needed 
+    """Replace all "-" with "_" in filenames because I had inconsistent namings. This could be generalized if needed 
     (put symbol1='-' and symbol2='_' as parameters)
 
     Args:
@@ -364,7 +364,6 @@ def edAnalysis_performance_test():
     df_results[df_results.wav.str.contains('M2')]
 
 
-
 def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
     prosodies=[]
     for i,row in tqdm(selection.iterrows()):
@@ -383,6 +382,17 @@ def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
 
 def compute_prediction_for_row(row, phonetics, target_phones='IH0 D', 
                             alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+    """Compute the prediction of phonemeContrast module with the information of one row libri_words_df
+
+    Args:
+        row (dataframe row): [description]
+        phonetics (list): list of phonemized words, e.g. phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D']
+        target_phones (str, optional): [description]. Defaults to 'IH0 D'.
+        alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
+
+    Returns:
+        [type]: [description]
+    """
     # set params and make label files for phonetics and grammar
     p=set_params(waveFileAddress=row.wav_path)
 
@@ -397,6 +407,18 @@ def compute_prediction_for_row(row, phonetics, target_phones='IH0 D',
 
 def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D', 
                             alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+    """Calls compute_prediction_for_row for all rows of a selection and gether the predictions in the dataframe and returns it.
+
+
+    Args:
+        selection ([type]): [description]
+        libri_words_df ([type]): [description]
+        target_phones (str, optional): [description]. Defaults to 'IH0 D'.
+        alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
+
+    Returns:
+        [type]: [description]
+    """
     detected_transcriptions=[]
     statuss=[]
     # match=[]
@@ -440,7 +462,7 @@ def get_rest(results_df, correct_terminations=['T IH0 D', 'T IH1 D', 'T IH2 D'])
         rest=rest[~rest.detected_transcription.str.endswith(el)]
     return rest
 
-def performance_test(selection, results_df, correct_terminations, target_phones):
+def performance_test(selection, results_df, correct_terminations):
     # print(rate)
     rate=compute_score(results_df, correct_terminations=correct_terminations)
     rest=get_rest(results_df, correct_terminations=correct_terminations)
@@ -502,6 +524,22 @@ def get_phone_termination_dict():
 
 
 def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alternatives=['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2'], n=None):
+    """This function uses libri_words_df containing information of sentences and words in 
+    librispeech dataset with phonetic transcriptions and timings.
+    It selects sentences containing a word with target_phones in it, 
+    compute prediction on that (make annotation files, call htk, call phonemeContrast module)
+    Then it computes a success rate by checking when the detected transcription is the same as the ground truth 
+    discarding cmu vowel stresses.
+
+    Args:
+        data_set (str, optional): [description]. Defaults to 'dev-clean'.
+        target_phones (str, optional): [description]. Defaults to 'AO1'.
+        alternatives (list, optional): [description]. Defaults to ['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2'].
+        n ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        [type]: [description]
+    """
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
 
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
@@ -526,7 +564,21 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alt
     return all_results
 
 def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
+    """This function uses libri_words_df containing information of sentences and words in 
+    librispeech dataset with phonetic transcriptions and timings.
 
+    It selects sentences containing a word with each pair (pretermination,termination) of words in "-ed" 
+    It computes prediction on that (make annotation files, call htk, call phonemeContrast module)
+    Then it computes, for every pair (pretermination,termination), a success rate by checking when the 
+    detected transcription ENDS WITH the same termination as the ground truth 
+
+    Args:
+        data_set (str, optional): [description]. Defaults to 'dev-clean'.
+        n ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        [type]: [description]
+    """
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
@@ -545,7 +597,7 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
 
         if len(selection)>0:
             results_df=compute_prediction_results(selection, libri_words_df, target_phones=termination)
-            rate, rest=performance_test(selection, results_df, correct_terminations, termination)
+            rate, rest=performance_test(selection, results_df, correct_terminations)
 
             results_dfs[pretermination]=results_df
             rests_dfs[pretermination]=rest
@@ -559,7 +611,7 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
     return all_results
 
 
-if 0:
+if False:
     # This is obsolete and probably not working anymore
     def show_summary(data_set='dev-clean', target='AO1'):
         # performance=pickle.load(open('pContrast_performance_'+module+'_'+data_set+'_'+'_'.join(contrasted_phonemes)+'.p','rb'))
