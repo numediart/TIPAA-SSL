@@ -7,7 +7,9 @@ A Flask API is provided to access the modules.
 
 Examples of client requests are available in ```dummy_client.py``` and ```index.html```
 
-The process is in two post requests:
+The process is in two post requests: 
+- Upload an audio file, 
+- Call a module, or a lower level function
 
 ### Upload an audio file with arguments:
 Its filename should be unique not to overwrite a previous one. Maybe It would be better to merge both steps in one post request to avoid this problem ?
