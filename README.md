@@ -31,12 +31,31 @@ module="sentenceStress" # or "wordStress", "iContrast"
 url= "/flowspeech/"+module
 data={"sentenceID":str(sentenceID), "filename":filename}
 ```
-Example of output:
+An example of feedback for each module:
+
+- sentenceStress:  the feedback is a list of 0/1 for each word, the 1 being the sentence stress
+For the sentence "I would love to go to ireland", the correct answer would be:
 ```
 b'{"status": "success", "result": [0, 0, 1, 0, 0, 0, 0]}'
+```
+
+- wordStress: the feedback is a list of 0/1 for each syllable, the 1 being the word stress
+```
+b'{"status": "success", "result": [1, 0]}'
+```
+
+- iContrast: the feedback is 0 if the phoneme is "IH" (short i) and 1 if the pohneme is "IY" (long i).
+For the word "slip", 
+```
 b'{"status": "success", "result": 0}'
+```
+
+- example if error:
+```
 b'{"status": "error: ./upload_files/iC_111_sl.wav could not be loaded", "result": []}'
 ```
+
+
 
 ### Lower level functions
 Besides existing module, I am working on two lower level functions. 
@@ -51,6 +70,8 @@ Example of output:
 ```
  b'{"status": 0, "result": [[0.8357734306528976], [0.49237615361307363], [0.8516958573738025], [0.2795877688695186], [0.5738685725256959], [0.27777777777777773], [0.7328439332799466, 0.4460136293979836, 0.6261916617539647]]}'
  ```
+
+ if you pass only one word with only one syllable, the result will be a `[[nan]]`
 
 - phonemeContrast gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes)
 ```
@@ -99,9 +120,10 @@ To git pull inside a container:
 ```
 docker exec flaskapp git pull
 ```
-
-
-
+Connect to a bash terminal without affecting the running state. 
+```
+docker exec -it flaskapp bash
+```
 ## Manual Installation
 ### Install HTK
 
