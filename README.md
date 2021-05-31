@@ -36,17 +36,21 @@ data={"sentenceID":str(sentenceID), "filename":filename}
 An example of feedback for each module:
 
 - sentenceStress:  the feedback is a list of 0/1 for each word, the 1 being the sentence stress
+
 For the sentence "I would love to go to ireland", the correct answer would be:
 ```
 b'{"status": "success", "result": [0, 0, 1, 0, 0, 0, 0]}'
 ```
 
 - wordStress: the feedback is a list of 0/1 for each syllable, the 1 being the word stress
+
+For the word "toothpaste"
 ```
 b'{"status": "success", "result": [1, 0]}'
 ```
 
-- iContrast: the feedback is 0 if the phoneme is "IH" (short i) and 1 if the pohneme is "IY" (long i).
+- iContrast: the feedback is 0 if the phoneme is "IH" (short i) and 1 if the phoneme is "IY" (long i).
+
 For the word "slip", 
 ```
 b'{"status": "success", "result": 0}'
