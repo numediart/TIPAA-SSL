@@ -74,21 +74,27 @@ data={"text":text, 'filename':filename}
 ```
 Example of output:
 ```
- b'{"status": 0, "result": [[0.8357734306528976], [0.49237615361307363], [0.8516958573738025], [0.2795877688695186], [0.5738685725256959], [0.27777777777777773], [0.7328439332799466, 0.4460136293979836, 0.6261916617539647]]}'
- ```
+b'{"status": "success", "result": [[83], [49], [85], [27], [57], [27], [73, 44, 62]]}'
+```
 
- if you pass only one word with only one syllable, the result will be a `[[nan]]`
+if you pass only one word with only one syllable, the result will be a `[[nan]]`
 
 - phonemeContrast gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes)
 ```
 url='/phonemeContrast'
 data={"text":text, 'filename':filename, 'word_id':word_id, 'alternatives':alternatives, 'target':target}
 ```
-Example of output:
+Example of output for the word "leave":
+
+If it was correct:
 ```
-b'{"status": "success", "result": ["T", "ER1", "N", "D AH0"], "ground_truth": ["T", "ER1", "N", "D"]}'
+b'{"status": "success", "result": ["L", "IY1", "V"], "ground_truth": ["L", "IY1", "V"]}'
 ```
 
+If it was wrong:
+```
+b'{"status": "success", "result": ["L", "IH1", "V"], "ground_truth": ["L", "IY1", "V"]}'
+```
 ## Docker application
 You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
 I used this info to do that: 
