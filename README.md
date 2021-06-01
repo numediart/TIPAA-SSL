@@ -18,14 +18,6 @@ Its filename should be unique not to overwrite a previous one. Maybe It would be
 url= "/"
 files = {'file': file}
 ```
-Maybe the example in ```index.html``` with a form is better for you:
-```
-<form method="POST" action="" enctype="multipart/form-data">
-    <p><input type="file" name="file"></p>
-    <p><input type="submit" value="Submit"></p>
-</form>
-```
-
 
 ### Call a module with the audio filename and sentenceID with arguments:
 ```
