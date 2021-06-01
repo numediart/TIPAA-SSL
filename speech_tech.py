@@ -8,81 +8,19 @@ import matplotlib.pyplot as plt
 from time import time
 from audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
 from htk_utils import process_grammar, htk_recognition, get_textgrid_data, clean_htk_files
-from label_data_processing import make_dct_all_phones_from_text, make_generic_dct_from_phonetics, make_grammar_from_dct, get_sentenceStress_annotation, get_data
+from label_data_processing import  get_sentenceStress_annotation, get_data
+
+from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
+from label_data_processing import set_params
 from text_processing import phonetics_from_sentence, remove_special_characters
 
-def set_params(
-    # waveFileAddress='/root/flowchase/sent.wav',
-    waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
-    sentenceID=1,
-    basename='phrase_',
-    fs_target = 16000, # the target sampling frequency
-    modelName = 'libri',
-    module='sentenceStress'):
-    """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
-
-    Args:
-        waveFileAddress (str, optional): [description]. Defaults to 'audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'.
-        sentenceID (int, optional): [description]. Defaults to 1.
-        fs_target (int, optional): [description]. Defaults to 16000.
-        module (str, optional): [description]. Defaults to 'sentenceStress'.
-
-    Returns:
-        dict
-    """
-    inputPhoneticTranscription_base = './lexicon/'+module+'/dct/'+basename
-    inputGrammar_base = './lexicon/'+module+'/grammar/'+basename
-    
-    if not (sentenceID is None):
-        inputGrammar = '%s%d.txt' % (inputGrammar_base, sentenceID)
-        inputPhoneticTranscription = '%s%d.dct' % (inputPhoneticTranscription_base, sentenceID)
-    else:
-        inputGrammar = '%s.txt' % (inputGrammar_base)
-        inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
-    params={}
-    params['waveFileAddress']=waveFileAddress
-    params['fs_target']=fs_target
-    params['inputPhoneticTranscription']=inputPhoneticTranscription
-    params['inputGrammar']=inputGrammar
-    params['modelName']=modelName
-    params['rand_fileName']=str(uuid.uuid4())
-    params['sentenceID']=sentenceID
-
-    return params
-
-def make_all_phones_annotation_files(
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress'),
-    text='I would love to go to ireland !'
-    ):
-    """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
-    then updates the default path to point to them in parameters dictionnary
-
-    Args:
-        p ([type], optional): [description]. Defaults to set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress').
-        text (str, optional): [description]. Defaults to 'I would love to go to ireland !'.
-
-    Returns:
-        dict: parameters dictionnary
-    """
-    # p=set_params(waveFileAddress=path, module='sentenceStress')
-    p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
-    make_dct_all_phones_from_text(text, path=p['inputPhoneticTranscription'])
-    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    return p
-
-def make_pContrast_annotation_files(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
-                text="turned around",word_id=0, target_phones='D', 
-                alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-    p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
-    # make_dct_all_phones_from_text(text, path=p['inputPhoneticTranscription'])
-    # make_grammar_from_all_phones_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    phonetics=phonetics_from_sentence(text)
-    phonetics=[' '.join(w) for w in phonetics]
-    make_generic_dct_from_phonetics(phonetics=phonetics, word_id=word_id, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
-    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    return p
+target_to_alternatives={
+    "DH":["DH","TH"],
+    "TH":["DH","TH"],
+    "AO1":["AO1","OW1"],
+    "OW1":["AO1","OW1"],
+    "IH0 D":['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
+}
 
 def get_annotated_signal(p=set_params()):
     """Load audio file and annotation files corresponding to parameters, 
@@ -302,10 +240,10 @@ def vowel_stresses(
 
     indxVowels, nVowelsPerWord=vowels(textgridData)
     weighted_score=compute_stress_score(textgridData, s,  p['fs_target'], indxVowels, nVowelsPerWord)
-    print(weighted_score)
-    fig=plt.figure()
-    plt.plot(weighted_score)
-    plt.savefig('word_curve.png')
+    # print(weighted_score)
+    # fig=plt.figure()
+    # plt.plot(weighted_score)
+    # plt.savefig('word_curve.png')
     # chose prominent vowel per word
 
     assert sum(nVowelsPerWord)==len(weighted_score)
@@ -316,7 +254,7 @@ def vowel_stresses(
         weighted_score_by_word.append(weighted_score[syl_start:syl_start+n_v].tolist())
         syl_start+=n_v
     #clean_htk_files(p)
-    return status, weighted_score_by_word
+    return "success", weighted_score_by_word
 
 def wordStress(
     p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress')
@@ -478,13 +416,13 @@ def prosody_by_phone(p):
     return "success", [textgridData, d]
 
 
-def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")):
+def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
-    p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turned_around.mp3', module="edAnalysis")
+    p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turned_around.mp3')
     ):
     """This functions uses textgridData that now has information of all detected phonetic transcriptions.
     It returns textgridData and the phonetics of the studied word.
@@ -557,13 +495,6 @@ def phonemeContrast_from_text_audio(
     Then it calls phonemeContrast module with this information. It also prints where are the differences in the phonetic entries
     between ground truth and predictions (might be returned in the future)
 
-    Args:
-        text (str, optional): [description]. Defaults to 'turned around'.
-        audio_path (str, optional): [description]. Defaults to 'audio_recordings/turned_around.mp3'.
-        word_id (int, optional): [description]. Defaults to 0.
-        target_phones (str, optional): [description]. Defaults to 'D'.
-        alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
-
     Returns:
         string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
     """
@@ -571,22 +502,37 @@ def phonemeContrast_from_text_audio(
     p=make_pContrast_annotation_files(p,text=text, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
     status,result=phonemeContrast(p)
     phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
-    print('difference between ground truth and prediction:', [int(el[0]==el[1]) for el in zip(result[-1], phonetic_GT)])
+    print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetic_GT)])
+    return status, result
+
+
+def phonemeContrast_from_phonetics_audio(
+                    phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], 
+                    audio_path='audio_recordings/turned_around.mp3', 
+                    word_id=0, 
+                    target_phones='D', 
+                    alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+    p=set_params(waveFileAddress=audio_path)
+    p=make_pContrast_annotation_files_from_phonetics(p,phonetics=phonetics, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
+    status,result=phonemeContrast(p)
+    print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetics)])
     return status, result
 
 def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
     """This uses text to get phonetics, to build annotation files for htk.
     Then it calls vowel_stresses module with this information.
-
-    Args:
-        text (str, optional): [description]. Defaults to 'I would love to go to Ireland !'.
-        audio_path (str, optional): [description]. Defaults to 'audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'.
-
     Returns:
         string, list of float list: status, stress intensities by word
     """
     p=set_params(waveFileAddress=audio_path)
     p=make_all_phones_annotation_files(p,text)
+    status,result=vowel_stresses(p)
+    return status, result
+
+
+def vowel_stresses_from_phonetics_audio(phonetics=phonetics_from_sentence('I would love to go to Ireland !'), audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
+    p=set_params(waveFileAddress=audio_path)
+    p=make_all_phones_annotation_files_from_phonetics(p,phonetics)
     status,result=vowel_stresses(p)
     return status, result
 
@@ -735,8 +681,8 @@ if __name__ == "__main__":
                     alternatives=['IH0', 'IH2', 'IY0', 'IY1', 'IY2'])
 
     phonetics=phonetics_from_sentence('Did he fall asleep?')
-    # Test performance of wordStress module
 
+    # Test performance of wordStress module
     start=time()
     wordStress()
     print(time()-start)
@@ -750,7 +696,6 @@ if __name__ == "__main__":
     p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
 
-
     get_annotated_signal_timing2=timing_test('get_annotated_signal', p=p)
     iContrast_timing=timing_test('iContrast')
     wordStress_timing=timing_test('wordStress')
@@ -759,7 +704,7 @@ if __name__ == "__main__":
     start=time();s,fs = load_audio(p['waveFileAddress'], fs=p['fs_target']);print(time()-start) #0.08
     start=time();s,fs=librosa.load(p['waveFileAddress'], sr=p['fs_target']);print(time()-start) #0.08
 
-    from scipy.io.wavfile import read, write
+    from scipy.io.wavfile import write
     import soundfile as sf
 
     # start=time();fs,s = read(p['waveFileAddress']);print(time()-start)
@@ -783,8 +728,12 @@ if __name__ == "__main__":
     ./inputs/' +p['rand_fileName']+ '.wav'
     start=time();out2 = os.popen(cmd2).read();print(time()-start)
 
-    # out2=os.system(cmd2)
-    # print('out2', out2)
-
     # read rec file (i.e., the alignment outcome)
     textgridData = pd.read_csv('./results/'+ rand_fileName +'.rec', sep=' ', header=None)
+
+    alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
+    # alternatives=['T', 'D', 'IH0 D', 'EH1 D', 'AH0 D']
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/ed_acceptEED.wav', module="edAnalysis")
+    make_pContrast_annotation_files(p, text="accepted",word_id=0, target_phones='IH0 D',
+    alternatives=alternatives)
+    status, results= phonemeContrast(p)
