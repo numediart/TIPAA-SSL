@@ -24,10 +24,18 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 upload_path="./upload_files/"
 @app.route('/', methods=['POST'])
 def upload_file():
-    uploaded_file = request.files['file']
+    try:
+      uploaded_file = request.files['file']
+    except:
+      return "error: could not access request.files['file'] "
     if uploaded_file.filename != '':
-        uploaded_file.save(upload_path+uploaded_file.filename)
-    return redirect(url_for('index'))
+        try:
+          uploaded_file.save(upload_path+uploaded_file.filename)
+        except:
+          return "could not save uploaded file"
+    else:
+      return "error: filename is empty"
+    return "success"
 
   
 @app.route('/flowspeech/<module>', methods=['GET', 'POST'])
@@ -69,15 +77,14 @@ def vowel_stresses_api():
     print(content['filename'])
     filename=content['filename']
     text=content['text']
-    # p=set_params(waveFileAddress=upload_path+filename)
-    # p=make_all_phones_annotation_files(p,text)
-    # status,result=vowel_stresses(p)
 
-    status,result=vowel_stresses_from_text_audio(text,upload_path+filename)
+    status,result=vowel_stresses_from_phonetics_audio(phonetics_from_sentence(text),upload_path+filename)
     print('result:',result)
     if not isinstance(result, list):
       print('result:',result)
       result=result.tolist()
+    
+    result=[[int(x*100) for x  in sublist] for sublist in result]
     d={'status':status, 'result':result}
     response=json.dumps(d)
     return response
@@ -98,18 +105,12 @@ def phoneme_contrast_api():
     target=content['target']
     alternatives=ast.literal_eval(content['alternatives'])
     print(alternatives)
-    
-    # p=set_params(waveFileAddress=upload_path+filename)
-    # p=make_pContrast_annotation_files(p,text=text,word_id=int(word_id), target_phones='D', 
-    #             alternatives=alternatives)
-    # status,result=phonemeContrast(p)
-    status,result=phonemeContrast_from_text_audio(text, upload_path+filename, int(word_id), target, alternatives)
+    status,result=phonemeContrast_from_phonetics_audio(phonetics_from_sentence(text), upload_path+filename, int(word_id), target, alternatives)
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):
       result=result.tolist()
       print('result:',result)
-
     if result!=[]:  
       phonetic_transcript=result[-1]
     else:
