@@ -32,7 +32,7 @@ def upload_file():
         try:
           uploaded_file.save(upload_path+uploaded_file.filename)
         except:
-          return "could not save uploaded file"
+          return "error: could not save uploaded file"
     else:
       return "error: filename is empty"
     return "success"
