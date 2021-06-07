@@ -1,4 +1,3 @@
-import uuid
 from scipy.io.wavfile import write
 import librosa
 import numpy as np
@@ -19,7 +18,17 @@ target_to_alternatives={
     "TH":["DH","TH"],
     "AO1":["AO1","OW1"],
     "OW1":["AO1","OW1"],
-    "IH0 D":['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
+    "IH1":["IH1","IY1"],
+    "IY1":["IH1","IY1"],
+    # "IH0 D":['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
+    "IH0 D":['T', 'D', 'IH0 D', 'EH2 D'],
+    "D":['T', 'D', 'IH0 D', 'EH2 D'],
+    "T":['T', 'D', 'IH0 D', 'EH2 D']
+}
+
+graphemes_to_alternatives={
+    "ie":["IY1","AY1"],
+    "ea":["IY1","EH1"]
 }
 
 def get_annotated_signal(p=set_params()):
@@ -157,7 +166,7 @@ def check_words_duration():
     #     return;
     # end
 
-def compute_stress_score(textgridData, s, fs, indxVowels, nVowelsPerWord):
+def compute_stress_score(textgridData, s, fs, indxVowels):
     """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
     a value by vowel representing a stress intensity
 
@@ -239,7 +248,7 @@ def vowel_stresses(
     #     return "error: inconsistent number of detected phonemes", []
 
     indxVowels, nVowelsPerWord=vowels(textgridData)
-    weighted_score=compute_stress_score(textgridData, s,  p['fs_target'], indxVowels, nVowelsPerWord)
+    weighted_score=compute_stress_score(textgridData, s,  p['fs_target'], indxVowels)
     # print(weighted_score)
     # fig=plt.figure()
     # plt.plot(weighted_score)
@@ -283,8 +292,13 @@ def wordStress(
 
     bin_score_by_word=max_by_line(weighted_score_by_word)
     binResult=np.concatenate(bin_score_by_word)
+
+    weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
+
+    return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": bin_score_by_word}
+
     
-    return "success", binResult
+    # return "success", binResult
 
 def sentenceStress(
     p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
@@ -295,33 +309,23 @@ def sentenceStress(
     -take the max of these max to have the most stressed word
     and build a binary vector with a one on this word index
 
-
     Args:
         p ([type], optional): [description]. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
 
     Returns:
         string, list of binaries: status, stress results by word (0=no stress,  1=stress)
     """
-
-    d=get_data()
-    #d[d.analysisId==232][d.focusType=='wordstress']
     a,textDict=get_sentenceStress_annotation()
-    module='sentenceStress'
-    focusType='sentencestress'
-    d=d[d.focusType==focusType]
-
-    for i,r in d.iterrows():
-        d=d.replace(d.loc[i].text,remove_special_characters(r.text))
-    # d=d[d.text.isin(set([remove_special_characters(el) for el in textDict.values()]))]
-
-    row=d[d.text==remove_special_characters(textDict[p['sentenceID']])]
-    p=make_all_phones_annotation_files(p,row.text.values[0])
+    p=make_all_phones_annotation_files(p,remove_special_characters(textDict[p['sentenceID']]))
     status, weighted_score_by_word=vowel_stresses(p)
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
+    # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
     binResult=np.zeros(len(max_scores_by_word)).astype(int)
     binResult[np.argmax(max_scores_by_word)]=1
 
-    return "success", binResult
+    return {"status": "success", "stress_intensities": [int(el*100) for el in max_scores_by_word], "stress_binaries": binResult}
+
+    # return "success", [max_scores_by_word, binResult]
 
 def number_and_indices(textgridData, char='w'):
     """get total number and indices of entries starting with char 
@@ -339,48 +343,6 @@ def number_and_indices(textgridData, char='w'):
     idxs = [x for x in idxs if x==x]
     n=len(idxs)
     return n, idxs
-
-def iContrast(
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
-    ):
-    """Use textgridData to have the timings of vowels 
-    (and check if the vowel detected is a short or long vowel. -> I removed that part with no noticeable change in performance)
-
-    Args:
-        p ([type], optional): [description]. Defaults to set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast").
-
-    Returns:
-        int: 0 if short, 1 if long
-    """
-    #p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
-    status, textgridData, s = get_annotated_signal(p)
-    if textgridData is None:
-        return status, []
-
-    # find the number of words and phonemes per word in the input phrase
-    # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
-    # if there is no '_', it is e.g. "o4". We put 1 in that case and else, the number of phonemes
-    # l=[el.split('_') for el in textgridData.iloc[:,2].tolist()]
-    # phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
-
-    # TODO: this is for the verification and it is not finished
-    nWords, indxWords = number_and_indices(textgridData, 'w')
-    nPho, indxPho = number_and_indices(textgridData, 'p')
-    nSil, indxSil = number_and_indices(textgridData, 's')
-
-    # TODO: weird, he does a loop for every phoneme, check if it is a short or long, and repeat, but does not record results.
-    # only the last result will be kept (maybe it works because there is only one vowel that needs to be checked)
-    for i,el in enumerate(textgridData.iloc[:,2].tolist()):
-        # print(el[-2:])
-        if el[-2:]=='*s':
-            binResult=0
-        elif el[-2:]=='*l':
-            binResult=1
-            # if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
-            #     binResult=0
-    #clean_htk_files(p)
-    return "success", binResult
-
 
 def prosody_by_phone(p):
     status, textgridData, s = get_annotated_signal(p)
@@ -420,9 +382,9 @@ def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordi
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_MP3.mp3', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Laaw_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Law_WAV.wav', module="oContrast")
-    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
+    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
     # p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis")
-    p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turned_around.mp3')
+    # p=set_params(sentenceID=9, waveFileAddress='audio_recordings/turned_around.mp3')
     ):
     """This functions uses textgridData that now has information of all detected phonetic transcriptions.
     It returns textgridData and the phonetics of the studied word.
@@ -438,6 +400,7 @@ def phonemeContrast(#p=set_params(sentenceID=111, waveFileAddress='audio_recordi
     detected_transcription=textgridData[textgridData.iloc[:,2].str[0]=='p']['detected_transcription'].tolist()
     #clean_htk_files(p)
     return "success", [textgridData, detected_transcription]
+
 
 
 def edAnalysis(
@@ -458,7 +421,6 @@ def edAnalysis(
     nPho, indxPho = number_and_indices(textgridData, 'p')
     nSil, indxSil = number_and_indices(textgridData, 's')
     nOutOfVoc, indxOutOfVoc = number_and_indices(textgridData, 'o')
-
     binResult = 0
     # check pronunciation
     for i in range(nPho):
@@ -511,12 +473,13 @@ def phonemeContrast_from_phonetics_audio(
                     audio_path='audio_recordings/turned_around.mp3', 
                     word_id=0, 
                     target_phones='D', 
-                    alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+                    alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     p=set_params(waveFileAddress=audio_path)
     p=make_pContrast_annotation_files_from_phonetics(p,phonetics=phonetics, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
     status,result=phonemeContrast(p)
-    print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetics)])
+    # print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetics)])
     return status, result
+
 
 def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
     """This uses text to get phonetics, to build annotation files for htk.
@@ -530,15 +493,63 @@ def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio
     return status, result
 
 
-def vowel_stresses_from_phonetics_audio(phonetics=phonetics_from_sentence('I would love to go to Ireland !'), audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
+def vowel_stresses_from_phonetics_audio(
+    # phonetics=phonetics_from_sentence('I would love to go to Ireland !'), audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
+    audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    ):
     p=set_params(waveFileAddress=audio_path)
     p=make_all_phones_annotation_files_from_phonetics(p,phonetics)
     status,result=vowel_stresses(p)
     return status, result
 
 
+
 # obsolete functions backup
 if False:
+    # generalized and replaced by phoneme contrast
+    def iContrast(
+        p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast")
+        ):
+        """Use textgridData to have the timings of vowels 
+        (and check if the vowel detected is a short or long vowel. -> I removed that part with no noticeable change in performance)
+
+        Args:
+            p ([type], optional): [description]. Defaults to set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_slip.wav', module="iContrast").
+
+        Returns:
+            int: 0 if short, 1 if long
+        """
+        #p=set_params(sentenceID=111, waveFileAddress='audio_recordings/iC_111_sleep.wav', module="iContrast")
+        status, textgridData, s = get_annotated_signal(p)
+        if textgridData is None:
+            return status, []
+
+        # find the number of words and phonemes per word in the input phrase
+        # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
+        # if there is no '_', it is e.g. "o4". We put 1 in that case and else, the number of phonemes
+        # l=[el.split('_') for el in textgridData.iloc[:,2].tolist()]
+        # phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
+
+        # TODO: this is for the verification and it is not finished
+        nWords, indxWords = number_and_indices(textgridData, 'w')
+        nPho, indxPho = number_and_indices(textgridData, 'p')
+        nSil, indxSil = number_and_indices(textgridData, 's')
+
+        # TODO: weird, he does a loop for every phoneme, check if it is a short or long, and repeat, but does not record results.
+        # only the last result will be kept (maybe it works because there is only one vowel that needs to be checked)
+        for i,el in enumerate(textgridData.iloc[:,2].tolist()):
+            # print(el[-2:])
+            if el[-2:]=='*s':
+                binResult=0
+            elif el[-2:]=='*l':
+                binResult=1
+                # if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
+                #     binResult=0
+        #clean_htk_files(p)
+        return "success", binResult
+
+    
     def sentenceStress_old(
         p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
         # p=set_params(sentenceID=1, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='sentenceStress')
@@ -737,3 +748,9 @@ if __name__ == "__main__":
     make_pContrast_annotation_files(p, text="accepted",word_id=0, target_phones='IH0 D',
     alternatives=alternatives)
     status, results= phonemeContrast(p)
+
+    make_pContrast_annotation_files(p, text="law",word_id=0, target_phones='AO1',    alternatives=['AO1','OW1','AA1', 'AH1 W'])
+
+    target='D'
+    phonetics=phonetics_from_sentence('turned around')
+    phonemeContrast_from_phonetics_audio(target_phones=target, alternatives=target_to_alternatives[target],audio_path='audio_recordings/turned_around.mp3',word_id=0)
