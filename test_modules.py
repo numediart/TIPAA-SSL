@@ -18,8 +18,8 @@ def test_audio_formats():
     sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a', module='sentenceStress'))
     sentenceStress(p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland_stereo.m4a', module='sentenceStress'))
 
-def test_iContrast():
-    iContrast()
+# def test_iContrast():
+#     iContrast()
 
 def test_pContrast():
     phonemeContrast()
@@ -42,10 +42,10 @@ def test_text_processing():
     word_stress_from_text()
 
 def test_performance_tests():
-    iContrast_performance_test()
+    # iContrast_performance_test()
     sentenceStress_performance_test()
     wordStress_performance_test()
-    sentenceStress_automatic_annot_performance_test()
+    # sentenceStress_automatic_annot_performance_test()
     edAnalysis_performance_test()
     edAnalysis_from_audiobook_data(data_set='dev-clean', n=100)
     pContrast_from_audiobook_data(n=100)
