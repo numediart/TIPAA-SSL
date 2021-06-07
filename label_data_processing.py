@@ -5,7 +5,7 @@ from glob import glob
 from shutil import copy
 import cmudict
 import os
-from text_processing import phonetics_from_sentence, remove_special_characters
+from text_processing import phonetics_from_sentence, remove_special_characters, n_vowels
 # from speech_tech import set_params
 import uuid
 
@@ -199,7 +199,7 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
         # Here we are at the level of a word of the sentence
         if i!=word_id:
             # In case it is not the word we want to detail in several lines, we just put its phonetics in one line
-            lines.append('w'+str(i)+' ['+'w'+str(i)+'_'+str(0)+'] '+word)
+            lines.append('w'+str(i)+' ['+'w'+str(i)+'] '+word)
         else:
             # Here we want to detail this specific word
             # split the word to detail in phonemes with the piece with several alternatives
@@ -417,7 +417,58 @@ def wordStress_make_dcts_grammars(path_dct='lexicon/wordStress/dct', path_gramma
 
 
 
+def syllables_data():
     
+    # http://www.delphiforfun.org/programs/Syllables.htm
+    # syllables=pd.read_csv('Syllables.txt',sep='=', header=None)
+    syllables=pd.read_csv('mhyph.txt', header=None)
+
+    syl_sep=syllables[0][0][5]
+    syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(syl_sep,'_')
+
+    syl_sep='_'
+
+
+    d=cmudict.dict()
+    syllables=syllables.dropna()  # there is one row that is nan...
+
+    # syllables.columns=['word', 'syllables']
+    syllables.columns=['syllables']
+
+    n_syls=[]
+    n_vowels_cmu=[]
+    texts=[]
+    phonetics=[]
+    for i,r in syllables.iterrows():
+        text=''.join(r[0].split(syl_sep)).lower()
+        texts.append(text)
+        try:
+            n_syls.append(int(len(r[0].split(syl_sep))))
+        except:
+            n_syls.append(None)
+        # print(d[r[0]][0])
+        try:
+            phonetics.append(' '.join(d[text][0]))
+            n_vowels_cmu.append(int(n_vowels(d[text][0])))
+        except IndexError:
+            n_vowels_cmu.append(None)
+            phonetics.append(None)
+
+
+    syllables['normalized_text']=texts
+    syllables['phonetics']=phonetics
+
+    syllables['n_syls']=n_syls
+    syllables['n_vowels_cmu']=n_vowels_cmu
+
+    syllables[syllables.n_vowels_cmu.isnull()].normalized_text.tolist()
+    len(syllables[~syllables.n_vowels_cmu.isnull()].normalized_text.tolist())
+
+    syllables=syllables.dropna()
+    syllables[syllables.n_syls==syllables.n_vowels_cmu]
+    syllables[syllables.n_syls!=syllables.n_vowels_cmu]
+
+    syllables.to_csv('syllables.csv')
 
 
 if False:
@@ -601,3 +652,6 @@ if False:
             df=pd.read_csv(gram, header=None)
             df.iloc[2,0]=df.iloc[2,0].replace('| $inv ','')
             df.to_csv(gram, index=None, header=None)
+
+
+    

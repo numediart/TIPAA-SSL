@@ -112,11 +112,14 @@ def phoneme_contrast_api():
       result=result.tolist()
       print('result:',result)
     if result!=[]:  
-      phonetic_transcript=result[-1]
+      # phonetic_transcript=result[-1]
+      phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
     else:
-      phonetic_transcript=result
-    phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
-    d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
+      phonetic_detection=result
+    # phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
+    # d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
+    
+    d={'status':status, 'phonetics':phonetic_detection}
     response=json.dumps(d)
     return response
 
