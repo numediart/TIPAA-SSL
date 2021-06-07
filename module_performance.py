@@ -127,6 +127,7 @@ def wordStress_performance_test():
         print(row)
         print(a[row.analysisId])
     preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
+    preds=[np.concatenate(el) for el in preds]
     example_errors=compute_errors(preds,GTs)
 
     # row=d[d.analysisId==422].iloc[0]
