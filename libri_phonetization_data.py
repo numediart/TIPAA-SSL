@@ -107,6 +107,18 @@ def cmu_ascii_mappings():
     
     return ascii_encoding, ascii_decoding
 
+def learning_content(selection,    n=20):
+    """
+    -count the occurences of words to have an idea of their frequence in english
+    -take the n first
+    """
+    counts=selection.word.value_counts().iloc[:n]
+    frequent_selection=selection[selection.word.isin(counts.index)]
+    frequent_selection_unique=frequent_selection.drop_duplicates(subset=['word'])
+    # frequent_selection_unique[['word','phones']]
+    frequent_selection_unique['frequency among examples']=counts[frequent_selection_unique.word].values/len(selection)*100
+    return frequent_selection_unique[['word','phones','frequency among examples']].sort_values('frequency among examples', ascending=False)
+
 
 if __name__ == "__main__":
     libri_words_df=build_librispeech_words_df()
@@ -119,6 +131,8 @@ if __name__ == "__main__":
     libri_words_df[libri_words_df.phones.str.endswith(' D IH0 D')]
     libri_words_df[libri_words_df.phones.str.endswith(' D AH0 D')]
 
+    libri_words_df[libri_words_df.phones.str.endswith(' S')]
+
     libri_words_df[libri_words_df.phones.str.endswith(' V D')]
     libri_words_df[libri_words_df.phones.str.endswith(' M D')]
     libri_words_df[libri_words_df.phones.str.endswith(' NG D')]
@@ -130,11 +144,10 @@ if __name__ == "__main__":
 
     libri_words_df[libri_words_df.phones.str.endswith('AO1')].word.unique()
     libri_words_df[libri_words_df.phones.str.contains('AO1')].word.unique()
-    libri_words_df[libri_words_df.phones.str.contains('AO1')]
+    libri_words_df[libri_words_df.phones.str.contains('AO0')&libri_words_df.phones.str.contains('IY1')]
     libri_words_df[libri_words_df.phones.str.contains('OW1')]
     libri_words_df[libri_words_df.phones.str.endswith(' B D') & libri_words_df.word.str.endswith('bed')]
     libri_words_df[libri_words_df.phones.str.endswith(' D') & libri_words_df.word.str.endswith('ied')]
-
 
     libri_words_df[libri_words_df.phones.str.endswith(' P T') & libri_words_df.word.str.endswith('ped')]
     libri_words_df[libri_words_df.phones.str.endswith(' K T') & libri_words_df.word.str.endswith('ked')]
@@ -144,7 +157,28 @@ if __name__ == "__main__":
 
     selection=libri_words_df[libri_words_df.phones.str.endswith(' P T') & libri_words_df.word.str.endswith('ped')]
 
-    libri_words_df[libri_words_df.phones.str.contains(' EH1 ') & libri_words_df.word.str.contains('ea')]
+    selection=libri_words_df[libri_words_df.phones.str.contains('AO1')]
+    content=learning_content(selection, n=20)
+    content.index=range(len(content))
+    content
+
+    selection=libri_words_df[libri_words_df.phones.str.contains('OW1')]
+    content=learning_content(selection,    n=10)
+    content.index=range(len(content))
+    content
+
+    selection=libri_words_df[libri_words_df.phones.str.contains('EH1') & libri_words_df.word.str.contains('ea')]
+    content=learning_content(selection,    n=10)
+    content.index=range(len(content))
+    content
+
+
+    selection=libri_words_df[libri_words_df.phones.str.contains(' IY1') & libri_words_df.word.str.contains('ea')]
+    selection=libri_words_df[libri_words_df.phones.str.contains('IY1') & libri_words_df.word.str.contains('ea')]
+    content=learning_content(selection,    n=10)
+    content.index=range(len(content))
+    content
+    
     libri_words_df[libri_words_df.phones.str.contains(' IY1 ') & libri_words_df.word.str.contains('ea')]
     libri_words_df[libri_words_df.phones.str.contains(' UH1 ') & libri_words_df.word.str.contains('oo')]
     libri_words_df[libri_words_df.phones.str.contains(' UW1 ') & libri_words_df.word.str.contains('oo')]
@@ -166,5 +200,5 @@ if __name__ == "__main__":
 
     # tg[0] -> words
     # tg[1] -> phones
-    words=[el.mark for el in tg[0]]
-    phones=[el.mark for el in tg[1]]
+    # words=[el.mark for el in tg[0]]
+    # phones=[el.mark for el in tg[1]]
