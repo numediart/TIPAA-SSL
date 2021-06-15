@@ -8,6 +8,7 @@ from libri_phonetization_data import *
 from tqdm import tqdm
 import pickle
 # Performance tests
+import seaborn as sns
 
 from speech_tech import target_to_alternatives, graphemes_to_alternatives
 
@@ -37,7 +38,7 @@ def compute_errors(preds, GTs):
     example_errors=[]
     for i,pred in enumerate(preds):
         if len(pred)==len(GTs[i]):
-            diff=abs(pred-GTs[i])
+            diff=abs(pred-np.array(GTs[i]))
             diffs.append(diff)
             total_n+=len(pred)
             stress_error+=diff.sum()
@@ -318,11 +319,12 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
         statuss.append(status)
         if results!=[]:
             detected_transcription=results[1]
-            d={'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
+            phonetic_detection=results[0][results[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
+            d={'detected_phone':phonetic_detection,'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
             detected_transcriptions.append(detected_transcription)
         else:
             detected_transcriptions.append([])
-            d={'phones':row.phones, 'detected_transcription':'', 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
+            d={'detected_phone':'','phones':row.phones, 'detected_transcription':'', 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
         result_records.append(d)
     results_df=pd.DataFrame.from_records(result_records)
     return results_df
@@ -442,6 +444,7 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alt
     if len(selection)>0:
         results_df=compute_prediction_results(selection, libri_words_df, target_phones=target_phones, alternatives=alternatives)
         all_results=performance_from_results(results_df)
+    else: all_results=[]
     if n is None:
         pickle.dump(all_results, open('performance_results/pContrast_performance_'+data_set+'_'+target_phones+'.p', 'wb'))
     else:
@@ -464,8 +467,6 @@ def unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones
     else:
         pickle.dump(all_results, open('performance_results/unpredictaple_vowels_performance_'+data_set+'_'+target_graphemes+'_'+target_phones+'_from_'+str(n)+'egs.p', 'wb'))
     return all_results
-
-
 
 
 def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
@@ -517,6 +518,51 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
 
 
 
+def confusion_analysis_of_pContrast(phone_set, n=100):
+    confusion_records=[]
+    for p in phone_set:
+        r=pContrast_from_audiobook_data(data_set='dev-clean', target_phones=p, alternatives=phone_set, n=n)
+        # results[p]=r
+
+        dict_count_prediction={}
+        for phone in phone_set: dict_count_prediction[phone]=0
+
+        if r!=[]:
+            for i,row in r['results_df'].iterrows(): 
+                # row.detected_phone
+                for el in row.detected_phone: dict_count_prediction[el]+=1
+        confusion_records.append(dict_count_prediction)
+
+    confusion_df=pd.DataFrame.from_records(confusion_records)
+    confusion_df.index=phone_set
+    return confusion_df
+
+
+def pContrast_confusion_from_audiobook_data(n=100):
+    import cmudict
+    phones=cmudict.phones()
+
+    cmu_vowels=[p[0]+'1' for p in phones if p[1][0]=='vowel']
+    cmu_consonants=[p[0] for p in phones if p[1][0]!='vowel']
+    # results={}
+
+    vowel_confusion_df=confusion_analysis_of_pContrast(cmu_vowels, n=n)
+    vowel_confusion_df_norm=(vowel_confusion_df.div(vowel_confusion_df.sum(axis=1), axis=0)*100).round(1)
+    vowel_confusion_df.to_csv('performance_results/vowel_confusion_df.csv')
+    vowel_confusion_df_norm.to_csv('performance_results/vowel_confusion_df_norm.csv')
+    
+    consonant_confusion_df=confusion_analysis_of_pContrast(cmu_consonants, n=n)
+    consonant_confusion_df_norm=(consonant_confusion_df.div(consonant_confusion_df.sum(axis=1), axis=0)*100).round(1)
+    consonant_confusion_df.to_csv('performance_results/consonant_confusion_df.csv')
+    consonant_confusion_df_norm.to_csv('performance_results/consonant_confusion_df_norm.csv')
+
+    
+    plt.clf()
+    sns.heatmap(vowel_confusion_df_norm, annot=True, cmap='YlGnBu')
+    plt.savefig('performance_results/vowel_contrast_confusion.png')
+    plt.clf()
+    sns.heatmap(consonant_confusion_df_norm, annot=True, cmap='YlGnBu')
+    plt.savefig('performance_results/consonant_contrast_confusion.png')
 
 if False:
     # I checked that automatic annot version worked as well, and deprecated iContrast(p) module
