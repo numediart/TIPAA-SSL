@@ -538,7 +538,7 @@ def confusion_analysis_of_pContrast(phone_set, n=100):
     return confusion_df
 
 
-def pContrast_confusion_from_audiobook_data(n=100):
+def vowels_consonants_confusions_from_audiobook_data(n=100):
     import cmudict
     phones=cmudict.phones()
 
