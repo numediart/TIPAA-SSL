@@ -27,16 +27,16 @@ upload_path="./upload_files/"
 @app.route('/', methods=['POST'])
 def upload_file():
     try:
-      uploaded_file = request.files['file']
+        uploaded_file = request.files['file']
     except:
-      return "error: could not access request.files['file'] "
+        return "error: could not access request.files['file'] "
     if uploaded_file.filename != '':
         try:
-          uploaded_file.save(upload_path+uploaded_file.filename)
+            uploaded_file.save(upload_path+uploaded_file.filename)
         except:
-          return "error: could not save uploaded file"
+            return "error: could not save uploaded file"
     else:
-      return "error: filename is empty"
+        return "error: filename is empty"
     return "success"
 
   
@@ -53,11 +53,11 @@ def add_message(module):
     sentenceID=content['sentenceID']
     p=set_params(sentenceID=int(sentenceID), waveFileAddress=upload_path+filename, module=module)
     try:
-      method_to_call = getattr(speech_tech, module)
+        method_to_call = getattr(speech_tech, module)
     except:
-      print('no such module exists')
-      response="-1"
-      return response
+        print('no such module exists')
+        response="-1"
+        return response
 
     res=method_to_call(p)
     # res=globals()[module](p)
@@ -88,8 +88,8 @@ def vowel_stresses_api():
     status,result=vowel_stresses_from_phonetics_audio(phonetics_from_sentence(text),upload_path+filename)
     print('result:',result)
     if not isinstance(result, list):
-      print('result:',result)
-      result=result.tolist()
+        print('result:',result)
+        result=result.tolist()
     
     result=[[int(x*100) for x  in sublist] for sublist in result]
     d={'status':status, 'result':result}
@@ -116,13 +116,13 @@ def phoneme_contrast_api():
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):
-      result=result.tolist()
-      print('result:',result)
+        result=result.tolist()
+        print('result:',result)
     if result!=[]:  
-      # phonetic_transcript=result[-1]
-      phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
+        # phonetic_transcript=result[-1]
+        phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
     else:
-      phonetic_detection=result
+        phonetic_detection=result
     # phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
     # d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
     
@@ -131,7 +131,7 @@ def phoneme_contrast_api():
     return response
 
 def run_app():
-  app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')
 
 if __name__ == '__main__':
     run_app()
