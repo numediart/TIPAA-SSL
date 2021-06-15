@@ -27,31 +27,26 @@ data={"sentenceID":str(sentenceID), "filename":filename}
 ```
 An example of feedback for each module:
 
-- sentenceStress:  the feedback is a list of 0/1 for each word, the 1 being the sentence stress
+- sentenceStress:  the feedback is 
+    - status ("success" or "error: ...") this success means a technical success in the sense that there were no failure, but not that the recognition was successful
+    - a list of stress intensities between 0 and 100 for each word
+    - a list of 0/1 for each word, the 1 being the sentence stress
 
 For the sentence "I would love to go to ireland", the correct answer would be:
 ```
-b'{"status": "success", "result": [0, 0, 1, 0, 0, 0, 0]}'
+b'{"status": "success", "stress_intensities": [83, 49, 85, 27, 57, 27, 73], "stress_binaries": [0, 0, 1, 0, 0, 0, 0]}'
 ```
 
-- wordStress: the feedback is a list of 0/1 for each syllable, the 1 being the word stress
+- wordStress: the feedback is a 
+    - status ("success" or "error: ...")
+    - a list of stress intensities for each syllable of each word between 0 and 100 by word 
+    - a list of 0/1 for each syllable of each word, the 1 being the word stress
 
 For the word "toothpaste"
 ```
-b'{"status": "success", "result": [1, 0]}'
-```
+ b'{"status": "success", "stress_intensities": [[77, 33]], "stress_binaries": [[1, 0]]}'
+ ```
 
-- iContrast: the feedback is 0 if the phoneme is "IH" (short i) and 1 if the phoneme is "IY" (long i).
-
-For the word "slip", 
-```
-b'{"status": "success", "result": 0}'
-```
-
-- example if error:
-```
-b'{"status": "error: ./upload_files/iC_111_sl.wav could not be loaded", "result": []}'
-```
 
 
 
@@ -59,6 +54,26 @@ b'{"status": "error: ./upload_files/iC_111_sl.wav could not be loaded", "result"
 Besides existing module, I am working on two lower level functions. 
 
 The logic behind them is to use text and audio as input. The text is automatically phonetized and "grammarized", then htk model is used and:
+
+- phonemeContrast gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes)
+```
+url='/phonemeContrast'
+data={"text":text, 'filename':filename, 'word_id':word_id, 'alternatives':alternatives, 'target':target}
+```
+Example of output for the word "leave":
+
+If it was correct:
+```
+b'{"status": "success", "phonetics": ["IY1"]}'
+```
+
+If it was wrong:
+```
+b'{"status": "success", "phonetics": ["IH1"]}'
+```
+
+
+
 - vowelStresses gives stress scores for each syllable of each word between 0 and 1
 ```
 url='/vowel_stresses'
@@ -71,22 +86,7 @@ b'{"status": "success", "result": [[83], [49], [85], [27], [57], [27], [73, 44, 
 
 if you pass only one word with only one syllable, the result will be a `[[nan]]`
 
-- phonemeContrast gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes)
-```
-url='/phonemeContrast'
-data={"text":text, 'filename':filename, 'word_id':word_id, 'alternatives':alternatives, 'target':target}
-```
-Example of output for the word "leave":
 
-If it was correct:
-```
-b'{"status": "success", "result": ["L", "IY1", "V"], "ground_truth": ["L", "IY1", "V"]}'
-```
-
-If it was wrong:
-```
-b'{"status": "success", "result": ["L", "IH1", "V"], "ground_truth": ["L", "IY1", "V"]}'
-```
 ## Docker application
 You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
 I used this info to do that: 
