@@ -9,6 +9,24 @@ from text_processing import phonetics_from_sentence, remove_special_characters, 
 # from speech_tech import set_params
 import uuid
 
+target_to_alternatives={
+    "DH":["DH","TH"],
+    "TH":["DH","TH"],
+    "AO1":["AO1","OW1"],
+    "OW1":["AO1","OW1"],
+    "IH1":["IH1","IY1"],
+    "IY1":["IH1","IY1"],
+    # "IH0 D":['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
+    "IH0 D":['T', 'D', 'IH0 D', 'EH2 D'],
+    "D":['T', 'D', 'IH0 D', 'EH2 D'],
+    "T":['T', 'D', 'IH0 D', 'EH2 D']
+}
+
+
+graphemes_to_alternatives={
+    "ie":["IY1","AY1"],
+    "ea":["IY1","EH1"]
+}
 
 def set_params(
     # waveFileAddress='/root/flowchase/sent.wav',
@@ -296,7 +314,7 @@ def make_all_phones_annotation_files_from_phonetics(
 
 def make_pContrast_annotation_files_from_phonetics(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
                 phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_id=0, target_phones='D', 
-                alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+                alternatives=target_to_alternatives['D']):
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     phonetics=[' '.join(w) for w in phonetics]

@@ -10,26 +10,11 @@ from htk_utils import process_grammar, htk_recognition, get_textgrid_data, clean
 from label_data_processing import  get_sentenceStress_annotation, get_data
 
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
-from label_data_processing import set_params
+from label_data_processing import set_params, target_to_alternatives, graphemes_to_alternatives
 from text_processing import phonetics_from_sentence, remove_special_characters
 
-target_to_alternatives={
-    "DH":["DH","TH"],
-    "TH":["DH","TH"],
-    "AO1":["AO1","OW1"],
-    "OW1":["AO1","OW1"],
-    "IH1":["IH1","IY1"],
-    "IY1":["IH1","IY1"],
-    # "IH0 D":['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
-    "IH0 D":['T', 'D', 'IH0 D', 'EH2 D'],
-    "D":['T', 'D', 'IH0 D', 'EH2 D'],
-    "T":['T', 'D', 'IH0 D', 'EH2 D']
-}
 
-graphemes_to_alternatives={
-    "ie":["IY1","AY1"],
-    "ea":["IY1","EH1"]
-}
+
 
 def get_annotated_signal(p=set_params()):
     """Load audio file and annotation files corresponding to parameters, 
@@ -295,7 +280,7 @@ def wordStress(
 
     weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
 
-    return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": bin_score_by_word}
+    return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
 
     
     # return "success", binResult
@@ -323,7 +308,7 @@ def sentenceStress(
     binResult=np.zeros(len(max_scores_by_word)).astype(int)
     binResult[np.argmax(max_scores_by_word)]=1
 
-    return {"status": "success", "stress_intensities": [int(el*100) for el in max_scores_by_word], "stress_binaries": binResult}
+    return {"status": "success", "stress_intensities": [int(el*100) for el in max_scores_by_word], "stress_binaries": binResult.tolist()}
 
     # return "success", [max_scores_by_word, binResult]
 
