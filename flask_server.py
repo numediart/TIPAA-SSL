@@ -3,6 +3,8 @@ from flask import send_from_directory
 
 app = Flask(__name__)
 
+# app.test_client
+
 from speech_tech import *
 import json
 import speech_tech
@@ -57,12 +59,17 @@ def add_message(module):
       response="-1"
       return response
 
-    status,result=method_to_call(p)
-    if isinstance(result, np.ndarray):
-      print('result:',result)
-      result=result.tolist()
-    d={'status':status, 'result':result}
-    response=json.dumps(d)
+    res=method_to_call(p)
+    # res=globals()[module](p)
+    
+    # pred=res['stress_binaries']
+    # status=res['status']
+    # if isinstance(result, np.ndarray):
+    #   print('result:',result)
+    #   result=result.tolist()
+    # d={'status':status, 'result':result}
+    print(res)
+    response=json.dumps(res)
     return response
   
 
