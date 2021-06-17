@@ -1,4 +1,4 @@
-from scipy.io.wavfile import write
+from scipy.io.wavfile import write, read
 import librosa
 import numpy as np
 import os
@@ -12,9 +12,17 @@ from label_data_processing import  get_sentenceStress_annotation, get_data
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
 from label_data_processing import set_params, target_to_alternatives, graphemes_to_alternatives
 from text_processing import phonetics_from_sentence, remove_special_characters
+import uuid
 
 
+def prepare_audio_file(audio_file, rID=str(uuid.uuid4()), fs=16000, remove_file_after_processing=False):
+    if os.path.exists(audio_file):
+        s,fs = load_audio(audio_file, fs=fs)
+    else:
+        return "error: "+audio_file+" could not be loaded", None
+    write('./inputs/'+ rID+ '.wav', fs, (s*32767).astype(np.int16))
 
+    return "success", rID
 
 def get_annotated_signal(p=set_params()):
     """Load audio file and annotation files corresponding to parameters, 
@@ -28,12 +36,11 @@ def get_annotated_signal(p=set_params()):
         status, textgridData, s (int, DataFrame, np array): textgridData contains phonetic predictions 
         from htk model with their timings and log probability
     """
-    if os.path.exists(p['waveFileAddress']):
-        s,fs = load_audio(p['waveFileAddress'], fs=p['fs_target'])
-    else:
-        return "error: "+p['waveFileAddress']+" could not be loaded", None, None
+    # prepare_audio_file(p)
+    fs,s=read('./inputs/'+ p['rand_fileName']+ '.wav')
+    s=s/32767
     try:
-        textgridData, cmdout2=get_textgrid_data(s,fs,p)
+        textgridData, cmdout2=get_textgrid_data(p)
     except Exception as e: 
         print(e)
         clean_htk_files(p)
@@ -276,7 +283,7 @@ def wordStress(
         return a_max
 
     bin_score_by_word=max_by_line(weighted_score_by_word)
-    binResult=np.concatenate(bin_score_by_word)
+    # binResult=np.concatenate(bin_score_by_word)
 
     weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
 
@@ -300,9 +307,8 @@ def sentenceStress(
     Returns:
         string, list of binaries: status, stress results by word (0=no stress,  1=stress)
     """
-    a,textDict=get_sentenceStress_annotation()
-    p=make_all_phones_annotation_files(p,remove_special_characters(textDict[p['sentenceID']]))
     status, weighted_score_by_word=vowel_stresses(p)
+
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
     # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
     binResult=np.zeros(len(max_scores_by_word)).astype(int)
@@ -455,14 +461,13 @@ def phonemeContrast_from_text_audio(
 
 def phonemeContrast_from_phonetics_audio(
                     phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], 
-                    audio_path='audio_recordings/turned_around.mp3', 
+                    p=set_params(waveFileAddress='audio_recordings/turned_around.mp3'), 
                     word_id=0, 
                     target_phones='D', 
                     alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-    p=set_params(waveFileAddress=audio_path)
+    # p=set_params(waveFileAddress=audio_path)
     p=make_pContrast_annotation_files_from_phonetics(p,phonetics=phonetics, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
     status,result=phonemeContrast(p)
-    # print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetics)])
     return status, result
 
 
@@ -481,13 +486,52 @@ def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio
 def vowel_stresses_from_phonetics_audio(
     # phonetics=phonetics_from_sentence('I would love to go to Ireland !'), audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
     phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
-    audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    # audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    p=set_params(waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     ):
-    p=set_params(waveFileAddress=audio_path)
+    # p=set_params(waveFileAddress=audio_path)
     p=make_all_phones_annotation_files_from_phonetics(p,phonetics)
     status,result=vowel_stresses(p)
     return status, result
 
+def sentenceStress_from_phonetics_audio(
+    # phonetics=phonetics_from_sentence('I would love to go to Ireland !'), audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
+    # audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    p=set_params(waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    ):
+    status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(phonetics,p)
+    
+    max_scores_by_word=[max(el) for el in weighted_score_by_word]
+    # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
+    binResult=np.zeros(len(max_scores_by_word)).astype(int)
+    binResult[np.argmax(max_scores_by_word)]=1
+
+    return {"status": "success", "stress_intensities": [int(el*100) for el in max_scores_by_word], "stress_binaries": binResult.tolist()}
+
+def wordStress_from_phonetics_audio(
+    # phonetics=phonetics_from_sentence('I would love to go to Ireland !'), audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
+    # audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    p=set_params(waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    ):
+    status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(phonetics,p)
+    
+    if weighted_score_by_word == []:
+        return status, []
+
+    def max_by_line(a):
+        a_max=[]
+        for el in a:
+            a_max.append((el == np.max(el)).astype(int))
+        return a_max
+
+    bin_score_by_word=max_by_line(weighted_score_by_word)
+    # binResult=np.concatenate(bin_score_by_word)
+
+    weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
+
+    return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
 
 
 # obsolete functions backup

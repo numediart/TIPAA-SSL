@@ -72,21 +72,17 @@ def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis
     Returns:
         lists: [description]
     """
-    focus=module_name_to_focus_type[module]
     preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
-    # pdb.set_trace()
 
     for i,row in tqdm(d.iterrows()):
-        # print(bin)
-        # row=d[d.analysisId==id]  #[d.focusType=='wordstress']
         id=row.analysisId
-        # if len(row)>0 and id in a:
         if id in a:
             ground_truth=a[id]
             path=os.path.join(audio_path, row.primaryKey+'.wav')
             p=set_params(sentenceID=id, waveFileAddress=path, module=module)
-            # pdb.set_trace()
-            # status, textgridData, s = get_annotated_signal(p)
+            # prepare_audio_file(p)
+            status_audio, rID=prepare_audio_file(path)
+            p['rand_fileName']=rID
             try:
                 # this calls the function with the name of the module
                 res=globals()[module](p)
@@ -96,21 +92,15 @@ def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis
                 statuss.append(status)
                 preds.append(pred)
                 GTs.append(ground_truth)
-                # GTs_from_phonetics.append(word_stress_from_text(row.text))
             except:
                 print('Error with:')
                 print(row)
                 errors.append(row)
                 p_errors.append(p)
-                # import pdb;pdb.set_trace()
     
     print(preds)
     print(GTs)
-    # print(GTs_from_phonetics)
     print(errors)
-
-    # pdb.set_trace()
-    # compute_errors(preds,GTs)
 
     return preds, statuss, GTs, errors
 
@@ -154,19 +144,19 @@ def sentenceStress_performance_test():
 
     for i,r in d.iterrows():
         d=d.replace(d.loc[i].text,remove_special_characters(r.text))
-    # d=d[d.text.isin(set([remove_special_characters(el) for el in textDict.values()]))]
 
     analysed_ids=[]
     for id,bin in a.items():
-        # print(bin)
         row=d[d.text==remove_special_characters(textDict[id])]
-        # if len(row)==0:print(id)
         if len(row)>0:
-            # print(remove_special_characters(textDict[id]))
-            # row=d[d.analysisId==id]  #[d.focusType=='wordstress']
             ground_truth=a[id]
             path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
             p=set_params(sentenceID=id, waveFileAddress=path, module='sentenceStress')
+            # prepare_audio_file(p)
+            status_audio, rID=prepare_audio_file(path)
+            p['rand_fileName']=rID
+            a,textDict=get_sentenceStress_annotation()
+            p=make_all_phones_annotation_files(p,remove_special_characters(textDict[p['sentenceID']]))
             try:
                 res=sentenceStress(p)
                 pred=res['stress_binaries']
@@ -192,6 +182,8 @@ def sentenceStress_performance_test():
 
     print("algo performance")
     compute_errors(preds, GTs)
+
+
 
 def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/iContrast_data.csv', audio_path="../audio-with-analysis-ids/audio/"):
     df=pd.read_csv(path)
@@ -254,7 +246,8 @@ def edAnalysis_performance_test():
     a=pd.read_excel(xls)
     path='audio_recordings/edAnalysis'
     ed_sentenceID=pd.read_csv(os.path.join('./lexicon/edAnalysis/dct','ed_sentenceID.csv'))
-    results, tgs, analyzed_files=[],[],[]
+    results, analyzed_files=[],[]
+    # tgs=[]
     for i,r in ed_sentenceID.iterrows():
         text=r[0].split('.')[0]
         text_dashed='-'.join(text.split(' '))
@@ -263,11 +256,14 @@ def edAnalysis_performance_test():
             if text_dashed in os.path.split(f)[-1]:
                 sentence_id_from_text=ed_sentenceID[ed_sentenceID['Unnamed: 0'].str.contains(text)]['Unnamed: 1'].values[0]
                 p=set_params(sentenceID=sentence_id_from_text, waveFileAddress=f, module="edAnalysis")
+                # prepare_audio_file(p)
+                status_audio, rID=prepare_audio_file(f)
+                p['rand_fileName']=rID
                 # p['inputPhoneticTranscription']='./lexicon/edAnalysis/dct/'+text+'.dct'
                 # p['inputGrammar']='./lexicon/edAnalysis/grammar/'+text+'.txt'
-                status, textgridData, s = get_annotated_signal(p)
+                # status, textgridData, s = get_annotated_signal(p)
                 results.append(edAnalysis(p)) 
-                tgs.append(textgridData)
+                # tgs.append(textgridData)
                 analyzed_files.append(f)
 
     df_results=pd.DataFrame()
@@ -290,6 +286,9 @@ def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
 
         # set params and make label files for phonetics and grammar
         p=set_params(waveFileAddress=row.wav_path, sentenceID=None, basename='test', module='edAnalysis')
+        # prepare_audio_file(p)
+        status_audio, rID=prepare_audio_file(row.wav_path)
+        p['rand_fileName']=rID
         make_generic_dct_from_phonetics(phonetics=phonetics, word_id=row.word_idx, target_phones=target_phones, path=p['inputPhoneticTranscription'])
         make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
         prosodies.append(prosody_by_phone(p))
@@ -315,7 +314,11 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
         sentence=get_sentence(row.path)
         phonetics=phonetics_for_row(row, libri_words_df)
         phonetics=[p.split(' ') for p in phonetics]
-        status, results = phonemeContrast_from_phonetics_audio(phonetics=phonetics, audio_path=row.wav_path, word_id=row.word_idx, target_phones=target_phones, alternatives=alternatives)
+        p=set_params(waveFileAddress=row.wav_path)
+        # prepare_audio_file(p)
+        status_audio, rID=prepare_audio_file(row.wav_path)
+        p['rand_fileName']=rID
+        status, results = phonemeContrast_from_phonetics_audio(phonetics=phonetics, p=p, word_id=row.word_idx, target_phones=target_phones, alternatives=alternatives)
         statuss.append(status)
         if results!=[]:
             detected_transcription=results[1]
@@ -793,6 +796,9 @@ if __name__ == "__main__":
     # make_grammar_from_dct()
 
     p=set_params(waveFileAddress=row.wav_path, sentenceID=None, basename='test', module="thContrast")
+    # prepare_audio_file(p)
+    status_audio, rID=prepare_audio_file(row.wav_path)
+    p['rand_fileName']=rID
     make_dir(os.path.split(p['inputPhoneticTranscription'])[0])
     make_dir(os.path.split(p['inputGrammar'])[0])
     alternatives=['DH', 'TH']

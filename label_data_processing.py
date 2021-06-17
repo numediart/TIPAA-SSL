@@ -35,7 +35,8 @@ def set_params(
     basename='phrase_',
     fs_target = 16000, # the target sampling frequency
     modelName = 'libri',
-    module='sentenceStress'):
+    module='sentenceStress'
+    ):
     """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
 
     Args:
@@ -282,14 +283,14 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
 
 
 def make_all_phones_annotation_files(
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress'),
+    p=set_params(waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress'),
     text='I would love to go to ireland !'
     ):
     """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
     then updates the default path to point to them in parameters dictionnary
 
     Args:
-        p ([type], optional): [description]. Defaults to set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress').
+        p ([type], optional): [description]. Defaults to set_params(waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress').
         text (str, optional): [description]. Defaults to 'I would love to go to ireland !'.
 
     Returns:
@@ -303,7 +304,7 @@ def make_all_phones_annotation_files(
     return p
 
 def make_all_phones_annotation_files_from_phonetics(
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress'),
+    p=set_params(waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress'),
     phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
     # p=set_params(waveFileAddress=path, module='sentenceStress')
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
@@ -312,9 +313,10 @@ def make_all_phones_annotation_files_from_phonetics(
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
-def make_pContrast_annotation_files_from_phonetics(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
+def make_pContrast_annotation_files_from_phonetics(p=set_params(waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
                 phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_id=0, target_phones='D', 
                 alternatives=target_to_alternatives['D']):
+    # import pdb;pdb.set_trace()
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     phonetics=[' '.join(w) for w in phonetics]
@@ -322,7 +324,7 @@ def make_pContrast_annotation_files_from_phonetics(p=set_params(sentenceID=111, 
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
-def make_pContrast_annotation_files(p=set_params(sentenceID=111, waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
+def make_pContrast_annotation_files(p=set_params(waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
                 text="turned around",word_id=0, target_phones='D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     phonetics=phonetics_from_sentence(text)

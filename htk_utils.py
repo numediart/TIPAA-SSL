@@ -1,5 +1,4 @@
 import uuid
-from scipy.io.wavfile import read, write
 import numpy as np
 import os
 import pandas as pd
@@ -78,7 +77,7 @@ def htk_recognition(modelName, rand_fileName, inputPhoneticTranscription):
 
     return textgridData, out2
 
-def get_textgrid_data(s,fs,p):
+def get_textgrid_data(p):
     """This function write necessary files to then call HMM model (htk_recognition) and the filter out silences
 
     Args:
@@ -90,7 +89,7 @@ def get_textgrid_data(s,fs,p):
         DataFrame: data of duration and phonetic characteristics of words or phonemes 
     """    
     rand_fileName = p['rand_fileName']
-    write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
+    # write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
 
     process_grammar(p['inputGrammar'], rand_fileName)
 
