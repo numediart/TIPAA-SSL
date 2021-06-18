@@ -5,25 +5,25 @@ Project to migrate Flowchase speech tech from octave to python
 
 A Flask API is provided to access the modules.
 
-Examples of client requests are available in ```dummy_client.py``` and ```index.html```
+Examples of client requests are available in ```dummy_client.py```
 
 The process is in two post requests: 
 - Upload an audio file, 
 - Call a module, or a lower level function
 
 ### Upload an audio file with arguments:
-Its filename should be unique not to overwrite a previous one. Maybe It would be better to merge both steps in one post request to avoid this problem ?
 
 ```
-url= "/"
+url= "/upload"
 files = {'file': file}
 ```
+The server returns a random ID "rID" to be used for processing afterwards.
 
-### Call a module with the audio filename and sentenceID with arguments:
+### Call a module with arguments:
 ```
-module="sentenceStress" # or "wordStress", "iContrast"
+module="sentenceStress" # or "wordStress"
 url= "/flowspeech/"+module
-data={"sentenceID":str(sentenceID), "filename":filename}
+data={"phonetics":phonetics, "rID":rID}
 ```
 An example of feedback for each module:
 
@@ -58,21 +58,38 @@ The logic behind them is to use text and audio as input. The text is automatical
 - phonemeContrast gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes)
 ```
 url='/phonemeContrast'
-data={"text":text, 'filename':filename, 'word_id':word_id, 'alternatives':alternatives, 'target':target}
-```
-Example of output for the word "leave":
-
-If it was correct:
-```
-b'{"status": "success", "phonetics": ["IY1"]}'
+data={"phonetics":phonetics, 'rID':rID, 'word_id':word_id, 'alternatives':alternatives, 'target':target}
 ```
 
-If it was wrong:
+An example for a recording containing "I visited Italy". We want to study the phoneme "IH0" in "visited". I took this example because there are two of them:
 ```
-b'{"status": "success", "phonetics": ["IH1"]}'
+data={'phonetics': '[["AY1"], ["V", "IH1", "Z", "IH0", "T", "IH0", "D"], ["IH1", "T", "AH0", "L", "IY0"]]',
+'rID': '487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
+'word_id': 1,
+'alternatives': "['IH0', 'IY0']",
+'target': 'IH0'}
 ```
 
+And as there are two "IH0", I put alternatives for both, and return the detection of both like this:
+```
+b'{"status": "success", "phonetic_detection": ["IH0", "IH0"]}'
+```
 
+Now, for this same sentence "I visited Italy", we want to study the -ed termination of "visited", it would be like this:
+
+The input:
+```
+data={'phonetics': '[["AY1"], ["V", "IH1", "Z", "IH0", "T", "IH0", "D"], ["IH1", "T", "AH0", "L", "IY0"]]',
+'rID': b'487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
+'word_id': 1,
+'alternatives': "['IH0 D', 'D', 'T']",
+'target': 'IH0 D'}
+```
+
+and the output (if pronounced correctly):
+```
+b'{"status": "success", "phonetic_detection": ["IH0 D"]}'
+```
 
 - vowelStresses gives stress scores for each syllable of each word between 0 and 1
 ```

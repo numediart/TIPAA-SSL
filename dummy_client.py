@@ -1,7 +1,7 @@
 import requests
 import json
 from text_processing import phonetics_from_sentence
-def send_audio(path='audio_recordings/WS_111_toothpaste.wav', url = 'http://localhost:5000/', client=requests):
+def send_audio(path='audio_recordings/WS_111_toothpaste.wav', url = 'http://localhost:5000/upload', client=requests):
     with open(path, 'rb') as file:
         files = {'file': file}
         req = client.post(url, files=files)
@@ -41,6 +41,17 @@ if __name__ == "__main__":
     rID=res.__dict__['_content']
     call_phoneme_contrast( rID.decode('utf-8'))
 
+    
+    res=send_audio(path='audio_recordings/I_visited_italy.mp3')
+    rID=res.__dict__['_content']
+    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_id=1, target='IH0', alternatives="['IH0', 'IY0']")
+
+    
+    res=send_audio(path='audio_recordings/I_visited_italy.mp3')
+    rID=res.__dict__['_content']
+    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_id=1, target='IH0 D', alternatives="['IH0 D', 'D', 'T']")
+
+
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
     call_vowel_stresses(rID.decode('utf-8'))
@@ -58,10 +69,6 @@ if __name__ == "__main__":
     # res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     # rID=res.__dict__['_content']
     # call_sentenceStress(rID.decode('utf-8'))
-
-    call_module()
-    call_module('hihuhiha')
-    call_module(module='wordStress', filename='WS_111_toothpaste.wav', sentenceID=111)
 
     send_audio(path='audio_recordings/iC_111_slip.wav')
 

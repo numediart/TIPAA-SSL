@@ -24,7 +24,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 
 upload_path="./upload_files/"
-@app.route('/', methods=['POST'])
+@app.route('/upload', methods=['POST'])
 def upload_file():
     try:
         uploaded_file = request.files['file']
@@ -127,13 +127,12 @@ def phoneme_contrast_api():
     # phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
     # d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
     
-    d={'status':status, 'phonetics':phonetic_detection}
+    d={'status':status, 'phonetic_detection':phonetic_detection}
     response=json.dumps(d)
     return response
 
 def run_app():
     app.run(debug=True, host='0.0.0.0')
-
 
 
 # deprecated functions
