@@ -15,7 +15,8 @@ from text_processing import phonetics_from_sentence, remove_special_characters
 import uuid
 
 
-def prepare_audio_file(audio_file, rID=str(uuid.uuid4()), fs=16000, remove_file_after_processing=False):
+def prepare_audio_file(audio_file, fs=16000, remove_file_after_processing=False):
+    rID=str(uuid.uuid4())
     if os.path.exists(audio_file):
         s,fs = load_audio(audio_file, fs=fs)
     else:
