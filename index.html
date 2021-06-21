@@ -29,7 +29,7 @@
   $(document).ready(function() {
     $("#jsonp2").click(function() {
       url= "/flowspeech/"+q('#module').value
-      data= {"sentenceID":q('#sentenceID').value, "filename":q('#filename').value}
+      data= {"phonetics":q('#phonetics').value, "rID":q('#rID').value}
       $.ajax({
         url: url,
         type: 'POST',
@@ -43,9 +43,28 @@
     });
   });
 
+//   var storedText;
+// var obj1;
+
+// fetch('https://raw.githubusercontent.com/noetits/cmudict_0.7b_json/main/cmudict0.7b.json')
+//   .then(function(response) {
+//     response.text().then(function(text) {
+//       storedText = text;
+//       done();
+//     });
+//   });
+
+// function done() {
+//     obj1 = jQuery.parseJSON(storedText);
+// console.log(obj1.test[0]);
+// /*   document.getElementById('log').textContent =
+//     "Here's what I got! \n" + obj1["test"]; */
+// }
+
+
   </script>
     <h1>File Upload</h1>
-    <form method="POST" action="" enctype="multipart/form-data">
+    <form method="POST" action="/upload" enctype="multipart/form-data">
       <p><input type="file" name="file"></p>
       <p><input type="submit" value="Submit"></p>
     </form>
@@ -57,13 +76,17 @@
       <select name="module" id="module">
         <option value="sentenceStress">sentenceStress</option>
         <option value="wordStress">wordStress</option>
-        <option value="iContrast">iContrast</option>
+        <!-- <option value="iContrast">iContrast</option> -->
         <!-- <option value="audi">Audi</option> -->
       </select>
-      <p><label for="filename">filename:</label>
-      <input type="text" name="filename" id="filename"></p>
-      <p><label for="sentenceID">sentenceID:</label>
-      <input type="number" id="sentenceID" name="sentenceID" min="1" max="1000">
+      <p><label for="rID">rID:</label>
+      <input type="text" name="rID" id="rID"></p>
+
+      <p><label for="phonetics">phonetics:</label>
+        <select name="phonetics" id="phonetics">
+          <option value="[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']]">I would love to go to ireland</option>
+        </select>
+      <!-- <input type="number" id="phonetics" name="phonetics" min="1" max="1000"> -->
   </form>
   <button id="jsonp2" type="button" class="btn btn-info">Get feedback</button>
 
