@@ -33,12 +33,19 @@ def phonetics_from_sentence(sentence="Where's the best place to have coffee ?"):
     return words_phones
 
 
+
 def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
     l=[]
     for el in transcription:
         if el[-1] in str([0,1,2]): l.append(el[:-1])
         else: l.append(el)
     return l
+
+def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0']):
+    n=0
+    for el in phonetics:
+        if el[-1] in str([0,1,2]): n+=1
+    return n
 
 def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
     # cmu vowels end by a number : 0, 1 or 2.   0= no stress, 1 = primary stress, 2 = secondary stress
@@ -111,4 +118,65 @@ def words_that_contains(phones=['IH0', 'D']):
             if x_in_y(phones, v[0]):
                 selection[k]=v[0]
     return selection
-    
+
+
+cmu_to_gibberish={'AA':'oh',
+                'AE':'ah',
+                'AH':'uh',
+                'AO':'aw',
+                'AW':'au',
+                'AY':'ay',
+                'B':'b',
+                'CH':'ch',
+                'D':'d',
+                'DH':'th',
+                'EH':'eh',
+                'ER':'uh',
+                'EY':'ey',
+                'F':'f',
+                'G':'g',
+                'HH':'h',
+                'IH':'i',
+                'IY':'ee',
+                'JH':'dj',
+                'K':'k',
+                'L':'l',
+                'M':'m',
+                'N':'n',
+                'NG':'ng',
+                'OW':'ow',
+                'OY':'oy',
+                'P':'p',
+                'R':'r',
+                'S':'s',
+                'SH':'sh',
+                'T':'t',
+                'TH':'th',
+                'UH':'u',
+                'UW':'oo',
+                'V':'v',
+                'W':'w',
+                'Y':'y',
+                'Z':'z',
+                'ZH':'j'}
+
+def gibberish_from_phonetics(phonetics=['P', 'R', 'AH0', 'F', 'EH1', 'SH', 'AH0', 'N', 'AH0', 'L']):
+
+    gibberish=[]
+    for p in phonetics:
+        if p[-1] =='0':
+            gibberish.append('uh')
+        else:
+            if p[-1] in str([0,1,2]): gibberish.append(cmu_to_gibberish[p[:-1]])
+            else: gibberish.append(cmu_to_gibberish[p])
+            
+    return ' '.join(gibberish)
+
+if __name__ == "__main__":
+    gibberish_from_phonetics()
+
+    words=['professional', 'analysis', 'temperature', 'personal', 'government']
+
+    gibberishes=[]
+    for w in words:
+        gibberishes.append(gibberish_from_phonetics(phonetics_from_sentence(w)[0]))
