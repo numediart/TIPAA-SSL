@@ -38,7 +38,10 @@ def get_annotated_signal(p=set_params()):
         from htk model with their timings and log probability
     """
     # prepare_audio_file(p)
-    fs,s=read('./inputs/'+ p['rand_fileName']+ '.wav')
+    try:
+        fs,s=read('./inputs/'+ p['rand_fileName']+ '.wav')
+    except FileNotFoundError:
+        return "error: audio file not found", None, None
     s=s/32767
     try:
         textgridData, cmdout2=get_textgrid_data(p)
