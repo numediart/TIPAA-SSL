@@ -1,12 +1,12 @@
 from flask import Flask, request, redirect, url_for
 from flask import send_from_directory
 
-app = Flask(__name__)
-
-
 from speech_tech import *
 import json
 import speech_tech
+
+app = Flask(__name__)
+
 
 @app.route('/')
 def index():
@@ -36,10 +36,14 @@ def upload_file():
         except:
             return "error: could not save uploaded file"
         try:
+            # import pdb;pdb.set_trace()
             status_conversion, rID = prepare_audio_file(upload_path+uploaded_file.filename)
-            os.remove(upload_path+uploaded_file.filename)
         except:
             return "error: could not convert uploaded file"
+        try:
+            os.remove(upload_path+uploaded_file.filename)
+        except:
+            return "error: could not delete temp file"
     else:
         return "error: filename is empty"
     return rID
@@ -101,11 +105,11 @@ def phoneme_contrast_api():
     # print(content)
     print(content['phonetics'])
     # print(content['filename'])
-    print(content['word_id'])
+    print(content['word_idx'])
     print(content['rID'])
     # filename=content['filename']
     phonetics=ast.literal_eval(content['phonetics'])
-    word_id=content['word_id']
+    word_idx=content['word_idx']
     rID=content['rID']
     target=content['target']
     alternatives=ast.literal_eval(content['alternatives'])
@@ -113,7 +117,7 @@ def phoneme_contrast_api():
 
     p=set_params()
     p['rand_fileName']=rID
-    status,result=phonemeContrast_from_phonetics_audio(phonetics, p, int(word_id), target, alternatives)
+    status,result=phonemeContrast_from_phonetics_audio(phonetics, p, int(word_idx), target, alternatives)
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):
@@ -124,7 +128,7 @@ def phoneme_contrast_api():
         phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
     else:
         phonetic_detection=result
-    # phonetic_GT=phonetics_from_sentence(text)[int(word_id)]
+    # phonetic_GT=phonetics_from_sentence(text)[int(word_idx)]
     # d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
     
     d={'status':status, 'phonetic_detection':phonetic_detection}

@@ -30,7 +30,7 @@ graphemes_to_alternatives={
 
 def set_params(
     # waveFileAddress='/root/flowchase/sent.wav',
-    waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
+    # waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
     sentenceID=1,
     basename='phrase_',
     fs_target = 16000, # the target sampling frequency
@@ -40,7 +40,6 @@ def set_params(
     """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
 
     Args:
-        waveFileAddress (str, optional): [description]. Defaults to 'audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'.
         sentenceID (int, optional): [description]. Defaults to 1.
         fs_target (int, optional): [description]. Defaults to 16000.
         module (str, optional): [description]. Defaults to 'sentenceStress'.
@@ -58,7 +57,7 @@ def set_params(
         inputGrammar = '%s.txt' % (inputGrammar_base)
         inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
     params={}
-    params['waveFileAddress']=waveFileAddress
+    # params['waveFileAddress']=waveFileAddress
     params['fs_target']=fs_target
     params['inputPhoneticTranscription']=inputPhoneticTranscription
     params['inputGrammar']=inputGrammar
@@ -89,13 +88,13 @@ def get_iContrast_annotations(path='../audio-with-analysis-ids/iContrast_data.cs
     # only those with analysisID in 3 digits have a manual annotation
     df=df[df.analysisId>100]
     annot={}
-    word_id={}
+    word_idx={}
     syl_id={}
     for i,r in df.iterrows():
         annot[r.primaryKey]=r['response']
-        word_id[r.analysisId]=r['word_id']
+        word_idx[r.analysisId]=r['word_idx']
         syl_id[r.analysisId]=r['syl_id']
-    return annot,word_id,syl_id
+    return annot,word_idx,syl_id
 
 def get_wordStress_annotation(path='../audio-with-analysis-ids/wordStress_annotations.csv'):
     d=get_data()
@@ -196,7 +195,7 @@ def make_dct_all_phones_from_text(sentence="shopping centre", path='test.dct'):
     phonetics=phonetics_from_sentence(sentence)
     make_dct_all_phones_from_phonetics(phonetics, path=path)
 
-def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'], word_id=1, target_phones='IH0 D', 
+def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'], word_idx=1, target_phones='IH0 D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
     """This function builds a dct file needed for htk model. It consists of a list of words and for one word a list of phoneme.
     Each line is either a word or phoneme (or in fact several phoneme). More generally each line is just one or several phoneme. But 
@@ -208,7 +207,7 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
 
     Args:
         phonetics (list, optional): [description]. Defaults to ['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'].
-        word_id (int, optional): [description]. Defaults to 1.
+        word_idx (int, optional): [description]. Defaults to 1.
         target_phones (str, optional): [description]. Defaults to 'IH0 D'.
         alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
         path (str, optional): [description]. Defaults to 'test.dct'.
@@ -216,7 +215,7 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
     lines=[]
     for i,word in enumerate(phonetics):
         # Here we are at the level of a word of the sentence
-        if i!=word_id:
+        if i!=word_idx:
             # In case it is not the word we want to detail in several lines, we just put its phonetics in one line
             lines.append('w'+str(i)+' ['+'w'+str(i)+'] '+word)
         else:
@@ -283,14 +282,14 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
 
 
 def make_all_phones_annotation_files(
-    p=set_params(waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress'),
+    p=set_params(module='wordStress'),
     text='I would love to go to ireland !'
     ):
     """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
     then updates the default path to point to them in parameters dictionnary
 
     Args:
-        p ([type], optional): [description]. Defaults to set_params(waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress').
+        p ([type], optional): [description]. Defaults to set_params(module='wordStress').
         text (str, optional): [description]. Defaults to 'I would love to go to ireland !'.
 
     Returns:
@@ -304,31 +303,29 @@ def make_all_phones_annotation_files(
     return p
 
 def make_all_phones_annotation_files_from_phonetics(
-    p=set_params(waveFileAddress='audio_recordings/WS_111_toothpaste.wav', module='wordStress'),
+    p=set_params(module='wordStress'),
     phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
-    # p=set_params(waveFileAddress=path, module='sentenceStress')
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     make_dct_all_phones_from_phonetics(phonetics, path=p['inputPhoneticTranscription'])
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
-def make_pContrast_annotation_files_from_phonetics(p=set_params(waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
-                phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_id=0, target_phones='D', 
+def make_pContrast_annotation_files_from_phonetics(p=set_params(module="edAnalysis"),
+                phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_idx=0, target_phones='D', 
                 alternatives=target_to_alternatives['D']):
-    # import pdb;pdb.set_trace()
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     phonetics=[' '.join(w) for w in phonetics]
-    make_generic_dct_from_phonetics(phonetics=phonetics, word_id=word_id, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
+    make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
-def make_pContrast_annotation_files(p=set_params(waveFileAddress='audio_recordings/turnEED_around.mp3', module="edAnalysis"),
-                text="turned around",word_id=0, target_phones='D', 
+def make_pContrast_annotation_files(p=set_params(module="edAnalysis"),
+                text="turned around",word_idx=0, target_phones='D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     phonetics=phonetics_from_sentence(text)
-    make_pContrast_annotation_files_from_phonetics(p=p, phonetics=phonetics, word_id=word_id, target_phones=target_phones, alternatives=alternatives)
+    make_pContrast_annotation_files_from_phonetics(p=p, phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
     return p
 
 
@@ -448,7 +445,6 @@ def syllables_data():
 
     syl_sep='_'
 
-
     d=cmudict.dict()
     syllables=syllables.dropna()  # there is one row that is nan...
 
@@ -493,7 +489,7 @@ def syllables_data():
 
 if False:
     # This is obsolete compared to make_generic_dct_from_phonetics
-    def make_generic_dct_from_text(sentence="I accepted to go to spain", word_id=1, target_phones='IH0 D', 
+    def make_generic_dct_from_text(sentence="I accepted to go to spain", word_idx=1, target_phones='IH0 D', 
                     alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
 
         phonetics=[cmudict.dict()[el] for el in remove_special_characters(sentence).split(' ')]
@@ -503,7 +499,7 @@ if False:
         lines=[]
         for i,alternative_words in enumerate(phonetics):
             # print(alternatives)
-            if i!=word_id:
+            if i!=word_idx:
                 for j,word in enumerate(alternative_words):
                     # print(word)
                     lines.append('w'+str(i)+' ['+'w'+str(i)+'_'+str(j)+'] '+' '.join(word))
@@ -511,7 +507,7 @@ if False:
                 # we detail phonemes for the target word
                 # TODO: I take the first alternative, may be I should extract different alternatives for each phoneme... complicated, 
                 # we are not even sure it is always the same number of phonemes
-                phoneme_list=phonetics[word_id][0]
+                phoneme_list=phonetics[word_idx][0]
                 # we list the phonemes up to the termanation
                 phonemes=['p'+str(i)+' ['+'p'+str(i)+']'+' '+p for i,p in enumerate(phoneme_list)][:-len(target_phones.split(' '))]
                 # we list alternatives

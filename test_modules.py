@@ -37,7 +37,7 @@ def test_audio_formats():
 
 
 def test_pContrast():
-    p=set_params(sentenceID=111, waveFileAddress='audio_recordings/Low_WAV.wav', module="oContrast")
+    p=set_params(sentenceID=11, module="oContrast")
     # prepare_audio_file(p)
     status_audio, rID=prepare_audio_file('audio_recordings/Low_WAV.wav')
     p['rand_fileName']=rID
@@ -45,7 +45,7 @@ def test_pContrast():
 
 
 def test_edAnalysis():
-    p=set_params(sentenceID=1, waveFileAddress='audio_recordings/ed_accepted.wav', module="edAnalysis")
+    p=set_params(sentenceID=1, module="edAnalysis")
     # prepare_audio_file(p)
     status_audio, rID=prepare_audio_file('audio_recordings/ed_accepted.wav')
     p['rand_fileName']=rID
@@ -69,7 +69,7 @@ def test_vowel_stresses():
 
 
 def test_phonemeContrast():
-    p=set_params(waveFileAddress='audio_recordings/turned_around.mp3')
+    p=set_params()
     # prepare_audio_file(p)
     status_audio, rID=prepare_audio_file('audio_recordings/turned_around.mp3')
     p['rand_fileName']=rID

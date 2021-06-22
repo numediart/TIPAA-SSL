@@ -24,10 +24,10 @@ def call_module(rID, text='I would love to go to ireland !', module='sentenceStr
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
-def call_phoneme_contrast(rID, text='turned around', word_id=0, target='D', alternatives="['T', 'D', 'IH0 D']", base_url = 'http://localhost:5000', client=requests):
+def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alternatives="['T', 'D', 'IH0 D']", base_url = 'http://localhost:5000', client=requests):
     url=base_url+"/phonemeContrast"
     phonetics=phonetics_from_sentence(text)
-    res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID, 'word_id':word_id, 'alternatives':alternatives, 'target':target})
+    res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target})
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
@@ -54,12 +54,11 @@ if __name__ == "__main__":
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID2=res.__dict__['_content']
-    call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_id=1, target='IH0', alternatives="['IH0', 'IY0']")
-
+    call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0', alternatives="['IH0', 'IY0']")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID=res.__dict__['_content']
-    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_id=1, target='IH0 D', alternatives="['IH0 D', 'D', 'T']")
+    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0 D', alternatives="['IH0 D', 'D', 'T']")
 
 
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
@@ -91,15 +90,15 @@ if __name__ == "__main__":
 
     send_audio('audio_recordings/Laaw_MP3.mp3')
     alternatives="['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2']"
-    call_phoneme_contrast(filename='Laaw_MP3.mp3', text='law',  word_id=0, target='AO1', alternatives=alternatives)
+    call_phoneme_contrast(filename='Laaw_MP3.mp3', text='law',  word_idx=0, target='AO1', alternatives=alternatives)
 
     send_audio('audio_recordings/iC_112_leave.wav')
     alternatives="['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2']"
-    call_phoneme_contrast(filename='iC_112_leave.wav', text='leave',  word_id=0, target='IY1', alternatives=alternatives)
+    call_phoneme_contrast(filename='iC_112_leave.wav', text='leave',  word_idx=0, target='IY1', alternatives=alternatives)
     
     send_audio('audio_recordings/ed_acceptEED.wav')
     # alternatives="['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2']"
     alternatives="['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']"
     # alternatives="['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']"
     # alternatives="['T', 'D']"
-    call_phoneme_contrast(filename='ed_acceptEED.wav', text='accepted',  word_id=0, target="IH0 D", alternatives=alternatives)
+    call_phoneme_contrast(filename='ed_acceptEED.wav', text='accepted',  word_idx=0, target="IH0 D", alternatives=alternatives)
