@@ -432,61 +432,7 @@ def wordStress_make_dcts_grammars(path_dct='lexicon/wordStress/dct', path_gramma
         make_grammar_from_dct(path_dct=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'),  path_grammar=os.path.join(path_grammar, 'phrase_'+str(r.analysisId)+'.txt'))
 
 
-
-
-def syllables_data():
-    
-    # http://www.delphiforfun.org/programs/Syllables.htm
-    # syllables=pd.read_csv('Syllables.txt',sep='=', header=None)
-    syllables=pd.read_csv('mhyph.txt', header=None)
-
-    syl_sep=syllables[0][0][5]
-    syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(syl_sep,'_')
-
-    syl_sep='_'
-
-    d=cmudict.dict()
-    syllables=syllables.dropna()  # there is one row that is nan...
-
-    # syllables.columns=['word', 'syllables']
-    syllables.columns=['syllables']
-
-    n_syls=[]
-    n_vowels_cmu=[]
-    texts=[]
-    phonetics=[]
-    for i,r in syllables.iterrows():
-        text=''.join(r[0].split(syl_sep)).lower()
-        texts.append(text)
-        try:
-            n_syls.append(int(len(r[0].split(syl_sep))))
-        except:
-            n_syls.append(None)
-        # print(d[r[0]][0])
-        try:
-            phonetics.append(' '.join(d[text][0]))
-            n_vowels_cmu.append(int(n_vowels(d[text][0])))
-        except IndexError:
-            n_vowels_cmu.append(None)
-            phonetics.append(None)
-
-
-    syllables['normalized_text']=texts
-    syllables['phonetics']=phonetics
-
-    syllables['n_syls']=n_syls
-    syllables['n_vowels_cmu']=n_vowels_cmu
-
-    syllables[syllables.n_vowels_cmu.isnull()].normalized_text.tolist()
-    len(syllables[~syllables.n_vowels_cmu.isnull()].normalized_text.tolist())
-
-    syllables=syllables.dropna()
-    syllables[syllables.n_syls==syllables.n_vowels_cmu]
-    syllables[syllables.n_syls!=syllables.n_vowels_cmu]
-
-    syllables.to_csv('syllables.csv')
-
-
+# Obsolete functions backup
 if False:
     # This is obsolete compared to make_generic_dct_from_phonetics
     def make_generic_dct_from_text(sentence="I accepted to go to spain", word_idx=1, target_phones='IH0 D', 

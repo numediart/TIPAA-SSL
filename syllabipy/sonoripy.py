@@ -16,88 +16,60 @@ import cmudict
 
 phones=cmudict.phones()
 
-approximates = []
-vowels=[]
-nasals=[]
-fricatives=[]
-affricates=[]
-stops=[]
-for p in phones:
-    if p[-1][0]=='vowel':
-        vowels.append(p[0].lower()+str(0))
-        vowels.append(p[0].lower()+str(1))
-        vowels.append(p[0].lower()+str(2))
-    if p[-1][0]=='nasal' or p[-1][0]=='liquid':
-        nasals.append(p[0].lower())
-    if p[-1][0]=='fricative':
-        fricatives.append(p[0].lower())
-    if p[-1][0]=='affricate':
-        affricates.append(p[0].lower())
-    if p[-1][0]=='stop':
-        stops.append(p[0].lower())
 
+# Python code to convert string to list character-wise
+# https://www.geeksforgeeks.org/python-program-convert-string-list/
+def str_to_list_of_char(string):
+    list1=[]
+    list1[:0]=string
+    return list1
 
 # SONORITY HIERARCHY, MODIFY FOR LANGUAGE BELOW
 # categories should be collapsed into more general groups
 
-# vowels = 'aeiouyàáâäæãåāèéêëēėęîïíīįìôöòóœøōõûüùúūůÿ'
-# approximates = ''
-# nasals = 'lmnrw'
-# fricatives = 'zvsfh'
-# affricates = ''
-# stops = 'bcdgtkpqxhj'
+def define_categories(mode='CMU'):
+    if mode=='CMU':
+        approximates,vowels,nasals,fricatives,affricates,stops=[],[],[],[],[],[]
+        for p in phones:
+            if p[-1][0]=='vowel':
+                vowels.append(p[0].lower()+str(0))
+                vowels.append(p[0].lower()+str(1))
+                vowels.append(p[0].lower()+str(2))
+            if p[-1][0]=='nasal' or p[-1][0]=='liquid':
+                nasals.append(p[0].lower())
+            if p[-1][0]=='fricative':
+                fricatives.append(p[0].lower())
+            if p[-1][0]=='affricate':
+                affricates.append(p[0].lower())
+            if p[-1][0]=='stop':
+                stops.append(p[0].lower())
+    elif mode=='letters':
+        vowels = str_to_list_of_char('aeiouyàáâäæãåāèéêëēėęîïíīįìôöòóœøōõûüùúūůÿ')
+        approximates = str_to_list_of_char('')
+        nasals = str_to_list_of_char('lmnrw')
+        fricatives = str_to_list_of_char('zvsfh')
+        affricates = str_to_list_of_char('')
+        stops = str_to_list_of_char('bcdgtkpqxhj')
+    else:
+        print('This mode of categories for sonoripy does not exist')
+
+    return approximates,vowels,nasals,fricatives,affricates,stops
 
 
-cmu_to_gibberish={'AA':'o',
-                'AE':'a',
-                'AH':'uh',
-                'AO':'aw',
-                'AW':'au',
-                'AY':'ay',
-                'B':'b',
-                'CH':'ch',
-                'D':'d',
-                'DH':'th',
-                'EH':'e',
-                'ER':'uhr',
-                'EY':'ey',
-                'F':'f',
-                'G':'g',
-                'HH':'h',
-                'IH':'i',
-                'IY':'ee',
-                'JH':'dj',
-                'K':'k',
-                'L':'l',
-                'M':'m',
-                'N':'n',
-                'NG':'ng',
-                'OW':'ow',
-                'OY':'oy',
-                'P':'p',
-                'R':'r',
-                'S':'s',
-                'SH':'sh',
-                'T':'t',
-                'TH':'th',
-                'UH':'u',
-                'UW':'oo',
-                'V':'v',
-                'W':'w',
-                'Y':'y',
-                'Z':'z',
-                'ZH':'j'}
+
 
 cmudict_dict=cmudict.dict()
 
 
-def SonoriPy(word, IPA=False):
+def SonoriPy(word, mode='CMU'):
     '''
     This program syllabifies words based on the Sonority Sequencing Principle (SSP)
 
     >>> SonoriPy("justification")
     ['jus', 'ti', 'fi', 'ca', 'tion']
     '''
+
+    approximates,vowels,nasals,fricatives,affricates,stops=define_categories(mode=mode)
 
     def no_syll_no_vowel(ss):
         '''
@@ -123,8 +95,8 @@ def SonoriPy(word, IPA=False):
         return nss
 
 
-    # SONORITY HIERARCHY for IPà
-    if IPA:
+    # SONORITY HIERARCHY for IPA. I am not using it, so I put False instead of a flag "IPA"
+    if False:
         # categories can be collapsed into more general groups
         vowelcount = 0  # if vowel count is 1, syllable is automatically 1
         sylset = []  # to collect letters and corresponding values
@@ -253,68 +225,101 @@ def SonoriPy(word, IPA=False):
     return (final_sylset)
 
 
-
-def generate_gibberish_from_words(words, indxs):
-    sylwords=[]
-    word_gibberishes=[]
-    for i,word in enumerate(words):
-        phonetics=cmudict_dict[word][int(indxs[i])]
-        sylwords.append(SonoriPy(phonetics))
-        gibberish=[[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in l] for l in SonoriPy(phonetics)]
-        word_gibberishes.append(gibberish)
-    word_gibberishes=['-'.join([''.join(el) for el in gibberish]) for gibberish in word_gibberishes]
+if False:
     
-    return word_gibberishes
+    cmu_to_gibberish={'AA':'o',
+                    'AE':'a',
+                    'AH':'uh',
+                    'AO':'aw',
+                    'AW':'au',
+                    'AY':'ay',
+                    'B':'b',
+                    'CH':'ch',
+                    'D':'d',
+                    'DH':'th',
+                    'EH':'e',
+                    'ER':'uhr',
+                    'EY':'ey',
+                    'F':'f',
+                    'G':'g',
+                    'HH':'h',
+                    'IH':'i',
+                    'IY':'ee',
+                    'JH':'dj',
+                    'K':'k',
+                    'L':'l',
+                    'M':'m',
+                    'N':'n',
+                    'NG':'ng',
+                    'OW':'ow',
+                    'OY':'oy',
+                    'P':'p',
+                    'R':'r',
+                    'S':'s',
+                    'SH':'sh',
+                    'T':'t',
+                    'TH':'th',
+                    'UH':'u',
+                    'UW':'oo',
+                    'V':'v',
+                    'W':'w',
+                    'Y':'y',
+                    'Z':'z',
+                    'ZH':'j'}
 
-def gibberish_alternatives(words):
-    lens=[]
-    for i,word in enumerate(words):
-        lens.append(len(cmudict_dict[word]))
-    lists_indxs=[list(np.arange(el)) for el in lens]
-    alternative_combinations=list(itertools.product(*lists_indxs))
-    alternative_gibberishes=[]
-    for indxs in alternative_combinations:
-        alternative_gibberishes.append(generate_gibberish_from_words(words, indxs))
-    
-    return [' '.join(el) for el in alternative_gibberishes]
+    def generate_gibberish_from_words(words, indxs):
+        sylwords=[]
+        word_gibberishes=[]
+        for i,word in enumerate(words):
+            phonetics=cmudict_dict[word][int(indxs[i])]
+            sylwords.append(SonoriPy(phonetics))
+            gibberish=[[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in l] for l in SonoriPy(phonetics)]
+            word_gibberishes.append(gibberish)
+        word_gibberishes=['-'.join([''.join(el) for el in gibberish]) for gibberish in word_gibberishes]
+        return word_gibberishes
 
-# THIS IS the general function
-def generate_gibberish_alternatives(sentences):
-    gibberishes=[]
-    for sent in sentences:
-        words=sent.split(' ')
-        word_gibberishes=gibberish_alternatives(words)
-        # making it unique (duplicates come from the vowel with different stresses that we do not care about)
-        word_gibberishes=list(OrderedSet(word_gibberishes))
-        gibberishes.append(word_gibberishes)
-    return gibberishes
+    def gibberish_alternatives(words):
+        lens=[]
+        for i,word in enumerate(words):
+            lens.append(len(cmudict_dict[word]))
+        lists_indxs=[list(np.arange(el)) for el in lens]
+        alternative_combinations=list(itertools.product(*lists_indxs))
+        alternative_gibberishes=[]
+        for indxs in alternative_combinations:
+            alternative_gibberishes.append(generate_gibberish_from_words(words, indxs))
+        
+        return [' '.join(el) for el in alternative_gibberishes]
 
-def generate_gibberishes(sentences):
-    gibberishes=[]
-    for sent in sentences:
-        words=sent.split(' ')
-        word_gibberishes=generate_gibberish_from_words(words)
-        gibberishes.append(word_gibberishes)
-    return [' '.join(g) for g in gibberishes]
+    # THIS IS the general function
+    def generate_gibberish_alternatives(sentences):
+        gibberishes=[]
+        for sent in sentences:
+            words=sent.split(' ')
+            word_gibberishes=gibberish_alternatives(words)
+            # making it unique (duplicates come from the vowel with different stresses that we do not care about)
+            word_gibberishes=list(OrderedSet(word_gibberishes))
+            gibberishes.append(word_gibberishes)
+        return gibberishes
 
-# def generate_syllables():
-#     words=['professional', 'analysis', 'temperature', 'personal', 'government']
-#     sentences=['yesterday morning','coffee','seek','take the lead','worked','started a company','think','visited']+words
-#     for sent in sentences:
-#         words=sent.split(' ')
-#         sylwords=[]
-#         # word_gibberishes=[]
-#         for word in words:
-#             print(word)
-#             sylwords.append(SonoriPy(word))
-#     return sylwords
+    def generate_gibberishes(sentences):
+        gibberishes=[]
+        for sent in sentences:
+            words=sent.split(' ')
+            word_gibberishes=generate_gibberish_from_words(words)
+            gibberishes.append(word_gibberishes)
+        return [' '.join(g) for g in gibberishes]
 
-def show_alternatives_distributions():
-    import numpy as np
-    lens=[]
-    for k,v in cmudict_dict.items():
-        lens.append(len(v))
-    print(np.histogram(lens, bins=[0,1,2,3,4,5,6,7]))
+    # def generate_syllables():
+    #     words=['professional', 'analysis', 'temperature', 'personal', 'government']
+    #     sentences=['yesterday morning','coffee','seek','take the lead','worked','started a company','think','visited']+words
+    #     for sent in sentences:
+    #         words=sent.split(' ')
+    #         sylwords=[]
+    #         # word_gibberishes=[]
+    #         for word in words:
+    #             print(word)
+    #             sylwords.append(SonoriPy(word))
+    #     return sylwords
 
 # command line usage
 if __name__ == '__main__':
