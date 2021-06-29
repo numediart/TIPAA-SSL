@@ -51,6 +51,7 @@ cmu_to_gibberish={'AA':'o',
                 'Z':'z',
                 'ZH':'j'}
 
+# special_characters=[',','?','!','-',';',':','"']
 
 def show_alternatives_distributions():
     import numpy as np
@@ -71,10 +72,16 @@ def get_cmudict_info(word='university'):
     """
     return cmudict_dict[word][0]
 
-def remove_special_characters(sentence="Where's the best place to have coffee ?"):
+def remove_special_characters(sentence="Where's the best place to have coffee ?", lowercase=True):
     chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
     # from https://huggingface.co/blog/fine-tune-wav2vec2-english
-    sentence = re.sub(chars_to_ignore_regex, '', sentence).lower()
+    sentence = re.sub(chars_to_ignore_regex, '', sentence)
+
+    if lowercase:
+        sentence=sentence.lower()
+
+    # This is to make sure there will not be empty strings after a splittin. So here I split, remove Nones, and rejoin
+    sentence=' '.join(list(filter(None, sentence.split(' '))))
     return sentence
 
 def phonetics_from_sentence(sentence="Where's the best place to have coffee ?"):
@@ -170,20 +177,29 @@ def words_that_contains(phones=['IH0', 'D']):
     selection={}
     for k,v in cmudict_dict.items():
         # cmudict_first_alternatives[k]=v[0]
-        if len(v[0])>=len(phones):
-            if x_in_y(phones, v[0]):
-                selection[k]=v[0]
+        if v!=[]:
+            if len(v[0])>=len(phones):
+                if x_in_y(phones, v[0]):
+                    selection[k]=v[0]
     return selection
+
 
 def syllables_data():
     # http://www.delphiforfun.org/programs/Syllables.htm
     # syllables=pd.read_csv('Syllables.txt',sep='=', header=None)
     syllables=pd.read_csv('mhyph.txt', header=None)
-
     syl_sep=syllables[0][0][5]
-    syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(syl_sep,'_')
+    syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(syl_sep,'|')
 
-    syl_sep='_'
+    # http://hindson.com.au/info/free/free-english-language-hyphenation-dictionary/
+    # syllables=pd.read_csv('EnglishHyphDict_v108.txt', header=None, sep=' ')
+    # syllables.iloc[:,1]=syllables.iloc[:,1].str.strip(';')
+    # syllables.iloc[:,1]=syllables.iloc[:,1].str.replace('-','_')
+    # # syllables.iloc[:,0]=syllables.iloc[:,1]
+    # syllables=pd.DataFrame(syllables.iloc[:,1])
+    # syllables.columns=[0]
+
+    syl_sep='|'
 
     d=cmudict_dict
     syllables=syllables.dropna()  # there is one row that is nan...
@@ -211,6 +227,8 @@ def syllables_data():
             phonetics.append(None)
 
     # len([el for el in n_vowels_cmu if el!=None])
+
+    syllables.syllables=syllables.syllables.str.lower()
     
     syllables['normalized_text']=texts
     syllables['phonetics']=phonetics
@@ -233,7 +251,7 @@ def syllables_data():
 def generate_phonetics_from_words(words, indxs):
     phonetics=[]
     for i,word in enumerate(words):
-        phonetics.append(SonoriPy(cmudict_dict[word][int(indxs[i])])) 
+        phonetics.append(SonoriPy(cmudict_dict[word][int(indxs[i])])[0]) 
         # SonoriPy(phonetics)   
         # gibberish=[[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in l] for l in SonoriPy(phonetics)]
 
@@ -260,33 +278,67 @@ def generate_phonetics_alternatives(sentences):
     return phonetics
 
 def syllabified_text(word, syllables_df):
+    if cmudict_dict[word]!=[]:
+            if n_vowels(cmudict_dict[word][0])==1:
+                syls_text=word
+                used_method='1 syl in cmu'
+                return syls_text, used_method
     try:
         syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
+        used_method='dataset'
     except IndexError:
         # if it did not exist in the manually syllabified data we have:
         # we can first say that words of one syllable is a trivial case, and we can detect that by checking if there is only one syllable
         # if not, I use SonoriPy (sonority sequencing principle) based on letters (it is less accurate than with phonemes but we use it only on fallback)
-        if cmudict_dict[word]!=[]:
-            if n_vowels(cmudict_dict[word][0])==1:
-                syls_text=word
-                return syls_text
-        letters_by_syl=SonoriPy(str_to_list_of_char(word), mode='letters')
-        syls_text='_'.join([''.join(syl) for syl in letters_by_syl])
-        return syls_text
-    return syls_text
+        # Maybe I could improve this part with logic in this (trailing "e", "-ed" ):
+        # https://datascience.stackexchange.com/questions/23376/how-to-get-the-number-of-syllables-in-a-word
+
+        # for the final -ed, remove the "e" except if "-ded" or "-ted"
+        # We remember if we did to insert back the "e" after syllabification
+        modified_ed=False
+        # smiles -> remove the e,   raises -> don't
+        modified_es=False
+        trailing_e=False
+
+        if word[-2:]=="ed" and word[-3] not in ['t','d']:
+            word=word[:-2]+'d'
+            modified_ed=True
+        elif word[-2:]=="es" and word[-3] not in ['s']:
+            word=word[:-2]+'s'
+            modified_es=True
+        elif word[-1]=="e":
+            word=word[:-1]
+            trailing_e=True
+        
+        letters_by_syl=SonoriPy(str_to_list_of_char(word), mode='letters')[0]
+        syls_text='|'.join([''.join(syl) for syl in letters_by_syl])
+
+        if modified_ed:
+            syls_text=syls_text[:-1]+"ed"
+        if modified_es:
+            syls_text=syls_text[:-1]+"es"
+        if trailing_e:
+            syls_text+='e'
+
+        used_method='SonoriPy'
+        return syls_text, used_method
+    return syls_text, used_method
 
 
 def prefill_content(sentences):
     syllables=syllables_data()
-
     syllables_texts=[]
+    used_methods_syllables=[]
     for s in sentences:
         words=s.split(' ')
         syls_texts=[]
+        used_method_syllables=[]
         for word in words:
-            syls_texts.append(syllabified_text(word, syllables))
+            syls_texts.append(syllabified_text(word, syllables)[0])
+            used_method_syllables.append(syllabified_text(word, syllables)[1])
         # syls_text=' '.join(syls_texts)
         syllables_texts.append(' '.join(syls_texts))
+        used_methods_syllables.append(used_method_syllables)
     
     ps=generate_phonetics_alternatives(sentences)
     # go through levels of the list (alternatives, words, syllables, phones) and then convert every phoneme in gibberish
@@ -297,22 +349,83 @@ def prefill_content(sentences):
     # '_' between syllables
     # spaces between words 
     # to have less degrees of nested list and be compatible with the database
-    ps2=[[' '.join(['_'.join(['|'.join(syl) for syl in word]) for word in alt]) for alt in phonetics] for phonetics in ps]
-    gs2=[[' '.join(['_'.join(['|'.join(syl) for syl in word]) for word in alt]) for alt in phonetics] for phonetics in gs]
+    ps2=[[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in phonetics] for phonetics in ps]
+    gs2=[[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in phonetics] for phonetics in gs]
 
     df=pd.DataFrame()
-    df['sentence']=sentences
-    df['syllables_text']=syllables_texts
-    df['CMU']=ps2
-    df['gibberish']=gs2
+    df['text']=sentences
+    df['cmu_phonetics']=ps2
+    df['pronounciation_guide']=gs2
+    df['syllable_parts']=syllables_texts
 
     # use syllables_data. But modify it to check if in cmu, another alternative has the same number of syllables instead
     # of only checking with the first alternative
 
+    n_alternatives=[]
+    for i,r in df.iterrows():
+        n_alternatives.append(len(r.pronounciation_guide))
+        r.cmu_phonetics=r.cmu_phonetics[0]
+        r.pronounciation_guide=r.pronounciation_guide[0]
+    
+    df['pronounciation_guide_hr']=df.pronounciation_guide.str.replace('_','')
+    df['n_syl_mismatch']=df.apply(lambda r: int(len(r.syllable_parts.split('|'))!=len(r.cmu_phonetics.split('|'))), axis=1)
+    # df['n_alternatives']=n_alternatives
+    df['used_method_for_syl_text']=used_methods_syllables
+
+    return df
+
+
+def find(s, ch=['|']):
+    return [i for i, ltr in enumerate(s) if ltr in ch]
+
+def insert(s, ch, i):
+    return s[:i] + ch + s[i:]
+
+def generate_prefill_csv(path='phrases_speaking_activities.txt', syl_sep='|', out_path='prefill_test.csv'):
+    sentences=pd.read_csv(path, sep='/', header=None)
+    norm_sentences=sentences.iloc[:,0].apply(lambda r: remove_special_characters(r)).tolist()
+    df=prefill_content(norm_sentences)
+    df.text=sentences
+
+    def insert_seps_in_cased_text(s, s_case):
+        s_case_sep=[]
+        for w,w_case in zip(s.split(' '),s_case.split(' ')):
+            idxs=find(w, [syl_sep])
+            # now that we found indices of where the syllable separators are, we need to find after which character to insert them
+            # as if the separators weren't there. So we need to substract the number of separators there was before, i.e. its index in the list
+            char_idxs=[el-i for i,el in enumerate(idxs)]
+
+            # here we insert the separator in the cased text thanks to the indices. It is important to do that
+            # starting from the end, so that the other indices are not afftected by these insertions
+            for idx in char_idxs[::-1]:
+                w_case=insert(w_case, syl_sep, idx)
+            s_case_sep.append(w_case)
+        return ' '.join(s_case_sep)
+    
+    case_syllable_parts=[]
+    for _,r in df.iterrows():
+        case_syllable_parts.append(insert_seps_in_cased_text(r['syllable_parts'], remove_special_characters(r['text'], lowercase=False)))
+    df.syllable_parts=case_syllable_parts
+
+    def add_special_char(s_orig, s_modified):
+        s_modified_with_special_chars=[]
+        for w_orig, w_modified in zip(s_orig.split(' '), s_modified.split(' ')):
+            if w_orig[-1]!=w_modified[-1]:
+                s_modified_with_special_chars.append(w_modified+w_orig[-1])
+            else:
+                s_modified_with_special_chars.append(w_modified)
+        return ' '.join(s_modified_with_special_chars)
+    
+    syl_parts_with_special_characters=[]
+    for _,r in df.iterrows():
+        syl_parts_with_special_characters.append(add_special_char(r.text, r.syllable_parts))
+    
+    df.syllable_parts=syl_parts_with_special_characters
+    
+    df.to_csv(out_path)
     return df
 
 if __name__ == "__main__":
-    
     
     words=['comfortable','table','professional', 'analysis', 'temperature', 'personal', 'government']
     sentences=words+['yesterday morning','coffee','seek','take the lead','worked','started a company','think','visited']
@@ -320,3 +433,41 @@ if __name__ == "__main__":
     # g=generate_gibberish_alternatives(sentences)
 
     df=prefill_content(sentences)
+    
+    df.iloc[:,-5:]
+
+    from label_data_processing import get_data
+    a=get_data()
+    sentences=a.text.apply(lambda r: remove_special_characters(r)).tolist()
+    df=prefill_content(sentences)
+    df.text=a.text
+    df.to_csv('prefill_test.csv')
+
+    df.iloc[:,-3:]
+    df.iloc[:,-5:-1]
+
+    sentences=pd.read_csv('phrases-for-noe.txt', sep='/', header=None)
+    sentences=sentences.iloc[:,0].apply(lambda r: remove_special_characters(r)).tolist()
+    df=prefill_content(sentences)
+
+    word=words[0]
+    scores_p=[el[-1] for el in SonoriPy(str_to_list_of_char(word), mode='letters')[-1]]
+
+    word=cmudict_dict['comfortable'][0]
+    scores_t=[el[-1] for el in SonoriPy(word)[-1]]
+
+    import matplotlib.pyplot as plt
+    from matplotlib.pyplot import xticks
+    plt.plot(scores_t)
+    plt.savefig('sonoripy_comfortable.png')
+    xticks(np.arange(len(word)), word)
+
+    syllables_df=syllables_data()
+    word='enjoyed'
+    syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
+    print(syls_text)
+
+    syllabified_text(word, syllables_df)
+
+    df=generate_prefill_csv()
+    df[df.n_syl_mismatch==1][['syllable_parts', 'pronounciation_guide_hr','used_method_for_syl_text']]
