@@ -3,7 +3,6 @@ from __future__ import unicode_literals  # for python2 compatibility
 # created at UC Berkeley 2015
 # Authors: Christopher Hench & Alex Estes © 2015-2019
 
-import codecs
 import sys
 from syllabipy.util import cleantext
 from datetime import datetime
@@ -16,6 +15,7 @@ import cmudict
 
 phones=cmudict.phones()
 
+cmudict_dict=cmudict.dict()
 
 # Python code to convert string to list character-wise
 # https://www.geeksforgeeks.org/python-program-convert-string-list/
@@ -35,7 +35,7 @@ def define_categories(mode='CMU'):
                 vowels.append(p[0].lower()+str(0))
                 vowels.append(p[0].lower()+str(1))
                 vowels.append(p[0].lower()+str(2))
-            if p[-1][0]=='nasal' or p[-1][0]=='liquid':
+            if p[-1][0]=='nasal' or p[-1][0]=='liquid' or p[-1][0]=='semivowel':
                 nasals.append(p[0].lower())
             if p[-1][0]=='fricative':
                 fricatives.append(p[0].lower())
@@ -50,15 +50,22 @@ def define_categories(mode='CMU'):
         fricatives = str_to_list_of_char('zvsfh')
         affricates = str_to_list_of_char('')
         stops = str_to_list_of_char('bcdgtkpqxhj')
+    elif mode=='IPA':
+        vowels = str_to_list_of_char('aeiouyàáâäæãåāèéêëēėęîïíīįìôöòóœøōõûüùúūůÿ')
+        approximates = str_to_list_of_char('')
+        nasals = str_to_list_of_char('lmnrw')
+        fricatives = str_to_list_of_char('zvsfhʃ')
+        affricates = str_to_list_of_char('')
+        stops = str_to_list_of_char('bcdgtkpqxhj')
+        
+        additional_vowels='ɝəaɔʌãeéẽɛøoõiu'
+        vowels+=str_to_list_of_char(additional_vowels)
     else:
         print('This mode of categories for sonoripy does not exist')
 
     return approximates,vowels,nasals,fricatives,affricates,stops
 
 
-
-
-cmudict_dict=cmudict.dict()
 
 
 def SonoriPy(word, mode='CMU'):
@@ -69,13 +76,10 @@ def SonoriPy(word, mode='CMU'):
     ['jus', 'ti', 'fi', 'ca', 'tion']
     '''
 
-    approximates,vowels,nasals,fricatives,affricates,stops=define_categories(mode=mode)
-
     def no_syll_no_vowel(ss):
         '''
         cannot be a syllable without a vowel
         '''
-
         nss = []
         front = []
         for i, syll in enumerate(ss):
@@ -97,14 +101,19 @@ def SonoriPy(word, mode='CMU'):
 
     # SONORITY HIERARCHY for IPA. I am not using it, so I put False instead of a flag "IPA"
     if False:
+        vowels = str_to_list_of_char('aeiouyàáâäæãåāèéêëēėęîïíīįìôöòóœøōõûüùúūůÿ')
+
+        additional_vowels='ɝə'
+        vowels+=str_to_list_of_char(additional_vowels)
+
         # categories can be collapsed into more general groups
         vowelcount = 0  # if vowel count is 1, syllable is automatically 1
         sylset = []  # to collect letters and corresponding values
-        for letter in word.strip(".:;?!)('" + '"'):
+        for letter in word.strip(".:;?!)('ˈ" + '"'):
             if letter.lower() in 'aɔʌã':
                 sylset.append((letter, 9))
                 vowelcount += 1  # to check for monosyllabic words
-            elif letter.lower() in 'eéẽɛøoõ':
+            elif letter.lower() in 'eéẽɛøoõ'+additional_vowels:
                 sylset.append((letter, 8))
                 vowelcount += 1  # to check for monosyllabic words
             elif letter.lower() in 'iu':
@@ -127,25 +136,46 @@ def SonoriPy(word, mode='CMU'):
             else:
                 sylset.append((letter, 0))
 
-    # assign numerical values to phonemes (characters)
-    vowelcount = 0  # if vowel count is 1, syllable is automatically 1
-    sylset = []  # to collect letters and corresponding values
-    for letter in word:
-        if letter.lower() in vowels:
-            sylset.append((letter, 5))
-            vowelcount += 1
-        elif letter.lower() in approximates:
-            sylset.append((letter, 4))
-        elif letter.lower() in nasals:
-            sylset.append((letter, 3))
-        elif letter.lower() in fricatives:
-            sylset.append((letter, 2))
-        elif letter.lower() in affricates:
-            sylset.append((letter, 1))
-        elif letter.lower() in stops:
-            sylset.append((letter, 0))
-        else:
-            sylset.append((letter, 0))
+    else:
+        approximates,vowels,nasals,fricatives,affricates,stops=define_categories(mode=mode)
+
+        if mode=='CMU':
+        # if False:
+            # processing: insert a consonant for vowels like "OW", "ER", etc. so that e.g. "going" can be in two syllables
+            vowel_ending_in_consonant=['w','y','r']
+            idx_to_insert_liquid=[]
+            for i,el in enumerate(word):
+                if el[-1] in str([0,1,2]) and el[-2].lower() in vowel_ending_in_consonant:
+                    # print(el)
+                    idx_to_insert_liquid.append(i)
+            for idx in idx_to_insert_liquid[::-1]:
+                # insert liquid, e.g. 'r', it does not really matter that it is the true one. Because it will just 
+                # be replaced by a score afterwards
+                # TODO: PROBLEM: I need to remove it afterwards, because I actually use the output of this to get syllabified phonetics...
+                word=word[:idx+1] + ['R'] + word[idx+1:]
+            
+            # compute the resulting places of inserted Rs
+            R_indices=[el+i+1 for i,el in enumerate(idx_to_insert_liquid)]
+
+        # assign numerical values to phonemes (characters)
+        vowelcount = 0  # if vowel count is 1, syllable is automatically 1
+        sylset = []  # to collect letters and corresponding values
+        for letter in word:
+            if letter.lower() in vowels:
+                sylset.append((letter, 5))
+                vowelcount += 1
+            elif letter.lower() in approximates:
+                sylset.append((letter, 4))
+            elif letter.lower() in nasals:
+                sylset.append((letter, 3))
+            elif letter.lower() in fricatives:
+                sylset.append((letter, 2))
+            elif letter.lower() in affricates:
+                sylset.append((letter, 1))
+            elif letter.lower() in stops:
+                sylset.append((letter, 0))
+            else:
+                sylset.append((letter, 0))
 
     # SSP syllabification follows
     final_sylset = []
@@ -222,7 +252,18 @@ def SonoriPy(word, mode='CMU'):
 
     final_sylset = no_syll_no_vowel(final_sylset)
 
-    return (final_sylset)
+    if mode=="CMU":
+        # Here we remove back the "R" liquids added for syllable separation purpose 
+        # We stored R indices in original list, here we have to pop in the list of syllable list
+        # so we compare R indices to accumulated lengths + idx of phoneme of current syllable
+        lens_acc=0
+        for idx_syl,syl in enumerate(final_sylset):
+            len_syl=len(syl)
+            for idx_ph,ph in enumerate(syl):
+                if lens_acc+idx_ph in R_indices: syl.pop(idx_ph)
+            lens_acc+=len_syl
+
+    return (final_sylset), sylset
 
 
 if False:
