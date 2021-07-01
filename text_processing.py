@@ -187,7 +187,7 @@ def words_that_contains(phones=['IH0', 'D']):
 def syllables_data():
     # http://www.delphiforfun.org/programs/Syllables.htm
     # syllables=pd.read_csv('Syllables.txt',sep='=', header=None)
-    syllables=pd.read_csv('mhyph.txt', header=None)
+    syllables=pd.read_csv('data/mhyph.txt', header=None)
     syl_sep=syllables[0][0][5]
     syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(syl_sep,'|')
 
@@ -243,7 +243,7 @@ def syllables_data():
     syllables[syllables.n_syls==syllables.n_vowels_cmu]
     syllables[syllables.n_syls!=syllables.n_vowels_cmu]
 
-    syllables.to_csv('syllables.csv')
+    syllables.to_csv('data/syllables.csv')
 
     return syllables
 
@@ -251,10 +251,7 @@ def syllables_data():
 def generate_phonetics_from_words(words, indxs):
     phonetics=[]
     for i,word in enumerate(words):
-        phonetics.append(SonoriPy(cmudict_dict[word][int(indxs[i])])[0]) 
-        # SonoriPy(phonetics)   
-        # gibberish=[[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in l] for l in SonoriPy(phonetics)]
-
+        phonetics.append(SonoriPy(cmudict_dict[word][int(indxs[i])])[0])
     return phonetics
 
 
@@ -326,7 +323,8 @@ def syllabified_text(word, syllables_df):
 
 
 def prefill_content(sentences):
-    syllables=syllables_data()
+    # syllables=syllables_data()
+    syllables=pd.read_csv('data/syllables.csv')
     syllables_texts=[]
     used_methods_syllables=[]
     for s in sentences:
@@ -364,8 +362,14 @@ def prefill_content(sentences):
     n_alternatives=[]
     for i,r in df.iterrows():
         n_alternatives.append(len(r.pronounciation_guide))
-        r.cmu_phonetics=r.cmu_phonetics[0]
-        r.pronounciation_guide=r.pronounciation_guide[0]
+        try:
+            r.cmu_phonetics=r.cmu_phonetics[0]
+        except IndexError:
+            r.cmu_phonetics=''
+        try:
+            r.pronounciation_guide=r.pronounciation_guide[0]
+        except IndexError:
+            r.pronounciation_guide=''
     
     df['pronounciation_guide_hr']=df.pronounciation_guide.str.replace('_','')
     df['n_syl_mismatch']=df.apply(lambda r: int(len(r.syllable_parts.split('|'))!=len(r.cmu_phonetics.split('|'))), axis=1)
@@ -422,7 +426,7 @@ def generate_prefill_csv(path='phrases_speaking_activities.txt', syl_sep='|', ou
     
     df.syllable_parts=syl_parts_with_special_characters
     
-    df.to_csv(out_path)
+    df.to_csv(out_path) 
     return df
 
 if __name__ == "__main__":

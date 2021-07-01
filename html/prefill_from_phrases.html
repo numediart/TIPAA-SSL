@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+      <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+      <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+      <meta name="robots" content="noindex, nofollow">
+      <meta name="googlebot" content="noindex, nofollow">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <script type="text/javascript" src="//code.jquery.com/jquery-1.8.3.js"></script>
+      <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.9.2/themes/base/jquery-ui.css">
+      <script type="text/javascript" src="http://code.jquery.com/ui/1.9.2/jquery-ui.js"></script>
+    <title>File Upload</title>
+  </head>
+  <style>
+    body {padding: 16px; font-family: sans-serif; font-size: 14px; color: #444}
+    input {font-size: 14px; padding: 8px 12px; outline: none; border: 1px solid #ddd}
+    input:focus {box-shadow: 0 1px 2px rgba(0,0,0,.15)}
+    p {padding: 12px}
+    button {background: #28d; padding: 9px 14px; margin-left: 8px; border: none; outline: none;
+            color: #fff; font-size: 14px; border-radius: 4px; cursor: pointer;}
+    button:hover {box-shadow: 0 1px 2px rgba(0,0,0,.15); opacity: 0.9;}
+    button:active {background: #29f;}
+    button[disabled] {opacity: 0.4; cursor: default}
+    </style>
+  <body>
+    <script>
+  function q(selector) {return document.querySelector(selector)}
+
+  // $(document).ready(function() {
+  //   $("#jsonp2").click(function() {
+  //     // url= "/"+q('#module').value
+  //     url= "/vowel_stresses"
+  //     $.ajax({
+  //       url: url,
+  //       type: 'POST',
+  //       ContentType: 'application/json',
+  //       // data: {'data': data}
+  //       data:  {"filename":q('#filename').value,"text":q('#text').value}
+  //     }).done(function(response){
+  //       alert("Data from Server:" + JSON.stringify(response));
+  //     }).fail(function(jqXHR, textStatus, errorThrown){
+  //       alert('FAILED! ERROR: ' + errorThrown);
+  //     });
+  //   });
+  // });
+
+  </script>
+    <h1>File Upload</h1>
+    Upload a text file containing a phrase at each line. Once you submit it, the file will be processed and the resulting CSV will downloaded.
+    This can take a bit of time (tens of seconds).
+    <form method="POST" action="/prefill_from_phrases" enctype="multipart/form-data">
+      <p><input type="file" name="file"></p>
+      <p><input type="submit" value="Submit"></p>
+    </form>
+
+    <!-- <h1>Call module</h1>
+    <form action=""  name="myForm">
+      <p><label for="filename">filename:</label>
+      <input type="text" name="filename" id="filename"></p>
+      <p><label for="text">text:</label>
+      <input type="text" id="text" name="text">
+  </form>
+  <button id="jsonp2" type="button" class="btn btn-info">Get feedback</button> -->
+
+  </body>
+</html>

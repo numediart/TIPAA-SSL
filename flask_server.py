@@ -1,24 +1,29 @@
 from flask import Flask, request, redirect, url_for
 from flask import send_from_directory
+from flask import send_file
 
 from speech_tech import *
 import json
 import speech_tech
-
+from text_processing import generate_prefill_csv
 app = Flask(__name__)
 
 
 @app.route('/')
 def index():
-    return send_from_directory( '.','index.html')
+    return send_from_directory( './html/','index.html')
 
 @app.route('/phonemeContrast.html')
 def phonemeContrast_html():
-    return send_from_directory( '.','phonemeContrast.html')
+    return send_from_directory( './html/','phonemeContrast.html')
 
 @app.route('/vowel_stresses.html')
 def vowel_stresses_html():
-    return send_from_directory( '.','vowel_stresses.html')
+    return send_from_directory( './html/','vowel_stresses.html')
+
+@app.route('/prefill_from_phrases.html')
+def prefill_from_phrases_html():
+    return send_from_directory( './html/','prefill_from_phrases.html')
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
@@ -47,6 +52,31 @@ def upload_file():
     else:
         return "error: filename is empty"
     return rID
+  
+
+@app.route('/prefill_from_phrases', methods=['POST'])
+def prefill_from_phrases():
+    try:
+        uploaded_file = request.files['file']
+    except:
+        return "error: could not access request.files['file'] "
+    if uploaded_file.filename != '':
+        try:
+            uploaded_file.save(upload_path+uploaded_file.filename)
+        except:
+            return "error: could not save uploaded file"
+        
+        df=generate_prefill_csv(upload_path+uploaded_file.filename, out_path=upload_path+'prefill.csv')
+        try:
+            os.remove(upload_path+uploaded_file.filename)
+        except:
+            return "error: could not delete temp file"
+    else:
+        return "error: filename is empty"
+    try:
+	    return send_file(upload_path+'prefill.csv', as_attachment=True)
+    except Exception as e:
+        return str(e)
   
 
 
@@ -134,6 +164,9 @@ def phoneme_contrast_api():
     d={'status':status, 'phonetic_detection':phonetic_detection}
     response=json.dumps(d)
     return response
+
+
+
 
 def run_app():
     app.run(debug=True, host='0.0.0.0')
