@@ -9,5 +9,7 @@ audiotsm
 pytsmod
 flask
 tqdm
-git+https://github.com/huggingface/datasets
+# git+https://github.com/huggingface/datasets
 gunicorn
+seaborn
+ordered_set
