@@ -36,7 +36,8 @@ RUN pip install --upgrade pip
 # Python packages from conda
 RUN conda install -c anaconda -y python=3
 
-# This is necessary so that librosa is able to read mp3 files
+# This is necessary so that librosa is able to read mp3 files (in 2 steps to avoid conda memory error...)
+RUN conda install -c conda-forge nettle
 RUN conda install -c conda-forge ffmpeg
 
 # This is necessary for pyworld library (f0 extraction)
@@ -47,6 +48,9 @@ RUN apt-get install -y libsndfile-dev
 ARG DEBIAN_FRONTEND=noninteractive
 
 COPY ./ $HOME/
+
+# Install this one alone because it seems complicated for a light EC2 machine
+RUN pip install pyworld
 RUN pip install -r requirements.txt
 
 # Install htk
