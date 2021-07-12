@@ -72,15 +72,24 @@ def get_cmudict_info(word='university'):
     """
     return cmudict_dict[word][0]
 
-def remove_special_characters(sentence="Where's the best place to have coffee ?", lowercase=True):
-    chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
+def remove_special_characters(sentence="Where's the best place to have coffee ?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'):
+    """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
+
+    Args:
+        sentence (str, optional): [description]. Defaults to "Where's the best place to have coffee ?".
+        lowercase (bool, optional): [description]. Defaults to True.
+        chars_to_ignore_regex (str, optional): [description]. Defaults to '[\,\?\.\!\-\;\:\"]'.
+
+    Returns:
+        str: normalized sentence
+    """
     # from https://huggingface.co/blog/fine-tune-wav2vec2-english
     sentence = re.sub(chars_to_ignore_regex, '', sentence)
 
     if lowercase:
         sentence=sentence.lower()
 
-    # This is to make sure there will not be empty strings after a splittin. So here I split, remove Nones, and rejoin
+    # This is to make sure there will not be empty strings after a splitting. So here I split, remove Nones, and rejoin
     sentence=' '.join(list(filter(None, sentence.split(' '))))
     return sentence
 
@@ -247,7 +256,6 @@ def syllables_data():
 
     return syllables
 
-
 def generate_phonetics_from_words(words, indxs):
     phonetics=[]
     for i,word in enumerate(words):
@@ -266,11 +274,15 @@ def phonetics_alternatives(words):
         alternative_phonetics.append(generate_phonetics_from_words(words, indxs))
     return alternative_phonetics
 
+def sentence_phonetics_alternatives(sentence):
+    words=sentence.split(' ')
+    word_phonetics=phonetics_alternatives(words)
+    return word_phonetics
+
 def generate_phonetics_alternatives(sentences):
     phonetics=[]
     for sent in sentences:
-        words=sent.split(' ')
-        word_phonetics=phonetics_alternatives(words)
+        word_phonetics=sentence_phonetics_alternatives(sent)
         phonetics.append(word_phonetics)
     return phonetics
 
@@ -322,110 +334,140 @@ def syllabified_text(word, syllables_df):
     return syls_text, used_method
 
 
-def prefill_content(sentences):
-    # syllables=syllables_data()
-    syllables=pd.read_csv('data/syllables.csv')
-    syllables_texts=[]
-    used_methods_syllables=[]
-    for s in sentences:
-        words=s.split(' ')
-        syls_texts=[]
-        used_method_syllables=[]
-        for word in words:
-            syls_texts.append(syllabified_text(word, syllables)[0])
-            used_method_syllables.append(syllabified_text(word, syllables)[1])
-        # syls_text=' '.join(syls_texts)
-        syllables_texts.append(' '.join(syls_texts))
-        used_methods_syllables.append(used_method_syllables)
-    
-    ps=generate_phonetics_alternatives(sentences)
-    # go through levels of the list (alternatives, words, syllables, phones) and then convert every phoneme in gibberish
-    gs=[[[[[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in syl] for syl in word] for word in alt] for alt in phonetics] for phonetics in ps]
-
-    # This puts 
-    # '|' between phonemes
-    # '_' between syllables
-    # spaces between words 
-    # to have less degrees of nested list and be compatible with the database
-    ps2=[[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in phonetics] for phonetics in ps]
-    gs2=[[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in phonetics] for phonetics in gs]
-
-    df=pd.DataFrame()
-    df['text']=sentences
-    df['cmu_phonetics']=ps2
-    df['pronounciation_guide']=gs2
-    df['syllable_parts']=syllables_texts
-
-    # use syllables_data. But modify it to check if in cmu, another alternative has the same number of syllables instead
-    # of only checking with the first alternative
-
-    n_alternatives=[]
-    for i,r in df.iterrows():
-        n_alternatives.append(len(r.pronounciation_guide))
-        try:
-            r.cmu_phonetics=r.cmu_phonetics[0]
-        except IndexError:
-            r.cmu_phonetics=''
-        try:
-            r.pronounciation_guide=r.pronounciation_guide[0]
-        except IndexError:
-            r.pronounciation_guide=''
-    
-    df['pronounciation_guide_hr']=df.pronounciation_guide.str.replace('_','')
-    df['n_syl_mismatch']=df.apply(lambda r: int(len(r.syllable_parts.split('|'))!=len(r.cmu_phonetics.split('|'))), axis=1)
-    # df['n_alternatives']=n_alternatives
-    df['used_method_for_syl_text']=used_methods_syllables
-
-    return df
-
-
 def find(s, ch=['|']):
     return [i for i, ltr in enumerate(s) if ltr in ch]
 
 def insert(s, ch, i):
     return s[:i] + ch + s[i:]
 
+
+def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
+    """To have syllable parts with capital letters, this function compare segmented syllable string to original text.
+    Indeed the segmented version had to be lowercased to look-up in a word dataset without being sensitive to case.
+    Here we get the position of syllable separators "|" and put them at their position in original cased text.
+
+    Args:
+        s (str): text segmented in syllables
+        s_case (str): cased text
+        syl_sep (str, optional): syllable separator. Defaults to '|'.
+
+    Returns:
+        str: cased text segmented in syllables
+    """
+    s_case_sep=[]
+    for w,w_case in zip(s.split(' '),s_case.split(' ')):
+        idxs=find(w, [syl_sep])
+        # now that we found indices of where the syllable separators are, we need to find after which character to insert them
+        # as if the separators weren't there. So we need to substract the number of separators there was before, i.e. its index in the list
+        char_idxs=[el-i for i,el in enumerate(idxs)]
+
+        # here we insert the separator in the cased text thanks to the indices. It is important to do that
+        # starting from the end, so that the other indices are not afftected by these insertions
+        for idx in char_idxs[::-1]:
+            w_case=insert(w_case, syl_sep, idx)
+        s_case_sep.append(w_case)
+    return ' '.join(s_case_sep)
+
+
+def add_special_char(s_orig, s_modified):
+    """This function adds punctuation marks to modified text (here with syllable separation symbols "|") 
+    at the end of words from an original sentence.
+    This assumes that punctuation marks are glued to words, which is the case in english. 
+    This assumption allows us to just check if the last charcter is the same in original and modified text
+    "Hello, my name is John."
+    "hello my name is john"
+    -> hello and john no not have the last same character.
+
+    Example:
+    s_orig="I'm taking a Spanish class."
+    s_modified="I'm tak|ing a Span|ish class"
+
+    output="I'm tak|ing a Span|ish class."
+
+    Args:
+        s_orig (str): original text
+        s_modified (str): modified text
+
+    Returns:
+        str: modified text with punctuation marks
+    """
+    s_modified_with_special_chars=[]
+    for w_orig, w_modified in zip(s_orig.split(' '), s_modified.split(' ')):
+        if w_orig[-1]!=w_modified[-1]:
+            s_modified_with_special_chars.append(w_modified+w_orig[-1])
+        else:
+            s_modified_with_special_chars.append(w_modified)
+    return ' '.join(s_modified_with_special_chars)
+
+def prefill_for_sentence(sentence, syllables_data, syl_sep='|'):
+    words=remove_special_characters(sentence).split(' ')
+    syls_texts=[]
+    used_method_syllables=[]
+    for word in words:
+        syls_texts.append(syllabified_text(word, syllables_data)[0])
+        used_method_syllables.append(syllabified_text(word, syllables_data)[1])
+    case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), remove_special_characters(sentence, lowercase=False), syl_sep=syl_sep)        
+
+    # p -> phonetics
+    p=sentence_phonetics_alternatives(remove_special_characters(sentence))
+
+    # g -> gibberish
+    # go through levels of the list (alternatives, words, syllables, phones) and then convert every phoneme in gibberish
+    g=[[[[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in syl] for syl in word] for word in alt] for alt in p]
+    
+    # This puts 
+    # '|' between phonemes
+    # '_' between syllables
+    # spaces between words 
+    # to have less degrees of nested list and be compatible with the database
+    p2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in p]
+    g2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in g]
+
+    # Keep first alternative. Maybe in the future I can store all the alternatives in another variable
+    try:
+        p2=p2[0]
+    except IndexError:
+        p2=''
+    try:
+        g2=g2[0]
+    except IndexError:
+        g2=''
+    
+    g_hr=g2.replace('_','')
+    n_syl_mismatch=int(len(case_syls_texts.split('|'))!=len(p2.split('|')))
+
+    case_syls_texts=add_special_char(sentence, case_syls_texts)
+
+    record={'text':sentence,
+        'cmu_phonetics':p2,
+        'pronounciation_guide':g2,
+        'pronounciation_guide_hr':g_hr,
+        'syllable_parts':case_syls_texts,
+        'n_syl_mismatch':n_syl_mismatch,
+        'used_method_for_syl_text':used_method_syllables}
+    return record
+
+def prefill_content(sentences, syl_sep='|'):
+    # syllables=syllables_data()
+    syllables=pd.read_csv('data/syllables.csv')
+    records=[]
+    for s in sentences:
+        record=prefill_for_sentence(s, syllables, syl_sep=syl_sep)
+        records.append(record)
+    df=pd.DataFrame.from_records(records)
+    return df
+
+
 def generate_prefill_csv(path='phrases_speaking_activities.txt', syl_sep='|', out_path='prefill_test.csv'):
     sentences=pd.read_csv(path, sep='/', header=None)
-    norm_sentences=sentences.iloc[:,0].apply(lambda r: remove_special_characters(r)).tolist()
-    df=prefill_content(norm_sentences)
+    df=prefill_content(sentences.iloc[:,0].tolist(), syl_sep=syl_sep)
     df.text=sentences
 
-    def insert_seps_in_cased_text(s, s_case):
-        s_case_sep=[]
-        for w,w_case in zip(s.split(' '),s_case.split(' ')):
-            idxs=find(w, [syl_sep])
-            # now that we found indices of where the syllable separators are, we need to find after which character to insert them
-            # as if the separators weren't there. So we need to substract the number of separators there was before, i.e. its index in the list
-            char_idxs=[el-i for i,el in enumerate(idxs)]
-
-            # here we insert the separator in the cased text thanks to the indices. It is important to do that
-            # starting from the end, so that the other indices are not afftected by these insertions
-            for idx in char_idxs[::-1]:
-                w_case=insert(w_case, syl_sep, idx)
-            s_case_sep.append(w_case)
-        return ' '.join(s_case_sep)
-    
-    case_syllable_parts=[]
-    for _,r in df.iterrows():
-        case_syllable_parts.append(insert_seps_in_cased_text(r['syllable_parts'], remove_special_characters(r['text'], lowercase=False)))
-    df.syllable_parts=case_syllable_parts
-
-    def add_special_char(s_orig, s_modified):
-        s_modified_with_special_chars=[]
-        for w_orig, w_modified in zip(s_orig.split(' '), s_modified.split(' ')):
-            if w_orig[-1]!=w_modified[-1]:
-                s_modified_with_special_chars.append(w_modified+w_orig[-1])
-            else:
-                s_modified_with_special_chars.append(w_modified)
-        return ' '.join(s_modified_with_special_chars)
-    
     syl_parts_with_special_characters=[]
     for _,r in df.iterrows():
         syl_parts_with_special_characters.append(add_special_char(r.text, r.syllable_parts))
     
     df.syllable_parts=syl_parts_with_special_characters
-    
     df.to_csv(out_path) 
     return df
 

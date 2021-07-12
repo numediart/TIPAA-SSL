@@ -5,7 +5,7 @@ from flask import send_file
 from speech_tech import *
 import json
 import speech_tech
-from text_processing import generate_prefill_csv
+from text_processing import generate_prefill_csv, prefill_for_sentence
 app = Flask(__name__)
 
 
@@ -54,6 +54,7 @@ def upload_file():
     return rID
   
 
+
 @app.route('/prefill_from_phrases', methods=['POST'])
 def prefill_from_phrases():
     try:
@@ -78,6 +79,21 @@ def prefill_from_phrases():
     except Exception as e:
         return str(e)
   
+
+syllables=pd.read_csv('data/syllables.csv')
+@app.route('/prefill_from_phrase', methods=['GET', 'POST'])
+def prefill_from_phrase():
+    content = request.form
+    # import pdb;pdb.set_trace()
+    print(request.__dict__)
+    print(content)
+    print(content['phrase'])
+
+    d=prefill_for_sentence(content['phrase'], syllables)
+    print(d)
+    response=json.dumps(d)
+    print(response)
+    return response
 
 
 @app.route('/vowel_stresses', methods=['GET', 'POST'])
