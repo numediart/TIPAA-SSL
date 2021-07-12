@@ -45,10 +45,7 @@ b'{"status": "success", "stress_intensities": [83, 49, 85, 27, 57, 27, 73], "str
 For the word "toothpaste"
 ```
  b'{"status": "success", "stress_intensities": [[77, 33]], "stress_binaries": [[1, 0]]}'
- ```
-
-
-
+```
 
 ### Lower level functions
 Besides existing module, I am working on two lower level functions. 
@@ -104,6 +101,31 @@ b'{"status": "success", "result": [[83], [49], [85], [27], [57], [27], [73, 44, 
 if you pass only one word with only one syllable, the result will be a `[[nan]]`
 
 
+### Prefill feature for linguistic database
+A prefill feature is available to generate phonetic content from a phrase with a POST request with arguments:
+
+```
+url='/prefill_from_phrase'
+data={"phrase":phrase}
+```
+
+Example:
+Input:
+```
+data={"phrase":"I'm taking a Spanish class."}
+```
+
+Output:
+```
+b'{"text": "I\'m taking a Spanish class.", 
+"cmu_phonetics": "AY1_M T_EY1|K_IH0_NG AH0 S_P_AE1|N_IH0_SH K_L_AE1_S", 
+"pronounciation_guide": "ay_m t_ey|k_i_ng uh s_p_a|n_i_sh k_l_a_s", 
+"pronounciation_guide_hr": "aym tey|king uh spa|nish klas", 
+"syllable_parts": "I\'m tak|ing a Span|ish class.", 
+"n_syl_mismatch": 0, 
+"used_method_for_syl_text": ["1 syl in cmu", "dataset", "1 syl in cmu", "dataset", "1 syl in cmu"]}'
+```
+
 ## Docker application
 You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
 I used this info to do that: 
@@ -113,7 +135,13 @@ https://github.com/srcecde/flask-docker-ec2
 First, clone this repo, then in it:
 
 ```
+sudo docker-compose build
 sudo docker-compose up -d
+```
+
+To kill all containers, e.g. to restart afterwards:
+```
+docker container kill $(docker ps -q)
 ```
 
 On AWS, I chose an Amazon Linux 2 with Docker installed. 
@@ -127,6 +155,7 @@ But I had to install docker-compose like this:
 pip install docker-compose
 ```
 
+(Not sure this is necessary)
 change the line of nginx/web.conf
 "	proxy_pass  http://aws.server.ip.here:5000/;"
 
