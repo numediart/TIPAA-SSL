@@ -256,33 +256,46 @@ def syllables_data():
 
     return syllables
 
-def generate_phonetics_from_words(words, indxs):
+
+def generate_syl_phonetics_alternatives_from_word(word):
+    ps=cmudict_dict[word]
+    syl_ps=[]
+    for p in ps:
+        syl_ps.append(SonoriPy(p)[0])
+    return syl_ps
+
+def generate_syl_phonetics_from_words(words, indxs):
     phonetics=[]
     for i,word in enumerate(words):
         phonetics.append(SonoriPy(cmudict_dict[word][int(indxs[i])])[0])
     return phonetics
 
 
-def phonetics_alternatives(words):
-    lens=[]
-    for i,word in enumerate(words):
-        lens.append(len(cmudict_dict[word]))
+
+def syl_phonetics_alternatives(words):
+    syl_phonetics_alternatives_words=[generate_syl_phonetics_alternatives_from_word(word) for word in words]
+    lens=[len(el) for el in syl_phonetics_alternatives_words]
+
     lists_indxs=[list(np.arange(el)) for el in lens]
     alternative_combinations=list(itertools.product(*lists_indxs))
     alternative_phonetics=[]
     for indxs in alternative_combinations:
-        alternative_phonetics.append(generate_phonetics_from_words(words, indxs))
+        s=[]
+        for i,idx in enumerate(indxs):
+            s.append(syl_phonetics_alternatives_words[i][idx])
+        alternative_phonetics.append(s)
     return alternative_phonetics
 
-def sentence_phonetics_alternatives(sentence):
+
+def sentence_syl_phonetics_alternatives(sentence):
     words=sentence.split(' ')
-    word_phonetics=phonetics_alternatives(words)
+    word_phonetics=syl_phonetics_alternatives(words)
     return word_phonetics
 
-def generate_phonetics_alternatives(sentences):
+def generate_syl_phonetics_alternatives(sentences):
     phonetics=[]
     for sent in sentences:
-        word_phonetics=sentence_phonetics_alternatives(sent)
+        word_phonetics=sentence_syl_phonetics_alternatives(sent)
         phonetics.append(word_phonetics)
     return phonetics
 
@@ -407,9 +420,13 @@ def prefill_for_sentence(sentence, syllables_data, syl_sep='|'):
         syls_texts.append(syllabified_text(word, syllables_data)[0])
         used_method_syllables.append(syllabified_text(word, syllables_data)[1])
     case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), remove_special_characters(sentence, lowercase=False), syl_sep=syl_sep)        
+    case_syls_texts=add_special_char(sentence, case_syls_texts)
+
 
     # p -> phonetics
-    p=sentence_phonetics_alternatives(remove_special_characters(sentence))
+    # p=sentence_syl_phonetics_alternatives(remove_special_characters(sentence))
+    # p=generate_syl_phonetics_from_words(words, np.zeros(len(words)))
+    p=[generate_syl_phonetics_alternatives_from_word(word) for word in words]
 
     # g -> gibberish
     # go through levels of the list (alternatives, words, syllables, phones) and then convert every phoneme in gibberish
@@ -420,31 +437,52 @@ def prefill_for_sentence(sentence, syllables_data, syl_sep='|'):
     # '_' between syllables
     # spaces between words 
     # to have less degrees of nested list and be compatible with the database
-    p2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in p]
-    g2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in g]
+    # p2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in p]
+    # g2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in g]
+    
+    p2=[['|'.join(['_'.join(syl) for syl in word]) for word in alt] for alt in p]
+    g2=[['|'.join(['_'.join(syl) for syl in word]) for word in alt] for alt in g]
+    
+    n_alternatives=[len(el) for el in p2]
+    g_hr=[[el.replace('_','') for el in w] for w  in g2]
+
+
+    n_syl_mismatches=[]
+    for w1,w2 in zip(case_syls_texts.split(' '),[el[0] for el in p2]):
+        n_syl_mismatch=int(len(w1.split('|'))!=len(w2.split('|')))
+        n_syl_mismatches.append(n_syl_mismatch)
+
+    # n_syl_mismatch=int(len(case_syls_texts.split('|'))!=len(p2.split('|')))
 
     # Keep first alternative. Maybe in the future I can store all the alternatives in another variable
     try:
-        p2=p2[0]
+        # p2=p2[0]
+        p2_0=' '.join([el[0] for el in p2])
     except IndexError:
-        p2=''
+        p2_0=''
     try:
-        g2=g2[0]
+        # g2=g2[0]
+        g2_0=' '.join([el[0] for el in g2])
     except IndexError:
-        g2=''
+        g2_0=''
+    try:
+        # g2=g2[0]
+        g_hr_0=' '.join([el[0] for el in g_hr])
+    except IndexError:
+        g_hr_0=''
     
-    g_hr=g2.replace('_','')
-    n_syl_mismatch=int(len(case_syls_texts.split('|'))!=len(p2.split('|')))
-
-    case_syls_texts=add_special_char(sentence, case_syls_texts)
-
     record={'text':sentence,
-        'cmu_phonetics':p2,
-        'pronounciation_guide':g2,
-        'pronounciation_guide_hr':g_hr,
+        'cmu_phonetics':p2_0,
+        'pronounciation_guide':g2_0,
+        'pronounciation_guide_hr':g_hr_0,
         'syllable_parts':case_syls_texts,
-        'n_syl_mismatch':n_syl_mismatch,
-        'used_method_for_syl_text':used_method_syllables}
+        'n_syl_mismatches':n_syl_mismatches,
+        'used_method_for_syl_text':used_method_syllables,
+        'cmu_phonetics_alt':p2,
+        'pronounciation_guide_alt':g2,
+        'pronounciation_guide_hr_alt':g_hr,
+        'n_alternatives':n_alternatives
+        }
     return record
 
 def prefill_content(sentences, syl_sep='|'):
@@ -516,4 +554,17 @@ if __name__ == "__main__":
     syllabified_text(word, syllables_df)
 
     df=generate_prefill_csv()
-    df[df.n_syl_mismatch==1][['syllable_parts', 'pronounciation_guide_hr','used_method_for_syl_text']]
+    df[df.n_syl_mismatches.apply(lambda r: np.sum(r))>0][['syllable_parts', 'pronounciation_guide_hr','used_method_for_syl_text']]
+
+    df[df.n_syl_mismatches.apply(lambda r: np.sum(r))>0][['syllable_parts', 'pronounciation_guide_hr','used_method_for_syl_text']]
+    df[df.n_syl_mismatches.apply(lambda r: np.sum(r))>0].n_syl_mismatches
+    df[df.n_syl_mismatches.apply(lambda r: np.sum(r))>0]
+    
+    df.n_alternatives.max()
+
+    df.iloc[df.n_alternatives.argmax()]
+    df.iloc[96]
+    
+    sentence=df.iloc[96].text
+    words=remove_special_characters(df.iloc[96].text).split(' ')
+    len(syl_phonetics_alternatives(words))

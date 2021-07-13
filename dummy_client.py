@@ -31,6 +31,11 @@ def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alt
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
+def call_prefill_for_sentence(sentence, base_url = 'http://localhost:5000', client=requests):
+    url=base_url+"/prefill_from_phrase"
+    res = client.post(url, data={"phrase":sentence})
+    print(res.__dict__['_content'])
+    return res.__dict__['_content']
 
 # deprecated functions
 if False:
@@ -46,11 +51,12 @@ if __name__ == "__main__":
     rID1=res.__dict__['_content']
     call_phoneme_contrast( rID1.decode('utf-8'))
 
-    
     res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
     rID=res.__dict__['_content']
     call_phoneme_contrast( rID.decode('utf-8'), base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
-
+    
+    call_prefill_for_sentence( "I'm taking a Spanish class.", base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+    call_prefill_for_sentence("Kayla isn't angry at Tyler")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID2=res.__dict__['_content']
@@ -60,11 +66,9 @@ if __name__ == "__main__":
     rID=res.__dict__['_content']
     call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0 D', alternatives="['IH0 D', 'D', 'T']")
 
-
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
     call_vowel_stresses(rID.decode('utf-8'))
-
     
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
