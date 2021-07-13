@@ -112,18 +112,30 @@ data={"phrase":phrase}
 Example:
 Input:
 ```
-data={"phrase":"I'm taking a Spanish class."}
+data={"phrase":"Kayla isn't angry at Tyler"}
 ```
 
 Output:
-```
-b'{"text": "I\'m taking a Spanish class.", 
+
+<!-- b'{"text": "I\'m taking a Spanish class.", 
 "cmu_phonetics": "AY1_M T_EY1|K_IH0_NG AH0 S_P_AE1|N_IH0_SH K_L_AE1_S", 
 "pronounciation_guide": "ay_m t_ey|k_i_ng uh s_p_a|n_i_sh k_l_a_s", 
 "pronounciation_guide_hr": "aym tey|king uh spa|nish klas", 
 "syllable_parts": "I\'m tak|ing a Span|ish class.", 
 "n_syl_mismatch": 0, 
-"used_method_for_syl_text": ["1 syl in cmu", "dataset", "1 syl in cmu", "dataset", "1 syl in cmu"]}'
+"used_method_for_syl_text": ["1 syl in cmu", "dataset", "1 syl in cmu", "dataset", "1 syl in cmu"]}' -->
+```
+b'{"text": "Kayla isn\'t angry at Tyler", 
+"cmu_phonetics": "K_EY1|L_AH0 IH1|Z_AH0_N_T AE1_NG|G_R_IY0 AE1_T T_AY1|L_ER0", 
+"pronounciation_guide": "k_ey|l_uh i|z_uh_n_t a_ng|g_r_ee a_t t_ay|l_uhr", 
+"pronounciation_guide_hr": "key|luh i|zuhnt ang|gree at tay|luhr", 
+"syllable_parts": "Kay|la isn\'t an|gry at Tyl|er",
+"n_syl_mismatches": [0, 1, 0, 0, 0], 
+"used_method_for_syl_text": ["SonoriPy", "dataset", "dataset", "1 syl in cmu", "dataset"], 
+"cmu_phonetics_alt": [["K_EY1|L_AH0"], ["IH1|Z_AH0_N_T", "IH0|Z_AH0_N_T", "IH1|Z_AH0_N"], ["AE1_NG|G_R_IY0"], ["AE1_T"], ["T_AY1|L_ER0"]], 
+"pronounciation_guide_alt": [["k_ey|l_uh"], ["i|z_uh_n_t", "i|z_uh_n_t", "i|z_uh_n"], ["a_ng|g_r_ee"], ["a_t"], ["t_ay|l_uhr"]], 
+"pronounciation_guide_hr_alt": [["key|luh"], ["i|zuhnt", "i|zuhnt", "i|zuhn"], ["ang|gree"], ["at"], ["tay|luhr"]], 
+"n_alternatives": [1, 3, 1, 1, 1]}'
 ```
 
 ## Docker application
@@ -166,7 +178,12 @@ docker build -t flowspeech .
 docker run -d -p 8000:8000 flowspeech
 ```
 
-To git pull inside a container:
+When you want to update the app with changes in code (no new depencies):
+```
+git pull && docker-compose up -d --no-deps --build flaskapp
+```
+
+To git pull inside a container, this can be useful if you only change e.g. html and not python code (it does not rebuild the app, therefore faster):
 ```
 docker exec flaskapp git pull
 ```
