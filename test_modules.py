@@ -66,6 +66,28 @@ def test_vowel_stresses():
     p['rand_fileName']=rID
     wordStress_from_phonetics_audio(p=p)
 
+def test_stress_with_level():
+    from text_processing import prefill_for_sentence
+    sentence="i would love to go to ireland"
+
+    syllables_data=pd.read_csv('data/syllables.csv')
+    d=prefill_for_sentence(sentence, syllables_data)
+    d['cmu_phonetics']
+    
+    p=set_params()
+    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    p['rand_fileName']=rID
+    stress_from_formatted_phonetics(d['cmu_phonetics'], level='sentence', p=p)
+    
+    p=set_params()
+    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    p['rand_fileName']=rID
+    stress_from_formatted_phonetics(d['cmu_phonetics'], level='word', p=p)
+    
+    p=set_params()
+    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    p['rand_fileName']=rID
+    vowel_stresses_from_phonetics_audio(p=p)
 
 
 def test_phonemeContrast():
@@ -75,9 +97,14 @@ def test_phonemeContrast():
     p['rand_fileName']=rID
     phonemeContrast_from_phonetics_audio(p=p)
 
+    p=set_params()
+    status_audio, rID=prepare_audio_file('audio_recordings/turned_around.mp3')
+    p['rand_fileName']=rID
+    phonemeContrast_from_formatted_phonetics_audio(p=p)
 
 def test_text_processing():
     word_stress_from_text()
+    df=generate_prefill_csv()
 
 def test_performance_tests():
     # iContrast_performance_test()
