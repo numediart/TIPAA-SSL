@@ -99,7 +99,6 @@ def prefill_from_phrase():
 @app.route('/vowel_stresses', methods=['GET', 'POST'])
 def vowel_stresses_api():
     content = request.form
-    # import pdb;pdb.set_trace()
     print(request.__dict__)
     print(content)
     print(content['phonetics'])
@@ -123,19 +122,21 @@ def vowel_stresses_api():
 @app.route('/flowspeech/<module>', methods=['GET', 'POST'])
 def module_api(module):
     content = request.form
-    # import pdb;pdb.set_trace()
     print(request.__dict__)
     print(content)
     print(content['phonetics'])
     print(content['rID'])
     rID=content['rID']
-    phonetics=ast.literal_eval(content['phonetics'])
+    # phonetics=ast.literal_eval(content['phonetics'])
+    phonetics=content['phonetics']
     p=set_params()
     p['rand_fileName']=rID
     if module=='sentenceStress':
-        res=sentenceStress_from_phonetics_audio(phonetics,p=p)
+        # res=sentenceStress_from_phonetics_audio(phonetics,p=p)
+        res=stress_from_formatted_phonetics(phonetics, level="sentence", p=p)
     elif module=='wordStress':
-        res=wordStress_from_phonetics_audio(phonetics,p=p)
+        # res=wordStress_from_phonetics_audio(phonetics,p=p)
+        res=stress_from_formatted_phonetics(phonetics, level="word", p=p)
     else:
         res={"status": "error: no such module"}
     response=json.dumps(res)
@@ -154,7 +155,8 @@ def phoneme_contrast_api():
     print(content['word_idx'])
     print(content['rID'])
     # filename=content['filename']
-    phonetics=ast.literal_eval(content['phonetics'])
+    # phonetics=ast.literal_eval(content['phonetics'])
+    phonetics=content['phonetics']
     word_idx=content['word_idx']
     rID=content['rID']
     target=content['target']
@@ -163,7 +165,8 @@ def phoneme_contrast_api():
 
     p=set_params()
     p['rand_fileName']=rID
-    status,result=phonemeContrast_from_phonetics_audio(phonetics, p, int(word_idx), target, alternatives)
+    # status,result=phonemeContrast_from_phonetics_audio(phonetics, p, int(word_idx), target, alternatives)
+    status,result=phonemeContrast_from_formatted_phonetics_audio(phonetics, p, int(word_idx), target, alternatives)
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):

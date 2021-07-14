@@ -6,12 +6,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from time import time
 from audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
-from htk_utils import process_grammar, htk_recognition, get_textgrid_data, clean_htk_files
-from label_data_processing import  get_sentenceStress_annotation, get_data
+from htk_utils import get_textgrid_data, clean_htk_files
 
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
 from label_data_processing import set_params, target_to_alternatives, graphemes_to_alternatives
-from text_processing import phonetics_from_sentence, remove_special_characters
+from text_processing import phonetics_from_sentence
 import uuid
 
 
@@ -506,6 +505,19 @@ def sentenceStress_from_phonetics_audio(
 
     return {"status": "success", "stress_intensities": [int(el*100) for el in max_scores_by_word], "stress_binaries": binResult.tolist()}
 
+
+
+def max_by_line(a):
+    a_max=[]
+    for el in a:
+        a_max.append((el == np.max(el)).astype(int))
+    return a_max
+
+def merge_list(l):
+    merged=[]
+    for el in l: merged+=el
+    return merged
+
 def wordStress_from_phonetics_audio(
     phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
     p=set_params()
@@ -515,19 +527,57 @@ def wordStress_from_phonetics_audio(
     if weighted_score_by_word == []:
         return status, []
 
-    def max_by_line(a):
-        a_max=[]
-        for el in a:
-            a_max.append((el == np.max(el)).astype(int))
-        return a_max
-
     bin_score_by_word=max_by_line(weighted_score_by_word)
     # binResult=np.concatenate(bin_score_by_word)
 
     weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
-
     return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
 
+def stress_from_formatted_phonetics(phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", level="word", p=set_params()):
+    split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+    lens=[len(el) for el in split_phonetics]
+    merged_phonetics=merge_list(split_phonetics)
+    status, weighted_score_by_syllable=vowel_stresses_from_phonetics_audio(merged_phonetics,p)
+    
+    if weighted_score_by_syllable == []:
+        return status, []
+
+    weighted_score_by_word_by_syllable_by_vowel=[]
+    i=0
+    for l in lens:
+        weighted_score_by_word_by_syllable_by_vowel.append(weighted_score_by_syllable[i:i+l])
+        i+=l
+
+    if level=="word":
+        weighted_score_by_word_by_syllable_int=[[max([int(vowel*100) for vowel  in syl])  for syl  in word] for word in weighted_score_by_word_by_syllable_by_vowel]
+        bin_score_by_word_by_syllable=max_by_line(weighted_score_by_word_by_syllable_int)
+        bin_score_by_word_by_syllable=[el.tolist() for el in bin_score_by_word_by_syllable]
+        return {"status": "success", "stress_intensities": weighted_score_by_word_by_syllable_int, "stress_binaries": bin_score_by_word_by_syllable}
+    elif level=="sentence":
+        max_score_by_word=[int(max(l)[0]*100) for l in weighted_score_by_word_by_syllable_by_vowel]
+        bin_score_by_word=np.zeros(len(max_score_by_word)).astype(int).tolist()
+        imax=np.argmax(max_score_by_word)
+        bin_score_by_word[imax]=1
+        return {"status": "success", "stress_intensities": max_score_by_word, "stress_binaries": bin_score_by_word}
+    else:
+        print("No such level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.")
+
+def phonemeContrast_from_formatted_phonetics_audio(
+                    phonetics='T_ER1_N_D ER0|AW1_N_D', 
+                    p=set_params(), 
+                    word_idx=0, 
+                    target_phones='D', 
+                    alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+    split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+    
+    merged_phonetics=[merge_list(word) for word in split_phonetics]
+    status, result=phonemeContrast_from_phonetics_audio(
+                    phonetics=merged_phonetics, 
+                    p=p, 
+                    word_idx=word_idx, 
+                    target_phones=target_phones, 
+                    alternatives=alternatives)
+    return status, result
 
 # obsolete functions backup
 if False:
@@ -738,7 +788,6 @@ if __name__ == "__main__":
     # start=time();s,fs=librosa.load(p['waveFileAddress'], sr=p['fs_target']);print(time()-start) #0.08
 
     from scipy.io.wavfile import write
-    import soundfile as sf
 
     # start=time();fs,s = read(p['waveFileAddress']);print(time()-start)
     # start=time();s,fs = sf.read(p['waveFileAddress']);print(time()-start) # 0.006
@@ -771,7 +820,7 @@ if __name__ == "__main__":
     # alternatives=alternatives)
     # status, results= phonemeContrast(p)
 
-    make_pContrast_annotation_files(p, text="law",word_idx=0, target_phones='AO1',    alternatives=['AO1','OW1','AA1', 'AH1 W'])
+    make_pContrast_annotation_files(p, text="law",word_idx=0, target_phones='AO1', alternatives=['AO1','OW1','AA1', 'AH1 W'])
 
     target='D'
     phonetics=phonetics_from_sentence('turned around')

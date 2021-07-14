@@ -1,6 +1,10 @@
 import requests
 import json
-from text_processing import phonetics_from_sentence
+from text_processing import phonetics_from_sentence, prefill_for_sentence
+import pandas as pd
+syllables_data=pd.read_csv('data/syllables.csv')
+
+
 def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:5000', client=requests):
     url=base_url+"/upload"
     print(url)
@@ -19,15 +23,20 @@ def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 
 
 def call_module(rID, text='I would love to go to ireland !', module='sentenceStress', base_url = 'http://localhost:5000', client=requests):
     url=base_url+"/flowspeech/"
-    phonetics=phonetics_from_sentence(text)
-    res = client.post(url+module, data={"phonetics":json.dumps(phonetics), 'rID':rID})
+    d=prefill_for_sentence(text, syllables_data)
+    phonetics=d['cmu_phonetics']
+    # res = client.post(url+module, data={"phonetics":json.dumps(phonetics), 'rID':rID})
+    res = client.post(url+module, data={"phonetics":phonetics, 'rID':rID})
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
 def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alternatives="['T', 'D', 'IH0 D']", base_url = 'http://localhost:5000', client=requests):
     url=base_url+"/phonemeContrast"
-    phonetics=phonetics_from_sentence(text)
-    res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target})
+    d=prefill_for_sentence(text, syllables_data)
+    phonetics=d['cmu_phonetics']
+    # phonetics=phonetics_from_sentence(text)
+    # res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target})
+    res = client.post(url, data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target})
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
@@ -55,7 +64,7 @@ if __name__ == "__main__":
     rID=res.__dict__['_content']
     call_phoneme_contrast( rID.decode('utf-8'), base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
     
-    call_prefill_for_sentence( "I'm taking a Spanish class.", base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+    call_prefill_for_sentence( "Kayla isn't angry at Tyler", base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
     call_prefill_for_sentence("Kayla isn't angry at Tyler")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
