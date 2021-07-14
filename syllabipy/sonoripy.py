@@ -254,14 +254,18 @@ def SonoriPy(word, mode='CMU'):
 
     if mode=="CMU":
         # Here we remove back the "R" liquids added for syllable separation purpose 
-        # We stored R indices in original list, here we have to pop in the list of syllable list
-        # so we compare R indices to accumulated lengths + idx of phoneme of current syllable
-        lens_acc=0
-        for idx_syl,syl in enumerate(final_sylset):
-            len_syl=len(syl)
-            for idx_ph,ph in enumerate(syl):
-                if lens_acc+idx_ph in R_indices: syl.pop(idx_ph)
-            lens_acc+=len_syl
+        # We stored R indices in original list, here we have to build a new list of syllable list
+        # by excluding R indices (that are at the word level without syllable segmentation )
+        final_sylset_new=[]
+        idx=0
+        for syl in final_sylset:
+            temp_syl=[]
+            for phone in syl:
+                if idx not in R_indices:
+                    temp_syl.append(phone)
+                idx+=1
+            final_sylset_new.append(temp_syl)
+        final_sylset=final_sylset_new
 
     return (final_sylset), sylset
 
