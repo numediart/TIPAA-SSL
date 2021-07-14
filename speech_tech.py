@@ -483,7 +483,6 @@ def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio
     status,result=vowel_stresses(p)
     return status, result
 
-
 def vowel_stresses_from_phonetics_audio(
     phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
     p=set_params()
@@ -567,16 +566,24 @@ def phonemeContrast_from_formatted_phonetics_audio(
                     p=set_params(), 
                     word_idx=0, 
                     target_phones='D', 
-                    alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+                    # alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
+                    alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D'
+                    ):
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
-    
+
+    # alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D'
+    split_alternatives=[alt.replace('_',' ') for alt in alternatives.split(' ')]
+    target_phones=target_phones.replace('_', ' ')
+
     merged_phonetics=[merge_list(word) for word in split_phonetics]
+    print(target_phones)
+    print(alternatives)
     status, result=phonemeContrast_from_phonetics_audio(
                     phonetics=merged_phonetics, 
                     p=p, 
                     word_idx=word_idx, 
                     target_phones=target_phones, 
-                    alternatives=alternatives)
+                    alternatives=split_alternatives)
     return status, result
 
 # obsolete functions backup

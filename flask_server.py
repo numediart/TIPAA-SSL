@@ -160,7 +160,8 @@ def phoneme_contrast_api():
     word_idx=content['word_idx']
     rID=content['rID']
     target=content['target']
-    alternatives=ast.literal_eval(content['alternatives'])
+    # alternatives=ast.literal_eval(content['alternatives'])
+    alternatives=content['alternatives']
     print(alternatives)
 
     p=set_params()
