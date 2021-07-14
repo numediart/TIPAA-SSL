@@ -30,7 +30,7 @@ def call_module(rID, text='I would love to go to ireland !', module='sentenceStr
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
-def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alternatives="['T', 'D', 'IH0 D']", base_url = 'http://localhost:5000', client=requests):
+def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:5000', client=requests):
     url=base_url+"/phonemeContrast"
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
@@ -69,11 +69,11 @@ if __name__ == "__main__":
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID2=res.__dict__['_content']
-    call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0', alternatives="['IH0', 'IY0']")
+    call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0', alternatives="IH0 IY0")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID=res.__dict__['_content']
-    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0 D', alternatives="['IH0 D', 'D', 'T']")
+    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0 D', alternatives="T D IH0_D")
 
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
@@ -87,6 +87,11 @@ if __name__ == "__main__":
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
     call_module(rID.decode('utf-8'), module="wordStress")
+
+    
+    res=send_audio(path='audio_recordings/WS_111_toothpaste.wav')
+    rID=res.__dict__['_content']
+    call_module(rID.decode('utf-8'), text="toothpaste", module="wordStress")
 
     # res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     # rID=res.__dict__['_content']
