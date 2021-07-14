@@ -120,7 +120,8 @@ if you pass only one word with only one syllable, the result will be a `[[nan]]`
 
 
 ### Prefill feature for linguistic database
-A prefill feature is available to generate phonetic content from a phrase with a POST request with arguments:
+
+A prefill feature is available to generate phonetic content programatically. You need to make a POST request to `/prefill_from_phrase`, submitting a payload of type `application/x-www-form-urlencoded` (not JSON), for example:
 
 ```
 url='/prefill_from_phrase'
@@ -157,6 +158,7 @@ b'{"text": "Kayla isn\'t angry at Tyler",
 ```
 
 ## Docker application
+
 You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
 I used this info to do that: 
 https://github.com/srcecde/flask-docker-ec2
