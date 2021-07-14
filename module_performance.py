@@ -55,124 +55,67 @@ def compute_errors(preds, GTs):
 
     return example_errors
 
-module_name_to_focus_type={'wordStress':'wordstress',
-    'sentenceStress':'sentencestress',
-    'iContrast':'shortIlongI'}
-def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis-ids/audio/"):
-    """This function works for wordStress, sentenceStress. It does not work for iContrast, because an annotation file (an thus a sentenceID) can correspond to several texts.
-     It uses the data.json file containing information 
-    from dynamoDB: (audio, text, sentenceID, module), and get the corresponding dct files to run prediction of a module on it.
-
-    Args:
-        d (dataframe): information  from dynamoDB audio, text, sentenceID, module
-        a (dict): annotations (ground truth)
-        module (string): module name
-        audio_path (str, optional): [description]. Defaults to "../audio-with-analysis-ids/audio/".
-
-    Returns:
-        lists: [description]
-    """
-    preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
-
-    for i,row in tqdm(d.iterrows()):
-        id=row.analysisId
-        if id in a:
-            ground_truth=a[id]
-            path=os.path.join(audio_path, row.primaryKey+'.wav')
-            p=set_params(sentenceID=id, module=module)
-            # prepare_audio_file(p)
-            status_audio, rID=prepare_audio_file(path)
-            p['rand_fileName']=rID
-            try:
-                # this calls the function with the name of the module
-                res=globals()[module](p)
-                
-                pred=res['stress_binaries']
-                status=res['status']
-                statuss.append(status)
-                preds.append(pred)
-                GTs.append(ground_truth)
-            except:
-                print('Error with:')
-                print(row)
-                errors.append(row)
-                p_errors.append(p)
-    
-    print(preds)
-    print(GTs)
-    print(errors)
-
-    return preds, statuss, GTs, errors
-
-def wordStress_performance_test():
+def stress_performance_test(level='sentence'):
     d=get_data()
-    #d[d.analysisId==232][d.focusType=='wordstress']
-    # a=get_wordStress_annotation()
-    module='wordStress'
-    focus='wordstress'
-    # audio_path="../audio-with-analysis-ids/audio/"
-    d=d[d.focusType==focus]
-    a={}
-    for i,row in tqdm(d.iterrows()):
-        a[row.analysisId]=word_stress_from_text(row.text) 
-        print(row)
-        print(a[row.analysisId])
-    preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
-    preds=[np.concatenate(el) for el in preds]
-    example_errors=compute_errors(preds,GTs)
 
-    # row=d[d.analysisId==422].iloc[0]
-    # audio_path="../audio-with-analysis-ids/audio/"
-    # path=os.path.join(audio_path, row.primaryKey+'.wav')
-    # p=set_params(sentenceID=row.analysisId, waveFileAddress=path, module=module)
-    # status, textgridData, s = get_annotated_signal(p)
-    # wordStress(p)
+    if level=="sentence":
+        a,textDict=get_sentenceStress_annotation()
+        focusType='sentencestress'
+        d=d[d.focusType==focusType]
+    elif level=="word":
+        focus='wordstress'
+        d=d[d.focusType==focus]
 
-    # os.system('cat '+p['inputPhoneticTranscription'])
-    # os.system('cat ./lexicon/wordStress/dct_old/'+os.path.split(p['inputPhoneticTranscription'])[-1])
-    # os.system('cat '+p['inputGrammar'])
+        # a=d.text.apply(lambda r:word_stress_from_text(r) )
+        a={}
+        for i,row in tqdm(d.iterrows()):
+            a[row.analysisId]=word_stress_from_text(row.text) 
+    else:
+        print("level should be 'word' or 'sentence'")
+        raise
 
-def sentenceStress_performance_test():
-    d=get_data()
-    #d[d.analysisId==232][d.focusType=='wordstress']
-    a,textDict=get_sentenceStress_annotation()
-    module='sentenceStress'
-    focusType='sentencestress'
-    d=d[d.focusType==focusType]
     audio_path="../audio-with-analysis-ids/audio/"
     preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
 
-    for i,r in d.iterrows():
-        d=d.replace(d.loc[i].text,remove_special_characters(r.text))
+    d.text=d.apply(lambda r:remove_special_characters(r['text']), axis=1)
 
     analysed_ids=[]
     for id,bin in a.items():
-        row=d[d.text==remove_special_characters(textDict[id])]
+        if level=='sentence':
+            row=d[d.text==remove_special_characters(textDict[id])]
+        elif level=='word':
+            row=d[d.analysisId==id]
         if len(row)>0:
-            ground_truth=a[id]
             path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
-            p=set_params(sentenceID=id)
-            status_audio, rID=prepare_audio_file(path)
+            p=set_params()
+            _, rID=prepare_audio_file(path)
             p['rand_fileName']=rID
-            p=make_all_phones_annotation_files(p,remove_special_characters(textDict[p['sentenceID']]))
+            p=make_all_phones_annotation_files(p,remove_special_characters(row.text.values[0]))
             try:
-                res=sentenceStress(p)
-                pred=res['stress_binaries']
+                if level=='sentence':
+                    res=sentenceStress(p)
+                    pred=res['stress_binaries']
+                elif level=='word':
+                    res=wordStress(p)
+                    # I merge word results to word word with compute_errors
+                    pred=merge_list(res['stress_binaries'])
+                else:
+                    print("level should be 'word' or 'sentence'")
+                    raise
+                
                 status=res['status']
                 statuss.append(status)
                 preds.append(pred)
-                GTs.append(ground_truth)
+                GTs.append(bin)
                 analysed_ids.append(id)
             except:
                 print('Error with:')
                 print(row)
                 errors.append(row)
                 p_errors.append(p)
-                # import pdb;pdb.set_trace()
     
     print(preds)
     print(GTs)
-    # print(GTs_from_phonetics)
     all_zero_baseline=[np.zeros(len(el)) for el in GTs]
     print(errors)
     print("all zero baseline")
@@ -181,24 +124,20 @@ def sentenceStress_performance_test():
     print("algo performance")
     compute_errors(preds, GTs)
 
-
+def stress_with_formatted_phonetics_performance_test():pass
 
 def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/iContrast_data.csv', audio_path="../audio-with-analysis-ids/audio/"):
     df=pd.read_csv(path)
     # only those with analysisID in 3 digits have a manual annotation
     df=df[df.analysisId>100]
     a,w_id,s_id=get_iContrast_annotations()
-    module='iContrast'
-    focus=module_name_to_focus_type[module]
-    
-    # preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
+   
     alternatives=['IH0', 'IH1', 'IH2', 'IY0', 'IY1', 'IY2']
     all_results=[]
     statuss=[]
     short_long_prediction={}
     for i,row in tqdm(df.iterrows()):
         id=row.analysisId
-        ground_truth=a[row.primaryKey]
         word_idx=w_id[id]
         syl_id=s_id[id]
         # row=d[d.analysisId==id]
@@ -206,7 +145,6 @@ def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/
         phonetics=phonetics_from_sentence(text)
         vowels_in_word=[el for el in phonetics[word_idx] if el[-1] in str([0,1,2])]
         target_phones=vowels_in_word[syl_id]
-        # target_phones=
 
         path=os.path.join(audio_path, row.primaryKey+'.wav')
         status,results=phonemeContrast_from_text_audio(text, path, word_idx, target_phones, alternatives)
@@ -223,8 +161,6 @@ def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/
                 short_long_prediction[row.primaryKey]=0
             else:
                 short_long_prediction[row.primaryKey]=1
-        # else:
-        #     short_long_prediction[id]=np.nan
     
     mismatch_rate=(len(a)-len(short_long_prediction))/len(short_long_prediction)
 
@@ -237,53 +173,18 @@ def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/
     print('example error rate:', example_error_rate)
 
 
-
-def edAnalysis_performance_test():
-    files=glob("/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/*/*/*wav")
-    xls='/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/20 words - research/20 problems-research.xlsx'
-    a=pd.read_excel(xls)
-    path='audio_recordings/edAnalysis'
-    ed_sentenceID=pd.read_csv(os.path.join('./lexicon/edAnalysis/dct','ed_sentenceID.csv'))
-    results, analyzed_files=[],[]
-    # tgs=[]
-    for i,r in ed_sentenceID.iterrows():
-        text=r[0].split('.')[0]
-        text_dashed='-'.join(text.split(' '))
-        print(text_dashed)
-        for f in files:
-            if text_dashed in os.path.split(f)[-1]:
-                sentence_id_from_text=ed_sentenceID[ed_sentenceID['Unnamed: 0'].str.contains(text)]['Unnamed: 1'].values[0]
-                p=set_params(sentenceID=sentence_id_from_text, module="edAnalysis")
-                # prepare_audio_file(p)
-                status_audio, rID=prepare_audio_file(f)
-                p['rand_fileName']=rID
-                # p['inputPhoneticTranscription']='./lexicon/edAnalysis/dct/'+text+'.dct'
-                # p['inputGrammar']='./lexicon/edAnalysis/grammar/'+text+'.txt'
-                # status, textgridData, s = get_annotated_signal(p)
-                results.append(edAnalysis(p)) 
-                # tgs.append(textgridData)
-                analyzed_files.append(f)
-
-    df_results=pd.DataFrame()
-    df_results['wav']=[os.path.split(f)[-1] for f in analyzed_files]
-    df_results['prediction']=pd.DataFrame(results).iloc[:,1]
-    df_results[df_results.wav.str.contains('F1')]
-    df_results[df_results.wav.str.contains('F2')]
-    df_results[df_results.wav.str.contains('M1')]
-    df_results[df_results.wav.str.contains('M2')]
-
 def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
     prosodies=[]
     for i,row in tqdm(selection.iterrows()):
         sentence=get_sentence(row.path)
-        # retrieve phonetics by word that ins not available directly from textgrids, but can be extracted from the dataframe
+        # retrieve phonetics by word that is not available directly from textgrids, but can be extracted from the dataframe
         # as I already extracted phonemes for each word using overlapping in timings
         phonetics=[]
         for w in sentence.split(' '):
             phonetics.append(libri_words_df[libri_words_df.word==w].iloc[0,:].phones)
 
         # set params and make label files for phonetics and grammar
-        p=set_params(sentenceID=None, basename='test', module='edAnalysis')
+        p=set_params(basename='test', module='edAnalysis')
         # prepare_audio_file(p)
         status_audio, rID=prepare_audio_file(row.wav_path)
         p['rand_fileName']=rID
@@ -566,6 +467,105 @@ def vowels_consonants_confusions_from_audiobook_data(n=100):
     plt.savefig('performance_results/consonant_contrast_confusion.png')
 
 if False:
+    # was remainly used only for wordStress that is now merged in "stress_performance_test"
+    def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis-ids/audio/"):
+        """This function works for wordStress, sentenceStress. It does not work for iContrast, because an annotation file (an thus a sentenceID) can correspond to several texts.
+        It uses the data.json file containing information 
+        from dynamoDB: (audio, text, sentenceID, module), and get the corresponding dct files to run prediction of a module on it.
+
+        Args:
+            d (dataframe): information  from dynamoDB audio, text, sentenceID, module
+            a (dict): annotations (ground truth)
+            module (string): module name
+            audio_path (str, optional): [description]. Defaults to "../audio-with-analysis-ids/audio/".
+
+        Returns:
+            lists: [description]
+        """
+        preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
+
+        for i,row in tqdm(d.iterrows()):
+            id=row.analysisId
+            if id in a:
+                ground_truth=a[id]
+                path=os.path.join(audio_path, row.primaryKey+'.wav')
+                p=set_params(sentenceID=id, module=module)
+                # prepare_audio_file(p)
+                status_audio, rID=prepare_audio_file(path)
+                p['rand_fileName']=rID
+                try:
+                    # this calls the function with the name of the module
+                    res=globals()[module](p)
+                    
+                    pred=res['stress_binaries']
+                    status=res['status']
+                    statuss.append(status)
+                    preds.append(pred)
+                    GTs.append(ground_truth)
+                except:
+                    print('Error with:')
+                    print(row)
+                    errors.append(row)
+                    p_errors.append(p)
+        
+        print(preds)
+        print(GTs)
+        print(errors)
+
+        return preds, statuss, GTs, errors
+
+
+    # merged in stress_performance_test
+    def wordStress_performance_test():
+        d=get_data()
+        #d[d.analysisId==232][d.focusType=='wordstress']
+        # a=get_wordStress_annotation()
+        module='wordStress'
+        focus='wordstress'
+        # audio_path="../audio-with-analysis-ids/audio/"
+        d=d[d.focusType==focus]
+        a={}
+        for i,row in tqdm(d.iterrows()):
+            a[row.analysisId]=word_stress_from_text(row.text) 
+            print(row)
+            print(a[row.analysisId])
+        preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
+        preds=[np.concatenate(el) for el in preds]
+        example_errors=compute_errors(preds,GTs)
+
+
+    # there is now edAnalysis_from_audiobook_data
+    def edAnalysis_performance_test():
+        files=glob("/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/*/*/*wav")
+        xls='/mnt/c/Users/noe_t/Downloads/20 words - research-20210401T100243Z-001/20 words - research/20 problems-research.xlsx'
+        a=pd.read_excel(xls)
+        path='audio_recordings/edAnalysis'
+        ed_sentenceID=pd.read_csv(os.path.join('./lexicon/edAnalysis/dct','ed_sentenceID.csv'))
+        results, analyzed_files=[],[]
+        # tgs=[]
+        for i,r in ed_sentenceID.iterrows():
+            text=r[0].split('.')[0]
+            text_dashed='-'.join(text.split(' '))
+            print(text_dashed)
+            for f in files:
+                if text_dashed in os.path.split(f)[-1]:
+                    sentence_id_from_text=ed_sentenceID[ed_sentenceID['Unnamed: 0'].str.contains(text)]['Unnamed: 1'].values[0]
+                    p=set_params(sentenceID=sentence_id_from_text, module="edAnalysis")
+                    # prepare_audio_file(p)
+                    status_audio, rID=prepare_audio_file(f)
+                    p['rand_fileName']=rID
+                    results.append(edAnalysis(p)) 
+                    analyzed_files.append(f)
+
+        df_results=pd.DataFrame()
+        df_results['wav']=[os.path.split(f)[-1] for f in analyzed_files]
+        df_results['prediction']=pd.DataFrame(results).iloc[:,1]
+        df_results[df_results.wav.str.contains('F1')]
+        df_results[df_results.wav.str.contains('F2')]
+        df_results[df_results.wav.str.contains('M1')]
+        df_results[df_results.wav.str.contains('M2')]
+
+
     # I checked that automatic annot version worked as well, and deprecated iContrast(p) module
     def iContrast_performance_test(path='../audio-with-analysis-ids/iContrast_data.csv', audio_path="../audio-with-analysis-ids/audio/"):
         # d=get_data()
@@ -581,8 +581,6 @@ if False:
         df=df[df.analysisId>100]
         a,w_id,s_id=get_iContrast_annotations()
         
-        # preds, statuss, GTs, errors=get_preds_and_GTs_from_data(d, a, module)
-
         GTs,preds=[],[]
         for i,row in tqdm(df.iterrows()):
             ground_truth=a[row.primaryKey]
@@ -793,7 +791,7 @@ if __name__ == "__main__":
     # phonetics_from_sentence(results['results_dfs']['TH'].iloc[0].sentence)
     target_phones='TH'
 
-    p=set_params(sentenceID=None, basename='test', module="thContrast")
+    p=set_params(basename='test', module="thContrast")
     # prepare_audio_file(p)
     status_audio, rID=prepare_audio_file(row.wav_path)
     p['rand_fileName']=rID

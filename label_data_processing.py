@@ -31,11 +31,11 @@ graphemes_to_alternatives={
 def set_params(
     # waveFileAddress='/root/flowchase/sent.wav',
     # waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
-    sentenceID=1,
-    basename='phrase_',
+    # sentenceID=1,
+    # basename='phrase_',
     fs_target = 16000, # the target sampling frequency
     modelName = 'libri',
-    module='sentenceStress'
+    # module='sentenceStress'
     ):
     """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
 
@@ -47,23 +47,20 @@ def set_params(
     Returns:
         dict
     """
-    inputPhoneticTranscription_base = './lexicon/'+module+'/dct/'+basename
-    inputGrammar_base = './lexicon/'+module+'/grammar/'+basename
+    # inputPhoneticTranscription_base = './lexicon/'+module+'/dct/'+basename
+    # inputGrammar_base = './lexicon/'+module+'/grammar/'+basename
     
-    if not (sentenceID is None):
-        inputGrammar = '%s%d.txt' % (inputGrammar_base, sentenceID)
-        inputPhoneticTranscription = '%s%d.dct' % (inputPhoneticTranscription_base, sentenceID)
-    else:
-        inputGrammar = '%s.txt' % (inputGrammar_base)
-        inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
+    # inputGrammar = '%s.txt' % (inputGrammar_base)
+    # inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
+
     params={}
     # params['waveFileAddress']=waveFileAddress
     params['fs_target']=fs_target
-    params['inputPhoneticTranscription']=inputPhoneticTranscription
-    params['inputGrammar']=inputGrammar
+    # params['inputPhoneticTranscription']=inputPhoneticTranscription
+    # params['inputGrammar']=inputGrammar
     params['modelName']=modelName
     params['rand_fileName']=str(uuid.uuid4())
-    params['sentenceID']=sentenceID
+    # params['sentenceID']=sentenceID
 
     return params
 
@@ -282,20 +279,20 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
 
 
 def make_all_phones_annotation_files(
-    p=set_params(module='wordStress'),
+    p=set_params(),
     text='I would love to go to ireland !'
     ):
     """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
     then updates the default path to point to them in parameters dictionnary
 
     Args:
-        p ([type], optional): [description]. Defaults to set_params(module='wordStress').
+        p ([type], optional): [description]. Defaults to set_params().
         text (str, optional): [description]. Defaults to 'I would love to go to ireland !'.
 
     Returns:
         dict: parameters dictionnary
     """
-    # p=set_params(waveFileAddress=path, module='sentenceStress')
+    # p=set_params(waveFileAddress=path)
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     make_dct_all_phones_from_text(text, path=p['inputPhoneticTranscription'])
@@ -303,7 +300,7 @@ def make_all_phones_annotation_files(
     return p
 
 def make_all_phones_annotation_files_from_phonetics(
-    p=set_params(module='wordStress'),
+    p=set_params(),
     phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
     p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
@@ -311,7 +308,7 @@ def make_all_phones_annotation_files_from_phonetics(
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
-def make_pContrast_annotation_files_from_phonetics(p=set_params(module="edAnalysis"),
+def make_pContrast_annotation_files_from_phonetics(p=set_params(),
                 phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_idx=0, target_phones='D', 
                 alternatives=target_to_alternatives['D']):
     p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
@@ -321,7 +318,7 @@ def make_pContrast_annotation_files_from_phonetics(p=set_params(module="edAnalys
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
     return p
 
-def make_pContrast_annotation_files(p=set_params(module="edAnalysis"),
+def make_pContrast_annotation_files(p=set_params(),
                 text="turned around",word_idx=0, target_phones='D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     phonetics=phonetics_from_sentence(text)
@@ -411,29 +408,31 @@ def make_grammar_from_dct(path_dct='test.dct',
         text_file.write("\n".join([str1,str2,str3]))
     return "\n".join([str1,str2,str3])
 
-def ed_make_grammars(path='/mnt/c/Users/noe_t/Downloads/edAnalysis-20210330T115859Z-001/edAnalysis'):
-    for el in glob(path+'/*.dct'):
-        make_grammar_from_dct(el)
-    IDs=pd.read_csv(path+'/ed_sentenceID.csv')
-    for i,r in IDs.iterrows():
-        copy(path+'/'+r[0].split('.')[0]+'.dct', path+'/phrase_'+str(r[1])+'.dct')
-        copy(path+'/'+r[0].split('.')[0]+'.txt', path+'/phrase_'+str(r[1])+'.txt')
-
-def sentenceStress_make_grammars(path_dct='lexicon/sentenceStress/dct', path_grammar='lexicon/sentenceStress/grammar'):
-    for el in glob(path_dct+'/*.dct'):
-        gram=os.path.join(path_grammar,os.path.split(el)[-1].split('.')[0]+'.txt')
-        make_grammar_from_dct(el,gram)
-
-def wordStress_make_dcts_grammars(path_dct='lexicon/wordStress/dct', path_grammar='lexicon/wordStress/grammar'):
-    d=get_data()
-    d=d[d.focusType=="wordstress"]
-    for i,r in d.iterrows():
-        make_dct_all_phones_from_text(r.text, path=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'))
-        make_grammar_from_dct(path_dct=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'),  path_grammar=os.path.join(path_grammar, 'phrase_'+str(r.analysisId)+'.txt'))
 
 
 # Obsolete functions backup
 if False:
+    
+    def sentenceStress_make_grammars(path_dct='lexicon/sentenceStress/dct', path_grammar='lexicon/sentenceStress/grammar'):
+        for el in glob(path_dct+'/*.dct'):
+            gram=os.path.join(path_grammar,os.path.split(el)[-1].split('.')[0]+'.txt')
+            make_grammar_from_dct(el,gram)
+
+    def wordStress_make_dcts_grammars(path_dct='lexicon/wordStress/dct', path_grammar='lexicon/wordStress/grammar'):
+        d=get_data()
+        d=d[d.focusType=="wordstress"]
+        for i,r in d.iterrows():
+            make_dct_all_phones_from_text(r.text, path=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'))
+            make_grammar_from_dct(path_dct=os.path.join(path_dct, 'phrase_'+str(r.analysisId)+'.dct'),  path_grammar=os.path.join(path_grammar, 'phrase_'+str(r.analysisId)+'.txt'))
+
+    def ed_make_grammars(path='/mnt/c/Users/noe_t/Downloads/edAnalysis-20210330T115859Z-001/edAnalysis'):
+        for el in glob(path+'/*.dct'):
+            make_grammar_from_dct(el)
+        IDs=pd.read_csv(path+'/ed_sentenceID.csv')
+        for i,r in IDs.iterrows():
+            copy(path+'/'+r[0].split('.')[0]+'.dct', path+'/phrase_'+str(r[1])+'.dct')
+            copy(path+'/'+r[0].split('.')[0]+'.txt', path+'/phrase_'+str(r[1])+'.txt')
+
     # This is obsolete compared to make_generic_dct_from_phonetics
     def make_generic_dct_from_text(sentence="I accepted to go to spain", word_idx=1, target_phones='IH0 D', 
                     alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):

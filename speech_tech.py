@@ -14,7 +14,7 @@ from text_processing import phonetics_from_sentence
 import uuid
 
 
-def prepare_audio_file(audio_file, fs=16000, remove_file_after_processing=False):
+def prepare_audio_file(audio_file, fs=16000):
     rID=str(uuid.uuid4())
     if os.path.exists(audio_file):
         s,fs = load_audio(audio_file, fs=fs)
@@ -93,13 +93,13 @@ def verification_n_of_phoneme(textgridData, p):
     return nEntries==0 or count_total!=nEntries or count_unique!=nEntries
 
 def chunking(
-    p=set_params(module='chunking')
+    p=set_params()
     ):
     """The goal of this module is to find pauses in a longer sequence such as a read paragraph.
     TODO: get_textgrid_data function filter out silences, so it won't work. Start from htk_recognition function in htk_utils
 
     Args:
-        p ([type], optional): [description]. Defaults to set_params(module='chunking').
+        p ([type], optional): [description]. Defaults to set_params().
 
     Returns:
         [type]: [description]
@@ -221,14 +221,14 @@ def compute_stress_score(textgridData, s, fs, indxVowels):
     return weighted_score
 
 def vowel_stresses(
-        p=set_params(sentenceID=111, module='wordStress')
+        p=set_params()
         ):
     """vowels_stresses() computes prosody features (intesity, pitch, ...) to compute 
     a value by vowel, located thanks to textgridData, representing a stress intensity.
     It also plots a curve representing the stress evolution.
 
     Args:
-        p ([type], optional): [description]. Defaults to set_params(sentenceID=111, module='wordStress').
+        p ([type], optional): [description]. Defaults to set_params().
 
     Returns:
         string, list of float list: status, stress intensities by word
@@ -260,14 +260,14 @@ def vowel_stresses(
     return "success", weighted_score_by_word
 
 def wordStress(
-    p=set_params(sentenceID=111, module='wordStress')
-    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='wordStress')
+    p=set_params()
+    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     ):
     """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
     a value by vowel representing a stress intensity, and take the max by word and build a binary vector with ones on maximums
 
     Args:
-        p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, module='sentenceStress').
+        p (dict, optional): global parameters. Defaults to set_params().
 
     Returns:
         string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
@@ -295,7 +295,7 @@ def wordStress(
     # return "success", binResult
 
 def sentenceStress(
-    p=set_params(sentenceID=1, module='sentenceStress')
+    p=set_params()
     ):
     """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
     a value by vowel representing a stress intensity, and 
@@ -304,7 +304,7 @@ def sentenceStress(
     and build a binary vector with a one on this word index
 
     Args:
-        p ([type], optional): [description]. Defaults to set_params(sentenceID=1, module='sentenceStress').
+        p ([type], optional): [description]. Defaults to set_params().
 
     Returns:
         string, list of binaries: status, stress results by word (0=no stress,  1=stress)
@@ -371,12 +371,8 @@ def prosody_by_phone(p):
     return "success", [textgridData, d]
 
 
-def phonemeContrast(#p=set_params(sentenceID=111, module="iContrast")
-    # p=set_params(sentenceID=111, module="oContrast")
-    # p=set_params(sentenceID=111, module="oContrast")
-    # p=set_params(sentenceID=111, module="oContrast")
-    p=set_params(sentenceID=111, module="oContrast")
-    # p=set_params(sentenceID=9, module="edAnalysis")
+def phonemeContrast(
+    p=set_params()
     # p=set_params(sentenceID=9)
     ):
     """This functions uses textgridData that now has information of all detected phonetic transcriptions.
@@ -391,41 +387,7 @@ def phonemeContrast(#p=set_params(sentenceID=111, module="iContrast")
         return status, []
     
     detected_transcription=textgridData[textgridData.iloc[:,2].str[0]=='p']['detected_transcription'].tolist()
-    #clean_htk_files(p)
     return "success", [textgridData, detected_transcription]
-
-
-
-def edAnalysis(
-    # p=set_params(sentenceID=1, module="edAnalysis")
-    # p=set_params(sentenceID=1, module="edAnalysis")
-    p=set_params(sentenceID=1, module="edAnalysis")
-    # p=set_params(sentenceID=2, module="edAnalysis")
-    # p=set_params(sentenceID=2, module="edAnalysis")
-    ):
-    status, textgridData, s = get_annotated_signal(p)
-    if textgridData is None:
-        return status, []
-    
-    # print(textgridData)
-    
-    # TODO: this is for the verification and it is not finished
-    nWords, indxWords = number_and_indices(textgridData, 'w')
-    nPho, indxPho = number_and_indices(textgridData, 'p')
-    nSil, indxSil = number_and_indices(textgridData, 's')
-    nOutOfVoc, indxOutOfVoc = number_and_indices(textgridData, 'o')
-    binResult = 0
-    # check pronunciation
-    for i in range(nPho):
-        if '*cor' in textgridData[2][indxPho[i]]:
-            status = 0
-            binResult = 2
-        elif '*err' in textgridData[2][indxPho[i]]:
-            status = 0
-            binResult = 1
-    
-    #clean_htk_files(p)
-    return "success", [binResult]
 
 def timing_test(module='wordStress', n=100, p=None):
     times=[]
@@ -588,15 +550,45 @@ def phonemeContrast_from_formatted_phonetics_audio(
 
 # obsolete functions backup
 if False:
+    
+    # generalized and replaced by phoneme contrast
+    def edAnalysis(
+        p=set_params(sentenceID=1, module="edAnalysis")
+        ):
+        status, textgridData, s = get_annotated_signal(p)
+        if textgridData is None:
+            return status, []
+        
+        # print(textgridData)
+        
+        # TODO: this is for the verification and it is not finished
+        nWords, indxWords = number_and_indices(textgridData, 'w')
+        nPho, indxPho = number_and_indices(textgridData, 'p')
+        nSil, indxSil = number_and_indices(textgridData, 's')
+        nOutOfVoc, indxOutOfVoc = number_and_indices(textgridData, 'o')
+        binResult = 0
+        # check pronunciation
+        for i in range(nPho):
+            if '*cor' in textgridData[2][indxPho[i]]:
+                status = 0
+                binResult = 2
+            elif '*err' in textgridData[2][indxPho[i]]:
+                status = 0
+                binResult = 1
+        
+        #clean_htk_files(p)
+        return "success", [binResult]
+
+
     # generalized and replaced by phoneme contrast
     def iContrast(
-        p=set_params(sentenceID=111, module="iContrast")
+        p=set_params(module="iContrast")
         ):
         """Use textgridData to have the timings of vowels 
         (and check if the vowel detected is a short or long vowel. -> I removed that part with no noticeable change in performance)
 
         Args:
-            p ([type], optional): [description]. Defaults to set_params(sentenceID=111, module="iContrast").
+            p ([type], optional): [description]. Defaults to set_params(module="iContrast").
 
         Returns:
             int: 0 if short, 1 if long
@@ -783,10 +775,10 @@ if __name__ == "__main__":
 
     get_annotated_signal_timing=timing_test('get_annotated_signal')
 
-    p=set_params(sentenceID=111, module="iContrast")
-    p=set_params(sentenceID=1, module='sentenceStress')
+    # p=set_params(sentenceID=111, module="iContrast")
+    # p=set_params(sentenceID=1, module='sentenceStress')
 
-    get_annotated_signal_timing2=timing_test('get_annotated_signal', p=p)
+    # get_annotated_signal_timing2=timing_test('get_annotated_signal', p=p)
     iContrast_timing=timing_test('iContrast')
     wordStress_timing=timing_test('wordStress')
 
@@ -811,11 +803,11 @@ if __name__ == "__main__":
     # start=time();textgridData=textgridData[(textgridData.iloc[:,2]!='sil')&(textgridData.iloc[:,2]!='sp')];print(time()-start)
 
     # Inside htk_recognition
-    cmd2 = 'HVite -A -T 1 -a -C ./model/' +p['modelName']+ '/Align.cfg -H ./model/' +p['modelName']+ '/hmm-mono -H \
-    ./model/generalSpeech/hmm-gs_1 -H ./model/generalSpeech/hmm-gss_2 -H ./model/generalSpeech/hmm-gss_3 -H ./model/generalSpeech/hmm-gss_4 \
-    -H ./model/generalSpeech/hmm-gss_5 -w ./inputs/'+ p['rand_fileName']+ '.net -l ./results -o N ' +p['inputPhoneticTranscription']+ ' ./model/' +p['modelName']+ '/monophones \
-    ./inputs/' +p['rand_fileName']+ '.wav'
-    start=time();out2 = os.popen(cmd2).read();print(time()-start)
+    # cmd2 = 'HVite -A -T 1 -a -C ./model/' +p['modelName']+ '/Align.cfg -H ./model/' +p['modelName']+ '/hmm-mono -H \
+    # ./model/generalSpeech/hmm-gs_1 -H ./model/generalSpeech/hmm-gss_2 -H ./model/generalSpeech/hmm-gss_3 -H ./model/generalSpeech/hmm-gss_4 \
+    # -H ./model/generalSpeech/hmm-gss_5 -w ./inputs/'+ p['rand_fileName']+ '.net -l ./results -o N ' +p['inputPhoneticTranscription']+ ' ./model/' +p['modelName']+ '/monophones \
+    # ./inputs/' +p['rand_fileName']+ '.wav'
+    # start=time();out2 = os.popen(cmd2).read();print(time()-start)
 
     # read rec file (i.e., the alignment outcome)
     # textgridData = pd.read_csv('./results/'+ rand_fileName +'.rec', sep=' ', header=None)
@@ -827,7 +819,7 @@ if __name__ == "__main__":
     # alternatives=alternatives)
     # status, results= phonemeContrast(p)
 
-    make_pContrast_annotation_files(p, text="law",word_idx=0, target_phones='AO1', alternatives=['AO1','OW1','AA1', 'AH1 W'])
+    # make_pContrast_annotation_files(p, text="law",word_idx=0, target_phones='AO1', alternatives=['AO1','OW1','AA1', 'AH1 W'])
 
     target='D'
     phonetics=phonetics_from_sentence('turned around')
