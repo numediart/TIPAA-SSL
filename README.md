@@ -25,6 +25,8 @@ module="sentenceStress" # or "wordStress"
 url= "/flowspeech/"+module
 data={"phonetics":phonetics, "rID":rID}
 ```
+The phonetics is consituted of CMU phonemes with seperators for phonemes ("_"), syllables ("|") and words (" ").
+
 An example of feedback for each module:
 
 - sentenceStress:  the feedback is 
@@ -32,7 +34,14 @@ An example of feedback for each module:
     - a list of stress intensities between 0 and 100 for each word
     - a list of 0/1 for each word, the 1 being the sentence stress
 
-For the sentence "I would love to go to ireland", the correct answer would be:
+For the sentence "I would love to go to ireland", 
+input:
+```
+data={"phonetics":"AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
+```
+
+
+the correct answer would be:
 ```
 b'{"status": "success", "stress_intensities": [83, 49, 85, 27, 57, 27, 73], "stress_binaries": [0, 0, 1, 0, 0, 0, 0]}'
 ```
@@ -42,7 +51,12 @@ b'{"status": "success", "stress_intensities": [83, 49, 85, 27, 57, 27, 73], "str
     - a list of stress intensities for each syllable of each word between 0 and 100 by word 
     - a list of 0/1 for each syllable of each word, the 1 being the word stress
 
-For the word "toothpaste"
+For the word "toothpaste", input:
+
+```
+data={"phonetics":'T_UW1_TH|P_EY2_S_T', "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
+```
+answer:
 ```
  b'{"status": "success", "stress_intensities": [[77, 33]], "stress_binaries": [[1, 0]]}'
 ```
@@ -57,15 +71,19 @@ The logic behind them is to use text and audio as input. The text is automatical
 url='/phonemeContrast'
 data={"phonetics":phonetics, 'rID':rID, 'word_id':word_id, 'alternatives':alternatives, 'target':target}
 ```
+As before, the phonetics is consituted of CMU phonemes with seperators for phonemes ("_"), syllables ("|") and words (" ").
+For alternatives, one alternative is considered a word of several phonemes.
 
 An example for a recording containing "I visited Italy". We want to study the phoneme "IH0" in "visited". I took this example because there are two of them:
 ```
-data={'phonetics': '[["AY1"], ["V", "IH1", "Z", "IH0", "T", "IH0", "D"], ["IH1", "T", "AH0", "L", "IY0"]]',
+data={'phonetics': 'AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0',
 'rID': '487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
 'word_id': 1,
-'alternatives': "['IH0', 'IY0']",
+'alternatives': 'IH0 IY0',
 'target': 'IH0'}
 ```
+
+To study e.d. the "-ed" termination, you would need to input `'target': 'IH0_D'` and e.g. `'alternatives': "T D IH0_D"`.
 
 And as there are two "IH0", I put alternatives for both, and return the detection of both like this:
 ```
