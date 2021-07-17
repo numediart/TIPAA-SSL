@@ -33,8 +33,8 @@ def set_params(
     # waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
     # sentenceID=1,
     # basename='phrase_',
-    fs_target = 16000, # the target sampling frequency
-    modelName = 'libri',
+    # fs_target = 16000, # the target sampling frequency
+    # modelName = 'libri',
     # module='sentenceStress'
     ):
     """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
@@ -55,10 +55,10 @@ def set_params(
 
     params={}
     # params['waveFileAddress']=waveFileAddress
-    params['fs_target']=fs_target
+    # params['fs_target']=fs_target
     # params['inputPhoneticTranscription']=inputPhoneticTranscription
     # params['inputGrammar']=inputGrammar
-    params['modelName']=modelName
+    # params['modelName']=modelName
     params['rand_fileName']=str(uuid.uuid4())
     # params['sentenceID']=sentenceID
 
@@ -293,37 +293,33 @@ def make_all_phones_annotation_files(
         dict: parameters dictionnary
     """
     # p=set_params(waveFileAddress=path)
-    p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
-    make_dct_all_phones_from_text(text, path=p['inputPhoneticTranscription'])
-    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    return p
+    # p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
+    # p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
+    make_dct_all_phones_from_text(text, path='inputs/'+p['rand_fileName']+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+p['rand_fileName']+'.dct',path_grammar='inputs/'+p['rand_fileName']+'.txt')
 
 def make_all_phones_annotation_files_from_phonetics(
     p=set_params(),
     phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
-    p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
-    make_dct_all_phones_from_phonetics(phonetics, path=p['inputPhoneticTranscription'])
-    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    return p
+    # p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
+    # p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
+    make_dct_all_phones_from_phonetics(phonetics, path='inputs/'+p['rand_fileName']+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+p['rand_fileName']+'.dct',path_grammar='inputs/'+p['rand_fileName']+'.txt')
 
 def make_pContrast_annotation_files_from_phonetics(p=set_params(),
                 phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_idx=0, target_phones='D', 
                 alternatives=target_to_alternatives['D']):
-    p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
+    # p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
+    # p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     phonetics=[' '.join(w) for w in phonetics]
-    make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
-    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    return p
+    make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path='inputs/'+p['rand_fileName']+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+p['rand_fileName']+'.dct',path_grammar='inputs/'+p['rand_fileName']+'.txt')
 
 def make_pContrast_annotation_files(p=set_params(),
                 text="turned around",word_idx=0, target_phones='D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     phonetics=phonetics_from_sentence(text)
     make_pContrast_annotation_files_from_phonetics(p=p, phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-    return p
 
 
 

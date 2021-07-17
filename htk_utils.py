@@ -1,29 +1,25 @@
-import uuid
-import numpy as np
 import os
 import pandas as pd
 
-
-def clean_htk_files(p):
+def clean_htk_files(rand_fileName):
     """Clean the files generated for and by the HTK model (as it uses input and output files)
     In the future, just delete the specific files after processing, by putting name in parameters (inputs and results files)
     """
-    print('rand_fileName',p['rand_fileName'])
+    print('rand_fileName',rand_fileName)
     input_extensions=['.net', '.wav', '.rec', '.dct', '.txt']
     output_extensions=['.rec']
 
     for ext in input_extensions:
-        f='inputs/'+p['rand_fileName']+ext
+        f='inputs/'+rand_fileName+ext
         if os.path.exists(f):
             os.system('rm '+f)
     for ext in output_extensions:
-        f='results/'+p['rand_fileName']+ext
+        f='results/'+rand_fileName+ext
         if os.path.exists(f):
             os.system('rm '+f)
 
-
 # HTK related functions
-def process_grammar(inputGrammar, rand_fileName):
+def process_grammar(rand_fileName):
     """process grammar of a sentence
 
     Args:
@@ -33,11 +29,11 @@ def process_grammar(inputGrammar, rand_fileName):
     Returns:
         int: 0 if success, -1 otherwise
     """    
-    cmd1 = 'HParse ' +inputGrammar +' ./inputs/'+ rand_fileName +'.net'
+    cmd1 = 'HParse ' +'./inputs/'+ rand_fileName +'.txt' +' ./inputs/'+ rand_fileName +'.net'
     a=os.system(cmd1)
     return a
 
-def htk_recognition(modelName, rand_fileName, inputPhoneticTranscription):
+def htk_recognition(modelName, rand_fileName):
     """This function uses an HMM model to do speech recognition or forced alignment. 
     It uses an HTK command that output a result file, then reads this file and filter some information.
 
@@ -50,6 +46,8 @@ def htk_recognition(modelName, rand_fileName, inputPhoneticTranscription):
         dataframe: timings of start and end of phonemes (or words ?)
         out2: std output of the command
     """
+    inputPhoneticTranscription='./inputs/' +rand_fileName+ '.dct'
+
     cmd2 = 'HVite -A -T 1 -a -C ./model/' +modelName+ '/Align.cfg -H ./model/' +modelName+ '/hmm-mono -H \
     ./model/generalSpeech/hmm-gs_1 -H ./model/generalSpeech/hmm-gss_2 -H ./model/generalSpeech/hmm-gss_3 -H ./model/generalSpeech/hmm-gss_4 \
     -H ./model/generalSpeech/hmm-gss_5 -w ./inputs/'+ rand_fileName+ '.net -l ./results -o N ' +inputPhoneticTranscription+ ' ./model/' +modelName+ '/monophones \
@@ -77,23 +75,22 @@ def htk_recognition(modelName, rand_fileName, inputPhoneticTranscription):
 
     return textgridData, out2
 
-def get_textgrid_data(p):
+def get_textgrid_data(rand_fileName, modelName = 'libri'):
     """This function write necessary files to then call HMM model (htk_recognition) and the filter out silences
 
     Args:
-        s (numpy array): signal waveform of the audio recording
-        fs (int): frequency of sampling of s
-        p (dict): parameters (paths of grammar, phonetics and files etc.)
+        rand_fileName ([type]): [description]
+        modelName (str, optional): [description]. Defaults to 'libri'.
 
     Returns:
         DataFrame: data of duration and phonetic characteristics of words or phonemes 
-    """    
-    rand_fileName = p['rand_fileName']
-    # write('./inputs/'+ rand_fileName+ '.wav', fs, (s*32767).astype(np.int16))
+    """
+    # rand_fileName = p['rand_fileName']
+    inputPhoneticTranscription='./inputs/' +rand_fileName+ '.dct'
 
-    process_grammar(p['inputGrammar'], rand_fileName)
+    process_grammar(rand_fileName)
 
-    textgridData, out2=htk_recognition(p['modelName'], rand_fileName, p['inputPhoneticTranscription'])
+    textgridData, out2=htk_recognition(modelName, rand_fileName)
 
     # filter out silences
     textgridData=textgridData[(textgridData.iloc[:,2]!='sil')&(textgridData.iloc[:,2]!='sp')]
@@ -101,7 +98,7 @@ def get_textgrid_data(p):
     # reset indices of dataframe
     textgridData.index=range(len(textgridData))
     
-    phonetics=pd.read_csv(p['inputPhoneticTranscription'], header=None, sep='(\] |\[)', engine='python')
+    phonetics=pd.read_csv(inputPhoneticTranscription, header=None, sep='(\] |\[)', engine='python')
 
     detected_transcription=[]
     for r in textgridData.iloc[:,2]:
@@ -112,6 +109,5 @@ def get_textgrid_data(p):
             print('out of vocabulary: no transcription')
     
     textgridData['detected_transcription']=detected_transcription
-    clean_htk_files(p)
+    clean_htk_files(rand_fileName)
     return textgridData, out2
-

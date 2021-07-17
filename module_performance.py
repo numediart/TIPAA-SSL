@@ -93,10 +93,10 @@ def stress_performance_test(level='sentence'):
             p=make_all_phones_annotation_files(p,remove_special_characters(row.text.values[0]))
             try:
                 if level=='sentence':
-                    res=sentenceStress(p)
+                    res=sentenceStress(rID)
                     pred=res['stress_binaries']
                 elif level=='word':
-                    res=wordStress(p)
+                    res=wordStress(rID)
                     # I merge word results to word word with compute_errors
                     pred=merge_list(res['stress_binaries'])
                 else:
@@ -125,53 +125,6 @@ def stress_performance_test(level='sentence'):
     compute_errors(preds, GTs)
 
 def stress_with_formatted_phonetics_performance_test():pass
-
-def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/iContrast_data.csv', audio_path="../audio-with-analysis-ids/audio/"):
-    df=pd.read_csv(path)
-    # only those with analysisID in 3 digits have a manual annotation
-    df=df[df.analysisId>100]
-    a,w_id,s_id=get_iContrast_annotations()
-   
-    alternatives=['IH0', 'IH1', 'IH2', 'IY0', 'IY1', 'IY2']
-    all_results=[]
-    statuss=[]
-    short_long_prediction={}
-    for i,row in tqdm(df.iterrows()):
-        id=row.analysisId
-        word_idx=w_id[id]
-        syl_id=s_id[id]
-        # row=d[d.analysisId==id]
-        text=row.text
-        phonetics=phonetics_from_sentence(text)
-        vowels_in_word=[el for el in phonetics[word_idx] if el[-1] in str([0,1,2])]
-        target_phones=vowels_in_word[syl_id]
-
-        path=os.path.join(audio_path, row.primaryKey+'.wav')
-        status,results=phonemeContrast_from_text_audio(text, path, word_idx, target_phones, alternatives)
-        all_results.append(results)
-        statuss.append(status)
-
-        if len(results)>0:
-            # this line get in textgridData, among the phones, the one with '_' because it is the one that have several alternatives
-            try:
-                phone=results[0][results[0].iloc[:,2].str.startswith('p')&results[0].iloc[:,2].str.contains('_')].detected_transcription.values[0]
-            except:
-                pdb.set_trace()
-            if phone[:2]=='IH':
-                short_long_prediction[row.primaryKey]=0
-            else:
-                short_long_prediction[row.primaryKey]=1
-    
-    mismatch_rate=(len(a)-len(short_long_prediction))/len(short_long_prediction)
-
-    diff=[abs(a[id]-short_long_prediction[id]) for id in short_long_prediction]
-    # [k,v ]
-    example_error_rate=sum(diff)/(len(diff))
-    print('n of examples:', len(a))
-    print('mismatch_rate:',mismatch_rate)
-    # print('bin error rate:', bin_error_rate)
-    print('example error rate:', example_error_rate)
-
 
 def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
     prosodies=[]
@@ -467,6 +420,55 @@ def vowels_consonants_confusions_from_audiobook_data(n=100):
     plt.savefig('performance_results/consonant_contrast_confusion.png')
 
 if False:
+
+    # maybe this one could still be useful. I would fave to use "phonemeContrast_from_phonetics_audio" instead of "phonemeContrast_from_text_audio"
+    def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/iContrast_data.csv', audio_path="../audio-with-analysis-ids/audio/"):
+        df=pd.read_csv(path)
+        # only those with analysisID in 3 digits have a manual annotation
+        df=df[df.analysisId>100]
+        a,w_id,s_id=get_iContrast_annotations()
+    
+        alternatives=['IH0', 'IH1', 'IH2', 'IY0', 'IY1', 'IY2']
+        all_results=[]
+        statuss=[]
+        short_long_prediction={}
+        for i,row in tqdm(df.iterrows()):
+            id=row.analysisId
+            word_idx=w_id[id]
+            syl_id=s_id[id]
+            # row=d[d.analysisId==id]
+            text=row.text
+            phonetics=phonetics_from_sentence(text)
+            vowels_in_word=[el for el in phonetics[word_idx] if el[-1] in str([0,1,2])]
+            target_phones=vowels_in_word[syl_id]
+
+            path=os.path.join(audio_path, row.primaryKey+'.wav')
+            status,results=phonemeContrast_from_text_audio(text, path, word_idx, target_phones, alternatives)
+            all_results.append(results)
+            statuss.append(status)
+
+            if len(results)>0:
+                # this line get in textgridData, among the phones, the one with '_' because it is the one that have several alternatives
+                try:
+                    phone=results[0][results[0].iloc[:,2].str.startswith('p')&results[0].iloc[:,2].str.contains('_')].detected_transcription.values[0]
+                except:
+                    pdb.set_trace()
+                if phone[:2]=='IH':
+                    short_long_prediction[row.primaryKey]=0
+                else:
+                    short_long_prediction[row.primaryKey]=1
+        
+        mismatch_rate=(len(a)-len(short_long_prediction))/len(short_long_prediction)
+
+        diff=[abs(a[id]-short_long_prediction[id]) for id in short_long_prediction]
+        # [k,v ]
+        example_error_rate=sum(diff)/(len(diff))
+        print('n of examples:', len(a))
+        print('mismatch_rate:',mismatch_rate)
+        # print('bin error rate:', bin_error_rate)
+        print('example error rate:', example_error_rate)
+
+
     # was remainly used only for wordStress that is now merged in "stress_performance_test"
     def get_preds_and_GTs_from_data(d, a, module, audio_path="../audio-with-analysis-ids/audio/"):
         """This function works for wordStress, sentenceStress. It does not work for iContrast, because an annotation file (an thus a sentenceID) can correspond to several texts.
@@ -800,4 +802,4 @@ if __name__ == "__main__":
     alternatives=['DH', 'TH']
     make_generic_dct_from_phonetics(phonetics=row.phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
     make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    status, results= phonemeContrast(p)
+    status, results= phonemeContrast(p['rand_fileName'])

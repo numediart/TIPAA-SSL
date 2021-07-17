@@ -1,5 +1,4 @@
 from scipy.io.wavfile import write, read
-import librosa
 import numpy as np
 import os
 import pandas as pd
@@ -24,7 +23,7 @@ def prepare_audio_file(audio_file, fs=16000):
 
     return "success", rID
 
-def get_annotated_signal(p=set_params()):
+def get_annotated_signal(rand_fileName):
     """Load audio file and annotation files corresponding to parameters, 
     and calls "textgridData" to obtain htk predictions of phonemes and
     their timings
@@ -36,31 +35,32 @@ def get_annotated_signal(p=set_params()):
         status, textgridData, s (int, DataFrame, np array): textgridData contains phonetic predictions 
         from htk model with their timings and log probability
     """
+    # rand_fileName, inputPhoneticTranscription, inputGrammar = p['rand_fileName'], p['inputPhoneticTranscription'], p['inputGrammar']
     try:
-        fs,s=read('./inputs/'+ p['rand_fileName']+ '.wav')
+        fs,s=read('./inputs/'+ rand_fileName+ '.wav')
     except FileNotFoundError:
-        return "error: audio file not found", None, None
+        return "error: audio file not found", None, None, None
     s=s/32767
     try:
-        textgridData, cmdout2=get_textgrid_data(p)
+        textgridData, _=get_textgrid_data(rand_fileName)
     except Exception as e: 
         print(e)
-        clean_htk_files(p)
-        return "error: could not get textgridData (check htk errors)", None, None
+        clean_htk_files(rand_fileName)
+        return "error: could not get textgridData (check htk errors)", None, None, None
     
     # if textgridData.iloc[:,3].mean()<8.5:
     if textgridData.iloc[:,3].mean()<5:
-        return "success: low posterior probability, the model is not confident with the recognition", None, None
+        return "success: low posterior probability, the model is not confident with the recognition", None, None, None
     
     # each row is True if out of vocabulary, False if it is a detected phoneme or word
     is_out_of_vocabulary=textgridData.iloc[:,2].str[:1].str.contains('o')
 
     if is_out_of_vocabulary.product():
-        return "success: all of the elements were out of vocabulary", None, None
+        return "success: all of the elements were out of vocabulary", None, None, None
     # if is_out_of_vocabulary.sum():
     #     return "error: at least one element was out of vocabulary", None, None
 
-    return 0, textgridData, s
+    return 0, textgridData, s, fs
 
 def verification_n_of_phoneme(textgridData, p):
 
@@ -104,7 +104,7 @@ def chunking(
     Returns:
         [type]: [description]
     """
-    status, textgridData, s = get_annotated_signal(p)
+    status, textgridData, s, fs = get_annotated_signal(p['rand_fileName'])
     if textgridData is None:
         return status, []
 
@@ -112,7 +112,7 @@ def chunking(
     silence_durations=textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,1]-textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,0]
     idx_to_filter=silence_durations[silence_durations>minSilDur].index
 
-    #clean_htk_files(p)
+    #clean_htk_files(rand_fileName)
 
 def vowels(textgridData):
     """extract vowels among phonemes in textgridData
@@ -221,7 +221,7 @@ def compute_stress_score(textgridData, s, fs, indxVowels):
     return weighted_score
 
 def vowel_stresses(
-        p=set_params()
+        rand_fileName
         ):
     """vowels_stresses() computes prosody features (intesity, pitch, ...) to compute 
     a value by vowel, located thanks to textgridData, representing a stress intensity.
@@ -233,7 +233,7 @@ def vowel_stresses(
     Returns:
         string, list of float list: status, stress intensities by word
     """
-    status, textgridData, s = get_annotated_signal(p)
+    status, textgridData, s, fs = get_annotated_signal(rand_fileName)
     if textgridData is None:
         return status, []
 
@@ -242,7 +242,7 @@ def vowel_stresses(
     #     return "error: inconsistent number of detected phonemes", []
 
     indxVowels, nVowelsPerWord=vowels(textgridData)
-    weighted_score=compute_stress_score(textgridData, s,  p['fs_target'], indxVowels)
+    weighted_score=compute_stress_score(textgridData, s,  fs, indxVowels)
     # print(weighted_score)
     # fig=plt.figure()
     # plt.plot(weighted_score)
@@ -256,11 +256,11 @@ def vowel_stresses(
     for w_i,n_v in enumerate(nVowelsPerWord):
         weighted_score_by_word.append(weighted_score[syl_start:syl_start+n_v].tolist())
         syl_start+=n_v
-    #clean_htk_files(p)
+    #clean_htk_files(rand_fileName)
     return "success", weighted_score_by_word
 
 def wordStress(
-    p=set_params()
+    rand_fileName
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     ):
     """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
@@ -273,7 +273,7 @@ def wordStress(
         string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
     """
     
-    status, weighted_score_by_word=vowel_stresses(p)
+    status, weighted_score_by_word=vowel_stresses(rand_fileName)
 
     if weighted_score_by_word == []:
         return status, []
@@ -295,7 +295,7 @@ def wordStress(
     # return "success", binResult
 
 def sentenceStress(
-    p=set_params()
+    rand_fileName
     ):
     """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
     a value by vowel representing a stress intensity, and 
@@ -309,7 +309,7 @@ def sentenceStress(
     Returns:
         string, list of binaries: status, stress results by word (0=no stress,  1=stress)
     """
-    status, weighted_score_by_word=vowel_stresses(p)
+    status, weighted_score_by_word=vowel_stresses(rand_fileName)
 
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
     # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
@@ -337,19 +337,19 @@ def number_and_indices(textgridData, char='w'):
     n=len(idxs)
     return n, idxs
 
-def prosody_by_phone(p):
-    status, textgridData, s = get_annotated_signal(p)
+def prosody_by_phone(rand_fileName):
+    status, textgridData, s, fs = get_annotated_signal(rand_fileName)
 
-    f0Samples=getIntonation(s, p['fs_target'])
-    vuv=np.nan_to_num(getf0Samples(s, p['fs_target']), nan=0).astype(bool)
+    f0Samples=getIntonation(s, fs)
+    vuv=np.nan_to_num(getf0Samples(s, fs), nan=0).astype(bool)
 
-    intensity=getIntensity(s, p['fs_target'])
+    intensity=getIntensity(s, fs)
     # detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='p']
     detected_phonemes=textgridData[textgridData.iloc[:,2].str[0]=='w']
     Imax,Imean,Fmax,Fmean,Dur,voicing=[],[],[],[],[],[]
     for i,r in detected_phonemes.iterrows():
-        start=round(p['fs_target']*r[0])
-        end=round(p['fs_target']*r[1])
+        start=round(fs*r[0])
+        end=round(fs*r[1])
         F_phone=f0Samples[start:end]
         I_phone=intensity[start:end]
         vuv_phone=vuv[start:end]
@@ -367,12 +367,12 @@ def prosody_by_phone(p):
     d['Dur']=Dur
     d['voicing']=voicing
 
-    #clean_htk_files(p)
+    #clean_htk_files(rand_fileName)
     return "success", [textgridData, d]
 
 
 def phonemeContrast(
-    p=set_params()
+    rand_fileName
     # p=set_params(sentenceID=9)
     ):
     """This functions uses textgridData that now has information of all detected phonetic transcriptions.
@@ -382,7 +382,7 @@ def phonemeContrast(
     Returns:
         string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
     """
-    status, textgridData, s = get_annotated_signal(p)
+    status, textgridData, s, fs = get_annotated_signal(rand_fileName)
     if textgridData is None:
         return status, []
     
@@ -402,55 +402,38 @@ def timing_test(module='wordStress', n=100, p=None):
     print(np.mean(times))
     return np.mean(times)
 
-def phonemeContrast_from_text_audio(
-                    text='turned around', 
-                    audio_path='audio_recordings/turned_around.mp3', 
-                    word_idx=0, 
-                    target_phones='D', 
-                    alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-    """This uses text to get phonetics, and target phones as well as alternatives to build annotation files for htk.
-    Then it calls phonemeContrast module with this information. It also prints where are the differences in the phonetic entries
-    between ground truth and predictions (might be returned in the future)
-
-    Returns:
-        string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
-    """
-    p=set_params()
-    p=make_pContrast_annotation_files(p,text=text, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-    status,result=phonemeContrast(p)
-    phonetic_GT=phonetics_from_sentence(text)[int(word_idx)]
-    print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetic_GT)])
-    return status, result
-
-
 def phonemeContrast_from_phonetics_audio(
                     phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], 
                     p=set_params(), 
                     word_idx=0, 
                     target_phones='D', 
                     alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-    p=make_pContrast_annotation_files_from_phonetics(p,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-    status,result=phonemeContrast(p)
-    return status, result
+    """This uses phonetics, and target phones as well as alternatives to build annotation files for htk.
+    Then it calls phonemeContrast module with this information. It also prints where are the differences in the phonetic entries
+    between ground truth and predictions (might be returned in the future)
 
+    Args:
+        phonetics (list, optional): [description]. Defaults to [['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']].
+        p ([type], optional): [description]. Defaults to set_params().
+        word_idx (int, optional): [description]. Defaults to 0.
+        target_phones (str, optional): [description]. Defaults to 'D'.
+        alternatives (list, optional): [description]. Defaults to ['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
 
-def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
-    """This uses text to get phonetics, to build annotation files for htk.
-    Then it calls vowel_stresses module with this information.
     Returns:
-        string, list of float list: status, stress intensities by word
+        [type]: [description]
     """
-    p=set_params()
-    p=make_all_phones_annotation_files(p,text)
-    status,result=vowel_stresses(p)
+    make_pContrast_annotation_files_from_phonetics(p,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
+    status,result=phonemeContrast(p['rand_fileName'])
     return status, result
+
+
 
 def vowel_stresses_from_phonetics_audio(
     phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
     p=set_params()
     ):
-    p=make_all_phones_annotation_files_from_phonetics(p,phonetics)
-    status,result=vowel_stresses(p)
+    make_all_phones_annotation_files_from_phonetics(p,phonetics)
+    status,result=vowel_stresses(p['rand_fileName'])
     return status, result
 
 def sentenceStress_from_phonetics_audio(
@@ -550,7 +533,37 @@ def phonemeContrast_from_formatted_phonetics_audio(
 
 # obsolete functions backup
 if False:
-    
+    # these are not valid anymore, I removed audio information from the rID
+    def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
+        """This uses text to get phonetics, to build annotation files for htk.
+        Then it calls vowel_stresses module with this information.
+        Returns:
+            string, list of float list: status, stress intensities by word
+        """
+        p=set_params()
+        make_all_phones_annotation_files(p,text)
+        status,result=vowel_stresses(p['rand_fileName'])
+        return status, result
+    def phonemeContrast_from_text_audio(
+                        text='turned around', 
+                        word_idx=0, 
+                        target_phones='D', 
+                        alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+        """This uses text to get phonetics, and target phones as well as alternatives to build annotation files for htk.
+        Then it calls phonemeContrast module with this information. It also prints where are the differences in the phonetic entries
+        between ground truth and predictions (might be returned in the future)
+
+        Returns:
+            string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
+        """
+        p=set_params()
+        make_pContrast_annotation_files(p,text=text, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
+        status,result=phonemeContrast(p['rand_fileName'])
+        phonetic_GT=phonetics_from_sentence(text)[int(word_idx)]
+        print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetic_GT)])
+        return status, result
+
+
     # generalized and replaced by phoneme contrast
     def edAnalysis(
         p=set_params(sentenceID=1, module="edAnalysis")
@@ -576,7 +589,7 @@ if False:
                 status = 0
                 binResult = 1
         
-        #clean_htk_files(p)
+        #clean_htk_files(rand_fileName)
         return "success", [binResult]
 
 
@@ -618,7 +631,7 @@ if False:
                 binResult=1
                 # if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
                 #     binResult=0
-        #clean_htk_files(p)
+        #clean_htk_files(rand_fileName)
         return "success", binResult
 
     
@@ -746,7 +759,7 @@ if False:
         else:
             binResult[np.argmax(weighted_score)]=1
 
-        #clean_htk_files(p)
+        #clean_htk_files(rand_fileName)
         return "success", binResult
 
 
@@ -754,13 +767,13 @@ if False:
 if __name__ == "__main__":
     # execute only if run as a script
 
-    # examples:
-    status, result=phonemeContrast_from_text_audio()
-    status, result=phonemeContrast_from_text_audio(text='Did he fall asleep?',
-                    audio_path='../audio-with-analysis-ids/audio/5deb3ea1-1c0f-4a2b-a2ca-36e0e856c11d.wav', 
-                    word_idx=0, 
-                    target_phones='IH1', 
-                    alternatives=['IH0', 'IH2', 'IY0', 'IY1', 'IY2'])
+    # # examples:
+    # status, result=phonemeContrast_from_text_audio()
+    # status, result=phonemeContrast_from_text_audio(text='Did he fall asleep?',
+    #                 audio_path='../audio-with-analysis-ids/audio/5deb3ea1-1c0f-4a2b-a2ca-36e0e856c11d.wav', 
+    #                 word_idx=0, 
+    #                 target_phones='IH1', 
+    #                 alternatives=['IH0', 'IH2', 'IY0', 'IY1', 'IY2'])
 
     phonetics=phonetics_from_sentence('Did he fall asleep?')
 
