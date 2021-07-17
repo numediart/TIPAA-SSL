@@ -11,13 +11,13 @@ def test_wordStress():
     status_audio, rID=prepare_audio_file('audio_recordings/WS_111_toothpaste.wav')
     p['rand_fileName']=rID
     p=make_all_phones_annotation_files(p,remove_special_characters(d[d.analysisId==111].text.values[0]))
-    wordStress(p)
+    wordStress(rID)
 
     p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     p['rand_fileName']=rID
     p=make_all_phones_annotation_files(p,remove_special_characters(d[d.analysisId==1].text.values[0]))
-    wordStress(p)
+    wordStress(rID)
 
 def test_sentenceStress():
     a,textDict=get_sentenceStress_annotation()
@@ -26,13 +26,13 @@ def test_sentenceStress():
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     p['rand_fileName']=rID
     p=make_all_phones_annotation_files(p,remove_special_characters(textDict[1]))
-    sentenceStress(p)
+    sentenceStress(rID)
 
     p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/WS_111_toothpaste.wav')
     p['rand_fileName']=rID
     p=make_all_phones_annotation_files(p,remove_special_characters(textDict[1]))
-    sentenceStress(p)
+    sentenceStress(rID)
 
 def test_audio_formats():
     prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf')
