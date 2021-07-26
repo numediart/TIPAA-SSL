@@ -57,7 +57,6 @@ def compute_errors(preds, GTs):
 
 def stress_performance_test(level='sentence'):
     d=get_data()
-
     if level=="sentence":
         a,textDict=get_sentenceStress_annotation()
         focusType='sentencestress'
@@ -90,10 +89,10 @@ def stress_performance_test(level='sentence'):
             make_all_phones_annotation_files(rID,remove_special_characters(row.text.values[0]))
             try:
                 if level=='sentence':
-                    res=sentenceStress(rID)
+                    res=sentenceStress(rID,rID)
                     pred=res['stress_binaries']
                 elif level=='word':
-                    res=wordStress(rID)
+                    res=wordStress(rID,rID)
                     # I merge word results to word word with compute_errors
                     pred=merge_list(res['stress_binaries'])
                 else:
@@ -144,7 +143,11 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
         phonetics=[p.split(' ') for p in phonetics]
 
         status_audio, rID=prepare_audio_file(row.wav_path)
-        status, results = phonemeContrast_from_phonetics_audio(rID, phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives)
+        # status, results = phonemeContrast_from_phonetics_audio(rID, phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives)
+        
+        make_pContrast_annotation_files_from_phonetics(rID,phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives)
+        status,results=phonemeContrast(rID, rID)
+        
         statuss.append(status)
         if results!=[]:
             detected_transcription=results[1]

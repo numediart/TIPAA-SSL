@@ -9,22 +9,22 @@ def test_wordStress():
 
     status_audio, rID=prepare_audio_file('audio_recordings/WS_111_toothpaste.wav')
     p=make_all_phones_annotation_files(rID,remove_special_characters(d[d.analysisId==111].text.values[0]))
-    wordStress(rID)
+    wordStress(rID,rID)
 
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     p=make_all_phones_annotation_files(rID,remove_special_characters(d[d.analysisId==1].text.values[0]))
-    wordStress(rID)
+    wordStress(rID,rID)
 
 def test_sentenceStress():
     a,textDict=get_sentenceStress_annotation()
 
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     p=make_all_phones_annotation_files(rID,remove_special_characters(textDict[1]))
-    sentenceStress(rID)
+    sentenceStress(rID,rID)
 
     status_audio, rID=prepare_audio_file('audio_recordings/WS_111_toothpaste.wav')
     p=make_all_phones_annotation_files(rID,remove_special_characters(textDict[1]))
-    sentenceStress(rID)
+    sentenceStress(rID,rID)
 
 def test_audio_formats():
     prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf')

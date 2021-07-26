@@ -11,7 +11,15 @@ from label_data_processing import make_all_phones_annotation_files, make_all_pho
 from label_data_processing import target_to_alternatives, graphemes_to_alternatives
 from text_processing import phonetics_from_sentence
 import uuid
+import json
+import time
 
+path_cached_filenames='data/cached_filenames.json'
+if os.path.exists(path_cached_filenames):
+    with open(path_cached_filenames, 'r') as fp:
+        cached_filenames = json.load(fp)
+else:
+    cached_filenames={}
 
 def prepare_audio_file(audio_file, fs=16000):
     rID=str(uuid.uuid4())
@@ -23,7 +31,7 @@ def prepare_audio_file(audio_file, fs=16000):
 
     return "success", rID
 
-def get_annotated_signal(rand_fileName):
+def get_annotated_signal(rand_fileName, wav_name):
     """Load audio file and annotation files corresponding to parameters, 
     and calls "textgridData" to obtain htk predictions of phonemes and
     their timings
@@ -35,17 +43,19 @@ def get_annotated_signal(rand_fileName):
         status, textgridData, s (int, DataFrame, np array): textgridData contains phonetic predictions 
         from htk model with their timings and log probability
     """
+    # if wav_name is None:
+    #     wav_name=rand_fileName
     # rand_fileName, inputPhoneticTranscription, inputGrammar = p['rand_fileName'], p['inputPhoneticTranscription'], p['inputGrammar']
     try:
-        fs,s=read('./inputs/'+ rand_fileName+ '.wav')
+        fs,s=read('./inputs/'+ wav_name+ '.wav')
     except FileNotFoundError:
         return "error: audio file not found", None, None, None
     s=s/32767
     try:
-        textgridData, _=get_textgrid_data(rand_fileName)
+        textgridData, _=get_textgrid_data(rand_fileName, wav_name)
     except Exception as e: 
         print(e)
-        clean_htk_files(rand_fileName)
+        clean_htk_files(wav_name)
         return "error: could not get textgridData (check htk errors)", None, None, None
     
     # if textgridData.iloc[:,3].mean()<8.5:
@@ -80,8 +90,6 @@ def verification_n_of_phoneme(textgridData, p):
             line=r.values[0].split(' ')
             phone=line[0]
             info=line[1][1:-1]
-            # print(phone)
-            # print(info)
             dict_phones[info]=phone
         if r[0][0]=='o':
             dict_phones[r[0].split(' ')[0]]=r[0].split(' ')[0]
@@ -112,7 +120,6 @@ def chunking(
     silence_durations=textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,1]-textgridData[textgridData.iloc[:,2]=='sil'].iloc[:,0]
     idx_to_filter=silence_durations[silence_durations>minSilDur].index
 
-    #clean_htk_files(rand_fileName)
 
 def vowels(textgridData):
     """extract vowels among phonemes in textgridData
@@ -221,7 +228,7 @@ def compute_stress_score(textgridData, s, fs, indxVowels):
     return weighted_score
 
 def vowel_stresses(
-        rand_fileName
+        rand_fileName, wav_name
         ):
     """vowels_stresses() computes prosody features (intesity, pitch, ...) to compute 
     a value by vowel, located thanks to textgridData, representing a stress intensity.
@@ -233,7 +240,10 @@ def vowel_stresses(
     Returns:
         string, list of float list: status, stress intensities by word
     """
-    status, textgridData, s, fs = get_annotated_signal(rand_fileName)
+    
+    # if wav_name is None:
+    #     wav_name=rand_fileName
+    status, textgridData, s, fs = get_annotated_signal(rand_fileName, wav_name)
     if textgridData is None:
         return status, []
 
@@ -256,11 +266,10 @@ def vowel_stresses(
     for w_i,n_v in enumerate(nVowelsPerWord):
         weighted_score_by_word.append(weighted_score[syl_start:syl_start+n_v].tolist())
         syl_start+=n_v
-    #clean_htk_files(rand_fileName)
     return "success", weighted_score_by_word
 
 def wordStress(
-    rand_fileName
+    rand_fileName, wav_name
     # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     ):
     """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
@@ -273,7 +282,9 @@ def wordStress(
         string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
     """
     
-    status, weighted_score_by_word=vowel_stresses(rand_fileName)
+    # if wav_name is None:
+    #     wav_name=rand_fileName
+    status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
 
     if weighted_score_by_word == []:
         return status, []
@@ -291,11 +302,8 @@ def wordStress(
 
     return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
 
-    
-    # return "success", binResult
-
 def sentenceStress(
-    rand_fileName
+    rand_fileName, wav_name
     ):
     """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
     a value by vowel representing a stress intensity, and 
@@ -309,7 +317,10 @@ def sentenceStress(
     Returns:
         string, list of binaries: status, stress results by word (0=no stress,  1=stress)
     """
-    status, weighted_score_by_word=vowel_stresses(rand_fileName)
+    
+    # if wav_name is None:
+    #     wav_name=rand_fileName
+    status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
 
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
     # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
@@ -337,8 +348,11 @@ def number_and_indices(textgridData, char='w'):
     n=len(idxs)
     return n, idxs
 
-def prosody_by_phone(rand_fileName):
-    status, textgridData, s, fs = get_annotated_signal(rand_fileName)
+def prosody_by_phone(rand_fileName, wav_name):
+    
+    # if wav_name is None:
+    #     wav_name=rand_fileName
+    status, textgridData, s, fs = get_annotated_signal(rand_fileName, wav_name)
 
     f0Samples=getIntonation(s, fs)
     vuv=np.nan_to_num(getf0Samples(s, fs), nan=0).astype(bool)
@@ -367,12 +381,11 @@ def prosody_by_phone(rand_fileName):
     d['Dur']=Dur
     d['voicing']=voicing
 
-    #clean_htk_files(rand_fileName)
     return "success", [textgridData, d]
 
 
 def phonemeContrast(
-    rand_fileName
+    rand_fileName, wav_name
     # p=set_params(sentenceID=9)
     ):
     """This functions uses textgridData that now has information of all detected phonetic transcriptions.
@@ -382,7 +395,10 @@ def phonemeContrast(
     Returns:
         string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
     """
-    status, textgridData, s, fs = get_annotated_signal(rand_fileName)
+    
+    # if wav_name is None:
+    #     wav_name=rand_fileName
+    status, textgridData, s, fs = get_annotated_signal(rand_fileName, wav_name)
     if textgridData is None:
         return status, []
     
@@ -405,7 +421,6 @@ def timing_test(module='wordStress', n=100, p=None):
 def phonemeContrast_from_phonetics_audio(
                     rID,
                     phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], 
-                    # p=set_params(), 
                     word_idx=0, 
                     target_phones='D', 
                     alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
@@ -423,8 +438,20 @@ def phonemeContrast_from_phonetics_audio(
     Returns:
         [type]: [description]
     """
-    make_pContrast_annotation_files_from_phonetics(rID,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-    status,result=phonemeContrast(rID)
+
+    p_idx='pC - '+' '.join(['_'.join(w) for w in phonetics])+str(word_idx)+target_phones+'_'.join(alternatives)
+
+    if p_idx not in cached_filenames:
+        time_str=time.asctime( time.localtime(time.time()) )
+        uid=str(uuid.uuid4())+'_'+time_str.replace(' ','_')
+        cached_filenames[p_idx]=uid
+
+        make_pContrast_annotation_files_from_phonetics(uid,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
+
+        with open(path_cached_filenames, 'w') as fp:
+            json.dump(cached_filenames, fp)
+
+    status,result=phonemeContrast(cached_filenames[p_idx], rID)
     return status, result
 
 
@@ -432,10 +459,19 @@ def phonemeContrast_from_phonetics_audio(
 def vowel_stresses_from_phonetics_audio(
     rID,
     phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']]
-    # p=set_params()
     ):
-    make_all_phones_annotation_files_from_phonetics(rID,phonetics)
-    status,result=vowel_stresses(rID)
+    p_idx='all_phones - '+' '.join(['_'.join(w) for w in phonetics])
+
+    if p_idx not in cached_filenames:
+        time_str=time.asctime( time.localtime(time.time()) )
+        uid=str(uuid.uuid4())+'_'+time_str.replace(' ','_')
+        cached_filenames[p_idx]=uid
+
+        make_all_phones_annotation_files_from_phonetics(uid,phonetics)
+        with open(path_cached_filenames, 'w') as fp:
+            json.dump(cached_filenames, fp)
+
+    status,result=vowel_stresses(cached_filenames[p_idx], rID)
     return status, result
 
 def sentenceStress_from_phonetics_audio(
@@ -446,7 +482,6 @@ def sentenceStress_from_phonetics_audio(
     status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(rID,phonetics)
     
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
-    # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
     binResult=np.zeros(len(max_scores_by_word)).astype(int)
     binResult[np.argmax(max_scores_by_word)]=1
 
@@ -593,7 +628,6 @@ if False:
                 status = 0
                 binResult = 1
         
-        #clean_htk_files(rand_fileName)
         return "success", [binResult]
 
 
@@ -635,7 +669,6 @@ if False:
                 binResult=1
                 # if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
                 #     binResult=0
-        #clean_htk_files(rand_fileName)
         return "success", binResult
 
     
@@ -763,7 +796,6 @@ if False:
         else:
             binResult[np.argmax(weighted_score)]=1
 
-        #clean_htk_files(rand_fileName)
         return "success", binResult
 
 

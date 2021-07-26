@@ -7,6 +7,7 @@ import cmudict
 import os
 from text_processing import phonetics_from_sentence, remove_special_characters
 import uuid
+from htk_utils import process_grammar
 
 target_to_alternatives={
     "DH":["DH","TH"],
@@ -237,46 +238,6 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
         except TypeError:
             import pdb;pdb.set_trace()
 
-
-
-
-def make_all_phones_annotation_files(
-    rID,
-    text='I would love to go to ireland !'
-    ):
-    """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
-    then updates the default path to point to them in parameters dictionnary
-
-    Args:
-        p ([type], optional): [description]. Defaults to set_params().
-        text (str, optional): [description]. Defaults to 'I would love to go to ireland !'.
-
-    Returns:
-        dict: parameters dictionnary
-    """
-    make_dct_all_phones_from_text(text, path='inputs/'+rID+'.dct')
-    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
-
-def make_all_phones_annotation_files_from_phonetics(
-    rID,
-    phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
-    make_dct_all_phones_from_phonetics(phonetics, path='inputs/'+rID+'.dct')
-    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
-
-def make_pContrast_annotation_files_from_phonetics(rID,
-                phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_idx=0, target_phones='D', 
-                alternatives=target_to_alternatives['D']):
-    phonetics=[' '.join(w) for w in phonetics]
-    make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path='inputs/'+rID+'.dct')
-    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
-
-def make_pContrast_annotation_files(rID,
-                text="turned around",word_idx=0, target_phones='D', 
-                alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-    phonetics=phonetics_from_sentence(text)
-    make_pContrast_annotation_files_from_phonetics(rID, phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-
-
 def make_grammar_from_dct(path_dct='test.dct',
                         path_grammar='test.txt'):
     """Make a grammar file from a dct file. We assume that 
@@ -355,6 +316,51 @@ def make_grammar_from_dct(path_dct='test.dct',
     with open(path_grammar, "w") as text_file:
         text_file.write("\n".join([str1,str2,str3]))
     return "\n".join([str1,str2,str3])
+
+
+
+
+def make_all_phones_annotation_files_from_phonetics(
+    rID,
+    phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
+    make_dct_all_phones_from_phonetics(phonetics, path='inputs/'+rID+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
+    process_grammar(rID)
+
+def make_pContrast_annotation_files_from_phonetics(rID,
+                phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_idx=0, target_phones='D', 
+                alternatives=target_to_alternatives['D']):
+    phonetics=[' '.join(w) for w in phonetics]
+    make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path='inputs/'+rID+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
+    process_grammar(rID)
+
+
+
+def make_all_phones_annotation_files(
+    rID,
+    text='I would love to go to ireland !'
+    ):
+    """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
+    then updates the default path to point to them in parameters dictionnary
+
+    Args:
+        p ([type], optional): [description]. Defaults to set_params().
+        text (str, optional): [description]. Defaults to 'I would love to go to ireland !'.
+
+    Returns:
+        dict: parameters dictionnary
+    """
+    make_dct_all_phones_from_text(text, path='inputs/'+rID+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
+    process_grammar(rID)
+
+
+def make_pContrast_annotation_files(rID,
+                text="turned around",word_idx=0, target_phones='D', 
+                alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
+    phonetics=phonetics_from_sentence(text)
+    make_pContrast_annotation_files_from_phonetics(rID, phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
 
 
 
