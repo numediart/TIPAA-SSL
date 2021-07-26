@@ -105,9 +105,7 @@ def vowel_stresses_api():
     print(content['rID'])
     rID=content['rID']
     phonetics=ast.literal_eval(content['phonetics'])
-    p=set_params()
-    p['rand_fileName']=rID
-    status,result=vowel_stresses_from_phonetics_audio(phonetics,p=p)
+    status,result=vowel_stresses_from_phonetics_audio(rID, phonetics)
     print('result:',result)
     if not isinstance(result, list):
         print('result:',result)
@@ -129,14 +127,10 @@ def module_api(module):
     rID=content['rID']
     # phonetics=ast.literal_eval(content['phonetics'])
     phonetics=content['phonetics']
-    p=set_params()
-    p['rand_fileName']=rID
     if module=='sentenceStress':
-        # res=sentenceStress_from_phonetics_audio(phonetics,p=p)
-        res=stress_from_formatted_phonetics(phonetics, level="sentence", p=p)
+        res=stress_from_formatted_phonetics(rID, phonetics, level="sentence")
     elif module=='wordStress':
-        # res=wordStress_from_phonetics_audio(phonetics,p=p)
-        res=stress_from_formatted_phonetics(phonetics, level="word", p=p)
+        res=stress_from_formatted_phonetics(rID, phonetics, level="word")
     else:
         res={"status": "error: no such module"}
     response=json.dumps(res)
@@ -164,10 +158,7 @@ def phoneme_contrast_api():
     alternatives=content['alternatives']
     print(alternatives)
 
-    p=set_params()
-    p['rand_fileName']=rID
-    # status,result=phonemeContrast_from_phonetics_audio(phonetics, p, int(word_idx), target, alternatives)
-    status,result=phonemeContrast_from_formatted_phonetics_audio(phonetics, p, int(word_idx), target, alternatives)
+    status,result=phonemeContrast_from_formatted_phonetics_audio(rID, phonetics, int(word_idx), target, alternatives)
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):

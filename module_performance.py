@@ -65,7 +65,6 @@ def stress_performance_test(level='sentence'):
     elif level=="word":
         focus='wordstress'
         d=d[d.focusType==focus]
-
         # a=d.text.apply(lambda r:word_stress_from_text(r) )
         a={}
         for i,row in tqdm(d.iterrows()):
@@ -87,10 +86,8 @@ def stress_performance_test(level='sentence'):
             row=d[d.analysisId==id]
         if len(row)>0:
             path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
-            p=set_params()
             _, rID=prepare_audio_file(path)
-            p['rand_fileName']=rID
-            p=make_all_phones_annotation_files(p,remove_special_characters(row.text.values[0]))
+            make_all_phones_annotation_files(rID,remove_special_characters(row.text.values[0]))
             try:
                 if level=='sentence':
                     res=sentenceStress(rID)
@@ -112,7 +109,7 @@ def stress_performance_test(level='sentence'):
                 print('Error with:')
                 print(row)
                 errors.append(row)
-                p_errors.append(p)
+                p_errors.append(path)
     
     print(preds)
     print(GTs)
@@ -123,27 +120,6 @@ def stress_performance_test(level='sentence'):
 
     print("algo performance")
     compute_errors(preds, GTs)
-
-def stress_with_formatted_phonetics_performance_test():pass
-
-def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
-    prosodies=[]
-    for i,row in tqdm(selection.iterrows()):
-        sentence=get_sentence(row.path)
-        # retrieve phonetics by word that is not available directly from textgrids, but can be extracted from the dataframe
-        # as I already extracted phonemes for each word using overlapping in timings
-        phonetics=[]
-        for w in sentence.split(' '):
-            phonetics.append(libri_words_df[libri_words_df.word==w].iloc[0,:].phones)
-
-        # set params and make label files for phonetics and grammar
-        p=set_params(basename='test', module='edAnalysis')
-        # prepare_audio_file(p)
-        status_audio, rID=prepare_audio_file(row.wav_path)
-        p['rand_fileName']=rID
-        make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, path=p['inputPhoneticTranscription'])
-        make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-        prosodies.append(prosody_by_phone(p))
 
 
 def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D', 
@@ -166,11 +142,9 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
         sentence=get_sentence(row.path)
         phonetics=phonetics_for_row(row, libri_words_df)
         phonetics=[p.split(' ') for p in phonetics]
-        p=set_params()
-        # prepare_audio_file(p)
+
         status_audio, rID=prepare_audio_file(row.wav_path)
-        p['rand_fileName']=rID
-        status, results = phonemeContrast_from_phonetics_audio(phonetics=phonetics, p=p, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives)
+        status, results = phonemeContrast_from_phonetics_audio(rID, phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives)
         statuss.append(status)
         if results!=[]:
             detected_transcription=results[1]
@@ -420,6 +394,25 @@ def vowels_consonants_confusions_from_audiobook_data(n=100):
     plt.savefig('performance_results/consonant_contrast_confusion.png')
 
 if False:
+    def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
+        prosodies=[]
+        for i,row in tqdm(selection.iterrows()):
+            sentence=get_sentence(row.path)
+            # retrieve phonetics by word that is not available directly from textgrids, but can be extracted from the dataframe
+            # as I already extracted phonemes for each word using overlapping in timings
+            phonetics=[]
+            for w in sentence.split(' '):
+                phonetics.append(libri_words_df[libri_words_df.word==w].iloc[0,:].phones)
+
+            # set params and make label files for phonetics and grammar
+            p=set_params(basename='test', module='edAnalysis')
+            # prepare_audio_file(p)
+            status_audio, rID=prepare_audio_file(row.wav_path)
+            p['rand_fileName']=rID
+            make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, path=p['inputPhoneticTranscription'])
+            make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
+            prosodies.append(prosody_by_phone(p))
+
 
     # maybe this one could still be useful. I would fave to use "phonemeContrast_from_phonetics_audio" instead of "phonemeContrast_from_text_audio"
     def iContrast_automatic_annot_performance_test(path='../audio-with-analysis-ids/iContrast_data.csv', audio_path="../audio-with-analysis-ids/audio/"):
@@ -793,13 +786,13 @@ if __name__ == "__main__":
     # phonetics_from_sentence(results['results_dfs']['TH'].iloc[0].sentence)
     target_phones='TH'
 
-    p=set_params(basename='test', module="thContrast")
+    # p=set_params(basename='test', module="thContrast")
     # prepare_audio_file(p)
     status_audio, rID=prepare_audio_file(row.wav_path)
-    p['rand_fileName']=rID
-    make_dir(os.path.split(p['inputPhoneticTranscription'])[0])
-    make_dir(os.path.split(p['inputGrammar'])[0])
-    alternatives=['DH', 'TH']
-    make_generic_dct_from_phonetics(phonetics=row.phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
-    make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    status, results= phonemeContrast(p['rand_fileName'])
+    # p['rand_fileName']=rID
+    # make_dir(os.path.split(p['inputPhoneticTranscription'])[0])
+    # make_dir(os.path.split(p['inputGrammar'])[0])
+    # alternatives=['DH', 'TH']
+    # make_generic_dct_from_phonetics(phonetics=row.phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
+    # make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
+    # status, results= phonemeContrast(p['rand_fileName'])

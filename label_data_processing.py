@@ -5,8 +5,7 @@ from glob import glob
 from shutil import copy
 import cmudict
 import os
-from text_processing import phonetics_from_sentence, remove_special_characters, n_vowels
-# from speech_tech import set_params
+from text_processing import phonetics_from_sentence, remove_special_characters
 import uuid
 
 target_to_alternatives={
@@ -27,43 +26,6 @@ graphemes_to_alternatives={
     "ie":["IY1","AY1"],
     "ea":["IY1","EH1"]
 }
-
-def set_params(
-    # waveFileAddress='/root/flowchase/sent.wav',
-    # waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
-    # sentenceID=1,
-    # basename='phrase_',
-    # fs_target = 16000, # the target sampling frequency
-    # modelName = 'libri',
-    # module='sentenceStress'
-    ):
-    """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
-
-    Args:
-        sentenceID (int, optional): [description]. Defaults to 1.
-        fs_target (int, optional): [description]. Defaults to 16000.
-        module (str, optional): [description]. Defaults to 'sentenceStress'.
-
-    Returns:
-        dict
-    """
-    # inputPhoneticTranscription_base = './lexicon/'+module+'/dct/'+basename
-    # inputGrammar_base = './lexicon/'+module+'/grammar/'+basename
-    
-    # inputGrammar = '%s.txt' % (inputGrammar_base)
-    # inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
-
-    params={}
-    # params['waveFileAddress']=waveFileAddress
-    # params['fs_target']=fs_target
-    # params['inputPhoneticTranscription']=inputPhoneticTranscription
-    # params['inputGrammar']=inputGrammar
-    # params['modelName']=modelName
-    params['rand_fileName']=str(uuid.uuid4())
-    # params['sentenceID']=sentenceID
-
-    return params
-
 
 
 # Data processing
@@ -279,7 +241,7 @@ def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH
 
 
 def make_all_phones_annotation_files(
-    p=set_params(),
+    rID,
     text='I would love to go to ireland !'
     ):
     """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
@@ -292,37 +254,27 @@ def make_all_phones_annotation_files(
     Returns:
         dict: parameters dictionnary
     """
-    # p=set_params(waveFileAddress=path)
-    # p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    # p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
-    make_dct_all_phones_from_text(text, path='inputs/'+p['rand_fileName']+'.dct')
-    make_grammar_from_dct(path_dct='inputs/'+p['rand_fileName']+'.dct',path_grammar='inputs/'+p['rand_fileName']+'.txt')
+    make_dct_all_phones_from_text(text, path='inputs/'+rID+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
 
 def make_all_phones_annotation_files_from_phonetics(
-    p=set_params(),
+    rID,
     phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
-    # p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    # p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
-    make_dct_all_phones_from_phonetics(phonetics, path='inputs/'+p['rand_fileName']+'.dct')
-    make_grammar_from_dct(path_dct='inputs/'+p['rand_fileName']+'.dct',path_grammar='inputs/'+p['rand_fileName']+'.txt')
+    make_dct_all_phones_from_phonetics(phonetics, path='inputs/'+rID+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
 
-def make_pContrast_annotation_files_from_phonetics(p=set_params(),
+def make_pContrast_annotation_files_from_phonetics(rID,
                 phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_idx=0, target_phones='D', 
                 alternatives=target_to_alternatives['D']):
-    # p['inputPhoneticTranscription']='inputs/'+p['rand_fileName']+'.dct'
-    # p['inputGrammar']='inputs/'+p['rand_fileName']+'.txt'
     phonetics=[' '.join(w) for w in phonetics]
-    make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path='inputs/'+p['rand_fileName']+'.dct')
-    make_grammar_from_dct(path_dct='inputs/'+p['rand_fileName']+'.dct',path_grammar='inputs/'+p['rand_fileName']+'.txt')
+    make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path='inputs/'+rID+'.dct')
+    make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
 
-def make_pContrast_annotation_files(p=set_params(),
+def make_pContrast_annotation_files(rID,
                 text="turned around",word_idx=0, target_phones='D', 
                 alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
     phonetics=phonetics_from_sentence(text)
-    make_pContrast_annotation_files_from_phonetics(p=p, phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-
-
-
+    make_pContrast_annotation_files_from_phonetics(rID, phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
 
 
 def make_grammar_from_dct(path_dct='test.dct',
@@ -407,7 +359,44 @@ def make_grammar_from_dct(path_dct='test.dct',
 
 
 # Obsolete functions backup
-if False:
+if False:    
+    def set_params(
+        # waveFileAddress='/root/flowchase/sent.wav',
+        # waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
+        # sentenceID=1,
+        # basename='phrase_',
+        # fs_target = 16000, # the target sampling frequency
+        # modelName = 'libri',
+        # module='sentenceStress'
+        ):
+        """Set parameters for an analysis task: wav, dct and grammar files as well as module to use
+
+        Args:
+            sentenceID (int, optional): [description]. Defaults to 1.
+            fs_target (int, optional): [description]. Defaults to 16000.
+            module (str, optional): [description]. Defaults to 'sentenceStress'.
+
+        Returns:
+            dict
+        """
+        # inputPhoneticTranscription_base = './lexicon/'+module+'/dct/'+basename
+        # inputGrammar_base = './lexicon/'+module+'/grammar/'+basename
+        
+        # inputGrammar = '%s.txt' % (inputGrammar_base)
+        # inputPhoneticTranscription = '%s.dct' % (inputPhoneticTranscription_base)
+
+        params={}
+        # params['waveFileAddress']=waveFileAddress
+        # params['fs_target']=fs_target
+        # params['inputPhoneticTranscription']=inputPhoneticTranscription
+        # params['inputGrammar']=inputGrammar
+        # params['modelName']=modelName
+        params['rand_fileName']=str(uuid.uuid4())
+        # params['sentenceID']=sentenceID
+
+        return params
+
+
     
     def sentenceStress_make_grammars(path_dct='lexicon/sentenceStress/dct', path_grammar='lexicon/sentenceStress/grammar'):
         for el in glob(path_dct+'/*.dct'):

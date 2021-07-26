@@ -8,7 +8,7 @@ from audio_processing import load_audio, getIntonation, getIntensity, normalize,
 from htk_utils import get_textgrid_data, clean_htk_files
 
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
-from label_data_processing import set_params, target_to_alternatives, graphemes_to_alternatives
+from label_data_processing import target_to_alternatives, graphemes_to_alternatives
 from text_processing import phonetics_from_sentence
 import uuid
 
@@ -93,7 +93,7 @@ def verification_n_of_phoneme(textgridData, p):
     return nEntries==0 or count_total!=nEntries or count_unique!=nEntries
 
 def chunking(
-    p=set_params()
+    rID
     ):
     """The goal of this module is to find pauses in a longer sequence such as a read paragraph.
     TODO: get_textgrid_data function filter out silences, so it won't work. Start from htk_recognition function in htk_utils
@@ -104,7 +104,7 @@ def chunking(
     Returns:
         [type]: [description]
     """
-    status, textgridData, s, fs = get_annotated_signal(p['rand_fileName'])
+    status, textgridData, s, fs = get_annotated_signal(rID)
     if textgridData is None:
         return status, []
 
@@ -403,8 +403,9 @@ def timing_test(module='wordStress', n=100, p=None):
     return np.mean(times)
 
 def phonemeContrast_from_phonetics_audio(
+                    rID,
                     phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], 
-                    p=set_params(), 
+                    # p=set_params(), 
                     word_idx=0, 
                     target_phones='D', 
                     alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
@@ -422,25 +423,27 @@ def phonemeContrast_from_phonetics_audio(
     Returns:
         [type]: [description]
     """
-    make_pContrast_annotation_files_from_phonetics(p,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-    status,result=phonemeContrast(p['rand_fileName'])
+    make_pContrast_annotation_files_from_phonetics(rID,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
+    status,result=phonemeContrast(rID)
     return status, result
 
 
 
 def vowel_stresses_from_phonetics_audio(
-    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
-    p=set_params()
+    rID,
+    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']]
+    # p=set_params()
     ):
-    make_all_phones_annotation_files_from_phonetics(p,phonetics)
-    status,result=vowel_stresses(p['rand_fileName'])
+    make_all_phones_annotation_files_from_phonetics(rID,phonetics)
+    status,result=vowel_stresses(rID)
     return status, result
 
 def sentenceStress_from_phonetics_audio(
-    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
-    p=set_params()
+    rID,
+    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']]
+    # p=set_params()
     ):
-    status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(phonetics,p)
+    status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(rID,phonetics)
     
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
     # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
@@ -463,10 +466,10 @@ def merge_list(l):
     return merged
 
 def wordStress_from_phonetics_audio(
-    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']],
-    p=set_params()
+    rID,
+    phonetics=[['AY1'], ['W', 'UH1', 'D'], ['L', 'AH1', 'V'], ['T', 'UW1'], ['G', 'OW1'], ['T', 'UW1'], ['AY1', 'ER0', 'L', 'AH0', 'N', 'D']]
     ):
-    status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(phonetics,p)
+    status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(rID, phonetics)
     
     if weighted_score_by_word == []:
         return status, []
@@ -477,11 +480,11 @@ def wordStress_from_phonetics_audio(
     weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
     return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
 
-def stress_from_formatted_phonetics(phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", level="word", p=set_params()):
+def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", level="word"):
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
     lens=[len(el) for el in split_phonetics]
     merged_phonetics=merge_list(split_phonetics)
-    status, weighted_score_by_syllable=vowel_stresses_from_phonetics_audio(merged_phonetics,p)
+    status, weighted_score_by_syllable=vowel_stresses_from_phonetics_audio(rID,merged_phonetics)
     
     if weighted_score_by_syllable == []:
         return status, []
@@ -507,8 +510,9 @@ def stress_from_formatted_phonetics(phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T
         print("No such level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.")
 
 def phonemeContrast_from_formatted_phonetics_audio(
+                    rID,
                     phonetics='T_ER1_N_D ER0|AW1_N_D', 
-                    p=set_params(), 
+                    # p=set_params(), 
                     word_idx=0, 
                     target_phones='D', 
                     # alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
@@ -523,9 +527,9 @@ def phonemeContrast_from_formatted_phonetics_audio(
     merged_phonetics=[merge_list(word) for word in split_phonetics]
     print(target_phones)
     print(alternatives)
-    status, result=phonemeContrast_from_phonetics_audio(
+    status, result=phonemeContrast_from_phonetics_audio(rID,
                     phonetics=merged_phonetics, 
-                    p=p, 
+                    # p=p, 
                     word_idx=word_idx, 
                     target_phones=target_phones, 
                     alternatives=split_alternatives)

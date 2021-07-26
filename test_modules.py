@@ -7,31 +7,23 @@ from label_data_processing import *
 def test_wordStress():
     d=get_data()
 
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/WS_111_toothpaste.wav')
-    p['rand_fileName']=rID
-    p=make_all_phones_annotation_files(p,remove_special_characters(d[d.analysisId==111].text.values[0]))
+    p=make_all_phones_annotation_files(rID,remove_special_characters(d[d.analysisId==111].text.values[0]))
     wordStress(rID)
 
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    p=make_all_phones_annotation_files(p,remove_special_characters(d[d.analysisId==1].text.values[0]))
+    p=make_all_phones_annotation_files(rID,remove_special_characters(d[d.analysisId==1].text.values[0]))
     wordStress(rID)
 
 def test_sentenceStress():
     a,textDict=get_sentenceStress_annotation()
 
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    p=make_all_phones_annotation_files(p,remove_special_characters(textDict[1]))
+    p=make_all_phones_annotation_files(rID,remove_special_characters(textDict[1]))
     sentenceStress(rID)
 
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/WS_111_toothpaste.wav')
-    p['rand_fileName']=rID
-    p=make_all_phones_annotation_files(p,remove_special_characters(textDict[1]))
+    p=make_all_phones_annotation_files(rID,remove_special_characters(textDict[1]))
     sentenceStress(rID)
 
 def test_audio_formats():
@@ -56,19 +48,14 @@ def test_audio_formats():
 #     edAnalysis(p)
 
 def test_vowel_stresses():
-    p=set_params()
-    # prepare_audio_file(p)
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    vowel_stresses_from_phonetics_audio(p=p)
+    vowel_stresses_from_phonetics_audio(rID)
 
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    sentenceStress_from_phonetics_audio(p=p)
+    sentenceStress_from_phonetics_audio(rID)
 
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    wordStress_from_phonetics_audio(p=p)
+    wordStress_from_phonetics_audio(rID)
 
 def test_stress_with_level():
     from text_processing import prefill_for_sentence
@@ -78,57 +65,44 @@ def test_stress_with_level():
     d=prefill_for_sentence(sentence, syllables_data)
     d['cmu_phonetics']
     
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    stress_from_formatted_phonetics(d['cmu_phonetics'], level='sentence', p=p)
+    stress_from_formatted_phonetics(rID, d['cmu_phonetics'], level='sentence')
     
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    stress_from_formatted_phonetics(d['cmu_phonetics'], level='word', p=p)
+    stress_from_formatted_phonetics(rID, d['cmu_phonetics'], level='word')
     
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    p['rand_fileName']=rID
-    vowel_stresses_from_phonetics_audio(p=p)
+    vowel_stresses_from_phonetics_audio(rID)
 
 
 def test_phonemeContrast():
-    p=set_params()
-    # prepare_audio_file(p)
     status_audio, rID=prepare_audio_file('audio_recordings/turned_around.mp3')
-    p['rand_fileName']=rID
-    phonemeContrast_from_phonetics_audio(p=p)
+    phonemeContrast_from_phonetics_audio(rID)
 
-    p=set_params()
     status_audio, rID=prepare_audio_file('audio_recordings/turned_around.mp3')
-    p['rand_fileName']=rID
-    phonemeContrast_from_formatted_phonetics_audio(p=p)
+    phonemeContrast_from_formatted_phonetics_audio(rID)
 
 def test_text_processing():
     word_stress_from_text()
     df=generate_prefill_csv()
 
 def test_performance_tests():
-    # iContrast_performance_test()
     stress_performance_test()
     stress_performance_test(level='word')
-    # wordStress_performance_test()
-    # sentenceStress_automatic_annot_performance_test()
-    # edAnalysis_performance_test()
+    
     edAnalysis_from_audiobook_data(data_set='dev-clean', n=100)
     pContrast_from_audiobook_data(n=100)
 
 def test_label_data_processing():
+    rID=str(uuid.uuid4())
+
     get_wordStress_annotation()
     get_sentenceStress_annotation()
-    # ed_make_grammars()
-    # get_data()
     make_dct_all_phones_from_text()
     make_generic_dct_from_phonetics()
     make_grammar_from_dct()
-    make_all_phones_annotation_files()
-    make_all_phones_annotation_files_from_phonetics()
-    make_pContrast_annotation_files_from_phonetics()
-    make_pContrast_annotation_files()
+
+    make_all_phones_annotation_files(rID)
+    make_all_phones_annotation_files_from_phonetics(rID)
+    make_pContrast_annotation_files_from_phonetics(rID)
+    make_pContrast_annotation_files(rID)
