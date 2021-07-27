@@ -73,7 +73,7 @@ if __name__ == "__main__":
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID=res.__dict__['_content']
-    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0 D', alternatives="T D IH0_D")
+    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0_D', alternatives="T D IH0_D")
 
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
@@ -97,11 +97,11 @@ if __name__ == "__main__":
     # rID=res.__dict__['_content']
     # call_sentenceStress(rID.decode('utf-8'))
 
-    send_audio(path='audio_recordings/iC_111_slip.wav')
-
-    call_module(sentenceID=111, filename='iC_111_slip.wav', module="iContrast")
-    call_vowel_stresses()
-    call_vowel_stresses(filename='iC_111_sleep.wav', text='sleep')
+    res=send_audio(path='audio_recordings/iC_111_slip.wav')
+    rID=res.__dict__['_content']
+    # call_module(rID, filename='iC_111_slip.wav', module="iContrast")
+    # call_vowel_stresses()
+    call_vowel_stresses(rID, text='sleep')
 
     send_audio('audio_recordings/turned_around.mp3')
     call_phoneme_contrast()
