@@ -94,16 +94,16 @@ Now, for this same sentence "I visited Italy", we want to study the -ed terminat
 
 The input:
 ```
-data={'phonetics': '[["AY1"], ["V", "IH1", "Z", "IH0", "T", "IH0", "D"], ["IH1", "T", "AH0", "L", "IY0"]]',
+data={'phonetics': 'AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0',
 'rID': b'487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
 'word_id': 1,
-'alternatives': "['IH0 D', 'D', 'T']",
-'target': 'IH0 D'}
+'alternatives': "IH0_D D T",
+'target': 'IH0_D'}
 ```
 
 and the output (if pronounced correctly):
 ```
-b'{"status": "success", "phonetic_detection": ["IH0 D"]}'
+b'{"status": "success", "phonetic_detection": ["IH0_D"]}'
 ```
 
 - vowelStresses gives stress scores for each syllable of each word between 0 and 1

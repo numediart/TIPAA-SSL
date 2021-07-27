@@ -568,6 +568,8 @@ def phonemeContrast_from_formatted_phonetics_audio(
                     word_idx=word_idx, 
                     target_phones=target_phones, 
                     alternatives=split_alternatives)
+    if result!=[]:
+        result[0].detected_transcription=result[0].detected_transcription.str.replace(' ','_')
     return status, result
 
 # obsolete functions backup
