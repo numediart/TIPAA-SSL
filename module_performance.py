@@ -123,7 +123,7 @@ def stress_performance_test(level='sentence'):
 
 def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D', 
                             alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-    """Calls phonemeContrast_from_phonetics_audio for all rows of a selection and gather the predictions in the dataframe and returns it.
+    """Calls phonemeContrast for all rows of a selection and gather the predictions in the dataframe and returns it.
 
     Args:
         selection ([type]): [description]
@@ -132,7 +132,7 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
         alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
 
     Returns:
-        [type]: [description]
+        dataframe: results_df containing info from input + column for detected_transcriptions and status (to see if there was an error in the process)
     """
     detected_transcriptions=[]
     statuss=[]
@@ -239,6 +239,15 @@ def get_phone_termination_dict():
 
 
 def performance_from_results(results_df):
+    """This looks at "detected_transcription" and "phones" columns.
+    It checks when there is a match after removing stress characters (0,1,2) in cmu vowels.
+
+    Args:
+        results_df ([dataframe]): output of compute_prediction_results function
+
+    Returns:
+        [type]: [description]
+    """
     match=[]
     for i,row in results_df.iterrows():
         # if row.phones=='': import pdb;pdb.set_trace()
@@ -295,9 +304,9 @@ def unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones
         results_df=compute_prediction_results(selection, libri_words_df, target_phones=target_phones, alternatives=alternatives)
         all_results=performance_from_results(results_df)
     if n is None:
-        pickle.dump(all_results, open('performance_results/unpredictaple_vowels_performance_'+data_set+'_'+target_graphemes+'_'+target_phones+'.p', 'wb'))
+        pickle.dump(all_results, open('performance_results/unpredictable_vowels_performance_'+data_set+'_'+target_graphemes+'_'+target_phones+'.p', 'wb'))
     else:
-        pickle.dump(all_results, open('performance_results/unpredictaple_vowels_performance_'+data_set+'_'+target_graphemes+'_'+target_phones+'_from_'+str(n)+'egs.p', 'wb'))
+        pickle.dump(all_results, open('performance_results/unpredictable_vowels_performance_'+data_set+'_'+target_graphemes+'_'+target_phones+'_from_'+str(n)+'egs.p', 'wb'))
     return all_results
 
 
@@ -348,8 +357,62 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
         pickle.dump(all_results, open('performance_results/ed_performance_'+data_set+'_from_'+str(n)+'egs.p', 'wb'))
     return all_results
 
+def final_s_from_audiobook_data(data_set='dev-clean', n=None):
+    
+    libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
+    # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
+    libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
+
+    # words that finish in "s" with phoneme "S" that also exist without an "s" and with last phoneme then not being "S"
+    words_in_s=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='S' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='S']
+    words_in_s=set(words_in_s)
+
+    selections=[]
+    selections_s=[]
+    results_dfs=[]
+    results_dfs_s=[]
+    # rests_dfs=[]
+    # rests_dfs_s=[]
+
+    libri_words_list=libri_words_df.word.unique()
+    for word in libri_words_list:
+        if word+'s' in words_in_s:
+            selection, selection_s = selection_with_and_without_s(libri_words_df, word)
+            if len(selection)>0 and len(selection_s)>0:
+                target=selection.iloc[0].phones.split(' ')[-1]
+                results_df=compute_prediction_results(selection, libri_words_df, target_phones=target, 
+                                alternatives=[target, target + ' S'])
+                results_df_s=compute_prediction_results(selection_s, libri_words_df, target_phones=target+ ' S', 
+                                alternatives=[target, target + ' S'])
+                selections.append(selection)
+                selections_s.append(selection_s)
+                results_dfs.append(results_df)
+                results_dfs_s.append(results_df_s)
+    
+    sdf=pd.concat(selections)
+    rdf=pd.concat(results_dfs)
+
+    all_results=performance_from_results(rdf)
+
+    sdf_s=pd.concat(selections_s)
+    rdf_s=pd.concat(results_dfs_s)
+
+    all_results_s=performance_from_results(rdf_s)
 
 
+    if n is None:
+        pickle.dump(all_results, open('performance_results/no_final_s_performance_'+data_set+'.p', 'wb'))
+        pickle.dump(all_results_s, open('performance_results/final_s_performance_'+data_set+'.p', 'wb'))
+    else:
+        pickle.dump(all_results, open('performance_results/no_final_s_from_audiobook_data_performance_'+data_set+'_from_'+str(n)+'egs.p', 'wb'))
+        pickle.dump(all_results_s, open('performance_results/final_s_from_audiobook_data_performance_'+data_set+'_from_'+str(n)+'egs.p', 'wb'))
+    
+    # all_results_s['failure'][all_results_s['failure'].phones.str.endswith(' T S')]
+    all_results['failure'][all_results_s['failure'].phones.str.endswith(' T S')]
+
+    return all_results, all_results_s
+            
+    
 def confusion_analysis_of_pContrast(phone_set, n=100):
     confusion_records=[]
     for p in phone_set:

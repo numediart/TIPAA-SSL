@@ -26,18 +26,31 @@ def get_phone_timings(f='librispeech_alignments/dev-clean/8842/304647/8842-30464
 def get_sentence(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
     tg = textgrid.TextGrid.fromFile(f)
     words=[el.mark for el in tg[0]]
+    # phones=[el.mark for el in tg[1]]
+
+    # get phones and drop "sp", "sil" and empty strings
+    phones=[el.mark for el in tg[1] if el.mark not in ['sil','sp','']]
     # drop empty strings
     words = [x for x in words if x]
     return ' '.join(words)
 
 
 def phonetics_for_row(row, libri_words_df):
-    # retrieve phonetics by word that is not available directly from textgrids, but can be extracted from the dataframe
-    # as I already extracted phonemes for each word using overlapping in timings
-    # it is important to use file_idx to be sure that the phonetic transcription of a word is correct. Because
-    # words can have several phonetic transcriptions depending on the context. e.g., the -> DH AH0, DH IY0
-    # I fact, even doing that may lead to some mistake, if the word is several times in the same sentence with different pronunciations...
+    """
+    retrieving phonetics by word that is not available directly from textgrids, but can be extracted from the dataframe
+    as I already extracted phonemes for each word using overlapping in timings
+    it is important to use file_idx to be sure that the phonetic transcription of a word is correct. Because
+    words can have several phonetic transcriptions depending on the context. e.g., the -> DH AH0, DH IY0
+    In fact, even doing that may lead to some mistake, if the word is several times in the same sentence with different pronunciations...
 
+
+    Args:
+        row ([type]): [description]
+        libri_words_df ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
     sentence=get_sentence(row.path)
     phonetics=[]
     for w_idx,w in enumerate(sentence.split(' ')):
@@ -107,7 +120,7 @@ def cmu_ascii_mappings():
     
     return ascii_encoding, ascii_decoding
 
-def learning_content(selection,    n=20):
+def learning_content(selection, n=20):
     """
     -count the occurences of words to have an idea of their frequence in english
     -take the n first
@@ -119,9 +132,48 @@ def learning_content(selection,    n=20):
     frequent_selection_unique['frequency among examples']=counts[frequent_selection_unique.word].values/len(selection)*100
     return frequent_selection_unique[['word','phones','frequency among examples']].sort_values('frequency among examples', ascending=False)
 
+def selection_with_and_without_s(libri_words_df, word='speak'):
+    selection=libri_words_df[libri_words_df.word==word]
+
+    phonetics=[]
+    for i,r in selection.iterrows():
+        p=phonetics_for_row(r, libri_words_df)
+        # if the word is not the last one of the sentence, look at the next to see if it starts with an "S"
+        if r.word_idx<len(p)-1:
+            if p[r.word_idx+1].split(' ')[0]=="S":
+                phonetics.append(float('nan'))
+            else:
+                phonetics.append(p)
+        else:
+            phonetics.append(p)
+
+    selection['phonetics']=phonetics
+
+    selection_s=libri_words_df[libri_words_df.word==word+'s']
+    phonetics=[]
+    for i,r in selection_s.iterrows():
+        p=phonetics_for_row(r, libri_words_df)
+        phonetics.append(p)
+    
+    selection_s['phonetics']=phonetics
+
+    return selection, selection_s
+    
+
+
 
 if __name__ == "__main__":
-    libri_words_df=build_librispeech_words_df()
+    # libri_words_df=build_librispeech_words_df()
+    libri_words_df=build_librispeech_words_df(n=10000)
+
+    libri_words_df[libri_words_df.word=='speaks']
+    selection=libri_words_df[libri_words_df.word=='speak']
+
+    phonetics=[]
+    for i,r in selection.iterrows():
+        p=phonetics_for_row(r, libri_words_df)
+        phonetics.append(p)
+
 
     libri_words_df[libri_words_df.word=='low']
     selection=libri_words_df[libri_words_df.phones.str.endswith(' IH0 D')]
@@ -132,6 +184,8 @@ if __name__ == "__main__":
     libri_words_df[libri_words_df.phones.str.endswith(' D AH0 D')]
 
     libri_words_df[libri_words_df.phones.str.endswith(' S')]
+    libri_words_df[libri_words_df.phones.str.endswith(' S') & libri_words_df.word.str.endswith('s')]
+
 
     libri_words_df[libri_words_df.phones.str.endswith(' V D')]
     libri_words_df[libri_words_df.phones.str.endswith(' M D')]
