@@ -13,3 +13,4 @@ tqdm
 gunicorn
 seaborn
 ordered_set
+g2p_en
