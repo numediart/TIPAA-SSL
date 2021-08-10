@@ -8,6 +8,10 @@ import numpy as np
 import itertools
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char
 
+from g2p_en.expand import normalize_numbers
+from g2p_en import G2p
+g2p = G2p()
+
 cmudict_dict=cmudict.dict()
 
 
@@ -71,19 +75,22 @@ def get_cmudict_info(word='university'):
     """
     return cmudict_dict[word][0]
 
-def remove_special_characters(sentence="Where's the best place to have coffee ?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'):
+def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\;\:\"\*]'):
     """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
 
     Args:
         sentence (str, optional): [description]. Defaults to "Where's the best place to have coffee ?".
         lowercase (bool, optional): [description]. Defaults to True.
-        chars_to_ignore_regex (str, optional): [description]. Defaults to '[\,\?\.\!\-\;\:\"]'.
+        chars_to_ignore_regex (str, optional): [description]. Defaults to '[\,\?\.\!\;\:\"\*]'.
 
     Returns:
         str: normalized sentence
     """
     # from https://huggingface.co/blog/fine-tune-wav2vec2-english
     sentence = re.sub(chars_to_ignore_regex, '', sentence)
+
+    # I saw this weird quote show up and mess the rest up
+    sentence=sentence.replace("’","'")
 
     if lowercase:
         sentence=sentence.lower()
@@ -92,7 +99,7 @@ def remove_special_characters(sentence="Where's the best place to have coffee ?"
     sentence=' '.join(list(filter(None, sentence.split(' '))))
     return sentence
 
-def phonetics_from_sentence(sentence="Where's the best place to have coffee ?"):
+def phonetics_from_sentence(sentence="Where's the best place to have coffee?"):
     sentence=remove_special_characters(sentence)
     words=sentence.split(' ')
     # drop empty strings
@@ -223,7 +230,7 @@ def syllables_data(syl_sep='|'):
     syllables=pd.concat([syllables,syllables_add])
 
     # http://hindson.com.au/info/free/free-english-language-hyphenation-dictionary/
-    # syllables=pd.read_csv('EnglishHyphDict_v108.txt', header=None, sep=' ')
+    # syllables=pd.read_csv('data/EnglishHyphDict_v108.txt', header=None, sep=' ')
     # syllables.iloc[:,1]=syllables.iloc[:,1].str.strip(';')
     # syllables.iloc[:,1]=syllables.iloc[:,1].str.replace('-','_')
     # # syllables.iloc[:,0]=syllables.iloc[:,1]
@@ -248,12 +255,12 @@ def syllables_data(syl_sep='|'):
             n_syls.append(int(len(r[0].split(syl_sep))))
         except:
             n_syls.append(None)
-        try:
-            phonetics.append(' '.join(d[text][0]))
-            n_vowels_cmu.append(int(n_vowels(d[text][0])))
-        except IndexError:
-            n_vowels_cmu.append(None)
-            phonetics.append(None)
+        # try:
+        #     phonetics.append(' '.join(d[text][0]))
+        #     n_vowels_cmu.append(int(n_vowels(d[text][0])))
+        # except IndexError:
+        #     n_vowels_cmu.append(None)
+        #     phonetics.append(None)
         try:
             n_syls_SonoriPy.append(n_syl_SonoriPy(d[text][0]))
         except IndexError:
@@ -262,50 +269,49 @@ def syllables_data(syl_sep='|'):
     syllables.syllables=syllables.syllables.str.lower()
     
     syllables['normalized_text']=texts
-    syllables['phonetics']=phonetics
+    # syllables['phonetics']=phonetics
 
     syllables['n_syls']=n_syls
     syllables['n_syls_SonoriPy']=n_syls_SonoriPy
-    syllables['n_vowels_cmu']=n_vowels_cmu
+    # syllables['n_vowels_cmu']=n_vowels_cmu
 
-    syllables[syllables.n_vowels_cmu.isnull()].normalized_text.tolist()
-    len(syllables[~syllables.n_vowels_cmu.isnull()].normalized_text.tolist())
+    # syllables[syllables.n_vowels_cmu.isnull()].normalized_text.tolist()
+    # len(syllables[~syllables.n_vowels_cmu.isnull()].normalized_text.tolist())
 
-    syllables=syllables.dropna()
-    # syllables[syllables.n_syls==syllables.n_vowels_cmu]
-    # syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
-    # syllables[syllables.n_vowels_cmu!=syllables.n_syls_SonoriPy]
+    if False:
+        syllables=syllables.dropna()
 
-    # syllables[syllables.normalized_text=="really"]
+        # syllables[syllables.n_syls==syllables.n_vowels_cmu]
+        # syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
+        # syllables[syllables.n_vowels_cmu!=syllables.n_syls_SonoriPy]
 
-    # Some words have several possibilities of text syllable segmentation.
-    # For a given word, if there are some that for which n_syls!=n_syls_SonoriPy, and others for which n_syls==n_syls_SonoriPy
-    # then I only keep those for which n_syls==n_syls_SonoriPy
+        # syllables[syllables.normalized_text=="really"]
 
-    inconsistent_syls=syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
-    lens=[]
-    for i,r in inconsistent_syls.iterrows():
-        lens.append(len(syllables[syllables.normalized_text==r.normalized_text]))
-    
-    inconsistent_syls['n_syl_text_alternatives']=lens
+        # Some words have several possibilities of text syllable segmentation.
+        # For a given word, if there are some that for which n_syls!=n_syls_SonoriPy, and others for which n_syls==n_syls_SonoriPy
+        # then I only keep those for which n_syls==n_syls_SonoriPy
 
-    # Select the ones who have potentially another solution with a consistent number of syls
-    candidates_for_good_alt=inconsistent_syls[inconsistent_syls['n_syl_text_alternatives']>1]
+        inconsistent_syls=syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
+        lens=[]
+        for i,r in inconsistent_syls.iterrows():
+            lens.append(len(syllables[syllables.normalized_text==r.normalized_text]))
+        
+        inconsistent_syls['n_syl_text_alternatives']=lens
 
-    # If there are possibilities with consistent number of syllables, remove the inconsistent ones
-    idx_to_remove=[]
-    for i,r in candidates_for_good_alt.iterrows():
-        alts=syllables[syllables.normalized_text==r.normalized_text]
-        if len(alts[alts.n_syls==alts.n_syls_SonoriPy])>0:
-            idx_to_remove+=alts[alts.n_syls!=alts.n_syls_SonoriPy].index.tolist()
-    syllables=syllables.drop(idx_to_remove)
+        # Select the ones who have potentially another solution with a consistent number of syls
+        candidates_for_good_alt=inconsistent_syls[inconsistent_syls['n_syl_text_alternatives']>1]
+
+        # If there are possibilities with consistent number of syllables, remove the inconsistent ones
+        idx_to_remove=[]
+        for i,r in candidates_for_good_alt.iterrows():
+            alts=syllables[syllables.normalized_text==r.normalized_text]
+            if len(alts[alts.n_syls==alts.n_syls_SonoriPy])>0:
+                idx_to_remove+=alts[alts.n_syls!=alts.n_syls_SonoriPy].index.tolist()
+        syllables=syllables.drop(idx_to_remove)
 
     syllables.to_csv('data/syllables.csv')
 
     return syllables
-
-def corrected_syllables():
-    syllables=syllables_data(syl_sep='|')
 
 def generate_syl_phonetics_alternatives_from_word(word="before"):
     """"Looks up in cmudict for phonetic alternatives, and apply SonoriPy on all alternatives
@@ -318,18 +324,43 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
         for default input: [[['B', 'IH0'], ['F', 'AO1', 'R']], [['B', 'IY2'], ['F', 'AO1', 'R']]]
     """
     ps=cmudict_dict[word]
+
+    # fallbacks
+    if ps==[]:
+        if '-' in word:
+            w_parts=word.split('-')
+            p_parts=[]
+            for w_part in w_parts:
+                p_part=cmudict_dict[w_part]
+                if p_part==[]:
+                    p_part=[g2p(w_part)]
+                p_parts.append(p_part)
+
+            # TODO: Here I could generate all alternatives instead of taking the firs teverytime.
+            # It would correspond to cmu alternatives for other words
+            p_parts_0=[p_part[0] for p_part in p_parts]
+            p_parts_0_cat=[]
+            for el in p_parts_0: p_parts_0_cat+=el
+            ps=[p_parts_0_cat]
+
+        else:
+            ps=[g2p(word)]
+
     syl_ps=[]
     for p in ps:
-        syl_ps.append(SonoriPy(p)[0])
+        try:
+            syl_ps.append(SonoriPy(p)[0])
+        except:
+            import pdb;pdb.set_trace()
     return syl_ps
 
 
-def syllabified_text(word, syllables_df):
+def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv')):
     """Construct syllabified word from a word.
 
      text with syllable segmentation is done with several rules/steps:
         -Use our syllables dataset
-        -If does not exist, check if only 1 vowel (trivial because 1 syllable) ⇒ in that case syllable=text
+        -If does not exist, check if only 1 vowel (trivial because 1 syllable) ==>  in that case syllable=text
         -If not, fall back to use SonoriPy (sonority sequencing principle) with letters.
     It is less accurate than with phonemes but we use it only on fallback.
     I improved this part with logic in this (trailing "e", "-ed", "-es" ):
@@ -348,21 +379,26 @@ def syllabified_text(word, syllables_df):
             used_method='1 syl in cmu'
             return syls_text, used_method
     try:
-        syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
+        # If there exist choices with consistent number of syllables, let's take the first one of these.
+        a=syllables_df[syllables_df.n_syls==syllables_df.n_syls_SonoriPy].loc[syllables_df.normalized_text==word]
+        if len(a)>0:
+            syls_text=a.syllables.values[0]
+        else:
+            syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
         used_method='dataset'
     except IndexError:
 
-        # for the final -ed, remove the "e" except if "-ded" or "-ted"
+        # for the final -ed, remove the "e" except if "-ded" or "-ted" or "-ired"
         # We remember if we did to insert back the "e" after syllabification
         modified_ed=False
         # smiles -> remove the e,   raises -> don't
         modified_es=False
         trailing_e=False
 
-        if word[-2:]=="ed" and word[-3] not in ['t','d']:
+        if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
             word=word[:-2]+'d'
             modified_ed=True
-        elif word[-2:]=="es" and word[-3] not in ['s','c']:
+        elif word[-2:]=="es" and word[-3] not in ['s','c','g']:
             word=word[:-2]+'s'
             modified_es=True
         elif word[-1]=="e":
@@ -423,7 +459,7 @@ def add_special_char(s_orig, s_modified):
     """This function adds punctuation marks to modified text (here with syllable separation symbols "|") 
     at the end of words from an original sentence.
     This assumes that punctuation marks are glued to words, which is the case in english. 
-    This assumption allows us to just check if the last charcter is the same in original and modified text
+    This assumption allows us to just check if the last character is the same in original and modified text
     "Hello, my name is John."
     "hello my name is john"
     -> hello and john no not have the last same character.
@@ -449,7 +485,7 @@ def add_special_char(s_orig, s_modified):
             s_modified_with_special_chars.append(w_modified)
     return ' '.join(s_modified_with_special_chars)
 
-def prefill_for_sentence(sentence, syllables_data, syl_sep='|'):
+def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_data=pd.read_csv('data/syllables.csv'), syl_sep='|'):
     """This function extract information of syllabified texts and phonetics. 
     It uses a combination of datasets (CMUdict, data from syllable_data() ) and algorithm (SonoriPy)
 
@@ -461,12 +497,49 @@ def prefill_for_sentence(sentence, syllables_data, syl_sep='|'):
     Returns:
         dict: see structure a the end of the function
     """
-    words=remove_special_characters(sentence).split(' ')
+    # this takes care of e.g. "2021", "$110"
+    sentence=normalize_numbers(sentence)
+    words=remove_special_characters(sentence, lowercase=False).split(' ')
+
+    # If all letters are capital (acronym), put syl_sep between all letters
+    # I need to do that before putting in lowercase, that is why I cannot put that in e.g. syllabified_text()
+    ws=[]
+    acronym_idxs=[]
+    for w_idx,w in enumerate(words):
+        if w.isupper():
+            acronym_idxs.append(w_idx)
+            w_sep=''
+            # add the syl_sep after every character of the acronym
+            for c in w:
+                w_sep+=c+syl_sep
+            w=w_sep[:-1]
+        ws.append(w)
+    words=ws
+
+    words=[word.lower() for word in words]
+
     syls_texts=[]
     used_method_syllables=[]
     for word in words:
-        syls_texts.append(syllabified_text(word, syllables_data)[0])
-        used_method_syllables.append(syllabified_text(word, syllables_data)[1])
+        # # This split and rejoin will apply only if there is a dash and then allow to treat separatelyparts of a word with dash
+        # if False:
+        if '-' in word:
+            syls_texts_parts=[]
+            used_method_syllables_parts=[]
+            for w_part in word.split('-'):
+                syls_texts_parts.append(syllabified_text(w_part, syllables_data)[0])
+                used_method_syllables_parts.append(syllabified_text(w_part, syllables_data)[1])
+            syls_texts.append('|-'.join(syls_texts_parts))
+            used_method_syllables.append('-'.join(used_method_syllables_parts))
+        else:
+            syls_texts.append(syllabified_text(word, syllables_data)[0])
+            used_method_syllables.append(syllabified_text(word, syllables_data)[1])
+    
+    # put back acronyms in syls_texts, and ignore what was there
+    for i in acronym_idxs:
+        syls_texts[i]=words[i]
+        used_method_syllables[i]='acronym'
+
     case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), remove_special_characters(sentence, lowercase=False), syl_sep=syl_sep)        
     case_syls_texts=add_special_char(sentence, case_syls_texts)
 
@@ -476,48 +549,64 @@ def prefill_for_sentence(sentence, syllables_data, syl_sep='|'):
     # p=generate_syl_phonetics_from_words(words, np.zeros(len(words)))
     p=[generate_syl_phonetics_alternatives_from_word(word) for word in words]
 
+    # phonetics for acronyms will be empty. I replace that by a lookup of every letter
+    for i in acronym_idxs:
+        # I separate the acronym in letters and lookup cmudict. I take the last, because
+        # there is only one alternative except for letter 'A' which has  [['AH0'], ['EY1']]
+        p[i]=[[cmudict_dict[w][-1] for w in words[i].split(syl_sep)]]
+
     # g -> gibberish
     # go through levels of the list (alternatives, words, syllables, phones) and then convert every phoneme in gibberish
     g=[[[[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in syl] for syl in word] for word in alt] for alt in p]
     
     # This puts 
-    # '|' between phonemes
-    # '_' between syllables
+    # '_' between phonemes
+    # '|' between syllables
     # spaces between words 
     # to have less degrees of nested list and be compatible with the database
-    # p2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in p]
-    # g2=[' '.join(['|'.join(['_'.join(syl) for syl in word]) for word in alt]) for alt in g]
-    
-    p2=[['|'.join(['_'.join(syl) for syl in word]) for word in alt] for alt in p]
-    g2=[['|'.join(['_'.join(syl) for syl in word]) for word in alt] for alt in g]
+    p2=[[syl_sep.join(['_'.join(syl) for syl in word]) for word in alt] for alt in p]
+    g2=[[syl_sep.join(['_'.join(syl) for syl in word]) for word in alt] for alt in g]
     
     n_alternatives=[len(el) for el in p2]
     g_hr=[[el.replace('_','') for el in w] for w  in g2]
 
+    n_syls_in_g_hr=[[len(alt.split(syl_sep)) for alt in word] for word in g_hr]
+    n_syls_in_text=[len(word.split(syl_sep)) for word in syls_texts]
+
+    # among alternatives of phonetics (or gibberish), take the first index for which the number of syllables is equal (i.e. difference=0)
+    # if there are none, just take the first alternative (index=0)
+    idxs_syls_consistent=[]
+    for syl_g,syl_t in zip(n_syls_in_g_hr, n_syls_in_text):
+        try:
+            idxs_syls_consistent.append((np.array(syl_g)-syl_t).tolist().index(0))
+        except:
+            idxs_syls_consistent.append(0)
+
+
     try:
         n_syl_mismatches=[]
-        for w1,w2 in zip(case_syls_texts.split(' '),[el[0] for el in p2]):
-            n_syl_mismatch=int(len(w1.split('|'))!=len(w2.split('|')))
+        for w1,w2 in zip(case_syls_texts.split(' '),[el[idxs_syls_consistent[i]] for i,el in enumerate(p2)]):
+            n_syl_mismatch=int(len(w1.split(syl_sep))!=len(w2.split(syl_sep)))
             n_syl_mismatches.append(n_syl_mismatch)
     except IndexError:
         n_syl_mismatches=[]
 
     # n_syl_mismatch=int(len(case_syls_texts.split('|'))!=len(p2.split('|')))
+    # Keep first alternative. 
 
-    # Keep first alternative. Maybe in the future I can store all the alternatives in another variable
     try:
         # p2=p2[0]
-        p2_0=' '.join([el[0] for el in p2])
+        p2_0=' '.join([el[idxs_syls_consistent[i]] for i,el in enumerate(p2)])
     except IndexError:
         p2_0=''
     try:
         # g2=g2[0]
-        g2_0=' '.join([el[0] for el in g2])
+        g2_0=' '.join([el[idxs_syls_consistent[i]] for i,el in enumerate(g2)])
     except IndexError:
         g2_0=''
     try:
         # g2=g2[0]
-        g_hr_0=' '.join([el[0] for el in g_hr])
+        g_hr_0=' '.join([el[idxs_syls_consistent[i]] for i,el in enumerate(g_hr)])
     except IndexError:
         g_hr_0=''
     
@@ -526,7 +615,7 @@ def prefill_for_sentence(sentence, syllables_data, syl_sep='|'):
         'pronounciation_guide':g2_0,
         'pronounciation_guide_hr':g_hr_0,
         'syllable_parts':case_syls_texts,
-        'n_syl_mismatch':sum(n_syl_mismatches),
+        'n_syl_mismatch':sum(n_syl_mismatches) if n_syl_mismatches!=[] else 1, # if is it empty, then there is also mistake
         'n_syl_mismatches':n_syl_mismatches,
         'used_method_for_syl_text':used_method_syllables,
         'cmu_phonetics_alt':p2,
@@ -561,9 +650,8 @@ def prefill_content(sentences, syl_sep='|'):
     return df
 
 
-def generate_prefill_csv(
-                            # path='phrases_speaking_activities.txt', 
-                            path='phrases_dynamoDB.txt',
+def generate_prefill_csv(                            # path='data/phrases_speaking_activities.txt', 
+                            path='data/phrases_dynamoDB.txt',
                             syl_sep='|', 
                             out_path='prefill_test.csv'):
     """Reads a text file containing phrases and uses prefill_content to return a CSV of syllabified texts and phonetics
@@ -580,15 +668,19 @@ def generate_prefill_csv(
     df=prefill_content(sentences.iloc[:,0].tolist(), syl_sep=syl_sep)
     df.text=sentences
 
-    syl_parts_with_special_characters=[]
-    for _,r in df.iterrows():
-        syl_parts_with_special_characters.append(add_special_char(r.text, r.syllable_parts))
+    # syl_parts_with_special_characters=[]
+    # for _,r in df.iterrows():
+    #     syl_parts_with_special_characters.append(add_special_char(r.text, r.syllable_parts))
     
-    df.syllable_parts=syl_parts_with_special_characters
+    # df.syllable_parts=syl_parts_with_special_characters
     df.to_csv(out_path) 
+    print("Total syl inconsistencies:", df['n_syl_mismatch'].sum())
     return df
 
-
+def word_selection():
+    # words that finish in "s" with phoneme "S" that also exist without an "s" and with last phoneme then not being "S"
+    words_in_s=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='S' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='S']
+    
 # obsolete functions backup
 if False:
     def generate_syl_phonetics_from_words(words, indxs):
@@ -646,7 +738,7 @@ if __name__ == "__main__":
     df.iloc[:,-3:]
     df.iloc[:,-5:-1]
 
-    sentences=pd.read_csv('phrases-for-noe.txt', sep='/', header=None)
+    sentences=pd.read_csv('data/phrases-for-noe.txt', sep='/', header=None)
     sentences=sentences.iloc[:,0].apply(lambda r: remove_special_characters(r)).tolist()
     df=prefill_content(sentences)
 
