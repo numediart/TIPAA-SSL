@@ -270,3 +270,24 @@ git clone https://github.com/flowchase/audio-with-analysis-ids
 ```
 
 You can use ```get_data()``` function.
+
+## Using AWS Polly
+
+Get an access ID from AWS: https://www.youtube.com/watch?v=VtuXrzfGLKQ&ab_channel=ActivePresenter
+
+Doc:
+https://docs.aws.amazon.com/polly/latest/dg/get-started-cli-exercise.html
+
+The script ```tts_aws.py``` allows you to synthesize a list of sentences.
+
+Use scp command to download them:
+
+```
+scp -r -i "~/flowspeech.pem" ec2-user@ec2-52-47-122-20.eu-west-3.compute.amazonaws.com:~/Flowspeech/synth_audio/ .
+```
+
+Details on AWS Polly CLI arguments and options:
+https://docs.aws.amazon.com/cli/latest/reference/polly/synthesize-speech.html
+
+SSML options:
+https://docs.aws.amazon.com/polly/latest/dg/supportedtags.html
