@@ -387,7 +387,6 @@ def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv')):
             syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
         used_method='dataset'
     except IndexError:
-
         # for the final -ed, remove the "e" except if "-ded" or "-ted" or "-ired"
         # We remember if we did to insert back the "e" after syllabification
         modified_ed=False
@@ -407,7 +406,10 @@ def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv')):
         elif word[-3:]=="les" and word[-4] not in stops: # do it for e.g. "smiles", but not gor "angles, muscles, articles, ..."
             word=word[:-2]+'s'
             modified_es=True
-        elif word[-1]=="e":
+        elif word[-1]=="e" and word[-2:]!='le': #this last one is treated hereafter because it depends
+            word=word[:-1]
+            trailing_e=True
+        elif word[-2:]=="le" and word[-3] not in stops: # do it for e.g. "smile", but not for "angle, muscle, article, ..."
             word=word[:-1]
             trailing_e=True
         
