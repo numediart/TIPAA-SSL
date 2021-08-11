@@ -395,10 +395,16 @@ def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv')):
         modified_es=False
         trailing_e=False
 
+        from syllabipy.sonoripy import define_categories
+        _,vowels,nasals,fricatives,affricates,stops=define_categories()
+
         if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
             word=word[:-2]+'d'
             modified_ed=True
-        elif word[-2:]=="es" and word[-3] not in ['s','c','g']:
+        elif word[-2:]=="es" and word[-3] not in ['s','c','g','x'] and word[-4:]!='ches' and word[-4:]!='shes' and word[-3:]!='les': #this last is treated hereafter because it dependes
+            word=word[:-2]+'s'
+            modified_es=True
+        elif word[-3:]=="les" and word[-4] not in stops: # do it for e.g. "smiles", but not gor "angles, muscles, articles, ..."
             word=word[:-2]+'s'
             modified_es=True
         elif word[-1]=="e":
