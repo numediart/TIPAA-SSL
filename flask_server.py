@@ -138,6 +138,7 @@ def module_api(module):
 
 
 import ast
+from text_processing import cmu_to_gibberish
 @app.route('/phonemeContrast', methods=['GET', 'POST'])
 def phoneme_contrast_api():
     content = request.form
@@ -171,8 +172,22 @@ def phoneme_contrast_api():
         phonetic_detection=result
     # phonetic_GT=phonetics_from_sentence(text)[int(word_idx)]
     # d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
+
+    word_idx=int(word_idx)
     
-    d={'status':status, 'phonetic_detection':phonetic_detection}
+    # extract the syllables which contain the target
+    syls_with_target=[syl for syl in phonetics.split(' ')[word_idx].split('|') if target in syl]
+    syls_detection=[syl.replace(target, phonetic_detection[i]) for i,syl in enumerate(syls_with_target)]
+
+    gs_t=[]
+    gs_d=[]
+    for syl_t,syl_d in zip(syls_with_target,syls_detection):
+        g_t=[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in syl_t.split('_')]
+        g_d=[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in syl_d.split('_')]
+        gs_t.append('_'.join(g_t))
+        gs_d.append('_'.join(g_d))
+    
+    d={'status':status, 'phonetic_detection':phonetic_detection, 'gibberish_truth':gs_t, 'gibberish_detected':gs_d}
     response=json.dumps(d)
     return response
 

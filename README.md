@@ -69,7 +69,7 @@ The logic behind them is to use text and audio as input. The text is automatical
 - phonemeContrast gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes)
 ```
 url='/phonemeContrast'
-data={"phonetics":phonetics, 'rID':rID, 'word_id':word_id, 'alternatives':alternatives, 'target':target}
+data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target}
 ```
 As before, the phonetics is consituted of CMU phonemes with seperators for phonemes ("_"), syllables ("|") and words (" ").
 For alternatives, one alternative is considered a word of several phonemes.
@@ -78,7 +78,7 @@ An example for a recording containing "I visited Italy". We want to study the ph
 ```
 data={'phonetics': 'AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0',
 'rID': '487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
-'word_id': 1,
+'word_idx': 1,
 'alternatives': 'IH0 IY0',
 'target': 'IH0'}
 ```
@@ -87,7 +87,7 @@ To study e.d. the "-ed" termination, you would need to input `'target': 'IH0_D'`
 
 And as there are two "IH0", I put alternatives for both, and return the detection of both like this:
 ```
-b'{"status": "success", "phonetic_detection": ["IH0", "IH0"]}'
+b'{"status": "success", "phonetic_detection": ["IH0", "IH0"], "gibberish_truth": ["z_i", "t_i_d"], "gibberish_detected": ["z_i", "t_i_d"]}'
 ```
 
 Now, for this same sentence "I visited Italy", we want to study the -ed termination of "visited", it would be like this:
@@ -96,7 +96,7 @@ The input:
 ```
 data={'phonetics': 'AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0',
 'rID': b'487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
-'word_id': 1,
+'word_idx': 1,
 'alternatives': "IH0_D D T",
 'target': 'IH0_D'}
 ```
@@ -210,6 +210,11 @@ docker exec flaskapp git pull
 Connect to a bash terminal without affecting the running state. 
 ```
 docker exec -it flaskapp bash
+```
+
+To show terminal output:
+```
+docker logs flaskapp
 ```
 ## Manual Installation
 ### Install HTK
