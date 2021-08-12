@@ -1,4 +1,5 @@
 import cmudict
+from pandas.io import pickle
 import textgrid
 # doc: https://github.com/kylebgorman/textgrid
 from itertools import compress
@@ -161,10 +162,83 @@ def selection_with_and_without_s(libri_words_df, word='speak'):
     
 
 
+def frequent_selection_containing(libri_words_df, phones=['AO0','IY1'], letters=[], n=20, option="contains"):
+    """select from libri_words_df with criteria, then does a selection based on frequence in the list, sorted
+
+    Args:
+        phones (list, optional): [description]. Defaults to ['AO0','IY1'].
+        letters (list, optional): [description]. Defaults to [].
+        n (int, optional): [description]. Defaults to 20.
+        option (str, optional): [description]. Defaults to "contains". can be 'endswith' or 'startstwith'
+
+    Returns:
+        [type]: [description]
+    """
+    
+    def select(selection, phone, column='phones'):
+        # apply one selection criteria
+        if option=='contains':
+            try:
+                selection=selection[selection[column].str.contains(phone)]
+            except:import pdb;pdb.set_trace()
+        elif option=='endswith':
+            selection=selection[selection[column].str.endswith(phone)]
+        elif option=='startswith':
+            selection=selection[selection[column].str.startswith(phone)]
+        else:
+            print('option should be in: ["contains","endwith","startswith"]')
+        return selection
+    
+    selection=libri_words_df
+    for phone in phones: selection=select(selection,phone)
+    for l in letters:selection=select(selection,l, 'word')
+
+    content=learning_content(selection, n=n)
+    content.index=range(len(content))
+    filename=option
+    
+    if phones!=[]:filename+='_phones_'+'_'.join(phones)
+    if letters!=[]:filename+='_letters_'+'_'.join(letters)
+    filename+='_n_'+str(n)
+
+    selection.to_csv('results/'+filename+'.csv')
+
+    return content
+
+
+def frequent_word_selections_for_phones(libri_words_df,
+                            phones=['IH0','IH1','IH2','IY0','IY1','IY2','AA0','AA1','AA2','AO0','AO1','AO2','OW0','OW1','OW2'], n=200):
+    dfs=[]
+    for phone in phones: 
+        dfs.append(frequent_selection_containing(libri_words_df,[phone], n=n).word)
+    df=pd.concat(dfs,axis=1)
+    df.columns=phones
+    return df
+
+
+def frequent_ed_word_selections_by_termation(libri_words_df, n=200):
+    from module_performance import get_phone_termination_dict
+    phone_termination_dict, correct_alternatives=get_phone_termination_dict()
+    import pickle
+    res=pickle.load(open('performance_results/ed_performance_dev-clean.p','rb'))
+    good_preterminations=[k for k in res['performances'] if res['performances'][k]>=0.8]
+    bad_preterminations=[k for k in res['performances'] if res['performances'][k]<0.8]
+
+    terminations=list(correct_alternatives.keys())
+
+    for term in terminations:
+        preterm_selection=[pret for pret in good_preterminations if phone_termination_dict[pret]==term]
+        dfs=[]
+        for preterm in preterm_selection:
+            full_termination=' '+' '.join([preterm,term])
+            dfs.append(frequent_selection_containing(libri_words_df, phones=[full_termination], letters=['ed'], option='endswith', n=n).word)
+        df=pd.concat(dfs,axis=1)
+        df.columns=preterm_selection
+        df.to_csv('results/ed_in_'+term+'.csv')
 
 if __name__ == "__main__":
-    # libri_words_df=build_librispeech_words_df()
-    libri_words_df=build_librispeech_words_df(n=10000)
+    libri_words_df=build_librispeech_words_df()
+    # libri_words_df=build_librispeech_words_df(n=10000)
 
     libri_words_df[libri_words_df.word=='speaks']
     selection=libri_words_df[libri_words_df.word=='speak']
@@ -211,28 +285,9 @@ if __name__ == "__main__":
 
     selection=libri_words_df[libri_words_df.phones.str.endswith(' P T') & libri_words_df.word.str.endswith('ped')]
 
-    selection=libri_words_df[libri_words_df.phones.str.contains('AO1')]
-    content=learning_content(selection, n=20)
-    content.index=range(len(content))
-    content
-
-    selection=libri_words_df[libri_words_df.phones.str.contains('OW1')]
-    content=learning_content(selection,    n=10)
-    content.index=range(len(content))
-    content
-
-    selection=libri_words_df[libri_words_df.phones.str.contains('EH1') & libri_words_df.word.str.contains('ea')]
-    content=learning_content(selection,    n=10)
-    content.index=range(len(content))
-    content
+    frequent_selection_containing(libri_words_df,['IH1'], n=200)
 
 
-    selection=libri_words_df[libri_words_df.phones.str.contains(' IY1') & libri_words_df.word.str.contains('ea')]
-    selection=libri_words_df[libri_words_df.phones.str.contains('IY1') & libri_words_df.word.str.contains('ea')]
-    content=learning_content(selection,    n=10)
-    content.index=range(len(content))
-    content
-    
     libri_words_df[libri_words_df.phones.str.contains(' IY1 ') & libri_words_df.word.str.contains('ea')]
     libri_words_df[libri_words_df.phones.str.contains(' UH1 ') & libri_words_df.word.str.contains('oo')]
     libri_words_df[libri_words_df.phones.str.contains(' UW1 ') & libri_words_df.word.str.contains('oo')]
@@ -245,14 +300,6 @@ if __name__ == "__main__":
     sents=[]
     for i,r in selection.iterrows():
         sents.append(get_sentence(r.path))
-
-
     example=selection.iloc[0,:]
 
     get_phone_timings(f=example.path, word_idx=example.word_idx)
-
-
-    # tg[0] -> words
-    # tg[1] -> phones
-    # words=[el.mark for el in tg[0]]
-    # phones=[el.mark for el in tg[1]]
