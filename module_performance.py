@@ -341,6 +341,9 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
         full_termination=' '+' '.join([pretermination,termination])
         correct_terminations=[' '+' '.join([pretermination,el]) for el in correct_alternatives[termination]]
         selection=libri_words_df[libri_words_df.phones.str.endswith(full_termination)]
+        # make sure the text ends with -ed. It get rids of words such as "and"
+        selection=selection[selection.word.str.endswith('ed')]
+        
 
         if len(selection)>0:
             results_df=compute_prediction_results(selection, libri_words_df, target_phones=termination)
@@ -408,7 +411,7 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None):
         pickle.dump(all_results_s, open('performance_results/final_s_from_audiobook_data_performance_'+data_set+'_from_'+str(n)+'egs.p', 'wb'))
     
     # all_results_s['failure'][all_results_s['failure'].phones.str.endswith(' T S')]
-    all_results['failure'][all_results_s['failure'].phones.str.endswith(' T S')]
+    # all_results['failure'][all_results['failure'].phones.str.endswith(' T')]
 
     return all_results, all_results_s
             
@@ -813,7 +816,9 @@ if __name__ == "__main__":
     pContrast_from_audiobook_data(target_phones='AO1', alternatives=['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2'], n=100)
     pContrast_from_audiobook_data(target_phones='AO1', alternatives=['AO1', 'OW1'], n=100)
     pContrast_from_audiobook_data(target_phones='IY1', alternatives=['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2'], n=100)
-    pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1'], n=20)
+    pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1'], n=100)
+    pContrast_from_audiobook_data(target_phones='IH0', alternatives=['IH0', 'IY0'], n=100)
+
     
     pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1', 'AY1'], n=20)
 
