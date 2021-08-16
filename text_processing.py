@@ -499,7 +499,11 @@ def add_special_char(s_orig, s_modified):
                 if location=="start":
                     if w_orig[i]==w_modified[0]:return i
         # glue the special characters the to the body
-        s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified+w_orig[-get_n_spec_char(location='end'):][1:])
+        if not get_n_spec_char(location='end'):
+            s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified+w_orig[-get_n_spec_char(location='end'):][1:])
+        else:
+            s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified)
+
 
     return ' '.join(s_modified_with_special_chars)
 
@@ -559,6 +563,7 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
         used_method_syllables[i]='acronym'
 
     case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), remove_special_characters(sentence, lowercase=False), syl_sep=syl_sep)        
+    
     case_syls_texts=add_special_char(sentence, case_syls_texts)
 
 
