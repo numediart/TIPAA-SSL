@@ -467,10 +467,12 @@ def add_special_char(s_orig, s_modified):
     """This function adds punctuation marks to modified text (here with syllable separation symbols "|") 
     at the end of words from an original sentence.
     This assumes that punctuation marks are glued to words, which is the case in english. 
-    This assumption allows us to just check if the last character is the same in original and modified text
+    This assumption allows us to just check if the first and last characters are the same in original and modified text
     "Hello, my name is John."
     "hello my name is john"
-    -> hello and john no not have the last same character.
+    -> hello and john do not have the last same character.
+
+    "*Hello*," / "hello", we extract "*" and "*,"
 
     Example:
     s_orig="I'm taking a Spanish class."
@@ -487,10 +489,18 @@ def add_special_char(s_orig, s_modified):
     """
     s_modified_with_special_chars=[]
     for w_orig, w_modified in zip(s_orig.split(' '), s_modified.split(' ')):
-        if w_orig[-1]!=w_modified[-1]:
-            s_modified_with_special_chars.append(w_modified+w_orig[-1])
-        else:
-            s_modified_with_special_chars.append(w_modified)
+        # n_spec_char=
+        def get_n_spec_char(location='start'):
+            # get the number of special character at the start or at the end of the word, 
+            # by looking at every character of the orig (containing the special characters)
+            for i in range(len(w_orig)):
+                if location=="end":
+                    if w_orig[-i]==w_modified[-1]:return i
+                if location=="start":
+                    if w_orig[i]==w_modified[0]:return i
+        # glue the special characters the to the body
+        s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified+w_orig[-get_n_spec_char(location='end'):][1:])
+
     return ' '.join(s_modified_with_special_chars)
 
 def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_data=pd.read_csv('data/syllables.csv'), syl_sep='|'):
@@ -529,7 +539,7 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
     syls_texts=[]
     used_method_syllables=[]
     for word in words:
-        # # This split and rejoin will apply only if there is a dash and then allow to treat separatelyparts of a word with dash
+        # # This split and rejoin will apply only if there is a dash and then allow to treat separately parts of a word with dash
         # if False:
         if '-' in word:
             syls_texts_parts=[]
@@ -590,7 +600,6 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
         except:
             idxs_syls_consistent.append(0)
 
-
     try:
         n_syl_mismatches=[]
         for w1,w2 in zip(case_syls_texts.split(' '),[el[idxs_syls_consistent[i]] for i,el in enumerate(p2)]):
@@ -638,7 +647,7 @@ def prefill_content(sentences, syl_sep='|'):
     The result is saved in a DataFrame.
 
     Args:
-        sentences ([type]): list of sentences (can conatin special characters and capital letters)
+        sentences ([type]): list of sentences (can contain special characters and capital letters)
         syl_sep (str, optional): [description]. Defaults to '|'.
 
     Returns:
