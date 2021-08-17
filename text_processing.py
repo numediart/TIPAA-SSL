@@ -520,8 +520,11 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
         dict: see structure a the end of the function
     """
     # this takes care of e.g. "2021", "$110"
-    sentence=normalize_numbers(sentence)
-    words=remove_special_characters(sentence, lowercase=False).split(' ')
+    # sentence=normalize_numbers(sentence)
+
+    # sentence.split(' ')
+
+    words=remove_special_characters(normalize_numbers(sentence), lowercase=False).split(' ')
 
     # If all letters are capital (acronym), put syl_sep between all letters
     # I need to do that before putting in lowercase, that is why I cannot put that in e.g. syllabified_text()
