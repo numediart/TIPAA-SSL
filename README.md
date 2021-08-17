@@ -19,11 +19,11 @@ files = {'file': file}
 ```
 The server returns a random ID "rID" to be used for processing afterwards.
 
-### Call a module with arguments:
+### Call a module with arguments (for sentenceStress and wordStress):
 ```
 module="sentenceStress" # or "wordStress"
 url= "/flowspeech/"+module
-data={"phonetics":phonetics, "rID":rID}
+data={"text":text, "phonetics":phonetics, "rID":rID}
 ```
 The phonetics is consituted of CMU phonemes with seperators for phonemes ("_"), syllables ("|") and words (" ").
 
@@ -37,9 +37,8 @@ An example of feedback for each module:
 For the sentence "I would love to go to ireland", 
 input:
 ```
-data={"phonetics":"AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
+data={"text":"I would love to go to ireland!", "phonetics":"AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
 ```
-
 
 the correct answer would be:
 ```
@@ -54,7 +53,7 @@ b'{"status": "success", "stress_intensities": [83, 49, 85, 27, 57, 27, 73], "str
 For the word "toothpaste", input:
 
 ```
-data={"phonetics":'T_UW1_TH|P_EY2_S_T', "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
+data={"text":"toothpaste", "phonetics":'T_UW1_TH|P_EY2_S_T', "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
 ```
 answer:
 ```
@@ -179,7 +178,8 @@ docker container kill $(docker ps -q)
 On AWS, I chose an Amazon Linux 2 with Docker installed. 
 Check the command to ssh to it on AWS.
 ```
-ssh -i "~/flowspeech.pem" ec2-user@ec2-52-47-122-20.eu-west-3.compute.amazonaws.com
+ssh -i "~/flowspeech.pem" ec2-user@ec2-13-36-36-234.eu-west-3.compute.amazonaws.com
+
 ```
 
 But I had to install docker-compose like this:
@@ -200,6 +200,7 @@ docker run -d -p 8000:8000 flowspeech
 
 When you want to update the app with changes in code (no new depencies):
 ```
+docker kill flaskapp
 git pull && docker-compose up -d --no-deps --build flaskapp
 ```
 
@@ -288,7 +289,7 @@ The script ```tts_aws.py``` allows you to synthesize a list of sentences.
 Use scp command to download them:
 
 ```
-scp -r -i "~/flowspeech.pem" ec2-user@ec2-52-47-122-20.eu-west-3.compute.amazonaws.com:~/Flowspeech/synth_audio/ .
+scp -r -i "~/flowspeech.pem" ec2-user@ec2-13-36-36-234.eu-west-3.compute.amazonaws.com:~/Flowspeech/synth_audio/ .
 ```
 
 Details on AWS Polly CLI arguments and options:
