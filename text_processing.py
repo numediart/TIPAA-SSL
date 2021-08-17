@@ -325,6 +325,7 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
     """
     ps=cmudict_dict[word]
 
+
     # fallbacks
     if ps==[]:
         if '-' in word:
@@ -345,6 +346,11 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
 
         else:
             ps=[g2p(word)]
+
+    # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
+    for p in ps:
+        if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==[ 'T', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
+            p[-2:]=['IH0','D']
 
     syl_ps=[]
     for p in ps:
