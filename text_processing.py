@@ -349,7 +349,7 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
 
     # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
     for p in ps:
-        if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==[ 'T', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
+        if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==[ 'D', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
             p[-2:]=['IH0','D']
 
     syl_ps=[]
