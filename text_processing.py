@@ -564,7 +564,7 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
 
     case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), remove_special_characters(sentence, lowercase=False), syl_sep=syl_sep)        
     
-    case_syls_texts=add_special_char(sentence, case_syls_texts)
+    # case_syls_texts=add_special_char(sentence, case_syls_texts)
 
 
     # p -> phonetics
