@@ -5,9 +5,10 @@ from glob import glob
 from shutil import copy
 import cmudict
 import os
-from text_processing import phonetics_from_sentence, remove_special_characters
+from text_processing import phonetics_from_sentence, remove_special_characters, remove_stress_annots
 import uuid
 from htk_utils import process_grammar
+import itertools
 
 target_to_alternatives={
     "DH":["DH","TH"],
@@ -17,9 +18,9 @@ target_to_alternatives={
     "IH1":["IH1","IY1"],
     "IY1":["IH1","IY1"],
     # "IH0 D":['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
-    "IH0 D":['T', 'D', 'IH0 D', 'EH2 D'],
-    "D":['T', 'D', 'IH0 D', 'EH2 D'],
-    "T":['T', 'D', 'IH0 D', 'EH2 D']
+    "IH0 D":['T', 'D', 'IH0 D'],
+    "D":['T', 'D', 'IH0 D'],
+    "T":['T', 'D', 'IH0 D']
 }
 
 
@@ -28,6 +29,112 @@ graphemes_to_alternatives={
     "ea":["IY1","EH1"]
 }
 
+def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
+    """We choosed conventions for the target:
+    For vowel contrasts:
+    -VC1 => IH/IY
+    -VC2 => AA/AO/OW
+
+    Example for VC1:
+    -If there is only one IH or IY, then it is the target
+    -else, the target is the stressed vowel
+
+    Args:
+        path (str, optional): [description]. Defaults to 'data/GE_linguistic_data.csv'.
+
+    Returns:
+        [type]: [description]
+    """
+    df=pd.read_csv(path)
+
+    df=df.drop(columns=['Unnamed: 14','Unnamed: 15'])
+
+    df['word_idx']=0
+    sents=df[df.text.str.contains('\*')].text.str.split(' ')
+
+    # checks in each word if there is a "*", put one if true in a list. Then I use index() to know where is the 1
+    df.loc[sents.index, 'word_idx']=sents.apply(lambda r: [int('*' in el) for i,el in enumerate(r)].index(1))
+
+    df['target']=np.nan
+    possible_targets={'_VC2':['AO','OW','AA'],  '_VC1':['IH','IY']}
+    def set_target(df, module='_VC1'):
+        for i,r in df.iterrows():
+            if module in r.id:
+                p=r.cmu_phonetics.split(' ')[r.word_idx]
+                phones=[el.split('_') for el in p.split('|')]
+                chain = itertools.chain(*phones)
+                phones=[el for el in chain]
+                pure_phones=remove_stress_annots(phones)
+                idx_targetable=[i for i,el in enumerate(pure_phones) if el in possible_targets[module]]
+                if len(idx_targetable)==1:
+                    target=phones[idx_targetable[0]]
+                    df.iloc[i, df.columns.get_loc('target')]=target
+                else:
+                    target=[el for el in phones if el[-1]=='1'][0]
+                    # print(target)
+                    df.iloc[i, df.columns.get_loc('target')]=target
+        return df
+    
+    df=set_target(df, module='_VC1')
+    df=set_target(df, module='_VC2')
+
+    # detect mistakes: 
+    # -the target was successfully asigned with the code above. This allowed me to detect some annotation errors 
+    # (e.g., there was no word in **, or live=layv vs liv)
+    
+    all_possible_targets=[[el+i for el in possible_targets['_VC1']] for i in ['0','1','2']]
+    all_possible_targets = itertools.chain(*all_possible_targets)
+    df[df.id.str.contains('_VC1') & ~df.target.isin(all_possible_targets)]
+    
+    all_possible_targets=[[el+i for el in possible_targets['_VC2']] for i in ['0','1','2']]
+    all_possible_targets = itertools.chain(*all_possible_targets)
+    df[df.id.str.contains('_VC2') & ~df.target.isin(all_possible_targets)]
+
+    ED_targets=['_T','_D','_IH0_D']
+    for i,r in df.loc[df.id.str.contains('_ED')].iterrows():
+        p=r.cmu_phonetics.split(' ')[r.word_idx]
+        s=remove_special_characters(r.text.split(' ')[r.word_idx])
+        # print(p)
+        
+        # We put T, then D, then OVERWRITE with IH0_D when necessary (so the order is important)
+        if sum([p.endswith(t) for t in ED_targets]): #Phonetics of the word has to and with at least one of the terminations
+            for target in ED_targets:
+                if p.endswith(target):
+                    df.iloc[i, df.columns.get_loc('target')]=target[1:]
+        else:
+            # -if it is in _ED but the word does not end by one og the above
+            # This shows potential annotation mistakes (e.g. if no word was in * *)
+            print(s)
+            print(r)
+    
+    # check that df for target!=nan is the same as df of row containing either _VC or _ED
+    assert (df.loc[df.id.str.contains('_ED')|df.id.str.contains('_VC')]==df.dropna()).product().product(), 'Error: rows containing _ED or _VC should be the same as df.dropna(), because nans are for rows that do not contain a target'
+    
+    # set alternatives from targets
+    def set_alternatives_from_target(target):
+        target_to_alternatives={
+            'IH':['IY','AA','AO','AW','AY','ER','OY'], # from   https://docs.google.com/spreadsheets/d/1tzb7ZKQOifCHXh-Aoz4PdAKPlIquThzk80EvXW1UxLw/edit#gid=0
+            'IY':['IH','AA','AE','AH','AO','AW','AY','EH','ER','OW','OY','UH'],
+            'AO':['OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
+            'AA':['OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
+            'OW':['AA','AO','AE','AY','ER','EY','IH','IY','OY','UH'],
+            "IH0_D":['T', 'D', 'IH0_D'],
+            "D":['T', 'D', 'IH0_D'],
+            "T":['T', 'D', 'IH0_D']
+        }
+        alternatives=float('nan')
+
+        if target[-1] in str([0,1,2]):
+            alternatives=' '.join([el+target[-1] for el in target_to_alternatives[target[:-1]]])
+        elif '_'+target in ED_targets:
+            alternatives=' '.join(target_to_alternatives[target])
+        return alternatives
+    df['alternatives']=df.target.dropna().apply(lambda r:   set_alternatives_from_target(r))
+
+    assert (df.loc[df.id.str.contains('_ED')|df.id.str.contains('_VC')]==df.dropna()).product().product(), 'Error: rows containing _ED or _VC should be the same as df.dropna(), because nans are for rows that do not contain a target'
+
+    df.to_csv('data/GE_linguistic_data_target_alternatives.csv', index=None)
+    return df
 
 # Data processing
 def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
