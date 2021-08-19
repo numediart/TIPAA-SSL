@@ -94,7 +94,6 @@ def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
     for i,r in df.loc[df.id.str.contains('_ED')].iterrows():
         p=r.cmu_phonetics.split(' ')[r.word_idx]
         s=remove_special_characters(r.text.split(' ')[r.word_idx])
-        # print(p)
         
         # We put T, then D, then OVERWRITE with IH0_D when necessary (so the order is important)
         if sum([p.endswith(t) for t in ED_targets]): #Phonetics of the word has to and with at least one of the terminations
@@ -113,11 +112,11 @@ def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
     # set alternatives from targets
     def set_alternatives_from_target(target):
         target_to_alternatives={
-            'IH':['IY','AA','AO','AW','AY','ER','OY'], # from   https://docs.google.com/spreadsheets/d/1tzb7ZKQOifCHXh-Aoz4PdAKPlIquThzk80EvXW1UxLw/edit#gid=0
-            'IY':['IH','AA','AE','AH','AO','AW','AY','EH','ER','OW','OY','UH'],
-            'AO':['OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
-            'AA':['OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
-            'OW':['AA','AO','AE','AY','ER','EY','IH','IY','OY','UH'],
+            'IH':['IH','IY','AA','AO','AW','AY','ER','OY'], # from   https://docs.google.com/spreadsheets/d/1tzb7ZKQOifCHXh-Aoz4PdAKPlIquThzk80EvXW1UxLw/edit#gid=0
+            'IY':['IY','IH','AA','AE','AH','AO','AW','AY','EH','ER','OW','OY','UH'],
+            'AO':['AO','OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
+            'AA':['AA','OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
+            'OW':['OW','AA','AO','AE','AY','ER','EY','IH','IY','OY','UH'],
             "IH0_D":['T', 'D', 'IH0_D'],
             "D":['T', 'D', 'IH0_D'],
             "T":['T', 'D', 'IH0_D']
@@ -133,6 +132,12 @@ def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
 
     assert (df.loc[df.id.str.contains('_ED')|df.id.str.contains('_VC')]==df.dropna()).product().product(), 'Error: rows containing _ED or _VC should be the same as df.dropna(), because nans are for rows that do not contain a target'
 
+    # I should drop duplicates, but keeping one having target and alternatives if there is
+
+    # for i,r in df.iterrows():
+    #     if len(r.text.split(' '))>0: df.iloc[i, df.columns.get_loc('pronounciation_guide')]=float('nan')
+
+    # df.appl
     df.to_csv('data/GE_linguistic_data_target_alternatives.csv', index=None)
     return df
 
