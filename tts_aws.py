@@ -24,13 +24,6 @@ def remove_special_characters(sentence="Where's the best place to have coffee ?"
     return sentence
 
 
-# df=pd.read_csv('data/BE_PickStressedWord_1.csv')
-# col=df.iloc[:,1]
-
-
-df=pd.read_csv('data/Business English-Vocabulary_all.csv')
-col=df.iloc[:10,2]
-
 def replace_with_tag(sentence, tag='emphasis', options='level="strong"'):
     idx=0
     tag_start=True #binary
@@ -47,13 +40,16 @@ def replace_with_tag(sentence, tag='emphasis', options='level="strong"'):
     return sentence
 
 
-def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',root_folder="synth_audio",synth_technique='standard',voice_id="Joanna"):
+def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',root_folder="synth_audio",synth_technique='standard',voice_id="Joanna", name="sample"):
+    sentence=sentence.replace("'","&apos;").replace('"','&quot;')
     text=replace_with_tag(sentence, tag=tag, options=options)
-    name='_'.join(remove_special_characters(sentence).split(' ')).replace('*','+')
+    
     path='/'.join([root_folder,synth_technique,tag,voice_id])+'/'
 
     if not os.path.exists(path): os.makedirs(path)
 
+    # reserved characters : https://docs.aws.amazon.com/polly/latest/dg/escapees.html
+    
     print('name',name)
     print('text',text)
 
@@ -65,24 +61,47 @@ def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',root
     --engine "+synth_technique+" \
     "+path+name+".mp3"
 
-    os.system(cmd)
+    if not os.path.exists(path+name+".mp3"):    os.system(cmd)
     
 
+
+
+# df=pd.read_csv('data/BE_PickStressedWord_1.csv')
+# col=df.iloc[:,1]
+
+# df=pd.read_csv('data/Business English-Vocabulary_all.csv')
+# col=df.iloc[:10,2]
+df=pd.read_csv('data/GE_linguistic_data_target_alternatives.csv')
+col=df.text
 root_folder="synth_audio"
-synth_technique='standard'
+synth_technique='neural' # "standard" or "neural"
 
 # tag=''
 # options=''
 
 tag='prosody'
-options='rate="70%" volume="+20dB pitch="+10%"'
-# options='rate="70%" volume="+20dB"'
+# options='rate="70%" volume="+20dB" pitch="+10%"'
+options='rate="70%" volume="+20dB"'
 
 # tag='emphasis'
 # options='level="strong"'
 
 voice_id="Joanna"
+spk_id="F_US"
 
-for sentence in col:
-    synthesize(sentence, tag=tag, options=options,root_folder=root_folder,synth_technique=synth_technique,voice_id=voice_id)
+# voice_id="Amy"
+# spk_id="F_UK"
+
+
+# voice_id="Matthew"
+# spk_id="M_US"
+
+# voice_id="Brian"
+# spk_id="M_UK"
+
+for i,sentence in col.iteritems():
+    # name='_'.join(remove_special_characters(sentence).split(' ')).replace('*','+')
+    name=spk_id+'_'+df.iloc[i, df.columns.get_loc('id')]
+    print(name)
+    synthesize(sentence, tag=tag, options=options,root_folder=root_folder,synth_technique=synth_technique,voice_id=voice_id,name=name)
 
