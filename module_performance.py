@@ -10,7 +10,7 @@ import pickle
 # Performance tests
 import seaborn as sns
 
-from speech_tech import target_to_alternatives, graphemes_to_alternatives
+from label_data_processing import target_to_alternatives, graphemes_to_alternatives
 
 def make_dir(path):
     if not os.path.exists(path): os.makedirs(path)
