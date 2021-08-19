@@ -2,8 +2,12 @@ import requests
 import json
 from text_processing import phonetics_from_sentence, prefill_for_sentence
 import pandas as pd
+import os
 syllables_data=pd.read_csv('data/syllables.csv')
 
+from label_data_processing import get_sentenceStress_annotation, get_data
+from text_processing import remove_special_characters, prefill_content
+import time
 
 def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:5000', client=requests):
     url=base_url+"/upload"
@@ -21,12 +25,12 @@ def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 
     return res.__dict__['_content']
 
 
-def call_module(rID, text='I would love to go to ireland !', module='sentenceStress', base_url = 'http://localhost:5000', client=requests):
+def call_module(rID, text='I would love to go to ireland!', module='sentenceStress', base_url = 'http://localhost:5000', client=requests):
     url=base_url+"/flowspeech/"
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
     # res = client.post(url+module, data={"phonetics":json.dumps(phonetics), 'rID':rID})
-    res = client.post(url+module, data={"phonetics":phonetics, 'rID':rID})
+    res = client.post(url+module, data={"text":text, "phonetics":phonetics, 'rID':rID})
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
@@ -46,6 +50,47 @@ def call_prefill_for_sentence(sentence, base_url = 'http://localhost:5000', clie
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
+def crash_test():
+    rIDs=[]
+    for i in range(100):
+        res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+        rID=res.__dict__['_content']
+        rIDs.append(rID)
+    
+    for rID in rIDs:
+        call_phoneme_contrast( rID.decode('utf-8'), base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+    
+
+    audio_path="../audio-with-analysis-ids/audio/"
+    # a,textDict=get_sentenceStress_annotation()
+
+    d=get_data()
+    focusType='sentencestress'
+    d=d[d.focusType==focusType]
+
+    # send all the audios (n times) and get rIDs 
+    rIDs=[]
+    n=2
+    start=time.time()
+    for _ in range(n):
+        for i,row in d.iterrows():
+            path=os.path.join(audio_path, row.primaryKey+'.wav')
+            res=send_audio(path=path, base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+            rID=res.__dict__['_content']
+            rIDs.append(rID)
+    avg_duration=(time.time()-start)/(len(d)*n)
+    print('avg duration upload:', avg_duration)
+
+
+    start=time.time()
+    tot_d=pd.concat([d]*n)
+    tot_d['rID']=rIDs
+    for i,row  in tot_d.iterrows():
+        call_module(row['rID'].decode('utf-8'), text=row.text, module='sentenceStress', base_url = 'http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com')
+    avg_duration=(time.time()-start)/(len(d)*n)
+    print('avg duration processing sentenceStress:', avg_duration)
+
+
 # deprecated functions
 if False:
     def call_module(module='sentenceStress', filename='SS_1_i_would_love_to_go_to_ireland.wav', sentenceID=1, client=requests):
@@ -60,11 +105,11 @@ if __name__ == "__main__":
     rID1=res.__dict__['_content']
     call_phoneme_contrast( rID1.decode('utf-8'))
 
-    res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+    res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-36-36-234.eu-west-3.compute.amazonaws.com")
     rID=res.__dict__['_content']
-    call_phoneme_contrast( rID.decode('utf-8'), base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+    call_phoneme_contrast( rID.decode('utf-8'), base_url="http://ec2-13-36-36-234.eu-west-3.compute.amazonaws.com")
     
-    call_prefill_for_sentence( "Kayla isn't angry at Tyler", base_url="http://ec2-52-47-122-20.eu-west-3.compute.amazonaws.com")
+    call_prefill_for_sentence( "Kayla isn't angry at Tyler", base_url="http://ec2-13-36-36-234.eu-west-3.compute.amazonaws.com")
     call_prefill_for_sentence("Kayla isn't angry at Tyler")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
