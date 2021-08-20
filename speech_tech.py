@@ -8,11 +8,11 @@ from audio_processing import load_audio, getIntonation, getIntensity, normalize,
 from htk_utils import get_textgrid_data, clean_htk_files
 
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
-from label_data_processing import target_to_alternatives, graphemes_to_alternatives
 from text_processing import phonetics_from_sentence
 import uuid
 import json
 import time
+import re
 
 path_cached_filenames='data/cached_filenames.json'
 if os.path.exists(path_cached_filenames):
@@ -318,8 +318,6 @@ def sentenceStress(
         string, list of binaries: status, stress results by word (0=no stress,  1=stress)
     """
     
-    # if wav_name is None:
-    #     wav_name=rand_fileName
     status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
 
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
@@ -386,7 +384,6 @@ def prosody_by_phone(rand_fileName, wav_name):
 
 def phonemeContrast(
     rand_fileName, wav_name
-    # p=set_params(sentenceID=9)
     ):
     """This functions uses textgridData that now has information of all detected phonetic transcriptions.
     It returns textgridData and the phonetics of the studied word.
@@ -515,7 +512,7 @@ def wordStress_from_phonetics_audio(
     weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
     return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
 
-def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", level="word"):
+def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", text="I would love to go to Ireland!", level="word", chunking_chars=[',',';','.','!','?', ':']): #'[\,\?\.\!\;\:\"\*]'
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
     lens=[len(el) for el in split_phonetics]
     merged_phonetics=merge_list(split_phonetics)
@@ -536,10 +533,40 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         bin_score_by_word_by_syllable=[el.tolist() for el in bin_score_by_word_by_syllable]
         return {"status": "success", "stress_intensities": weighted_score_by_word_by_syllable_int, "stress_binaries": bin_score_by_word_by_syllable}
     elif level=="sentence":
+
+        def chunk_text(text):
+            for c in chunking_chars:
+                text=text.replace(c, chunking_chars[0])
+            chunks=text.split(chunking_chars[0])
+            chunks = list(filter(None, chunks)) # remove empty string
+            # split each chunk in words, remove empty strings, get length (to know the n of words in each chunk)
+            n_words_by_chunk=[len(list(filter(None, el.split(' ')))) for el in chunks]
+            assert sum(n_words_by_chunk)==len(text.split(' ')), "Checking number of words is the same after chunking"
+            return n_words_by_chunk
+        
+        n_words_by_chunk=chunk_text(text)
         max_score_by_word=[int(max(l)[0]*100) for l in weighted_score_by_word_by_syllable_by_vowel]
-        bin_score_by_word=np.zeros(len(max_score_by_word)).astype(int).tolist()
-        imax=np.argmax(max_score_by_word)
-        bin_score_by_word[imax]=1
+        scores_grouped_by_chunk=[]
+        i=0
+        for l in n_words_by_chunk:
+            scores_grouped_by_chunk.append(max_score_by_word[i:i+l])
+            i+=l
+
+        def intensity_to_bin(score_by_word):
+            bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
+            imax=np.argmax(score_by_word)
+            bin_score_by_word[imax]=1
+            return bin_score_by_word
+
+        bins_by_chunk=[]
+        for chunk in scores_grouped_by_chunk:
+            bin=intensity_to_bin(chunk)
+            bins_by_chunk.append(bin)
+
+        
+        bin_score_by_word=[]
+        for el in bins_by_chunk: bin_score_by_word+=el
+
         return {"status": "success", "stress_intensities": max_score_by_word, "stress_binaries": bin_score_by_word}
     else:
         print("No such level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.")
@@ -575,7 +602,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
 # obsolete functions backup
 if False:
     # these are not valid anymore, I removed audio information from the rID
-    def vowel_stresses_from_text_audio(text='I would love to go to Ireland !', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
+    def vowel_stresses_from_text_audio(text='I would love to go to Ireland!', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
         """This uses text to get phonetics, to build annotation files for htk.
         Then it calls vowel_stresses module with this information.
         Returns:
@@ -871,7 +898,3 @@ if __name__ == "__main__":
     # status, results= phonemeContrast(p)
 
     # make_pContrast_annotation_files(p, text="law",word_idx=0, target_phones='AO1', alternatives=['AO1','OW1','AA1', 'AH1 W'])
-
-    target='D'
-    phonetics=phonetics_from_sentence('turned around')
-    phonemeContrast_from_phonetics_audio(target_phones=target, alternatives=target_to_alternatives[target],audio_path='audio_recordings/turned_around.mp3',word_idx=0)
