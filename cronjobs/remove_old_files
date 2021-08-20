@@ -1,0 +1,1 @@
+* * * * *  find /root/inputs/*wav -type f -mmin +5  -exec rm -f {} +

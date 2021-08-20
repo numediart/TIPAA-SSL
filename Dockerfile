@@ -71,5 +71,18 @@ WORKDIR $HOME/
 # https://gist.github.com/pangyuteng/f5b00fe63ac31a27be00c56996197597
 # ENTRYPOINT ["python", "flask_server.py"]
 # ENTRYPOINT ["gunicorn", "flask_server:app"]
-CMD ["gunicorn"  , "-b", "0.0.0.0:8000", "flask_server:app"]
+# CMD ["gunicorn"  , "-b", "0.0.0.0:8000", "flask_server:app"]
+
+
+# from https://stackoverflow.com/questions/37458287/how-to-run-a-cron-job-inside-a-docker-container
+# copy crontabs for root user
+COPY cronjobs/remove_old_files /etc/crontabs/root
+
+# start crond with log level 8 in foreground, output to stderr
+# CMD ["crond", "-f", "-d", "8"]
+RUN apt install -y cron
+RUN crontab /etc/crontabs/root
+
+# CMD gunicorn -b 0.0.0.0:8000 flask_server:app && cron
+CMD ["bash", "run_server.sh"]
 EXPOSE 8000
