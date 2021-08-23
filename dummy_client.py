@@ -9,7 +9,7 @@ from label_data_processing import get_sentenceStress_annotation, get_data
 from text_processing import remove_special_characters, prefill_content
 import time
 
-def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:5000', client=requests):
+def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/upload"
     print(url)
     with open(path, 'rb') as file:
@@ -17,7 +17,7 @@ def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http:/
         req = client.post(url, files=files)
     return req
 
-def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 'http://localhost:5000', client=requests):
+def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/vowel_stresses"
     phonetics=phonetics_from_sentence(text)
     res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID})
@@ -25,7 +25,7 @@ def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 
     return res.__dict__['_content']
 
 
-def call_module(rID, text='I would love to go to ireland!', module='sentenceStress', base_url = 'http://localhost:5000', client=requests):
+def call_module(rID, text='I would love to go to ireland!', module='sentenceStress', base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/flowspeech/"
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
@@ -34,7 +34,7 @@ def call_module(rID, text='I would love to go to ireland!', module='sentenceStre
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
-def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:5000', client=requests):
+def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/phonemeContrast"
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
@@ -44,7 +44,7 @@ def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alt
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
-def call_prefill_for_sentence(sentence, base_url = 'http://localhost:5000', client=requests):
+def call_prefill_for_sentence(sentence, base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/prefill_from_phrase"
     res = client.post(url, data={"phrase":sentence})
     print(res.__dict__['_content'])
@@ -94,7 +94,7 @@ def crash_test():
 # deprecated functions
 if False:
     def call_module(module='sentenceStress', filename='SS_1_i_would_love_to_go_to_ireland.wav', sentenceID=1, client=requests):
-        res = client.post('http://localhost:5000/flowspeech/'+module, data={"sentenceID":str(sentenceID), 'filename':filename})
+        res = client.post('http://localhost:8000/flowspeech/'+module, data={"sentenceID":str(sentenceID), 'filename':filename})
         print(res.__dict__['_content'])
         return res.__dict__['_content']
 
