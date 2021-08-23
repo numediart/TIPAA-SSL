@@ -8,6 +8,8 @@ syllables_data=pd.read_csv('data/syllables.csv')
 from label_data_processing import get_sentenceStress_annotation, get_data
 from text_processing import remove_special_characters, prefill_content
 import time
+import base64
+import ast
 
 def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/upload"
@@ -99,8 +101,27 @@ if False:
         return res.__dict__['_content']
 
 
+def test_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
+    # based on :
+    # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
+    encode_string = base64.b64encode(open(path, "rb").read())
+
+    extension=path.split('.')[-1]
+
+    res = client.post(base_url+"/send_base64_audio", data={"audio":encode_string, "extension":extension})
+
+    # wav_file = open("temp.wav", "wb")
+    # decode_string = base64.b64decode(encode_string)
+    # wav_file.write(decode_string)
+    # wav_file.close()
+    return res.__dict__['_content']
 
 if __name__ == "__main__":
+
+    res=test_base64(path='audio_recordings/turned_around.mp3')
+    rID=ast.literal_eval(res.decode('utf-8'))['rID']
+    call_phoneme_contrast(rID)
+
     res=send_audio(path='audio_recordings/turned_around.mp3')
     rID1=res.__dict__['_content']
     call_phoneme_contrast( rID1.decode('utf-8'))

@@ -9,6 +9,8 @@ import speech_tech
 from text_processing import generate_prefill_csv, prefill_for_sentence
 app = Flask(__name__)
 
+import uuid
+import base64
 
 @app.route('/')
 def index():
@@ -67,6 +69,33 @@ def upload_file():
         return "error: filename is empty"
     return rID
   
+
+@app.route('/send_base64_audio', methods=['GET', 'POST'])
+def send_audio():
+    content = request.form
+    print(request.__dict__)
+    print(content)
+    print(content['audio'])
+    print(content['extension'])
+    audio=content['audio']
+    # phonetics=ast.literal_eval(content['phonetics'])
+    extension=content['extension']
+
+    temp_filename=str(uuid.uuid4())
+    # based on:
+    # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
+    wav_file = open(upload_path+temp_filename+"."+extension, "wb")
+    decode_string = base64.b64decode(audio)
+    wav_file.write(decode_string)
+    wav_file.close()
+
+    status_conversion, rID = prepare_audio_file(upload_path+temp_filename+"."+extension)
+
+    os.remove(upload_path+temp_filename+"."+extension)
+    res={"status": "success", "rID":rID}
+    response=json.dumps(res)
+    return response
+
 
 
 @app.route('/prefill_from_phrases', methods=['POST'])
