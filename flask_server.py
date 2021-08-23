@@ -1,6 +1,7 @@
 from flask import Flask, request, redirect, url_for
 from flask import send_from_directory
 from flask import send_file
+from flask import Response
 
 from speech_tech import *
 import json
@@ -34,21 +35,34 @@ def upload_file():
     try:
         uploaded_file = request.files['file']
     except:
-        return "error: could not access request.files['file'] "
+        return Response(
+            "error: could not access request.files['file']",
+            status=400,
+        )
     if uploaded_file.filename != '':
         try:
             uploaded_file.save(upload_path+uploaded_file.filename)
         except:
-            return "error: could not save uploaded file"
+            return Response(
+                "error: could not save uploaded file",
+                status=500,
+            )
         try:
             # import pdb;pdb.set_trace()
             status_conversion, rID = prepare_audio_file(upload_path+uploaded_file.filename)
         except:
-            return "error: could not convert uploaded file"
+            return Response(
+                "error: could not convert uploaded file",
+                status=500,
+            )
         try:
             os.remove(upload_path+uploaded_file.filename)
         except:
-            return "error: could not delete temp file"
+            # return "error: could not delete temp file"
+            return Response(
+                "error: could not convert uploaded file",
+                status=500,
+            )
     else:
         return "error: filename is empty"
     return rID
