@@ -178,8 +178,7 @@ docker container kill $(docker ps -q)
 On AWS, I chose an Amazon Linux 2 with Docker installed. 
 Check the command to ssh to it on AWS.
 ```
-ssh -i "~/flowspeech.pem" ec2-user@ec2-13-36-36-234.eu-west-3.compute.amazonaws.com
-
+ssh -i "~/flowspeech.pem" ec2-user@ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
 ```
 
 But I had to install docker-compose like this:
