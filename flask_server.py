@@ -128,7 +128,8 @@ def module_api(module):
     # phonetics=ast.literal_eval(content['phonetics'])
     phonetics=content['phonetics']
     if module=='sentenceStress':
-        res=stress_from_formatted_phonetics(rID, phonetics, level="sentence")
+        text=content['text']
+        res=stress_from_formatted_phonetics(rID, phonetics, text, level="sentence")
     elif module=='wordStress':
         res=stress_from_formatted_phonetics(rID, phonetics, level="word")
     else:
@@ -159,7 +160,9 @@ def phoneme_contrast_api():
     alternatives=content['alternatives']
     print(alternatives)
 
-    status,result=phonemeContrast_from_formatted_phonetics_audio(rID, phonetics, int(word_idx), target, alternatives)
+    word_idx=int(word_idx)
+
+    status,result=phonemeContrast_from_formatted_phonetics_audio(rID, phonetics, word_idx, target, alternatives)
     print('status:',status)
     print('result:',result)
     if not isinstance(result, list):
@@ -170,11 +173,7 @@ def phoneme_contrast_api():
         phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
     else:
         phonetic_detection=result
-    # phonetic_GT=phonetics_from_sentence(text)[int(word_idx)]
-    # d={'status':status, 'result':phonetic_transcript, 'ground_truth':phonetic_GT}
 
-    word_idx=int(word_idx)
-    
     # extract the syllables which contain the target
     syls_with_target=[syl for syl in phonetics.split(' ')[word_idx].split('|') if target in syl]
     syls_detection=[syl.replace(target, phonetic_detection[i]) for i,syl in enumerate(syls_with_target)]
