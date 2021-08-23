@@ -1,122 +1,19 @@
 # Flowspeech
+
 Project to migrate Flowchase speech tech from octave to python
 
 ## Web service
 
 A Flask API is provided to access the modules.
 
-Examples of client requests are available in ```dummy_client.py```
+Examples of client requests are available in `dummy_client.py`.
 
-The process is in two post requests: 
-- Upload an audio file, 
-- Call a module, or a lower level function
+The process for processing speech has to be done in 2 separate requests:
 
-### Upload an audio file with arguments:
+1. Upload the audio file and get a request id (rID)
+2. Call the right module (or a lower level function) with then needed params plus the rID
 
-```
-url= "/upload"
-files = {'file': file}
-```
-The server returns a random ID "rID" to be used for processing afterwards.
-
-### Call a module with arguments (for sentenceStress and wordStress):
-```
-module="sentenceStress" # or "wordStress"
-url= "/flowspeech/"+module
-data={"text":text, "phonetics":phonetics, "rID":rID}
-```
-The phonetics is consituted of CMU phonemes with seperators for phonemes ("_"), syllables ("|") and words (" ").
-
-An example of feedback for each module:
-
-- sentenceStress:  the feedback is 
-    - status ("success" or "error: ...") this success means a technical success in the sense that there were no failure, but not that the recognition was successful
-    - a list of stress intensities between 0 and 100 for each word
-    - a list of 0/1 for each word, the 1 being the sentence stress
-
-For the sentence "I would love to go to ireland", 
-input:
-```
-data={"text":"I would love to go to ireland!", "phonetics":"AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
-```
-
-the correct answer would be:
-```
-b'{"status": "success", "stress_intensities": [83, 49, 85, 27, 57, 27, 73], "stress_binaries": [0, 0, 1, 0, 0, 0, 0]}'
-```
-
-- wordStress: the feedback is a 
-    - status ("success" or "error: ...")
-    - a list of stress intensities for each syllable of each word between 0 and 100 by word 
-    - a list of 0/1 for each syllable of each word, the 1 being the word stress
-
-For the word "toothpaste", input:
-
-```
-data={"text":"toothpaste", "phonetics":'T_UW1_TH|P_EY2_S_T', "rID":'487c3fe1-5f17-4010-a019-92b1c6ebfc5a'}
-```
-answer:
-```
- b'{"status": "success", "stress_intensities": [[77, 33]], "stress_binaries": [[1, 0]]}'
-```
-
-### Lower level functions
-Besides existing module, I am working on two lower level functions. 
-
-The logic behind them is to use text and audio as input. The text is automatically phonetized and "grammarized", then htk model is used and:
-
-- phonemeContrast gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes)
-```
-url='/phonemeContrast'
-data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target}
-```
-As before, the phonetics is consituted of CMU phonemes with seperators for phonemes ("_"), syllables ("|") and words (" ").
-For alternatives, one alternative is considered a word of several phonemes.
-
-An example for a recording containing "I visited Italy". We want to study the phoneme "IH0" in "visited". I took this example because there are two of them:
-```
-data={'phonetics': 'AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0',
-'rID': '487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
-'word_idx': 1,
-'alternatives': 'IH0 IY0',
-'target': 'IH0'}
-```
-
-To study e.d. the "-ed" termination, you would need to input `'target': 'IH0_D'` and e.g. `'alternatives': "T D IH0_D"`.
-
-And as there are two "IH0", I put alternatives for both, and return the detection of both like this:
-```
-b'{"status": "success", "phonetic_detection": ["IH0", "IH0"], "gibberish_truth": ["z_i", "t_i_d"], "gibberish_detected": ["z_i", "t_i_d"]}'
-```
-
-Now, for this same sentence "I visited Italy", we want to study the -ed termination of "visited", it would be like this:
-
-The input:
-```
-data={'phonetics': 'AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0',
-'rID': b'487c3fe1-5f17-4010-a019-92b1c6ebfc5a',
-'word_idx': 1,
-'alternatives': "IH0_D D T",
-'target': 'IH0_D'}
-```
-
-and the output (if pronounced correctly):
-```
-b'{"status": "success", "phonetic_detection": ["IH0_D"]}'
-```
-
-- vowelStresses gives stress scores for each syllable of each word between 0 and 1
-```
-url='/vowel_stresses'
-data={"text":text, 'filename':filename}
-```
-Example of output:
-```
-b'{"status": "success", "result": [[83], [49], [85], [27], [57], [27], [73, 44, 62]]}'
-```
-
-if you pass only one word with only one syllable, the result will be a `[[nan]]`
-
+**To learn more about making requests to the Speech Processing API**, please see [this documentation file](/API.md).
 
 ### Prefill feature for linguistic database
 

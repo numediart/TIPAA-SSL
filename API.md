@@ -1,0 +1,203 @@
+# API docs for Flowspeech (making speech procesing requests)
+
+## Upload an audio file with arguments:
+
+```
+POST /upload
+Body (FormData): files = {'file': file}
+```
+
+The server returns a random ID "rID" to be used for processing afterwards.
+
+## Call the sentenceStress module
+
+```
+POST /flowspeech/sentenceStress
+Body (JSON): {
+    text: string,
+    phonetics: string,
+    rID: string
+}
+```
+
+The `phonetics` property should contain the CMU phonetics (with separators for phonemes ("_"), syllables ("|") and words (" ")).
+
+The response object is a JSON payload with the following schema:
+
+```typescript
+type Response = {
+    // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
+    status: 'success'|'error'
+    // a list of stress intensities between 0 and 100 for each word
+    stress_intensities: number[],
+    // a list of 0/1 for each word, the 1 being the sentence stress
+    stress_binaries: number[]
+}
+```
+
+Below is an example request/response.
+
+Request:
+
+```json
+{
+    "text": "I would love to go to ireland",
+    "phonetics": "AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D",
+    "rID": "487c3fe1-5f17-4010-a019-92b1c6ebfc5a"
+}
+```
+
+Response:
+```json
+{
+    "status": "success",
+    "stress_intensities": [83, 49, 85, 27, 57, 27, 73],
+    "stress_binaries": [0, 0, 1, 0, 0, 0, 0]
+}
+```
+
+## Call the wordStress module
+
+Request:
+
+```
+POST /flowspeech/wordStress
+Body (JSON): {
+    text: string,
+    phonetics: string,
+    rID: string
+}
+```
+
+Response:
+
+```typescript
+type Response = {
+    // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
+    status: 'success'|'error'
+    // a list of stress intensities for each syllable of each word between 0 and 100 by word
+    stress_intensities: number[],
+    // a list of 0/1 for each syllable of each word, the 1 being the word stress
+    stress_binaries: number[]
+}
+```
+
+Below is an example request/response.
+
+Request:
+
+```json
+{
+    "text": "toothpaste",
+    "phonetics": "T_UW1_TH|P_EY2_S_T",
+    "rID": "487c3fe1-5f17-4010-a019-92b1c6ebfc5a"
+}
+```
+
+Response:
+```json
+{
+    "status": "success",
+    "stress_intensities": [[77, 73]],
+    "stress_binaries": [[1, 0]]
+}
+```
+
+## Call the phonemeContrast module
+
+> The logic behind this one is to use text and audio as input. The text is automatically phonetized and "grammarized", then htk model is used.
+
+The `phonemeContrast` module gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes):
+
+```
+POST /phonemeContrast
+Body (JSON): {
+    phonetics: string
+    rID: string
+    word_idx: number
+    alternatives: string
+    target: string
+}
+```
+
+As before, the phonetics is consituted of CMU phonemes with separators for phonemes (`_`), syllables (`|`) and words (` `). For alternatives, one alternative is considered a word of several phonemes.
+
+The response payload has the following schema:
+
+```typescript
+type Response = {
+    status: 'success'|'error'
+    phonetic_detection: string[]
+    gibberish_truth: string[],
+    gibberish_detected: string[]
+}
+```
+
+### Example for long/short i
+
+For example, for a recording containing “I visited Italy”, and a request to study the phoneme `IH0` in the word `visited`, the payload is:
+
+```json
+{
+    "rID": "487c3fe1-5f17-4010-a019-92b1c6ebfc5a",
+    "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
+    "word_idx": 1,
+    "alternatives": "IH0 IY0",
+    "target": "IH0"
+}
+```
+
+The response will be:
+
+```json
+{
+    "status": "success",
+    "phonetic_detection": ["IH0", "IH0"],
+    "gibberish_truth": ["z_i", "t_i_d"],
+    "gibberish_detected": ["z_i", "t_i_d"]
+}
+```
+
+And as there are two `IH0`, the detection and alternatives for both are included.
+
+### Example for final ed
+
+To study e.d. the "-ed" termination, you would need to input `'target': 'IH0_D'` and e.g. `'alternatives': "T D IH0_D"`.
+
+For the same sentence “I visited Italy”, we want to study the -ed termination of “visited”, therefore the request is:
+
+```json
+{
+    "rID": "487c3fe1-5f17-4010-a019-92b1c6ebfc5a",
+    "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
+    "word_idx": 1,
+    "alternatives": "IH0_D D T",
+    "target": "IH0_D"
+}
+```
+
+This time the output (if pronounced correctly) will be:
+
+```json
+{
+    "status": "success",
+    "phonetic_detection": ["IH0_D"]
+}
+```
+
+## Call the vowelStress module
+
+vowelStresses gives stress scores for each syllable of each word between 0 and 1
+
+```
+url='/vowel_stresses'
+data={"text":text, 'filename':filename}
+```
+
+Example of output:
+
+```
+b'{"status": "success", "result": [[83], [49], [85], [27], [57], [27], [73, 44, 62]]}'
+```
+
+if you pass only one word with only one syllable, the result will be a `[[nan]]`
