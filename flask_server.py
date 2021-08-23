@@ -194,7 +194,7 @@ def phoneme_contrast_api():
 
 
 def run_app():
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0', port=8000)
 
 
 # deprecated functions
