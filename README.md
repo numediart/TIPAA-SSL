@@ -185,7 +185,7 @@ The script ```tts_aws.py``` allows you to synthesize a list of sentences.
 Use scp command to download them:
 
 ```
-scp -r -i "~/flowspeech.pem" ec2-user@ec2-13-36-36-234.eu-west-3.compute.amazonaws.com:~/Flowspeech/synth_audio/ .
+scp -r -i "~/flowspeech.pem" ec2-user@ec2-13-37-107-52.eu-west-3.compute.amazonaws.com:~/Flowspeech/synth_audio/ .
 ```
 
 Details on AWS Polly CLI arguments and options:
