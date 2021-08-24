@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 import uuid
 import base64
-
+   
 @app.route('/')
 def index():
     return send_from_directory( './html/','index.html')
@@ -29,6 +29,7 @@ def prefill_from_phrases_html():
     return send_from_directory( './html/','prefill_from_phrases.html')
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
 
 
 upload_path="./upload_files/"
@@ -60,19 +61,37 @@ def upload_file():
         try:
             os.remove(upload_path+uploaded_file.filename)
         except:
-            # return "error: could not delete temp file"
             return Response(
-                "error: could not convert uploaded file",
+                "error: could not remove uploaded file",
                 status=500,
             )
     else:
-        return "error: filename is empty"
+        return Response(
+                "error: filename is empty",
+                status=400,
+            )
     return rID
   
 
+
+
+def access_property_error(content, property):
+    try:
+        content[property]
+        return 0
+    except:
+        response='error: could not access "'+property+'" property of the request'
+        return response
+    
 @app.route('/send_base64_audio', methods=['GET', 'POST'])
 def send_audio():
     content = request.form
+
+    properties=["audio","extension"]
+    for prop in properties:
+        err=access_property_error(content, prop)
+        if err: return Response(err,status=400,)
+    
     print(request.__dict__)
     print(content)
     print(content['audio'])
@@ -102,31 +121,50 @@ def send_audio():
 def prefill_from_phrases():
     try:
         uploaded_file = request.files['file']
-    except:
-        return "error: could not access request.files['file'] "
+    except:        
+        return Response(
+                "error: could not access request.files['file']",
+                status=400,
+            )
     if uploaded_file.filename != '':
         try:
             uploaded_file.save(upload_path+uploaded_file.filename)
         except:
-            return "error: could not save uploaded file"
+            return Response(
+                "error: could not save uploaded file",
+                status=500,
+            )
         
         df=generate_prefill_csv(upload_path+uploaded_file.filename, out_path=upload_path+'prefill.csv')
         try:
             os.remove(upload_path+uploaded_file.filename)
         except:
-            return "error: could not delete temp file"
+            return Response(
+                "error: could not remove uploaded file",
+                status=500,
+            )
     else:
-        return "error: filename is empty"
+        return Response(
+                "error: filename is empty",
+                status=400,
+            )
     try:
 	    return send_file(upload_path+'prefill.csv', as_attachment=True)
     except Exception as e:
-        return str(e)
+        return Response(
+                "error: "+str(e),
+                status=500,
+            )
   
 
 syllables=pd.read_csv('data/syllables.csv')
 @app.route('/prefill_from_phrase', methods=['GET', 'POST'])
 def prefill_from_phrase():
     content = request.form
+    
+    err=access_property_error(content, "phrase")
+    if err: return Response(err,status=400,)
+
     # import pdb;pdb.set_trace()
     print(request.__dict__)
     print(content)
@@ -142,6 +180,13 @@ def prefill_from_phrase():
 @app.route('/vowel_stresses', methods=['GET', 'POST'])
 def vowel_stresses_api():
     content = request.form
+
+    properties=["phonetics","rID"]
+    for prop in properties:
+        err=access_property_error(content, prop)
+        if err: return Response(err,status=400,)
+    
+    
     print(request.__dict__)
     print(content)
     print(content['phonetics'])
@@ -163,6 +208,12 @@ def vowel_stresses_api():
 @app.route('/flowspeech/<module>', methods=['GET', 'POST'])
 def module_api(module):
     content = request.form
+    
+    properties=["phonetics","rID","text"]
+    for prop in properties:
+        err=access_property_error(content, prop)
+        if err: return Response(err,status=400,)
+
     print(request.__dict__)
     print(content)
     print(content['phonetics'])
@@ -186,6 +237,12 @@ from text_processing import cmu_to_gibberish
 @app.route('/phonemeContrast', methods=['GET', 'POST'])
 def phoneme_contrast_api():
     content = request.form
+    
+    properties=["phonetics","rID","word_idx","target","alternatives"]
+    for prop in properties:
+        err=access_property_error(content, prop)
+        if err: return Response(err,status=400,)
+    
     # import pdb;pdb.set_trace()
     print(request.__dict__)
     # print(content)
