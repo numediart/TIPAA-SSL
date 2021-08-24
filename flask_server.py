@@ -101,16 +101,33 @@ def send_audio():
     extension=content['extension']
 
     temp_filename=str(uuid.uuid4())
-    # based on:
-    # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
-    wav_file = open(upload_path+temp_filename+"."+extension, "wb")
-    decode_string = base64.b64decode(audio)
-    wav_file.write(decode_string)
-    wav_file.close()
+    try:
+        # based on:
+        # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
+        wav_file = open(upload_path+temp_filename+"."+extension, "wb")
+        decode_string = base64.b64decode(audio)
+        wav_file.write(decode_string)
+        wav_file.close()
+    except:
+        return Response(
+            "error: could not save uploaded file",
+            status=500,
+        )
 
-    status_conversion, rID = prepare_audio_file(upload_path+temp_filename+"."+extension)
-
-    os.remove(upload_path+temp_filename+"."+extension)
+    try:
+        status_conversion, rID = prepare_audio_file(upload_path+temp_filename+"."+extension)
+    except:
+        return Response(
+            "error: could not convert uploaded file",
+            status=500,
+        )
+    try:
+        os.remove(upload_path+temp_filename+"."+extension)
+    except:
+        return Response(
+            "error: could not remove uploaded file",
+            status=500,
+        )
     res={"status": "success", "rID":rID}
     response=json.dumps(res)
     return response
