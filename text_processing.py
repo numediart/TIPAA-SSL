@@ -683,8 +683,9 @@ def prefill_content(sentences, syl_sep='|'):
 
 def generate_prefill_csv(                            # path='data/phrases_speaking_activities.txt', 
                             path='data/phrases_dynamoDB.txt',
-                            syl_sep='|', 
-                            out_path='prefill_test.csv'):
+                            syl_sep='|'#, 
+                            # out_path='prefill_test.csv'
+                            ):
     """Reads a text file containing phrases and uses prefill_content to return a CSV of syllabified texts and phonetics
 
     Args:
@@ -704,7 +705,7 @@ def generate_prefill_csv(                            # path='data/phrases_speaki
     #     syl_parts_with_special_characters.append(add_special_char(r.text, r.syllable_parts))
     
     # df.syllable_parts=syl_parts_with_special_characters
-    df.to_csv(out_path) 
+    # df.to_csv(out_path) 
     print("Total syl inconsistencies:", df['n_syl_mismatch'].sum())
     return df
 

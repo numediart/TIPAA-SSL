@@ -1,6 +1,5 @@
 from flask import Flask, request, redirect, url_for
 from flask import send_from_directory
-from flask import send_file
 from flask import Response
 
 from speech_tech import *
@@ -138,7 +137,7 @@ def send_audio():
 def prefill_from_phrases():
     try:
         uploaded_file = request.files['file']
-    except:        
+    except:
         return Response(
                 "error: could not access request.files['file']",
                 status=400,
@@ -152,7 +151,7 @@ def prefill_from_phrases():
                 status=500,
             )
         
-        df=generate_prefill_csv(upload_path+uploaded_file.filename, out_path=upload_path+'prefill.csv')
+        df=generate_prefill_csv(upload_path+uploaded_file.filename)#, out_path=upload_path+'prefill.csv')
         try:
             os.remove(upload_path+uploaded_file.filename)
         except:
@@ -166,7 +165,11 @@ def prefill_from_phrases():
                 status=400,
             )
     try:
-	    return send_file(upload_path+'prefill.csv', as_attachment=True)
+        return Response(
+                df.to_csv(),
+                mimetype="text/csv",
+                headers={"Content-disposition":
+                "attachment; filename=filename.csv"})
     except Exception as e:
         return Response(
                 "error: "+str(e),
