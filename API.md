@@ -12,7 +12,7 @@ The server returns a random ID "rID", as plain text, to be used for processing a
 Alternatively, you can send audio encoded as a string in base64:
 ```
 POST /send_base64_audio
-Body (JSON): {
+Body (FormData): {
     audio: string,
     extension: string
 }
@@ -31,7 +31,7 @@ type Response = {
 
 ```
 POST /flowspeech/sentenceStress
-Body (JSON): {
+Body (FormData): {
     text: string,
     phonetics: string,
     rID: string
@@ -80,7 +80,7 @@ Request:
 
 ```
 POST /flowspeech/wordStress
-Body (JSON): {
+Body (FormData): {
     text: string,
     phonetics: string,
     rID: string
@@ -129,7 +129,7 @@ The `phonemeContrast` module gives you a detected transcription based on a targe
 
 ```
 POST /phonemeContrast
-Body (JSON): {
+Body (FormData): {
     phonetics: string
     rID: string
     word_idx: number
