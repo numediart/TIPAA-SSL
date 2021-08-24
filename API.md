@@ -22,7 +22,6 @@ The response object is a JSON payload with the following schema:
 
 ```typescript
 type Response = {
-    // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
     status: 'success'|'error',
     rID: string
 }
