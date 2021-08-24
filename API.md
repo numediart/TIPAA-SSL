@@ -7,7 +7,26 @@ POST /upload
 Body (FormData): files = {'file': file}
 ```
 
-The server returns a random ID "rID" to be used for processing afterwards.
+The server returns a random ID "rID", as plain text, to be used for processing afterwards.
+
+Alternatively, you can send audio encoded as a string in base64:
+```
+POST /send_base64_audio
+Body (JSON): {
+    audio: string,
+    extension: string
+}
+```
+
+The response object is a JSON payload with the following schema:
+
+```typescript
+type Response = {
+    // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
+    status: 'success'|'error',
+    rID: string
+}
+```
 
 ## Call the sentenceStress module
 
@@ -27,7 +46,7 @@ The response object is a JSON payload with the following schema:
 ```typescript
 type Response = {
     // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
-    status: 'success'|'error'
+    status: 'success'|'error',
     // a list of stress intensities between 0 and 100 for each word
     stress_intensities: number[],
     // a list of 0/1 for each word, the 1 being the sentence stress
