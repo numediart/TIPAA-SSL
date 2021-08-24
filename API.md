@@ -199,7 +199,9 @@ This time the output (if pronounced correctly) will be:
 ```json
 {
     "status": "success",
-    "phonetic_detection": ["IH0_D"]
+    "phonetic_detection": ["IH0_D"],
+    "gibberish_truth": ["t_i_d"],
+    "gibberish_detected": ["t_i_d"]
 }
 ```
 
