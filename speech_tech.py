@@ -14,12 +14,15 @@ import json
 import time
 import re
 
-path_cached_filenames='data/cached_filenames.json'
-if os.path.exists(path_cached_filenames):
-    with open(path_cached_filenames, 'r') as fp:
-        cached_filenames = json.load(fp)
-else:
-    cached_filenames={}
+# path_cached_filenames='data/cached_filenames.json'
+# if os.path.exists(path_cached_filenames):
+#     with open(path_cached_filenames, 'r') as fp:
+#         cached_filenames = json.load(fp)
+# else:
+
+# os.remove("inputs/*")
+os.system("rm inputs/*")
+cached_filenames={}
 
 def prepare_audio_file(audio_file, fs=16000):
     rID=str(uuid.uuid4())
@@ -445,8 +448,8 @@ def phonemeContrast_from_phonetics_audio(
 
         make_pContrast_annotation_files_from_phonetics(uid,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
 
-        with open(path_cached_filenames, 'w') as fp:
-            json.dump(cached_filenames, fp)
+        # with open(path_cached_filenames, 'w') as fp:
+        #     json.dump(cached_filenames, fp)
 
     status,result=phonemeContrast(cached_filenames[p_idx], rID)
     return status, result
@@ -465,8 +468,8 @@ def vowel_stresses_from_phonetics_audio(
         cached_filenames[p_idx]=uid
 
         make_all_phones_annotation_files_from_phonetics(uid,phonetics)
-        with open(path_cached_filenames, 'w') as fp:
-            json.dump(cached_filenames, fp)
+        # with open(path_cached_filenames, 'w') as fp:
+        #     json.dump(cached_filenames, fp)
 
     status,result=vowel_stresses(cached_filenames[p_idx], rID)
     return status, result
