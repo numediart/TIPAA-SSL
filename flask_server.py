@@ -86,7 +86,7 @@ def access_property_error(content, property):
 def send_audio():
     content = request.form
 
-    properties=["audio","extension"]
+    properties=["audio"]
     for prop in properties:
         err=access_property_error(content, prop)
         if err: return Response(err,status=400,)
@@ -94,16 +94,16 @@ def send_audio():
     print(request.__dict__)
     print(content)
     print(content['audio'])
-    print(content['extension'])
+    # print(content['extension'])
     audio=content['audio']
     # phonetics=ast.literal_eval(content['phonetics'])
-    extension=content['extension']
+    # extension=content['extension']
 
     temp_filename=str(uuid.uuid4())
     try:
         # based on:
         # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
-        wav_file = open(upload_path+temp_filename+"."+extension, "wb")
+        wav_file = open(upload_path+temp_filename+".audio", "wb")
         decode_string = base64.b64decode(audio)
         wav_file.write(decode_string)
         wav_file.close()
@@ -114,14 +114,14 @@ def send_audio():
         )
 
     try:
-        status_conversion, rID = prepare_audio_file(upload_path+temp_filename+"."+extension)
+        status_conversion, rID = prepare_audio_file(upload_path+temp_filename+".audio")
     except:
         return Response(
             "error: could not convert uploaded file",
             status=500,
         )
     try:
-        os.remove(upload_path+temp_filename+"."+extension)
+        os.remove(upload_path+temp_filename+".audio")
     except:
         return Response(
             "error: could not remove uploaded file",
@@ -165,6 +165,8 @@ def prefill_from_phrases():
                 status=400,
             )
     try:
+        # from:
+        # https://stackoverflow.com/questions/38634862/use-flask-to-convert-a-pandas-dataframe-to-csv-and-serve-a-download
         return Response(
                 df.to_csv(),
                 mimetype="text/csv",
@@ -258,7 +260,7 @@ from text_processing import cmu_to_gibberish
 def phoneme_contrast_api():
     content = request.form
     
-    properties=["phonetics","rID","word_idx","target","alternatives"]
+    properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
     for prop in properties:
         err=access_property_error(content, prop)
         if err: return Response(err,status=400,)
@@ -274,6 +276,7 @@ def phoneme_contrast_api():
     # phonetics=ast.literal_eval(content['phonetics'])
     phonetics=content['phonetics']
     word_idx=content['word_idx']
+    syl_idx=content['syl_idx']
     rID=content['rID']
     target=content['target']
     # alternatives=ast.literal_eval(content['alternatives'])
@@ -281,7 +284,18 @@ def phoneme_contrast_api():
     print(alternatives)
 
     word_idx=int(word_idx)
+    syl_idx=int(syl_idx)
 
+    # split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+    # extract the syllables which contain the target
+    syls_with_target=[syl for syl in phonetics.split(' ')[word_idx].split('|') if target in syl]
+    idx_syls_with_target=[i for i,syl in enumerate(phonetics.split(' ')[word_idx].split('|')) if target in syl]
+
+    if syl_idx not in idx_syls_with_target:
+        return Response("error: the syllable corresponding to syl_idx does not contain the target.",status=400,)
+    
+    target_idx=idx_syls_with_target.index(syl_idx)
+    
     status,result=phonemeContrast_from_formatted_phonetics_audio(rID, phonetics, word_idx, target, alternatives)
     print('status:',status)
     print('result:',result)
@@ -294,8 +308,6 @@ def phoneme_contrast_api():
     else:
         phonetic_detection=result
 
-    # extract the syllables which contain the target
-    syls_with_target=[syl for syl in phonetics.split(' ')[word_idx].split('|') if target in syl]
     syls_detection=[syl.replace(target, phonetic_detection[i]) for i,syl in enumerate(syls_with_target)]
 
     gs_t=[]
@@ -306,7 +318,7 @@ def phoneme_contrast_api():
         gs_t.append('_'.join(g_t))
         gs_d.append('_'.join(g_d))
     
-    d={'status':status, 'phonetic_detection':phonetic_detection, 'gibberish_truth':gs_t, 'gibberish_detected':gs_d}
+    d={'status':status, 'phonetic_detection':phonetic_detection[target_idx], 'gibberish_truth':gs_t[target_idx], 'gibberish_detected':gs_d[target_idx]}
     response=json.dumps(d)
     return response
 

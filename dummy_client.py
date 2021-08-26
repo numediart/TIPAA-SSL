@@ -5,8 +5,7 @@ import pandas as pd
 import os
 syllables_data=pd.read_csv('data/syllables.csv')
 
-from label_data_processing import get_sentenceStress_annotation, get_data
-from text_processing import remove_special_characters, prefill_content
+from label_data_processing import get_data
 import time
 import base64
 import ast
@@ -36,13 +35,13 @@ def call_module(rID, text='I would love to go to ireland!', module='sentenceStre
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
-def call_phoneme_contrast(rID, text='turned around', word_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', client=requests):
+def call_phoneme_contrast(rID, text='turned around', word_idx=0, syl_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/phonemeContrast"
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
     # phonetics=phonetics_from_sentence(text)
     # res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target})
-    res = client.post(url, data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target})
+    res = client.post(url, data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'syl_idx':syl_idx, 'alternatives':alternatives, 'target':target})
     print(res.__dict__['_content'])
     return res.__dict__['_content']
 
@@ -110,10 +109,6 @@ def test_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http:
 
     res = client.post(base_url+"/send_base64_audio", data={"audio":encode_string, "extension":extension})
 
-    # wav_file = open("temp.wav", "wb")
-    # decode_string = base64.b64decode(encode_string)
-    # wav_file.write(decode_string)
-    # wav_file.close()
     return res.__dict__['_content']
 
 if __name__ == "__main__":
@@ -126,20 +121,24 @@ if __name__ == "__main__":
     rID1=res.__dict__['_content']
     call_phoneme_contrast( rID1.decode('utf-8'))
 
-    res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-36-36-234.eu-west-3.compute.amazonaws.com")
-    rID=res.__dict__['_content']
-    call_phoneme_contrast( rID.decode('utf-8'), base_url="http://ec2-13-36-36-234.eu-west-3.compute.amazonaws.com")
+    res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
+    rID=res.__dict__['_content'].decode('utf-8')
+
+    res=test_base64(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
+    rID=ast.literal_eval(res.decode('utf-8'))['rID']
+
+    call_phoneme_contrast( rID, base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     
-    call_prefill_for_sentence( "Kayla isn't angry at Tyler", base_url="http://ec2-13-36-36-234.eu-west-3.compute.amazonaws.com")
+    call_prefill_for_sentence( "Kayla isn't angry at Tyler", base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     call_prefill_for_sentence("Kayla isn't angry at Tyler")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID2=res.__dict__['_content']
-    call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0', alternatives="IH0 IY0")
+    call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=1, target='IH0', alternatives="IH0 IY0")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID=res.__dict__['_content']
-    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, target='IH0_D', alternatives="T D IH0_D")
+    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=2, target='IH0_D', alternatives="T D IH0_D")
 
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
