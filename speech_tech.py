@@ -10,9 +10,7 @@ from htk_utils import get_textgrid_data, clean_htk_files
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
 from text_processing import phonetics_from_sentence
 import uuid
-import json
 import time
-import re
 
 # path_cached_filenames='data/cached_filenames.json'
 # if os.path.exists(path_cached_filenames):
@@ -20,8 +18,10 @@ import re
 #         cached_filenames = json.load(fp)
 # else:
 
-# os.remove("inputs/*")
-os.system("rm inputs/*")
+from glob import glob
+inputs=glob('inputs/*')
+for f in inputs: os.remove(f)
+
 cached_filenames={}
 
 def prepare_audio_file(audio_file, fs=16000):
