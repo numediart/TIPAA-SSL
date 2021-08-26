@@ -133,6 +133,7 @@ Body (FormData): {
     phonetics: string
     rID: string
     word_idx: number
+    syl_idx: number
     alternatives: string
     target: string
 }
@@ -145,21 +146,22 @@ The response payload has the following schema:
 ```typescript
 type Response = {
     status: 'success'|'error'
-    phonetic_detection: string[]
-    gibberish_truth: string[],
-    gibberish_detected: string[]
+    phonetic_detection: string
+    gibberish_truth: string
+    gibberish_detected: string
 }
 ```
 
 ### Example for long/short i
 
-For example, for a recording containing “I visited Italy”, and a request to study the phoneme `IH0` in the word `visited`, the payload is:
+For example, for a recording containing “I visited Italy”, and a request to study the phoneme `IH0` after the `Z` in the word `visited`, the payload is:
 
 ```json
 {
     "rID": "487c3fe1-5f17-4010-a019-92b1c6ebfc5a",
     "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
     "word_idx": 1,
+    "syl_idx": 1,
     "alternatives": "IH0 IY0",
     "target": "IH0"
 }
@@ -170,9 +172,9 @@ The response will be:
 ```json
 {
     "status": "success",
-    "phonetic_detection": ["IH0", "IH0"],
-    "gibberish_truth": ["z_i", "t_i_d"],
-    "gibberish_detected": ["z_i", "t_i_d"]
+    "phonetic_detection": "IH0",
+    "gibberish_truth": "z_i",
+    "gibberish_detected": "z_i"
 }
 ```
 
@@ -189,6 +191,7 @@ For the same sentence “I visited Italy”, we want to study the -ed terminatio
     "rID": "487c3fe1-5f17-4010-a019-92b1c6ebfc5a",
     "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
     "word_idx": 1,
+    syl_idx=2,
     "alternatives": "IH0_D D T",
     "target": "IH0_D"
 }
@@ -199,9 +202,9 @@ This time the output (if pronounced correctly) will be:
 ```json
 {
     "status": "success",
-    "phonetic_detection": ["IH0_D"],
-    "gibberish_truth": ["t_i_d"],
-    "gibberish_detected": ["t_i_d"]
+    "phonetic_detection": "IH0_D",
+    "gibberish_truth": "t_i_d",
+    "gibberish_detected": "t_i_d"
 }
 ```
 
