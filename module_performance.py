@@ -70,7 +70,7 @@ def stress_performance_test(level='sentence'):
             a[row.analysisId]=word_stress_from_text(row.text) 
     else:
         print("level should be 'word' or 'sentence'")
-        raise
+        raise "level should be 'word' or 'sentence'"
 
     audio_path="../audio-with-analysis-ids/audio/"
     preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
@@ -87,12 +87,19 @@ def stress_performance_test(level='sentence'):
             path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
             _, rID=prepare_audio_file(path)
             make_all_phones_annotation_files(rID,remove_special_characters(row.text.values[0]))
+
+            # phonetics=phonetics_from_sentence(row.text.values[0])
+            formatted_phonetics=prefill_for_sentence(row.text.values[0])['cmu_phonetics']
+            # sentence=textDict[id]
             try:
                 if level=='sentence':
-                    res=sentenceStress(rID,rID)
+                    sentence=textDict[id]
+                    res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=sentence, level="sentence")
+                    # res=sentenceStress(rID,rID)
                     pred=res['stress_binaries']
                 elif level=='word':
-                    res=wordStress(rID,rID)
+                    res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, level="word")
+                    # res=wordStress(rID,rID)
                     # I merge word results to word word with compute_errors
                     pred=merge_list(res['stress_binaries'])
                 else:
@@ -110,8 +117,8 @@ def stress_performance_test(level='sentence'):
                 errors.append(row)
                 p_errors.append(path)
     
-    print(preds)
-    print(GTs)
+    print('preds:',preds)
+    print('GTs:',GTs)
     all_zero_baseline=[np.zeros(len(el)) for el in GTs]
     print(errors)
     print("all zero baseline")
