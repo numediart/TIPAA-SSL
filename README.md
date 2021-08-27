@@ -53,7 +53,7 @@ b'{"text": "Kayla isn\'t angry at Tyler",
 "n_alternatives": [1, 3, 1, 1, 1]}'
 ```
 
-## Docker application
+## Docker application on EC2
 
 You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
 I used this info to do that: 
@@ -113,6 +113,62 @@ To show terminal output:
 ```
 docker logs flaskapp
 ```
+
+## Docker application on ECR and ECS
+
+In this setup, the idea is to docker push an image to a Amazons Elastic Container Registry (ECR), that will be used in the ECS.
+
+How to setup a service (this is aweful, manual, and not working properly)
+https://towardsdatascience.com/deploying-a-docker-container-with-ecs-and-fargate-7b0cbc9cd608
+https://itnext.io/run-your-containers-on-aws-fargate-c2d4f6a47fda
+
+
+Fortunately, with docker and aws-cli, there are interesting stuff:
+
+https://devops4solutions.com/deploy-docker-container-in-ecs-using-docker-compose/
+https://dev.to/sfrancavilla/deploy-web-apps-nginx-to-ecs-with-docker-198i
+
+First create repos
+```
+aws ecr create-repository --repository-name speech_api
+aws ecr create-repository --repository-name nginx
+```
+
+Connect to ECR
+```
+aws ecr get-login-password \
+    --region eu-west-3 \
+| docker login \
+    --username AWS \
+    --password-stdin 937215464284.dkr.ecr.eu-west-3.amazonaws.com
+```
+
+Push images to ECR:
+```
+docker push 937215464284.dkr.ecr.eu-west-3.amazonaws.com/speech_api
+```
+or with docker-compose, the yml has to conatain "image: ECR_URL":
+`docker-compose push`
+
+For only one of them, e.g.:
+ docker-compose push nginx
+
+Thus the procedure to run a docker compose, or update it:
+```
+docker context use default
+docker-compose -f docker-compose_aws.yml build
+docker-compose -f docker-compose_aws.yml push
+```
+then:
+```
+docker context use myecs
+docker compose -f docker-compose_aws.yml up
+```
+It takes time to update, but a new task is first created and afterwards the old one is removed.
+
+aws ecs list-clusters
+
+
 ## Manual Installation
 ### Install HTK
 
