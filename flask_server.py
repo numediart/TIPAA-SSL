@@ -91,9 +91,9 @@ def send_audio():
         err=access_property_error(content, prop)
         if err: return Response(err,status=400,)
     
-    print(request.__dict__)
-    print(content)
-    print(content['audio'])
+    print(request.__dict__.keys())
+    # print(content)
+    # print(content['audio'])
     # print(content['extension'])
     audio=content['audio']
     # phonetics=ast.literal_eval(content['phonetics'])
