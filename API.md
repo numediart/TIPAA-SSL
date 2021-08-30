@@ -13,8 +13,7 @@ Alternatively, you can send audio encoded as a string in base64:
 ```
 POST /send_base64_audio
 Body (FormData): {
-    audio: string,
-    extension: string
+    audio: string
 }
 ```
 
