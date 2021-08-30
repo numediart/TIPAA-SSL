@@ -190,7 +190,7 @@ For the same sentence “I visited Italy”, we want to study the -ed terminatio
     "rID": "487c3fe1-5f17-4010-a019-92b1c6ebfc5a",
     "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
     "word_idx": 1,
-    "syl_idx"=1,
+    "syl_idx": 1,
     "alternatives": "IH0_D D T",
     "target": "IH0_D"
 }
