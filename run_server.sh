@@ -6,5 +6,7 @@
 # gunicorn flask_server:app 
 # uwsgi --http 127.0.0.1:5000 --module flask_server:app
 
+export FLOWSPEECH_KEY="ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"
 cron
 gunicorn -b 0.0.0.0:8000 flask_server:app
+# python flask_server.py
