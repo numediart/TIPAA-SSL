@@ -35,7 +35,6 @@ def debug_only(f):
         return f(**kwargs)
     return wrapped
 
-print(os.environ['FLOWSPEECH_KEY'])
 
 syllables=pd.read_csv('data/syllables.csv')
 
@@ -231,17 +230,25 @@ responseSchema=Schema.from_dict(
     }
 )
 
+
+
+properties=["audio", "API_KEY"]
 @doc(description='send audio API.', tags=['audio'])
-@use_kwargs({'audio':fields.String(required=True, description="base64 encoded audio")}, location=('form'))
+@use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @app.route('/send_base64_audio', methods=['POST'])
 def send_audio():
     content = request.form
-    properties=["audio"]
+    properties=["audio", "API_KEY"]
     for prop in properties:
         err=access_property_error(content, prop)
         if err: return Response(err,status=400,)
     
+    if os.environ['FLOWSPEECH_KEY']!=content['API_KEY']: 
+        return Response(
+            "error: wrong API key",
+            status=400,
+        )
     print(request.__dict__.keys())
     # print(content)
     # print(content['audio'])
@@ -285,10 +292,6 @@ def send_audio():
 
 
 
-# class responseSchema(Schema):
-#     message = fields.Str(default='Success')
-
-# {'message': fields.Str(default='Success')}
 
 record={'text':fields.Str(),
         'cmu_phonetics':fields.Str(),
@@ -308,6 +311,7 @@ responseSchema=Schema.from_dict(record)
 @use_kwargs({'phrase':fields.String(required=True, description="base64 encoded audio")}, location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @app.route('/prefill_from_phrase', methods=['POST'])
+@debug_only
 def prefill_from_phrase():
     content = request.form
     
@@ -331,7 +335,7 @@ responseSchema=Schema.from_dict(
         "status": fields.Str(), 
         "stress_intensities":fields.List(fields.Integer), 
         "stress_binaries":fields.List(fields.Integer)
-        }
+    }
 )
 properties=["phonetics","rID","text"]
 @doc(description='Phoneme contrast', tags=['stress'])
