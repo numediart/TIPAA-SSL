@@ -10,7 +10,9 @@ from flask_apispec import marshal_with, doc, use_kwargs
 from flask import send_from_directory
 from flask import Response
 
-from speech_tech import *
+# from speech_tech import *
+from speech_tech import stress_from_formatted_phonetics, prepare_audio_file, vowel_stresses_from_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio
+import pandas as pd
 import json
 import speech_tech
 from text_processing import generate_prefill_csv, prefill_for_sentence
@@ -53,6 +55,10 @@ app.config.update({
 })
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# for not breaking the order of functions in thr doc:
+# https://github.com/marshmallow-code/apispec/issues/193
+app.config["JSON_SORT_KEYS"] = False
 
 @app.route('/')
 @debug_only
@@ -227,11 +233,8 @@ responseSchema=Schema.from_dict(
     {
     "status": fields.Str(), 
     "rID":fields.Str()
-    }
+    }, name="audio_response"
 )
-
-
-
 properties=["audio", "API_KEY"]
 @doc(description='send audio API.', tags=['audio'])
 @use_kwargs(properties_to_args(properties), location=('form'))
@@ -293,52 +296,16 @@ def send_audio():
 
 
 
-record={'text':fields.Str(),
-        'cmu_phonetics':fields.Str(),
-        'pronounciation_guide':fields.Str(),
-        'pronounciation_guide_hr':fields.Str(),
-        'syllable_parts':fields.Str(),
-        'n_syl_mismatch':fields.Integer(),
-        'n_syl_mismatches':fields.List(fields.Integer),
-        'used_method_for_syl_text':fields.List(fields.Str()),
-        'cmu_phonetics_alt':fields.List(fields.List(fields.Str())),
-        'pronounciation_guide_alt':fields.List(fields.List(fields.Str())),
-        'pronounciation_guide_hr_alt':fields.List(fields.List(fields.Str())),
-        'n_alternatives':fields.List(fields.Integer)
-        }
-responseSchema=Schema.from_dict(record)
-@doc(description='Prefill from phrase', tags=['prefill'])
-@use_kwargs({'phrase':fields.String(required=True, description="base64 encoded audio")}, location=('form'))
-@marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/prefill_from_phrase', methods=['POST'])
-@debug_only
-def prefill_from_phrase():
-    content = request.form
-    
-    err=access_property_error(content, "phrase")
-    if err: return Response(err,status=400,)
-
-    # import pdb;pdb.set_trace()
-    print(request.__dict__)
-    print(content)
-    print(content['phrase'])
-
-    d=prefill_for_sentence(content['phrase'], syllables)
-    print(d)
-    response=json.dumps(d)
-    print(response)
-    return response
-
 
 responseSchema=Schema.from_dict(
     {
         "status": fields.Str(), 
         "stress_intensities":fields.List(fields.Integer), 
         "stress_binaries":fields.List(fields.Integer)
-    }
+    }, name="stress_response"
 )
 properties=["phonetics","rID","text"]
-@doc(description='Phoneme contrast', tags=['stress'])
+@doc(description='Detection sentence stress or word stress', tags=['stress'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @app.route('/flowspeech/<module>', methods=['POST'])
@@ -371,7 +338,8 @@ responseSchema=Schema.from_dict(
     {"status": fields.Str(), 
     "phonetic_detection": fields.Str(), 
     "gibberish_truth": fields.Str(),
-    "gibberish_detected":fields.Str()}
+    "gibberish_detected":fields.Str()},
+    name="phonemeContrast_response"
 )
 properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
 @doc(description='Phoneme contrast', tags=['phonemeContrast'])
@@ -442,6 +410,44 @@ def phoneme_contrast_api():
     
     d={'status':status, 'phonetic_detection':phonetic_detection[target_idx], 'gibberish_truth':gs_t[target_idx], 'gibberish_detected':gs_d[target_idx]}
     response=json.dumps(d)
+    return response
+
+
+
+record={'text':fields.Str(),
+        'cmu_phonetics':fields.Str(),
+        'pronounciation_guide':fields.Str(),
+        'pronounciation_guide_hr':fields.Str(),
+        'syllable_parts':fields.Str(),
+        'n_syl_mismatch':fields.Integer(),
+        'n_syl_mismatches':fields.List(fields.Integer),
+        'used_method_for_syl_text':fields.List(fields.Str()),
+        'cmu_phonetics_alt':fields.List(fields.List(fields.Str())),
+        'pronounciation_guide_alt':fields.List(fields.List(fields.Str())),
+        'pronounciation_guide_hr_alt':fields.List(fields.List(fields.Str())),
+        'n_alternatives':fields.List(fields.Integer)
+        }
+responseSchema=Schema.from_dict(record, name="prefill response")
+@doc(description='Prefill from phrase', tags=['prefill'])
+@use_kwargs({'phrase':fields.String(required=True, description="Text sentence to be processed. It can contain special characters etc.")}, location=('form'))
+@marshal_with(responseSchema, code=200)  # marshalling
+@app.route('/prefill_from_phrase', methods=['POST'])
+@debug_only
+def prefill_from_phrase():
+    content = request.form
+    
+    err=access_property_error(content, "phrase")
+    if err: return Response(err,status=400,)
+
+    # import pdb;pdb.set_trace()
+    print(request.__dict__)
+    print(content)
+    print(content['phrase'])
+
+    d=prefill_for_sentence(content['phrase'], syllables)
+    print(d)
+    response=json.dumps(d)
+    print(response)
     return response
 
 

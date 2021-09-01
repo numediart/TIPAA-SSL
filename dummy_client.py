@@ -92,6 +92,16 @@ def crash_test():
     print('avg duration processing sentenceStress:', avg_duration)
 
 
+def send_audio_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
+    # based on :
+    # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
+    encode_string = base64.b64encode(open(path, "rb").read())
+    res = client.post(base_url+"/send_base64_audio", data={"audio":encode_string, "API_KEY":"ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"})
+
+    return res.__dict__['_content']
+
+
+
 # deprecated functions
 if False:
     def call_module(module='sentenceStress', filename='SS_1_i_would_love_to_go_to_ireland.wav', sentenceID=1, client=requests):
@@ -99,21 +109,9 @@ if False:
         print(res.__dict__['_content'])
         return res.__dict__['_content']
 
-
-def test_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
-    # based on :
-    # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
-    encode_string = base64.b64encode(open(path, "rb").read())
-
-    extension=path.split('.')[-1]
-
-    res = client.post(base_url+"/send_base64_audio", data={"audio":encode_string, "extension":extension})
-
-    return res.__dict__['_content']
-
 if __name__ == "__main__":
 
-    res=test_base64(path='audio_recordings/turned_around.mp3')
+    res=send_audio_base64(path='audio_recordings/turned_around.mp3')
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
     call_phoneme_contrast(rID)
 
@@ -124,7 +122,7 @@ if __name__ == "__main__":
     res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     rID=res.__dict__['_content'].decode('utf-8')
 
-    res=test_base64(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
+    res=send_audio_base64(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
 
     call_phoneme_contrast( rID, base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
@@ -135,25 +133,29 @@ if __name__ == "__main__":
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID2=res.__dict__['_content']
     call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=1, target='IH0', alternatives="IH0 IY0")
+
+    
+    res=send_audio(path='audio_recordings/I_visited_italy.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
+    rID2=res.__dict__['_content']
+    call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=1, target='IH0', alternatives="IH0 IY0", base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     
     res=send_audio(path='audio_recordings/I_visited_italy.mp3')
     rID=res.__dict__['_content']
-    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=2, target='IH0_D', alternatives="T D IH0_D")
+    call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=2, target='IH0_D', alternatives="T D IH0_D", base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
 
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
     call_vowel_stresses(rID.decode('utf-8'))
     
-    res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    rID=res.__dict__['_content']
-    call_module(rID.decode('utf-8'))
+    res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    rID=ast.literal_eval(res.decode('utf-8'))['rID']
+    call_module(rID)
 
     
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.__dict__['_content']
     call_module(rID.decode('utf-8'), module="wordStress")
 
-    
     res=send_audio(path='audio_recordings/WS_111_toothpaste.wav')
     rID=res.__dict__['_content']
     call_module(rID.decode('utf-8'), text="toothpaste", module="wordStress")
