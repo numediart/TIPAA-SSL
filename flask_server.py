@@ -76,13 +76,11 @@ def phonemeContrast_html():
 def vowel_stresses_html():
     return send_from_directory( './html/','vowel_stresses.html')
 
-@app.route('/prefill_from_phrases.html')
-@debug_only
+@app.route('/prefill_from_phrases.html', methods=['GET'])
 def prefill_from_phrases_html():
     return send_from_directory( './html/','prefill_from_phrases.html')
 
 @app.route('/prefill_from_phrases', methods=['POST'])
-@debug_only
 def prefill_from_phrases():
     try:
         uploaded_file = request.files['file']
@@ -183,7 +181,7 @@ def vowel_stresses_api():
         if err: return Response(err,status=400,)
     
     
-    print(request.__dict__)
+    # print(request.__dict__)
     print(content)
     print(content['phonetics'])
     print(content['rID'])
@@ -219,11 +217,6 @@ def access_property_error(content, property):
         return response
     
 # docs: https://flask-apispec.readthedocs.io/en/latest/usage.html#decorators
-
-# class responseSchema(Schema):
-#     # message = fields.Str(default='Success')
-#     class Meta:
-#         fields = ('status', 'rID')
 
 # how to do a schema with a dict:
 # https://marshmallow.readthedocs.io/en/stable/quickstart.html#declaring-schemas
@@ -317,7 +310,7 @@ def module_api(module):
         err=access_property_error(content, prop)
         if err: return Response(err,status=400,)
 
-    print(request.__dict__)
+    # print(request.__dict__)
     print(content)
     print(content['phonetics'])
     print(content['rID'])
@@ -353,7 +346,7 @@ def phoneme_contrast_api():
         err=access_property_error(content, prop)
         if err: return Response(err,status=400,)
     
-    print(request.__dict__)
+    # print(request.__dict__)
     print(content['phonetics'])
     print(content['word_idx'])
     print(content['rID'])
@@ -388,7 +381,8 @@ def phoneme_contrast_api():
         # phonetic_transcript=result[-1]
         phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
     else:
-        phonetic_detection=result
+        # phonetic_detection=result
+        return Response(status,status=500,)
 
     if phonetic_detection==[]: Response("error: phonetic detection is empty",status=500,)
     # syls_detection=[syl.replace(target, phonetic_detection[i]) for i,syl in enumerate(syls_with_target)]
@@ -397,7 +391,7 @@ def phoneme_contrast_api():
         try:
             phonetic_detection[i]
         except:
-            return Response("error: the syllable corresponding to syl_idx does not contain the target.",status=500,)
+            return Response("error: index out of bounds in phonetic detection",status=500,)
         syls_detection.append(syl.replace(target, phonetic_detection[i]))
 
     gs_t=[]
@@ -440,7 +434,7 @@ def prefill_from_phrase():
     if err: return Response(err,status=400,)
 
     # import pdb;pdb.set_trace()
-    print(request.__dict__)
+    # print(request.__dict__)
     print(content)
     print(content['phrase'])
 
@@ -466,7 +460,7 @@ if False:
     def module_api(module):
         content = request.form
         # import pdb;pdb.set_trace()
-        print(request.__dict__)
+        # print(request.__dict__)
         print(content)
         print(content['sentenceID'])
         print(content['filename'])
