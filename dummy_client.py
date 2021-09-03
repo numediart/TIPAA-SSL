@@ -84,12 +84,15 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
     for i in tqdm(range(100)):
         res=send_audio_base64(path='audio_recordings/turned_around.mp3', base_url=base_url, client=client)
         res=ast.literal_eval(res.data.decode('utf-8'))
+        assert res['status']=='success'
         rID=res['rID']
         rIDs.append(rID)
     
     print("phoneme contrast calls starting")
     for rID in rIDs:
-        call_phoneme_contrast(rID, base_url=base_url, client=client)
+        res=call_phoneme_contrast(rID, base_url=base_url, client=client)
+        res=ast.literal_eval(res.data.decode('utf-8'))
+        assert res['status']=='success'
     
     audio_path="../audio-with-analysis-ids/audio/"
     d=get_data()
@@ -99,12 +102,15 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
     # send all the audios (n times) and get rIDs 
     rIDs=[]
     n=2
+    print("uploads starting")
     start=time.time()
     for _ in range(n):
-        for i,row in d.iterrows():
+        for i,row in tqdm(d.iterrows()):
             path=os.path.join(audio_path, row.primaryKey+'.wav')
-            res=send_audio_base64(path=path, base_url=base_url)
-            rID=res.data
+            res=send_audio_base64(path=path, base_url=base_url, client=client)
+            res=ast.literal_eval(res.data.decode('utf-8'))
+            assert res['status']=='success'
+            rID=res['rID']
             rIDs.append(rID)
     avg_duration=(time.time()-start)/(len(d)*n)
     print('avg duration upload:', avg_duration)
@@ -113,7 +119,7 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
     tot_d=pd.concat([d]*n)
     tot_d['rID']=rIDs
     for i,row  in tot_d.iterrows():
-        call_module(row['rID'].decode('utf-8'), text=row.text, module='sentenceStress', base_url = base_url, client=client)
+        call_module(row['rID'], text=row.text, module='sentenceStress', base_url = base_url, client=client)
     avg_duration=(time.time()-start)/(len(d)*n)
     print('avg duration processing sentenceStress:', avg_duration)
 
