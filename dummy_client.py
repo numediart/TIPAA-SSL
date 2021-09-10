@@ -18,10 +18,10 @@ def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http:/
     # print(url)
     with open(path, 'rb') as file:
         files = {'file': file}
-        req = client.post(url, files=files)
+        res = client.post(url, files=files)
     # This is for compatibility between requests module and flask's test_client
     if '_content' in res.__dict__.keys(): res.data=res._content
-    return req
+    return res
 
 def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/vowel_stresses"
@@ -78,7 +78,7 @@ def send_audio_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 
     
     return res
 
-def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/", client=requests):
+def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/", audio_path="../audio-with-analysis-ids/audio/", client=requests):
     rIDs=[]
     print("uploads starting")
     for i in tqdm(range(100)):
@@ -94,7 +94,6 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
         res=ast.literal_eval(res.data.decode('utf-8'))
         assert res['status']=='success'
     
-    audio_path="../audio-with-analysis-ids/audio/"
     d=get_data()
     focusType='sentencestress'
     d=d[d.focusType==focusType]
@@ -123,12 +122,6 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
     avg_duration=(time.time()-start)/(len(d)*n)
     print('avg duration processing sentenceStress:', avg_duration)
 
-# deprecated functions
-if False:
-    def call_module(module='sentenceStress', filename='SS_1_i_would_love_to_go_to_ireland.wav', sentenceID=1, client=requests):
-        res = client.post('http://localhost:8000/flowspeech/'+module, data={"sentenceID":str(sentenceID), 'filename':filename})
-        print(res.data)
-        return res.data
 
 if __name__ == "__main__":
     res=send_audio_base64(path='audio_recordings/turned_around.mp3').data
@@ -170,8 +163,9 @@ if __name__ == "__main__":
     call_vowel_stresses(rID.decode('utf-8'))
     
     res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav').data
+    res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com").data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
-    call_module(rID)
+    res=call_module(rID, base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
 
     
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
