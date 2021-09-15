@@ -66,6 +66,11 @@ def index():
     return send_from_directory( './html/','index.html')
 
 
+@app.route('/app.js')
+@debug_only
+def record_app():
+    return send_from_directory( './html/','app.js')
+
 @app.route('/phonemeContrast.html')
 @debug_only
 def phonemeContrast_html():
@@ -131,6 +136,7 @@ upload_path="./upload_files/"
 @app.route('/upload', methods=['POST'])
 @debug_only
 def upload_file():
+    # import pdb;pdb.set_trace()
     try:
         uploaded_file = request.files['file']
     except:
@@ -149,6 +155,7 @@ def upload_file():
         try:
             # import pdb;pdb.set_trace()
             status_conversion, rID = prepare_audio_file(upload_path+uploaded_file.filename)
+            print(rID)
         except:
             return Response(
                 "error: could not convert uploaded file",
@@ -304,6 +311,8 @@ properties=["phonetics","rID","text"]
 @app.route('/flowspeech/<module>', methods=['POST'])
 def module_api(module):
     content = request.form
+
+    # import pdb;pdb.set_trace()
     
     properties=["phonetics","rID","text"]
     for prop in properties:
@@ -426,7 +435,7 @@ responseSchema=Schema.from_dict(record, name="prefill response")
 @use_kwargs({'phrase':fields.String(required=True, description="Text sentence to be processed. It can contain special characters etc.")}, location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @app.route('/prefill_from_phrase', methods=['POST'])
-@debug_only
+@debug_only 
 def prefill_from_phrase():
     content = request.form
     
