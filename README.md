@@ -53,7 +53,16 @@ b'{"text": "Kayla isn\'t angry at Tyler",
 "n_alternatives": [1, 3, 1, 1, 1]}'
 ```
 
+## Process for updating code on server
+- Do a pytest locally without container
+- docker-compose build containers locally
+- docker-compose up it locally, to check that it runs (I can also docker exec into it)
+- On EC2: ssh to it, then, git pull and build flaskapp
+- On ECS docker-compose push, then docker compose up
+
 ## Docker application on EC2
+
+NOTE: To have debug mode on EC2, change in run_server.sh the line gunicorn to the commented "python flask_server.py"
 
 You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
 I used this info to do that: 
@@ -83,9 +92,9 @@ But I had to install docker-compose like this:
 pip install docker-compose
 ```
 
-(Not sure this is necessary)
+(Not necessary it seems, as well as the IP in the docker-compose.yml, it can be 0.0.0.0 as well)
 change the line of nginx/web.conf
-"	proxy_pass  http://aws.server.ip.here:5000/;"
+"	proxy_pass  http://aws.server.ip.here:8000/;"
 
 
 If you just want to use it locally, without nginx server, you can build only flowspeech image:
@@ -143,7 +152,8 @@ aws ecr get-login-password \
     --password-stdin 937215464284.dkr.ecr.eu-west-3.amazonaws.com
 ```
 
-Push images to ECR:
+:warning: **In run_server.sh, make sure it is the gunicorn command to have the production server**
+<!-- Push images to ECR:
 ```
 docker push 937215464284.dkr.ecr.eu-west-3.amazonaws.com/speech_api
 ```
@@ -151,9 +161,9 @@ or with docker-compose, the yml has to conatain "image: ECR_URL":
 `docker-compose push`
 
 For only one of them, e.g.:
- docker-compose push nginx
+ docker-compose push nginx -->
 
-Thus the procedure to run a docker compose, or update it:
+The procedure to push and run a docker compose, or update it:
 ```
 docker context use default
 docker-compose -f docker-compose_aws.yml build
@@ -166,8 +176,12 @@ docker compose -f docker-compose_aws.yml up
 ```
 It takes time to update, but a new task is first created and afterwards the old one is removed.
 
+```
 aws ecs list-clusters
+aws ecs list-tasks --cluster arn:aws:ecs:eu-west-3:937215464284:cluster/flowspeech
+```
 
+https://www.pulumi.com/docs/tutorials/aws/aws-py-fargate/
 
 ## Manual Installation
 ### Install HTK
