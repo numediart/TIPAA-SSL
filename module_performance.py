@@ -158,12 +158,13 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
         statuss.append(status)
         if results!=[]:
             detected_transcription=results[1]
+            confidence_scores=results[0].iloc[:,3].tolist()
             phonetic_detection=results[0][results[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
-            d={'detected_phone':phonetic_detection,'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
+            d={'detected_phone':phonetic_detection,'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'confidence_scores':confidence_scores, 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
             detected_transcriptions.append(detected_transcription)
         else:
             detected_transcriptions.append([])
-            d={'detected_phone':'','phones':row.phones, 'detected_transcription':'', 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
+            d={'detected_phone':'','phones':row.phones, 'detected_transcription':'', 'confidence_scores':[], 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
         result_records.append(d)
     results_df=pd.DataFrame.from_records(result_records)
     return results_df
@@ -442,7 +443,6 @@ def confusion_analysis_of_pContrast(phone_set, n=100):
     confusion_df.index=phone_set
     return confusion_df
 
-
 def vowels_consonants_confusions_from_audiobook_data(n=100):
     import cmudict
     phones=cmudict.phones()
@@ -468,6 +468,23 @@ def vowels_consonants_confusions_from_audiobook_data(n=100):
     plt.clf()
     sns.heatmap(consonant_confusion_df_norm, annot=True, cmap='YlGnBu')
     plt.savefig('performance_results/consonant_contrast_confusion.png')
+
+def confidence_scores_analysis(data_set='dev-clean', n=None):
+    """In this function, I want to analyze the distribution of confidence score of the model when a correct sentence is pronounced and when
+    random speech (here another sentence that has nothing to to with the correct one).
+    The goal of this analysis is to choose a threshold accordingly to say "sorry, you said nonsense".
+    
+
+    Args:
+        data_set (str, optional): [description]. Defaults to 'dev-clean'.
+        n ([type], optional): [description]. Defaults to None.
+    """
+    libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
+
+    # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
+    libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
+    selection=libri_words_df[libri_words_df.phones.str.contains(target_phones) & libri_words_df.word.str.contains(target_graphemes)]
+
 
 if False:
     def compute_voicings(selection, libri_words_df, target_phones='IH0 D'):
@@ -834,10 +851,10 @@ if __name__ == "__main__":
         pContrast_from_audiobook_data(target_phones=target, alternatives=target_to_alternatives[target], n=100)
 
     alternatives=['F T',
-    'F IH2 D',
-    'F EH2 D',
-    'F',
-    'F D']
+        'F IH2 D',
+        'F EH2 D',
+        'F',
+        'F D']
     pContrast_from_audiobook_data(target_phones="F T", alternatives=alternatives, n=1000)
 
     unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='IY1', target_graphemes='ea', alternatives=['IY1', 'EH1', 'EY1'], n=100)
