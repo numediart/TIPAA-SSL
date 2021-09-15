@@ -334,7 +334,11 @@ def module_api(module):
     else:
         res={"status": "error: no such module"}
     response=json.dumps(res)
-    return response
+
+    if res['status'].split(':')[0]=='error':
+        return Response(response,status=500,)
+    else:
+        return Response(response,status=200,)
 
 responseSchema=Schema.from_dict(
     {"status": fields.Str(), 

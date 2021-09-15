@@ -11,13 +11,6 @@ from label_data_processing import make_all_phones_annotation_files, make_all_pho
 from text_processing import phonetics_from_sentence
 import uuid
 import time
-
-# path_cached_filenames='data/cached_filenames.json'
-# if os.path.exists(path_cached_filenames):
-#     with open(path_cached_filenames, 'r') as fp:
-#         cached_filenames = json.load(fp)
-# else:
-
 from glob import glob
 inputs=glob('inputs/*')
 for f in inputs: os.remove(f)
@@ -55,7 +48,10 @@ def get_annotated_signal(rand_fileName, wav_name):
         return "error: audio file not found", None, None, None
     s=s/32767
     try:
+        # import pdb;pdb.set_trace()
         textgridData, _=get_textgrid_data(rand_fileName, wav_name)
+        if len(textgridData)==0:
+            return "success: part or all the phrase was not recognized in expected phonemes", None, None, None
     except Exception as e: 
         print(e)
         clean_htk_files(wav_name)
@@ -63,7 +59,7 @@ def get_annotated_signal(rand_fileName, wav_name):
     
     # if textgridData.iloc[:,3].mean()<8.5:
     if textgridData.iloc[:,3].mean()<5:
-        return "success: low posterior probability, the model is not confident with the recognition", None, None, None
+        return "success: low posterior probability, the pronunciation seems too far from expected phonetics", None, None, None
     
     # each row is True if out of vocabulary, False if it is a detected phoneme or word
     is_out_of_vocabulary=textgridData.iloc[:,2].str[:1].str.contains('o')
@@ -73,7 +69,7 @@ def get_annotated_signal(rand_fileName, wav_name):
     # if is_out_of_vocabulary.sum():
     #     return "error: at least one element was out of vocabulary", None, None
 
-    return 0, textgridData, s, fs
+    return "success", textgridData, s, fs
 
 def verification_n_of_phoneme(textgridData, p):
 
@@ -244,8 +240,6 @@ def vowel_stresses(
         string, list of float list: status, stress intensities by word
     """
     
-    # if wav_name is None:
-    #     wav_name=rand_fileName
     status, textgridData, s, fs = get_annotated_signal(rand_fileName, wav_name)
     if textgridData is None:
         return status, []
@@ -290,7 +284,8 @@ def wordStress(
     status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
 
     if weighted_score_by_word == []:
-        return status, []
+        return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
 
     def max_by_line(a):
         a_max=[]
@@ -507,7 +502,8 @@ def wordStress_from_phonetics_audio(
     status, weighted_score_by_word=vowel_stresses_from_phonetics_audio(rID, phonetics)
     
     if weighted_score_by_word == []:
-        return status, []
+        return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
 
     bin_score_by_word=max_by_line(weighted_score_by_word)
     # binResult=np.concatenate(bin_score_by_word)
@@ -522,7 +518,8 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
     status, weighted_score_by_syllable=vowel_stresses_from_phonetics_audio(rID,merged_phonetics)
     
     if weighted_score_by_syllable == []:
-        return status, []
+        return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
 
     weighted_score_by_word_by_syllable_by_vowel=[]
     i=0
@@ -565,7 +562,6 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         for chunk in scores_grouped_by_chunk:
             bin=intensity_to_bin(chunk)
             bins_by_chunk.append(bin)
-
         
         bin_score_by_word=[]
         for el in bins_by_chunk: bin_score_by_word+=el
