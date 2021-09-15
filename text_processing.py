@@ -55,6 +55,82 @@ cmu_to_gibberish={'AA':'o',
                 'Z':'z',
                 'ZH':'j'}
 
+# from https://github.com/kosuke-kitahara/xlsr-wav2vec2-phoneme-recognition/blob/main/Fine_tuning_XLSR_Wav2Vec2_for_Phoneme_Recognition.ipynb
+# IPA
+# ref: https://en.wikipedia.org/wiki/ARPABET
+arpabet_to_ipa = {
+    'aa': 'ɑ',
+    'ae': 'æ',
+    'ah':'ʌ',
+    'ao':'ɔ',
+    'aw':'W',
+    'ax':'ə',
+    'axr':'ɚ',
+    'ay':'Y',
+    'eh':'ɛ',
+    'er':'ɝ',
+    'ey':'e',
+    'ih':'ɪ',
+    'ix':'ɨ',
+    'iy':'i',
+    'ow':'o',
+    'oy':'O',
+    'uh':'ʊ',
+    'uw':'u',
+    'ux':'ʉ',
+    'b':'b',
+    'ch':'C',
+    'd':'d',
+    'dh':'ð',
+    'dx':'ɾ',
+    'el':'l̩',
+    'em':'m̩',
+    'en':'n̩',
+    'f':'f',
+    'g':'g',
+    'hh':'h',
+    'h':'h',
+    'jh':'J',
+    'k':'k',
+    'l':'l',    
+    'm':'m',    
+    'n':'n',    
+    'ng':'ŋ',    
+    'nx':'ɾ̃',    
+    'p':'p',    
+    'q':'ʔ',    
+    'r':'ɹ',    
+    's':'s',    
+    'sh':'ʃ',    
+    't':'t',    
+    'th':'θ',    
+    'v':'v',    
+    'w':'w',    
+    'wh':'ʍ',    
+    'y':'j',    
+    'z':'z',    
+    'zh':'ʒ',    
+    'ax-h':'ə̥',    
+    'bcl':'b̚',    
+    'dcl':'d̚',    
+    'eng':'ŋ̍',    
+    'gcl':'ɡ̚',    
+    'hv':'ɦ',    
+    'kcl':'k̚',    
+    'pcl':'p̚',    
+    'tcl':'t̚',
+    'epi':'S', 
+    'pau':'P',   
+}
+
+cmu_phones=[el[0] for el in cmudict.phones()]
+
+# CMU is a subset of arpabet
+cmu_1_char={}
+cmu_1_char_to_gibberish={}
+for p in cmu_phones:
+    cmu_1_char[p]=arpabet_to_ipa[p.lower()]
+    cmu_1_char_to_gibberish[cmu_1_char[p]]=cmu_to_gibberish[p]
 
 def show_alternatives_distributions():
     import numpy as np
