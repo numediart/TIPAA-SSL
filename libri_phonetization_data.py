@@ -9,6 +9,8 @@ import pandas as pd
 import os
 from glob import glob
 
+from text_processing import remove_stress_annots, cmu_1_char
+
 def get_phone_timings(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid',word_idx=8):
     """Uses the (start,end) of a word and (starts,ends) of phonemes to retrieve phonemes corresponding to a word
 
@@ -30,7 +32,7 @@ def get_sentence(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-001
     # phones=[el.mark for el in tg[1]]
 
     # get phones and drop "sp", "sil" and empty strings
-    phones=[el.mark for el in tg[1] if el.mark not in ['sil','sp','']]
+    phones=[el.mark for el in tg[1] if el.mark not in ['sil','sp','','spn']]
     # drop empty strings
     words = [x for x in words if x]
     return ' '.join(words)
@@ -95,6 +97,47 @@ def build_librispeech_words_df(
             records.append(d)
     libri_words_df=pd.DataFrame.from_records(records)
     return libri_words_df
+
+
+def libri_phonetics(
+        data_set='dev-clean',
+        basepath='librispeech_alignments',
+        audio_path='LibriSpeech/',
+        # audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/',
+        n=None
+        ):
+    
+    libri_words_df=build_librispeech_words_df(
+        data_set=data_set,
+        basepath=basepath,
+        audio_path=audio_path,
+        n=n
+    )
+    # paths=libri_words_df.path.unique()
+
+    libri_rows=libri_words_df.drop_duplicates(subset='path')
+    ps=[]
+    texts=[]
+    for i,r in tqdm(libri_rows.iterrows()):
+        texts.append(get_sentence(r.path))
+        ps.append(phonetics_for_row(r, libri_words_df))
+    
+    libri_rows['text']=texts
+    libri_rows['phonetics']=ps
+
+    libri_rows=libri_rows[['file_idx','path','wav_path', 'text', 'phonetics']]
+
+    ids=libri_rows.path.apply(lambda r:r.split('/')[-1].split('.')[0])
+    libri_rows['id']=ids
+
+    cmu_1_char['spn']=''
+    ipa=libri_rows.phonetics.apply(lambda r: ' '.join([''.join([cmu_1_char[p] for p in remove_stress_annots(w.split(' '))]) for w in r]))
+    ipa=ipa.apply(lambda r: r.replace('  ',' '))
+    libri_rows['ipa']=ipa
+
+    libri_rows.to_csv('data/libri_text_ipa_'+data_set+'.csv')
+
+
 
 def cmu_ascii_mappings():
     #  if needed to lowercase:
@@ -243,6 +286,7 @@ if __name__ == "__main__":
     libri_words_df[libri_words_df.word=='speaks']
     selection=libri_words_df[libri_words_df.word=='speak']
 
+    
     phonetics=[]
     for i,r in selection.iterrows():
         p=phonetics_for_row(r, libri_words_df)
