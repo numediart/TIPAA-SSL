@@ -32,21 +32,6 @@ def test_audio_formats():
     prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland_stereo.m4a')
 
 
-# def test_pContrast():
-#     p=set_params(sentenceID=11, module="oContrast")
-#     # prepare_audio_file(p)
-#     status_audio, rID=prepare_audio_file('audio_recordings/Low_WAV.wav')
-#     p['rand_fileName']=rID
-#     phonemeContrast(p)
-
-
-# def test_edAnalysis():
-#     p=set_params(sentenceID=1, module="edAnalysis")
-#     # prepare_audio_file(p)
-#     status_audio, rID=prepare_audio_file('audio_recordings/ed_accepted.wav')
-#     p['rand_fileName']=rID
-#     edAnalysis(p)
-
 def test_vowel_stresses():
     status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     vowel_stresses_from_phonetics_audio(rID)
@@ -92,6 +77,7 @@ def test_performance_tests():
     
     edAnalysis_from_audiobook_data(data_set='dev-clean', n=100)
     pContrast_from_audiobook_data(n=100)
+    final_s_from_audiobook_data(data_set='dev-clean', n=100)
 
 def test_label_data_processing():
     rID=str(uuid.uuid4())
@@ -106,3 +92,7 @@ def test_label_data_processing():
     make_all_phones_annotation_files_from_phonetics(rID)
     make_pContrast_annotation_files_from_phonetics(rID)
     make_pContrast_annotation_files(rID)
+
+
+if __name__ == '__main__':
+    test_performance_tests()
