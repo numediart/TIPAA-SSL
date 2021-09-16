@@ -58,8 +58,8 @@ def get_annotated_signal(rand_fileName, wav_name):
         return "error: could not get textgridData (check htk errors)", None, None, None
     
     # if textgridData.iloc[:,3].mean()<8.5:
-    if textgridData.iloc[:,3].mean()<5:
-        return "success: low posterior probability, the pronunciation seems too far from expected phonetics", None, None, None
+    # if textgridData.iloc[:,3].mean()<5:
+    #     return "success: low posterior probability, the pronunciation seems too far from expected phonetics", None, None, None
     
     # each row is True if out of vocabulary, False if it is a detected phoneme or word
     is_out_of_vocabulary=textgridData.iloc[:,2].str[:1].str.contains('o')

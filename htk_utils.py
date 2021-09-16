@@ -110,11 +110,13 @@ def get_textgrid_data(rand_fileName, wav_name, modelName = 'libri'):
             detected_transcription.append(corresponding_transcription.values[0])
         else:
             print('out of vocabulary: no transcription')
+            detected_transcription.append('out_of_vocabulary')
 
-    if len(textgridData)!=len(detected_transcription):
-        print("part or all the phrase was not recognized in expected phonemes")
-        return [], out2
+    # if len(textgridData)!=len(detected_transcription):
+    #     print("part or all the phrase was not recognized in expected phonemes")
+    #     return [], out2
     
     textgridData['detected_transcription']=detected_transcription
+    print(textgridData)
     clean_htk_files(wav_name)
     return textgridData, out2
