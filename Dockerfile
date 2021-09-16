@@ -53,6 +53,9 @@ COPY ./ $HOME/
 RUN pip install pyworld
 RUN pip install -r requirements.txt
 
+# clean unnecessary setup files 
+RUN conda clean --all -y
+
 # Install htk
 # remove if exists, in case it is a shortcut from git
 RUN rm -rf $HOME/htk/
