@@ -35,7 +35,7 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
 # RUN conda install -c anaconda -y python=3 && conda install -c conda-forge nettle ffmpeg
 RUN conda install -c conda-forge nettle ffmpeg && \
 # For using e.g. MelGAN or wav2vec2
-   conda install pytorch cpuonly -c pytorch && \
+   conda install pytorch torchaudio cpuonly -c pytorch && \
 # clean unnecessary setup files 
    conda clean --all -y
 
