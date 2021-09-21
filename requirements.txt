@@ -9,10 +9,14 @@ audiotsm
 pytsmod
 flask
 tqdm
-# git+https://github.com/huggingface/datasets
 gunicorn
 seaborn
 ordered_set
 g2p_en
 flask-restful
 flask-apispec
+# torch
+pyyaml
+speechbrain
+# transformers==4.6.1
+# s3prl
