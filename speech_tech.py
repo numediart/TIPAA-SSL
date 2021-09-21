@@ -318,6 +318,10 @@ def sentenceStress(
     
     status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
 
+    
+    if weighted_score_by_word == []:
+        return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
     max_scores_by_word=[max(el) for el in weighted_score_by_word]
     # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
     binResult=np.zeros(len(max_scores_by_word)).astype(int)
@@ -596,6 +600,8 @@ def phonemeContrast_from_formatted_phonetics_audio(
                     alternatives=split_alternatives)
     if result!=[]:
         result[0].detected_transcription=result[0].detected_transcription.str.replace(' ','_')
+    
+    print('phonemeContrast_from_formatted_phonetics_audio result:', result)
     return status, result
 
 # obsolete functions backup

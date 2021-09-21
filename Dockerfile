@@ -9,83 +9,55 @@
 
 # Modified by noe tits
 
-#FROM frolvlad/alpine-miniconda3
 FROM continuumio/miniconda3
-
+ARG DEBIAN_FRONTEND=noninteractive
 # working directory
 ENV HOME /root
 WORKDIR $HOME
 
-
-# Update repository list
-RUN apt-get update
-
-# packages list
-RUN \
-	apt-get update && apt-get install -y \
+# packages list. The --no-install-recommends avoids installing recommended packages that are not necessary for a tiny docker image: https://phoenixnap.com/kb/docker-image-size
+RUN	apt-get update && apt-get install --no-install-recommends -y \
     libc6-dev-i386 \
     libx11-dev \
     gawk \
     curl \
     git \
-	make
-
-# pip
-RUN pip install --upgrade pip
+	make \
+    cron \
+    # These two are  necessary for pyworld library (f0 extraction)
+    g++ \
+    libsndfile-dev\  
+    # clean up apt cache to save space
+    && rm -rf /var/lib/apt/lists/*
 
 # Python packages from conda
-RUN conda install -c anaconda -y python=3
-
 # This is necessary so that librosa is able to read mp3 files (in 2 steps to avoid conda memory error...)
-RUN conda install -c conda-forge nettle
-RUN conda install -c conda-forge ffmpeg
-
-# This is necessary for pyworld library (f0 extraction)
-RUN apt-get install -y g++
-
-RUN apt-get install -y libsndfile-dev
-
-ARG DEBIAN_FRONTEND=noninteractive
+# RUN conda install -c anaconda -y python=3 && conda install -c conda-forge nettle ffmpeg
+RUN conda install -c conda-forge nettle ffmpeg && \
+# For using e.g. MelGAN or wav2vec2
+   conda install pytorch cpuonly -c pytorch && \
+# clean unnecessary setup files 
+   conda clean --all -y
 
 COPY ./ $HOME/
 
-# Install this one alone because it seems complicated for a light EC2 machine
-RUN pip install pyworld
-RUN pip install -r requirements.txt
+# pip
+RUN pip install --upgrade pip && pip install pyworld && pip install -r requirements.txt
 
-# clean unnecessary setup files 
-RUN conda clean --all -y
+# load melgan model now so that it is cached later
+# RUN echo "import torch;torch.hub.load('descriptinc/melgan-neurips', 'load_melgan')" | python
 
 # Install htk
-# remove if exists, in case it is a shortcut from git
-RUN rm -rf $HOME/htk/
-RUN git clone https://github.com/loretoparisi/htk
-WORKDIR $HOME/htk/
-RUN ./configure --disable-hslab && \
+# remove if exists, in case it is a shortcut from git that was copied above
+RUN rm -rf $HOME/htk/ &&\
+    git clone https://github.com/loretoparisi/htk &&\
+    cd $HOME/htk/ && ./configure --disable-hslab && \
     make all && \
     make install
-
-# CMD ["bash"]
-WORKDIR $HOME/
-# following: https://runnable.com/docker/python/dockerize-your-flask-application
-# ENTRYPOINT [ "python" ]
-# CMD [ "/root/run_server.sh" ]
-
-# https://gist.github.com/pangyuteng/f5b00fe63ac31a27be00c56996197597
-# ENTRYPOINT ["python", "flask_server.py"]
-# ENTRYPOINT ["gunicorn", "flask_server:app"]
-# CMD ["gunicorn"  , "-b", "0.0.0.0:8000", "flask_server:app"]
-
 
 # from https://stackoverflow.com/questions/37458287/how-to-run-a-cron-job-inside-a-docker-container
 # copy crontabs for root user
 COPY cronjobs/remove_old_files /etc/crontabs/root
-
-# start crond with log level 8 in foreground, output to stderr
-# CMD ["crond", "-f", "-d", "8"]
-RUN apt install -y cron
 RUN crontab /etc/crontabs/root
-
-# CMD gunicorn -b 0.0.0.0:8000 flask_server:app && cron
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000

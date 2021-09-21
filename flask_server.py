@@ -395,9 +395,9 @@ def phoneme_contrast_api():
         phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
     else:
         # phonetic_detection=result
-        return Response(status,status=500,)
+        return Response(status,status=200,)
 
-    if phonetic_detection==[]: Response("error: phonetic detection is empty",status=500,)
+    if phonetic_detection==[]: Response("error: phonetic detection is empty",status=200,)
     # syls_detection=[syl.replace(target, phonetic_detection[i]) for i,syl in enumerate(syls_with_target)]
     syls_detection=[]
     for i,syl in enumerate(syls_with_target):
@@ -452,9 +452,9 @@ def prefill_from_phrase():
     print(content['phrase'])
 
     d=prefill_for_sentence(content['phrase'], syllables)
-    print(d)
+    # print(d)
     response=json.dumps(d)
-    print(response)
+    # print(response)
     return response
 
 

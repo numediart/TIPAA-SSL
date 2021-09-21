@@ -1,8 +1,8 @@
 import torch
+import numpy as np
 from glob import glob
 import librosa
 import sys
-from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2CTCTokenizer, Wav2Vec2ForCTC, TrainingArguments, Trainer
 import random
 import soundfile as sf
 
@@ -28,18 +28,37 @@ def show_random_elements(dataset, num_examples=10):
 
 
 
+def melgan_analysis_synthesis(s):
+    vocoder = torch.hub.load('descriptinc/melgan-neurips', 'load_melgan')
+    mel = vocoder(torch.from_numpy(s.astype(np.float32))[None])
+    s=vocoder.inverse(mel)  # audio (torch.tensor) -> (batch_size, 80, timesteps)
+    return s.numpy().flatten()
+
+
+from speechbrain.pretrained import SpectralMaskEnhancement
+enhance_model = SpectralMaskEnhancement.from_hparams(
+        source="speechbrain/metricgan-plus-voicebank",
+        savedir="pretrained_models/metricgan-plus-voicebank",
+    )
+def speech_enhancement(s):
+    # Load and add fake batch dimension
+    # noisy = enhance_model.load_audio(
+    #     "speechbrain/metricgan-plus-voicebank/example.wav"
+    # ).unsqueeze(0)
+    s=torch.from_numpy(s.astype(np.float32))[None]
+    # Add relative length tensor
+    enhanced = enhance_model.enhance_batch(s, lengths=torch.tensor([1.]))
+    return enhanced.numpy().flatten()
+
+
 def torch_example_use():
     model_list=torch.hub.list('s3prl/s3prl')
     model_type="wav2vec2_hug_base_960"
 
     if model_type not in model_list: print('The model type is not in the list, maybe the name has changes, check torch.hub.list of the repo')
-
     model=torch.hub.load('s3prl/s3prl',model_type)#.to(device)
-
     audio_path="audio_recordings/"
     paths=glob(audio_path+'/*')
-
-
     wavs=[]
     for p in paths:
         try:
@@ -66,7 +85,8 @@ def torch_example_use():
 
 
 if __name__=="__main__":
-    
+    from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2CTCTokenizer, Wav2Vec2ForCTC, TrainingArguments, Trainer
+
     path = 'dl_models/wav2vec2-base-libri-pr'
     processor = Wav2Vec2Processor.from_pretrained(path)
     model = Wav2Vec2ForCTC.from_pretrained(path+'/checkpoint-10700')

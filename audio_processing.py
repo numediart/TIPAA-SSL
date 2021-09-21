@@ -6,20 +6,24 @@ import pytsmod as tsm
 
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
-
-def load_audio(waveFileAddress, fs=16000):
+from DL_speech_tech import melgan_analysis_synthesis, speech_enhancement
+def load_audio(waveFileAddress, fs=16000, speech_correction=True):
     """Load audio, remove DC and normalize waveform
+    speech_correction refers to the use of MetricGAN+. A speech enhancement system based on an adversarial loss and PESQ/STOI metrics 
+    to improve audio quality. 
 
     Args:
         waveFileAddress (string): wav file address
-
     Returns:
         numpy array, int: waveform signal and frequency of sampling
     """
     # fs, s = read(waveFileAddress)
     s,fs=librosa.load(waveFileAddress, sr=fs)
 
-    #trim silences
+    if speech_correction:
+        s=speech_enhancement(s)
+
+    # trim silences
     # s, index = librosa.effects.trim(s, top_db=20)
     # remove DC
     s = s - s[int(0.15*len(s)):int(0.85*len(s))].mean() # we exclude 15% at each side that might contain buffer initialization/release noises
