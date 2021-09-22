@@ -105,9 +105,9 @@ type Response = {
     // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
     status: 'success'|'error: [message]'
     // a list of stress intensities for each syllable of each word between 0 and 100 by word
-    stress_intensities: number[],
+    stress_intensities: number[][],
     // a list of 0/1 for each syllable of each word, the 1 being the word stress
-    stress_binaries: number[]
+    stress_binaries: number[][]
 }
 ```
 
