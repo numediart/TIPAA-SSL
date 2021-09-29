@@ -4,7 +4,7 @@ scripts/__pycache__/**
 scripts/synth_audio/**
 .vscode/**
 audio_recordings/edAnalysis/**
-audio_recordings/**
+@REM audio_recordings/**
 file_selection/**
 lexicon/**
 upload_files/**
@@ -18,3 +18,7 @@ synth_audio/**
 synth_audio\ -\ Copie/**
 performance_results/**
 dl_models/**
+results/**
+@REM data/**
+syllabipy/__pycache__/**
+.*/**
