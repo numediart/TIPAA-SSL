@@ -33,10 +33,16 @@ def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 
     
     return res
 
-def call_module(rID, text='I would love to go to ireland!', module='sentenceStress', base_url = 'http://localhost:8000', client=requests):
+def call_module(rID, text='I would love to go to ireland!', module='sentenceStress', base_url = 'http://localhost:8000', client=requests, fake_mistake=False):
     url=base_url+"/flowspeech/"
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
+
+    # Here I alter the phonetics on purpose to see if the server catches the error
+    if fake_mistake:
+        # in the last word, I remove '_' separators to mess the phonetics
+        phonetics=' '.join(phonetics.split(' ')[:-1]+[phonetics.split(' ')[-1].replace('_','')])
+        
     # res = client.post(url+module, data={"phonetics":json.dumps(phonetics), 'rID':rID})
     res = client.post(url+module, data={"text":text, "phonetics":phonetics, 'rID':rID})
 
@@ -78,7 +84,7 @@ def send_audio_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 
     
     return res
 
-def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/", audio_path="../audio-with-analysis-ids/audio/", client=requests):
+def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/", audio_path="data/audio-with-analysis-ids/audio/", client=requests):
     rIDs=[]
     print("uploads starting")
     for i in tqdm(range(100)):
@@ -160,6 +166,8 @@ if __name__ == "__main__":
 
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.data
+    call_module(rID.decode('utf-8')).data
+    call_module(rID.decode('utf-8'), fake_mistake=True).data
     call_vowel_stresses(rID.decode('utf-8'))
     
     res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav').data
