@@ -195,6 +195,14 @@ def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
         else: l.append(el)
     return l
 
+
+def check_phonemes(phonemes):
+    """This function returns a non existing phoneme if it happens. else it returns None
+    """
+    ps=remove_stress_annots(phonemes)
+    for p in ps:
+        if p not in cmu_phones: return p
+        
 def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0']):
     n=0
     for el in phonetics:

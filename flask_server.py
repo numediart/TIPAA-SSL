@@ -11,11 +11,11 @@ from flask import send_from_directory
 from flask import Response
 
 # from speech_tech import *
-from speech_tech import stress_from_formatted_phonetics, prepare_audio_file, vowel_stresses_from_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio
+from speech_tech import stress_from_formatted_phonetics, prepare_audio_file, vowel_stresses_from_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, merge_list
 import pandas as pd
 import json
 import speech_tech
-from text_processing import generate_prefill_csv, prefill_for_sentence
+from text_processing import generate_prefill_csv, prefill_for_sentence, check_phonemes
 
 import uuid
 import base64
@@ -228,7 +228,6 @@ def access_property_error(content, property):
 # how to do a schema with a dict:
 # https://marshmallow.readthedocs.io/en/stable/quickstart.html#declaring-schemas
 
-
 responseSchema=Schema.from_dict(
     {
     "status": fields.Str(), 
@@ -326,6 +325,17 @@ def module_api(module):
     rID=content['rID']
     # phonetics=ast.literal_eval(content['phonetics'])
     phonetics=content['phonetics']
+
+    
+    split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+    merged_phonetics=[merge_list(word) for word in split_phonetics]    
+    not_p=check_phonemes(merge_list(merged_phonetics))
+    if not_p is not None: 
+        err="error: "+not_p+" is not a phoneme"
+        return Response(err,status=400,)
+
+
+
     if module=='sentenceStress':
         text=content['text']
         res=stress_from_formatted_phonetics(rID, phonetics, text, level="sentence")
@@ -364,6 +374,15 @@ def phoneme_contrast_api():
     print(content['word_idx'])
     print(content['rID'])
     phonetics=content['phonetics']
+    
+    split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+    merged_phonetics=[merge_list(word) for word in split_phonetics]    
+    not_p=check_phonemes(merge_list(merged_phonetics))
+    if not_p is not None: 
+        err="error: "+not_p+" is not a phoneme"
+        return Response(err,status=400,)
+
+
     word_idx=content['word_idx']
     syl_idx=content['syl_idx']
     rID=content['rID']
