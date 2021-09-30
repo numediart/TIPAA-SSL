@@ -31,10 +31,9 @@ def get_annotated_signal(rand_fileName, wav_name):
     """Load audio file and annotation files corresponding to parameters, 
     and calls "textgridData" to obtain htk predictions of phonemes and
     their timings
-
+    
     Args:
         p (dictionary, optional): global parameters (wav, dct, grammar file paths, ). Defaults to set_params().
-
     Returns:
         status, textgridData, s (int, DataFrame, np array): textgridData contains phonetic predictions 
         from htk model with their timings and log probability
@@ -49,13 +48,15 @@ def get_annotated_signal(rand_fileName, wav_name):
     s=s/32767
     try:
         # import pdb;pdb.set_trace()
-        textgridData, _=get_textgrid_data(rand_fileName, wav_name)
+        textgridData, out=get_textgrid_data(rand_fileName, wav_name)
+        if out.stderr.decode('utf-8')!='':
+            return "error: could not get textgridData, htk error is:"+out.stderr.decode('utf-8'), None, None, None
         if len(textgridData)==0:
             return "success: part or all the phrase was not recognized in expected phonemes", None, None, None
-    except Exception as e: 
-        print(e)
+    except Exception as e:
+        print("get_annotated_signal Exception:",e)
         clean_htk_files(wav_name)
-        return "error: could not get textgridData (check htk errors)", None, None, None
+        return "error: could not get textgridData, check htk error", None, None, None
     
     # if textgridData.iloc[:,3].mean()<8.5:
     # if textgridData.iloc[:,3].mean()<5:
@@ -99,6 +100,8 @@ def verification_n_of_phoneme(textgridData, p):
     count_unique = len(phone_set)
     return nEntries==0 or count_total!=nEntries or count_unique!=nEntries
 
+
+
 def chunking(
     rID
     ):
@@ -122,10 +125,8 @@ def chunking(
 
 def vowels(textgridData):
     """extract vowels among phonemes in textgridData
-
     Args:
         textgridData ([type]): [description]
-
     Returns:
         indxVowels, nVowelsPerWord: index of vowels and number of vowels
     """
@@ -264,72 +265,6 @@ def vowel_stresses(
         weighted_score_by_word.append(weighted_score[syl_start:syl_start+n_v].tolist())
         syl_start+=n_v
     return "success", weighted_score_by_word
-
-def wordStress(
-    rand_fileName, wav_name
-    # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    ):
-    """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
-    a value by vowel representing a stress intensity, and take the max by word and build a binary vector with ones on maximums
-
-    Args:
-        p (dict, optional): global parameters. Defaults to set_params().
-
-    Returns:
-        string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
-    """
-    
-    # if wav_name is None:
-    #     wav_name=rand_fileName
-    status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
-
-    if weighted_score_by_word == []:
-        return {"status": status, "stress_intensities": [], "stress_binaries": []}
-
-
-    def max_by_line(a):
-        a_max=[]
-        for el in a:
-            a_max.append((el == np.max(el)).astype(int))
-        return a_max
-
-    bin_score_by_word=max_by_line(weighted_score_by_word)
-    # binResult=np.concatenate(bin_score_by_word)
-
-    weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
-
-    return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
-
-def sentenceStress(
-    rand_fileName, wav_name
-    ):
-    """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
-    a value by vowel representing a stress intensity, and 
-    -take the max by word 
-    -take the max of these max to have the most stressed word
-    and build a binary vector with a one on this word index
-
-    Args:
-        p ([type], optional): [description]. Defaults to set_params().
-
-    Returns:
-        string, list of binaries: status, stress results by word (0=no stress,  1=stress)
-    """
-    
-    status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
-
-    
-    if weighted_score_by_word == []:
-        return {"status": status, "stress_intensities": [], "stress_binaries": []}
-
-    max_scores_by_word=[max(el) for el in weighted_score_by_word]
-    # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
-    binResult=np.zeros(len(max_scores_by_word)).astype(int)
-    binResult[np.argmax(max_scores_by_word)]=1
-
-    return {"status": "success", "stress_intensities": [int(el*100) for el in max_scores_by_word], "stress_binaries": binResult.tolist()}
-
-    # return "success", [max_scores_by_word, binResult]
 
 def number_and_indices(textgridData, char='w'):
     """get total number and indices of entries starting with char 
@@ -519,12 +454,11 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
     lens=[len(el) for el in split_phonetics]
     merged_phonetics=merge_list(split_phonetics)
+
     status, weighted_score_by_syllable=vowel_stresses_from_phonetics_audio(rID,merged_phonetics)
     
     if weighted_score_by_syllable == []:
         return {"status": status, "stress_intensities": [], "stress_binaries": []}
-
-
     weighted_score_by_word_by_syllable_by_vowel=[]
     i=0
     for l in lens:
@@ -537,7 +471,20 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         bin_score_by_word_by_syllable=[el.tolist() for el in bin_score_by_word_by_syllable]
         return {"status": "success", "stress_intensities": weighted_score_by_word_by_syllable_int, "stress_binaries": bin_score_by_word_by_syllable}
     elif level=="sentence":
+        def remove_downwards_trend(y):
+            if len(y)>1:
+                # Remove downwards trend
+                x=range(len(y))
+                model = np.polyfit(x, y, 1)
+                a=model[0]
+                b=model[1]
+                y=y-(a*x+b)
 
+                # normalize between 0 and 100
+                y=y-min(y)
+                y=y/max(y)*100
+            return y
+        
         def chunk_text(text):
             for c in chunking_chars:
                 text=text.replace(c, chunking_chars[0])
@@ -550,11 +497,17 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         
         n_words_by_chunk=chunk_text(text)
         max_score_by_word=[int(max(l)[0]*100) for l in weighted_score_by_word_by_syllable_by_vowel]
+
         scores_grouped_by_chunk=[]
         i=0
         for l in n_words_by_chunk:
             scores_grouped_by_chunk.append(max_score_by_word[i:i+l])
             i+=l
+        
+        # Remove downwards trends: it seems to have a positive impact on the performance. But it would be good to test
+        # with more examples
+
+        # scores_grouped_by_chunk=[remove_downwards_trend(el).astype(int).tolist() for el in scores_grouped_by_chunk]
 
         def intensity_to_bin(score_by_word):
             bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
@@ -569,8 +522,8 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         
         bin_score_by_word=[]
         for el in bins_by_chunk: bin_score_by_word+=el
-
-        return {"status": "success", "stress_intensities": max_score_by_word, "stress_binaries": bin_score_by_word}
+        # import pdb;pdb.set_trace()
+        return {"status": "success", "stress_intensities": merge_list(scores_grouped_by_chunk), "stress_binaries": bin_score_by_word}
     else:
         print("No such level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.")
 
@@ -584,12 +537,9 @@ def phonemeContrast_from_formatted_phonetics_audio(
                     alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D'
                     ):
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
-
-    # alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D'
     split_alternatives=[alt.replace('_',' ') for alt in alternatives.split(' ')]
     target_phones=target_phones.replace('_', ' ')
-
-    merged_phonetics=[merge_list(word) for word in split_phonetics]
+    
     print(target_phones)
     print(alternatives)
     status, result=phonemeContrast_from_phonetics_audio(rID,
@@ -606,6 +556,88 @@ def phonemeContrast_from_formatted_phonetics_audio(
 
 # obsolete functions backup
 if False:
+    
+    def wordStress(
+        rand_fileName, wav_name
+        # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+        ):
+        """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
+        a value by vowel representing a stress intensity, and take the max by word and build a binary vector with ones on maximums
+
+        Args:
+            p (dict, optional): global parameters. Defaults to set_params().
+
+        Returns:
+            string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
+        """
+        
+        # if wav_name is None:
+        #     wav_name=rand_fileName
+        status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
+
+        if weighted_score_by_word == []:
+            return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
+
+        def max_by_line(a):
+            a_max=[]
+            for el in a:
+                a_max.append((el == np.max(el)).astype(int))
+            return a_max
+
+        bin_score_by_word=max_by_line(weighted_score_by_word)
+        # binResult=np.concatenate(bin_score_by_word)
+
+        weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
+
+        return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
+
+    def sentenceStress(
+        rand_fileName, wav_name
+        ):
+        """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
+        a value by vowel representing a stress intensity, and 
+        -take the max by word 
+        -take the max of these max to have the most stressed word
+        and build a binary vector with a one on this word index
+
+        Args:
+            p ([type], optional): [description]. Defaults to set_params().
+
+        Returns:
+            string, list of binaries: status, stress results by word (0=no stress,  1=stress)
+        """
+        
+        status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
+
+        
+        if weighted_score_by_word == []:
+            return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
+
+
+        
+        max_scores_by_word=[max(el) for el in weighted_score_by_word]
+        stress_intensities=[int(el*100) for el in max_scores_by_word]
+
+        # Try to remove downwards trend
+        x=range(len(stress_intensities))
+        model = np.polyfit(x, y, 1)
+        a=model[0]
+        b=model[1]
+        stress_intensities=stress_intensities-(a*x+b)
+
+        # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
+        binResult=np.zeros(len(stress_intensities)).astype(int)
+        binResult[np.argmax(stress_intensities)]=1
+        print("------------")
+        print(stress_intensities)
+
+        return {"status": "success", "stress_intensities": stress_intensities, "stress_binaries": binResult.tolist()}
+
+        # return "success", [max_scores_by_word, binResult]
+
+
     # these are not valid anymore, I removed audio information from the rID
     def vowel_stresses_from_text_audio(text='I would love to go to Ireland!', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
         """This uses text to get phonetics, to build annotation files for htk.
