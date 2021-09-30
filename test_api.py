@@ -18,6 +18,13 @@ def test_api():
         res=call_phoneme_contrast(rID, client=c)
         assert res.status_code == 200
 
+        res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', client=c)
+        assert res.status_code == 200
+        res=ast.literal_eval(res.data.decode('utf-8'))
+        rID=res['rID']
+        res=call_module(rID, fake_mistake=True, client=c)
+
+
         base_url = 'http://localhost:8000'
         crash_test(base_url=base_url, client=c)
 
