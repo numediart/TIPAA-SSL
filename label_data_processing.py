@@ -163,7 +163,7 @@ def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
     return df
 
 # Data processing
-def get_data(path_to_json='../audio-with-analysis-ids/data.json'):
+def get_data(path_to_json='data/audio-with-analysis-ids/data.json'):
     """Get a dataframe containing info of audio recordings with sentence ids
 
     Args:
