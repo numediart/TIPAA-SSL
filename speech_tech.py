@@ -31,7 +31,7 @@ def get_annotated_signal(rand_fileName, wav_name):
     """Load audio file and annotation files corresponding to parameters, 
     and calls "textgridData" to obtain htk predictions of phonemes and
     their timings
-    
+
     Args:
         p (dictionary, optional): global parameters (wav, dct, grammar file paths, ). Defaults to set_params().
     Returns:
@@ -539,7 +539,8 @@ def phonemeContrast_from_formatted_phonetics_audio(
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
     split_alternatives=[alt.replace('_',' ') for alt in alternatives.split(' ')]
     target_phones=target_phones.replace('_', ' ')
-    
+    merged_phonetics=merge_list(split_phonetics)
+
     print(target_phones)
     print(alternatives)
     status, result=phonemeContrast_from_phonetics_audio(rID,
