@@ -6,7 +6,8 @@ https://otgwtqxqdtniak6jrr0zokonfsyucqeq.flowchase.app/swagger-ui/
 or
 
 http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/swagger-ui/
-http://ec2-13-36-39-202.eu-west-3.compute.amazonaws.com/swagger-ui/
+
+http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com/swagger-ui/
 
 <!-- Or on ECS with Fargate (serverless):
 http://flows-loadb-19tm1yge5w0sm-b7204da6b43ea9e2.elb.eu-west-3.amazonaws.com:8000/swagger-ui/ -->
