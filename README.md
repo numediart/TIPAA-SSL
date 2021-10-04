@@ -55,10 +55,11 @@ b'{"text": "Kayla isn\'t angry at Tyler",
 
 ## Process for updating code on server
 - Do a pytest locally without container
-- docker-compose build containers locally
-- docker-compose up it locally, to check that it runs (I can also docker exec into it)
+- docker compose build containers locally
+- docker compose up it locally, to check that it runs (I can also docker exec into it)
 - On EC2: ssh to it, then, git pull and build flaskapp
-- On ECS docker-compose push, then docker compose up
+- On ECS: docker context use myecs, then docker compose push (see below), then docker compose up (then docker context use default)
+- or docker push on scaleway and see with Filipe
 
 ## Docker application on EC2
 
@@ -182,6 +183,13 @@ aws ecs list-tasks --cluster arn:aws:ecs:eu-west-3:937215464284:cluster/flowspee
 ```
 
 https://www.pulumi.com/docs/tutorials/aws/aws-py-fargate/
+
+## Scaleway
+
+You can login via `docker login rg.fr-par.scw.cloud/flowspeech -u nologin -p $SCW_SECRET_TOKEN`
+
+After a local `docker compose build`,
+the usual flow seems to be `docker tag flowspeech_flaskapp:latest rg.fr-par.scw.cloud/flowspeech/flowspeech_flaskapp:latest` + `docker push rg.fr-par.scw.cloud/flowspeech/flowspeech_flaskapp:latest`
 
 ## Manual Installation
 ### Install HTK

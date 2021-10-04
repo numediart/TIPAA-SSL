@@ -507,7 +507,7 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         # Remove downwards trends: it seems to have a positive impact on the performance. But it would be good to test
         # with more examples
 
-        # scores_grouped_by_chunk=[remove_downwards_trend(el).astype(int).tolist() for el in scores_grouped_by_chunk]
+        scores_grouped_by_chunk=[remove_downwards_trend(el).astype(int).tolist() for el in scores_grouped_by_chunk]
 
         def intensity_to_bin(score_by_word):
             bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
@@ -882,7 +882,7 @@ if __name__ == "__main__":
 
     # Test performance of wordStress module
     start=time()
-    wordStress()
+    # wordStress()
     print(time()-start)
 
     modules=['edAnalysis','phonemeContrast','iContrast','wordStress','sentenceStress']
