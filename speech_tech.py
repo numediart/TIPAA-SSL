@@ -483,7 +483,9 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
                 # normalize between 0 and 100
                 y=y-min(y)
                 y=y/max(y)*100
-            return y
+            else:
+                y=np.array(y)
+            return y.astype(int).tolist()
         
         def chunk_text(text):
             for c in chunking_chars:
@@ -506,9 +508,7 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         
         # Remove downwards trends: it seems to have a positive impact on the performance. But it would be good to test
         # with more examples
-
-        scores_grouped_by_chunk=[remove_downwards_trend(el).astype(int).tolist() for el in scores_grouped_by_chunk]
-
+        scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
         def intensity_to_bin(score_by_word):
             bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
             imax=np.argmax(score_by_word)
