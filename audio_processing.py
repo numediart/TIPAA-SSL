@@ -122,6 +122,7 @@ def getIntensity(s, fs):
 
     #  remove any inf due to the log operation and replace them with the minimum value of intensity
     # int_db(isinf(int_db)) = min(int_db(~isinf(int_db)));
+    int_db[int_db==-np.inf]=min(int_db[int_db>-np.inf])
     return int_db
 
 def normalize(x):
