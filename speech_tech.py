@@ -472,7 +472,7 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         return {"status": "success", "stress_intensities": weighted_score_by_word_by_syllable_int, "stress_binaries": bin_score_by_word_by_syllable}
     elif level=="sentence":
         def remove_downwards_trend(y):
-            if len(y)>1:
+            if len(y)>2:
                 # Remove downwards trend
                 x=range(len(y))
                 model = np.polyfit(x, y, 1)
@@ -494,10 +494,12 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
             chunks = list(filter(None, chunks)) # remove empty string
             # split each chunk in words, remove empty strings, get length (to know the n of words in each chunk)
             n_words_by_chunk=[len(list(filter(None, el.split(' ')))) for el in chunks]
-            assert sum(n_words_by_chunk)==len(text.split(' ')), "Checking number of words is the same after chunking"
+            # assert sum(n_words_by_chunk)==len(list(filter(None, text.split(' ')))), "Checking number of words is the same after chunking"
             return n_words_by_chunk
         
         n_words_by_chunk=chunk_text(text)
+
+        # import pdb;pdb.set_trace()
         max_score_by_word=[int(max(l)[0]*100) for l in weighted_score_by_word_by_syllable_by_vowel]
 
         scores_grouped_by_chunk=[]
