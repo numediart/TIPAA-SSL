@@ -66,8 +66,6 @@ def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
                 syl_lens=[len(el) for el in phones]
                 syl_ends=np.cumsum(syl_lens)
 
-
-
                 chain = itertools.chain(*phones)
                 phones=[el for el in chain]
                 pure_phones=remove_stress_annots(phones)
@@ -162,7 +160,7 @@ def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
     df.to_csv('data/GE_linguistic_data_target_alternatives_syl_idx.csv', index=None)
     return df
 
-# Data processing
+# Old database content processing
 def get_data(path_to_json='data/audio-with-analysis-ids/data.json'):
     """Get a dataframe containing info of audio recordings with sentence ids
 
@@ -232,6 +230,58 @@ def get_sentenceStress_annotation(path='../audio-with-analysis-ids/learning_cont
         binDict[i]=[int(el) for el in r['binResult'].split(' ')]
         textDict[i]=r['Sentence stress']
     return binDict, textDict
+
+# New database content processing
+
+def build_data(F, n_F,  df_focus_word, df_data):
+    glob_F=glob(F+'/*')
+    records=[]
+    for i,el in enumerate(n_F):
+        # print(i) 
+        # print(el)
+        id=df_focus_word.iloc[int(el)-1]['id filipe']
+        bins=df_data[df_data.id==id].bins.values[0]
+        text=df_data[df_data.id==id].text.values[0]
+        audio_path=glob_F[i]
+        r={'bins':bins, 'text':text, 'audio_path':audio_path, 'n_marker':el, 'id':id}
+        records.append(r)
+    return pd.DataFrame.from_records(records)
+
+def get_data_new_content():
+    F2="data/new_content_audio/F2/Repetition_Tasks_Jessie_AmE/Repetition Task 1 (multivoices)"
+    F1="data/new_content_audio/F1/Repetition Task 1"
+    M1="data/new_content_audio/M1/Repetition Task 1"
+    
+    glob_F1=glob(F1+'/*')
+    glob_M1=glob(M1+'/*')
+    glob_F2=glob(F2+'/*')
+
+    # marker number: odd=question, even=answer
+    n_F2=[el.split('/')[-1].split('.')[0].split('_')[-1] for el in glob_F2]
+    n_M1=[n if n[0]!='0' else n[1:] for n in [el.split('/')[-1].split('.')[0].split('_')[-1][9:] for el in glob_M1]]
+    n_F1=[el.split('/')[-1].split('.')[0].split('_')[-1][6:] for el in glob_F1]
+
+    # glob(F1+'/*')
+    # glob(M1+'/*')
+    
+    df_data=pd.read_csv('data/syllabus_phrases_export_2021-09-15_125529.csv')
+    df_data['bins']=df_data.apply(lambda r: [int('*' in el) for el in r.text.split(' ')], axis=1)
+    df2=pd.read_csv('data/focus_word_phrases_id.csv')
+    
+    df_focus_word=df2[df2.name.str.startswith('Task1')]
+    df_focus_word.index+=1
+
+    df_F1=build_data(F1, n_F1, df_focus_word, df_data)
+    df_F2=build_data(F2, n_F2, df_focus_word, df_data)
+    df_M1=build_data(M1, n_M1, df_focus_word, df_data)
+
+    df_tot=pd.concat([df_F1, df_F2, df_M1], axis=0)
+
+    return df_tot
+    
+
+
+
 
 def make_dct_all_phones_from_phonetics(phonetics, path='test.dct'):
     """This functions generates a dct file for the wordStress module. Phonemes are detailed
