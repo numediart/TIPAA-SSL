@@ -93,6 +93,7 @@ def prefill_from_phrases():
         return Response(
                 "error: could not access request.files['file']",
                 status=400,
+                mimetype="application/json"
             )
     if uploaded_file.filename != '':
         try:
@@ -101,6 +102,7 @@ def prefill_from_phrases():
             return Response(
                 "error: could not save uploaded file",
                 status=500,
+                mimetype="application/json"
             )
         
         df=generate_prefill_csv(upload_path+uploaded_file.filename)#, out_path=upload_path+'prefill.csv')
@@ -110,11 +112,13 @@ def prefill_from_phrases():
             return Response(
                 "error: could not remove uploaded file",
                 status=500,
+                mimetype="application/json"
             )
     else:
         return Response(
                 "error: filename is empty",
                 status=400,
+                mimetype="application/json"
             )
     try:
         # from:
@@ -128,7 +132,8 @@ def prefill_from_phrases():
         return Response(
                 "error: "+str(e),
                 status=500,
-            )
+                mimetype="application/json"
+                )
 
 
 
@@ -143,6 +148,7 @@ def upload_file():
         return Response(
             "error: could not access request.files['file']",
             status=400,
+            mimetype="application/json"
         )
     if uploaded_file.filename != '':
         try:
@@ -151,6 +157,7 @@ def upload_file():
             return Response(
                 "error: could not save uploaded file",
                 status=500,
+                mimetype="application/json"
             )
         try:
             # import pdb;pdb.set_trace()
@@ -160,6 +167,7 @@ def upload_file():
             return Response(
                 "error: could not convert uploaded file",
                 status=500,
+                mimetype="application/json"
             )
         try:
             os.remove(upload_path+uploaded_file.filename)
@@ -167,11 +175,13 @@ def upload_file():
             return Response(
                 "error: could not remove uploaded file",
                 status=500,
+                mimetype="application/json"
             )
     else:
         return Response(
                 "error: filename is empty",
                 status=400,
+                mimetype="application/json"
             )
     return rID
 
@@ -185,7 +195,7 @@ def vowel_stresses_api():
     properties=["phonetics","rID"]
     for prop in properties:
         err=access_property_error(content, prop)
-        if err: return Response(err,status=400,)
+        if err: return Response(err,status=400,mimetype="application/json")
     
     
     # print(request.__dict__)
@@ -244,12 +254,13 @@ def send_audio():
     properties=["audio", "API_KEY"]
     for prop in properties:
         err=access_property_error(content, prop)
-        if err: return Response(err,status=400,)
+        if err: return Response(err,status=400,mimetype="application/json")
     
     if os.environ['FLOWSPEECH_KEY']!=content['API_KEY']: 
         return Response(
             "error: wrong API key",
             status=400,
+            mimetype="application/json"
         )
     print(request.__dict__.keys())
     # print(content)
@@ -272,6 +283,7 @@ def send_audio():
         return Response(
             "error: could not save uploaded file",
             status=500,
+            mimetype="application/json"
         )
 
     try:
@@ -280,6 +292,7 @@ def send_audio():
         return Response(
             "error: could not convert uploaded file",
             status=500,
+            mimetype="application/json"
         )
     try:
         os.remove(upload_path+temp_filename+".audio")
@@ -287,6 +300,7 @@ def send_audio():
         return Response(
             "error: could not remove uploaded file",
             status=500,
+            mimetype="application/json"
         )
     res={"status": "success", "rID":rID}
     response=json.dumps(res)
@@ -316,7 +330,7 @@ def module_api(module):
     properties=["phonetics","rID","text"]
     for prop in properties:
         err=access_property_error(content, prop)
-        if err: return Response(err,status=400,)
+        if err: return Response(err,status=400,mimetype="application/json")
 
     # print(request.__dict__)
     print(content)
@@ -332,7 +346,7 @@ def module_api(module):
     not_p=check_phonemes(merge_list(merged_phonetics))
     if not_p is not None: 
         err="error: "+not_p+" is not a phoneme"
-        return Response(err,status=400,)
+        return Response(err,status=400,mimetype="application/json")
 
 
 
@@ -346,9 +360,9 @@ def module_api(module):
     response=json.dumps(res)
 
     if res['status'].split(':')[0]=='error':
-        return Response(response,status=500,)
+        return Response(response,status=500,mimetype="application/json")
     else:
-        return Response(response,status=200,)
+        return Response(response,status=200,mimetype="application/json")
 
 responseSchema=Schema.from_dict(
     {"status": fields.Str(), 
@@ -367,7 +381,7 @@ def phoneme_contrast_api():
     properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
     for prop in properties:
         err=access_property_error(content, prop)
-        if err: return Response(err,status=400,)
+        if err: return Response(err,status=400,mimetype="application/json")
     
     # print(request.__dict__)
     print(content['phonetics'])
@@ -380,7 +394,7 @@ def phoneme_contrast_api():
     not_p=check_phonemes(merge_list(merged_phonetics))
     if not_p is not None: 
         err="error: "+not_p+" is not a phoneme"
-        return Response(err,status=400,)
+        return Response(err,status=400,mimetype="application/json")
 
 
     word_idx=content['word_idx']
@@ -399,7 +413,7 @@ def phoneme_contrast_api():
     idx_syls_with_target=[i for i,syl in enumerate(phonetics.split(' ')[word_idx].split('|')) if target in syl]
 
     if syl_idx not in idx_syls_with_target:
-        return Response("error: the syllable corresponding to syl_idx does not contain the target.",status=400,)
+        return Response("error: the syllable corresponding to syl_idx does not contain the target.",status=400,mimetype="application/json")
     
     target_idx=idx_syls_with_target.index(syl_idx)
     
@@ -414,16 +428,16 @@ def phoneme_contrast_api():
         phonetic_detection=result[0][result[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
     else:
         # phonetic_detection=result
-        return Response(status,status=200,)
+        return Response(status,status=200,mimetype="application/json")
 
-    if phonetic_detection==[]: Response("error: phonetic detection is empty",status=200,)
+    if phonetic_detection==[]: Response("error: phonetic detection is empty",status=200,mimetype="application/json")
     # syls_detection=[syl.replace(target, phonetic_detection[i]) for i,syl in enumerate(syls_with_target)]
     syls_detection=[]
     for i,syl in enumerate(syls_with_target):
         try:
             phonetic_detection[i]
         except:
-            return Response("error: index out of bounds in phonetic detection",status=500,)
+            return Response("error: index out of bounds in phonetic detection",status=500,mimetype="application/json")
         syls_detection.append(syl.replace(target, phonetic_detection[i]))
 
     gs_t=[]
@@ -463,7 +477,7 @@ def prefill_from_phrase():
     content = request.form
     
     err=access_property_error(content, "phrase")
-    if err: return Response(err,status=400,)
+    if err: return Response(err,status=400,mimetype="application/json")
 
     # import pdb;pdb.set_trace()
     # print(request.__dict__)
