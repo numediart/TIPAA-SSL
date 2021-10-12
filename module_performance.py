@@ -111,9 +111,11 @@ def stress_performance_test(level='sentence'):
                 preds.append(pred)
                 GTs.append(bin)
                 analysed_ids.append(id)
-            except:
+            except  Exception as e:
+                # import pdb;pdb.set_trace()
                 print('Error with:')
                 print(row)
+                print(e)
                 errors.append(row)
                 p_errors.append(path)
     
@@ -126,6 +128,55 @@ def stress_performance_test(level='sentence'):
 
     print("algo performance")
     compute_errors(preds, GTs)
+    return errors
+
+def stress_ranking_test():
+    
+    df=get_data_new_content()
+    stress_intensities=[]
+    stress_binaries=[]
+
+    for i,row in df.iterrows():
+        formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
+        _, rID=prepare_audio_file(row.audio_path)
+        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=row.text, level="sentence")
+        print(res)
+        stress_intensities.append(res['stress_intensities'])
+        stress_binaries.append(res['stress_binaries'])
+    df['stress_intensities']=stress_intensities
+    df['stress_binaries']=stress_binaries
+
+    sum_df=df.bins.apply(lambda r:sum(r))
+    df=df[sum_df==1]
+
+    n_word_by_chunk=df.text.apply(lambda r:chunk_text(r))
+    cumsum=n_word_by_chunk.apply(lambda r:np.cumsum([0]+r))
+    idx_1=df.bins.apply(lambda r:r.index(1))
+
+    def get_range(cumsum,idx_1):
+        range_df=pd.concat([cumsum,idx_1], axis=1)
+        ranges=[]
+        for i,r in range_df.iterrows():
+            idx=r.bins
+            ns=r.text
+            for i,n in enumerate(ns[::-1]):
+                if idx>=n: 
+                    range_of_i=[r.text[len(ns)-i-1],r.text[len(ns)-i]]
+                    ranges.append(range_of_i)
+                    break
+        range_df['ranges']=ranges
+        return range_df
+    
+    range_df=get_range(cumsum,idx_1)
+
+    df_all=pd.concat([df, range_df[['ranges']]], axis=1)
+    df_all.apply(lambda r: r['stress_intensities'], axis=1)
+
+    # COI = Chunk Of Interest
+    df_all['COI_stress_intensities']=df_all.apply(lambda r: r['stress_intensities'][r.ranges[0]:r.ranges[1]], axis=1)
+    df_all['COI_bins']=df_all.apply(lambda r: r['bins'][r.ranges[0]:r.ranges[1]], axis=1)
+
+    return df_all
 
 
 def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D', 
@@ -829,65 +880,107 @@ if False:
 
 
 if __name__ == "__main__":
-    # pContrast_from_audiobook_data(contrasted_phonemes=['DH', 'TH'], alternatives=['DH', 'TH'], module="thContrast")
-    # show_summary(contrasted_phonemes=['DH', 'TH'], module="thContrast")
-    # show_summary(contrasted_phonemes=['IY1', 'IH1'], module="iContrast")
-    # show_summary(contrasted_phonemes=['AO1', 'OW1'], module="oContrast")
-    # show_summary()
 
-    # pContrast_from_audiobook_data()
-    # edAnalysis_from_audiobook_data(data_set='test-other')
-    pContrast_from_audiobook_data(target_phones='AO1', alternatives=['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2'], n=100)
-    pContrast_from_audiobook_data(target_phones='AO1', alternatives=['AO1', 'OW1'], n=100)
-    pContrast_from_audiobook_data(target_phones='IY1', alternatives=['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2'], n=100)
-    pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1'], n=100)
-    pContrast_from_audiobook_data(target_phones='IH0', alternatives=['IH0', 'IY0'], n=100)
+    df=stress_ranking_test()
 
-    
-    pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1', 'AY1'], n=20)
+    # remove examples with empty detection (nothing recognized)
+    df=df[df.apply(lambda r:len(r.stress_intensities), axis=1)>0]
 
-    # target='IH1'
-    for target in target_to_alternatives.keys():
-        pContrast_from_audiobook_data(target_phones=target, alternatives=target_to_alternatives[target], n=100)
+    ratio=df.apply(lambda r: r['stress_binaries'][r['bins'].index(1)], axis=1).sum()/len(df)
 
-    alternatives=['F T',
-        'F IH2 D',
-        'F EH2 D',
-        'F',
-        'F D']
-    pContrast_from_audiobook_data(target_phones="F T", alternatives=alternatives, n=1000)
+    # wrong examples:
+    df[df.apply(lambda r: r['stress_binaries'][r['bins'].index(1)], axis=1)==0][['text','bins','stress_binaries','stress_intensities']]
 
-    unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='IY1', target_graphemes='ea', alternatives=['IY1', 'EH1', 'EY1'], n=100)
-    unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='EH1', target_graphemes='ea', alternatives=['IY1', 'EH1', 'EY1'], n=100)
-    unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='EY1', target_graphemes='ea', alternatives=['IY1', 'EH1', 'EY1'], n=1000)
-    
-    unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='IY1', target_graphemes='ie', alternatives=['IY1', 'AY1'], n=1000)
-    unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='AY1', target_graphemes='ie', alternatives=['IY1', 'AY1', 'Y EH1'], n=1000)
+    ratio=len(df[df.stress_intensities.apply(lambda r:[int(el/100) for el in r])==df.bins])/len(df)
+
+    ratio=len(df[df.COI_stress_intensities.apply(lambda r:[int(el/100) for el in r])==df.COI_bins])/len(df)
+    ratio=len(df[df.COI_stress_intensities.apply(lambda r:[np.argmax(r)] if len(r)<2 else np.argpartition(r, -2)[-2:])==df.COI_bins.apply(lambda r:r.index(1))])/len(df)
+
+    # select examples for which the 1 is among the two largest intensities and with predicted intensity>thresh
+    n_max=2
+    threshold=60
+    select=df[df.apply(lambda r:(
+        r.COI_bins.index(1) in 
+        ([np.argmax(r.COI_stress_intensities)] 
+        if len(r.COI_stress_intensities)<n_max+1 else np.argpartition(r.COI_stress_intensities, -n_max)[-n_max:])
+        )
+        & (r.COI_stress_intensities[r.COI_bins.index(1)]>threshold)
+    , axis=1)]
+    ratio=len(select)/len(df)
+
+    # df[df.apply(lambda r:r.COI_stress_intensities[r.COI_bins.index(1)]>60, axis=1)]
+    # n_max_stress_intensities=df.COI_stress_intensities.apply(lambda r:[np.max(r)] if len(r)<n_max else [r[el] for el in np.argpartition(r, -n_max)[-n_max:]])
+    # n_max_stress_intensities[n_max_stress_intensities.apply(lambda r:min(r))<10]
+
+    df.stress_intensities.apply(lambda r:[int(el/100) for el in r])
+
+    df.bins.apply(lambda r:r.index(1))
+    sum_df=df.bins.apply(lambda r:sum(r))
+    # sum_df[sum_df==0]
+    # df[sum_df==0]
+
+    df_1=df[sum_df==1]
+
+    if False:
+        # pContrast_from_audiobook_data(contrasted_phonemes=['DH', 'TH'], alternatives=['DH', 'TH'], module="thContrast")
+        # show_summary(contrasted_phonemes=['DH', 'TH'], module="thContrast")
+        # show_summary(contrasted_phonemes=['IY1', 'IH1'], module="iContrast")
+        # show_summary(contrasted_phonemes=['AO1', 'OW1'], module="oContrast")
+        # show_summary()
+
+        # pContrast_from_audiobook_data()
+        # edAnalysis_from_audiobook_data(data_set='test-other')
+        pContrast_from_audiobook_data(target_phones='AO1', alternatives=['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2'], n=100)
+        pContrast_from_audiobook_data(target_phones='AO1', alternatives=['AO1', 'OW1'], n=100)
+        pContrast_from_audiobook_data(target_phones='IY1', alternatives=['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2'], n=100)
+        pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1'], n=100)
+        pContrast_from_audiobook_data(target_phones='IH0', alternatives=['IH0', 'IY0'], n=100)
+
+        
+        pContrast_from_audiobook_data(target_phones='IH1', alternatives=['IH1', 'IY1', 'AY1'], n=20)
+
+        # target='IH1'
+        for target in target_to_alternatives.keys():
+            pContrast_from_audiobook_data(target_phones=target, alternatives=target_to_alternatives[target], n=100)
+
+        alternatives=['F T',
+            'F IH2 D',
+            'F EH2 D',
+            'F',
+            'F D']
+        pContrast_from_audiobook_data(target_phones="F T", alternatives=alternatives, n=1000)
+
+        unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='IY1', target_graphemes='ea', alternatives=['IY1', 'EH1', 'EY1'], n=100)
+        unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='EH1', target_graphemes='ea', alternatives=['IY1', 'EH1', 'EY1'], n=100)
+        unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='EY1', target_graphemes='ea', alternatives=['IY1', 'EH1', 'EY1'], n=1000)
+        
+        unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='IY1', target_graphemes='ie', alternatives=['IY1', 'AY1'], n=1000)
+        unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='AY1', target_graphemes='ie', alternatives=['IY1', 'AY1', 'Y EH1'], n=1000)
 
 
-    results=pContrast_from_audiobook_data(target_phones='DH', alternatives=['DH', 'TH'], n=100)
-    row=results['failure'].iloc[1]
-    results['results_df'].status.unique()
+        results=pContrast_from_audiobook_data(target_phones='DH', alternatives=['DH', 'TH'], n=100)
+        row=results['failure'].iloc[1]
+        results['results_df'].status.unique()
 
-    # compute_prediction_for_row(row,row.phonetics,target_phones='DH', alternatives=['DH', 'TH'])
+        # compute_prediction_for_row(row,row.phonetics,target_phones='DH', alternatives=['DH', 'TH'])
 
-    pContrast_from_audiobook_data(target_phones='DH', alternatives=['DH', 'Z'], n=100)
-    results=pContrast_from_audiobook_data(target_phones='TH', alternatives=['DH', 'TH'], n=100)
-    # results=pContrast_from_audiobook_data(contrasted_phonemes=contrasted_phonemes, alternatives=alternatives, module="thContrast", n=100)
-    
-    
-    row=results['failure'].iloc[-1]
+        pContrast_from_audiobook_data(target_phones='DH', alternatives=['DH', 'Z'], n=100)
+        results=pContrast_from_audiobook_data(target_phones='TH', alternatives=['DH', 'TH'], n=100)
+        # results=pContrast_from_audiobook_data(contrasted_phonemes=contrasted_phonemes, alternatives=alternatives, module="thContrast", n=100)
+        
+        
+        row=results['failure'].iloc[-1]
 
-    # phonetics_from_sentence(results['results_dfs']['TH'].iloc[0].sentence)
-    target_phones='TH'
+        # phonetics_from_sentence(results['results_dfs']['TH'].iloc[0].sentence)
+        target_phones='TH'
 
-    # p=set_params(basename='test', module="thContrast")
-    # prepare_audio_file(p)
-    status_audio, rID=prepare_audio_file(row.wav_path)
-    # p['rand_fileName']=rID
-    # make_dir(os.path.split(p['inputPhoneticTranscription'])[0])
-    # make_dir(os.path.split(p['inputGrammar'])[0])
-    # alternatives=['DH', 'TH']
-    # make_generic_dct_from_phonetics(phonetics=row.phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
-    # make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
-    # status, results= phonemeContrast(p['rand_fileName'])
+        # p=set_params(basename='test', module="thContrast")
+        # prepare_audio_file(p)
+        status_audio, rID=prepare_audio_file(row.wav_path)
+        # p['rand_fileName']=rID
+        # make_dir(os.path.split(p['inputPhoneticTranscription'])[0])
+        # make_dir(os.path.split(p['inputGrammar'])[0])
+        # alternatives=['DH', 'TH']
+        # make_generic_dct_from_phonetics(phonetics=row.phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives, path=p['inputPhoneticTranscription'])
+        # make_grammar_from_dct(path_dct=p['inputPhoneticTranscription'],path_grammar=p['inputGrammar'])
+        # status, results= phonemeContrast(p['rand_fileName'])
