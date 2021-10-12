@@ -8,7 +8,7 @@ from audio_processing import load_audio, getIntonation, getIntensity, normalize,
 from htk_utils import get_textgrid_data, clean_htk_files
 
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
-from text_processing import phonetics_from_sentence
+from text_processing import phonetics_from_sentence, chunk_text
 import uuid
 import time
 from glob import glob
@@ -230,7 +230,7 @@ def compute_stress_score(textgridData, s, fs, indxVowels):
 def vowel_stresses(
         rand_fileName, wav_name
         ):
-    """vowels_stresses() computes prosody features (intesity, pitch, ...) to compute 
+    """vowels_stresses() computes prosody features (intensity, pitch, ...) to compute 
     a value by vowel, located thanks to textgridData, representing a stress intensity.
     It also plots a curve representing the stress evolution.
 
@@ -487,21 +487,8 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
                 y=np.array(y)
             return y.astype(int).tolist()
         
-        def chunk_text(text):
-            for c in chunking_chars:
-                text=text.replace(c, chunking_chars[0])
-            chunks=text.split(chunking_chars[0])
-            chunks = list(filter(None, chunks)) # remove empty string
-            # split each chunk in words, remove empty strings, get length (to know the n of words in each chunk)
-            n_words_by_chunk=[len(list(filter(None, el.split(' ')))) for el in chunks]
-            # assert sum(n_words_by_chunk)==len(list(filter(None, text.split(' ')))), "Checking number of words is the same after chunking"
-            return n_words_by_chunk
-        
-        n_words_by_chunk=chunk_text(text)
-
-        # import pdb;pdb.set_trace()
+        n_words_by_chunk=chunk_text(text, chunking_chars=chunking_chars)
         max_score_by_word=[int(max(l)[0]*100) for l in weighted_score_by_word_by_syllable_by_vowel]
-
         scores_grouped_by_chunk=[]
         i=0
         for l in n_words_by_chunk:
@@ -511,10 +498,17 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         # Remove downwards trends: it seems to have a positive impact on the performance. But it would be good to test
         # with more examples
         scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
-        def intensity_to_bin(score_by_word):
+        def intensity_to_bin(score_by_word, n_max=2):
             bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
-            imax=np.argmax(score_by_word)
-            bin_score_by_word[imax]=1
+            
+            if len(score_by_word)==1:
+                imax=np.argmax(score_by_word)
+                bin_score_by_word[imax]=1
+            else:
+                imaxes=[np.argmax(score_by_word)] if len(score_by_word)<n_max else np.argpartition(score_by_word, -n_max)[-n_max:]
+                for imax in imaxes:
+                    if score_by_word[imax]>60:
+                        bin_score_by_word[imax]=1
             return bin_score_by_word
 
         bins_by_chunk=[]

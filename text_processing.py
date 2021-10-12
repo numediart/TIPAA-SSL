@@ -175,6 +175,17 @@ def remove_special_characters(sentence="Where's the best place to have coffee?",
     sentence=' '.join(list(filter(None, sentence.split(' '))))
     return sentence
 
+
+def chunk_text(text, chunking_chars=[',',';','.','!','?', ':']):
+    for c in chunking_chars:
+        text=text.replace(c, chunking_chars[0])
+    chunks=text.split(chunking_chars[0])
+    chunks = list(filter(None, chunks)) # remove empty string
+    # split each chunk in words, remove empty strings, get length (to know the n of words in each chunk)
+    n_words_by_chunk=[len(list(filter(None, el.split(' ')))) for el in chunks]
+    # assert sum(n_words_by_chunk)==len(list(filter(None, text.split(' ')))), "Checking number of words is the same after chunking"
+    return n_words_by_chunk
+    
 def phonetics_from_sentence(sentence="Where's the best place to have coffee?"):
     sentence=remove_special_characters(sentence)
     words=sentence.split(' ')
