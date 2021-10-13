@@ -488,7 +488,7 @@ def prefill_from_phrase():
     # print(d)
     response=json.dumps(d)
     # print(response)
-    return response
+    return Response(response,status=200,mimetype="application/json")
 
 
 def run_app():
