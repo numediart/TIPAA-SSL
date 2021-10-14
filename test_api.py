@@ -8,17 +8,21 @@ import ast
 def test_api():
     # c=app.test_client()
     with app.test_client() as c:
-        res=send_audio_base64(client=c)
+        # res=send_audio_base64(client=c)
+        res=send_audio_base64(path='audio_recordings/ended.mp3', client=c)
         assert res.status_code == 200
 
         res=ast.literal_eval(res.data.decode('utf-8'))
         assert res['status']=='success'
         rID=res['rID']
         print(res)
-        res=call_phoneme_contrast(rID, client=c)
+        # res=call_phoneme_contrast(rID, client=c)
+        res=call_phoneme_contrast(rID, text="ended", word_idx=0, syl_idx=1, target="IH0_D", alternatives="T D IH0_D", client=c)
+
         assert res.status_code == 200
 
         res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', client=c)
+
         assert res.status_code == 200
         res=ast.literal_eval(res.data.decode('utf-8'))
         rID=res['rID']
