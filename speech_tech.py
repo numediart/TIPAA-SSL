@@ -532,10 +532,16 @@ def phonemeContrast_from_formatted_phonetics_audio(
                     # alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
                     alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D'
                     ):
+    # I want to keep the target as one entry (and not split it in several phonemes for e.g. IH0_D)
+    phonetics=phonetics.replace(target_phones, 'TAR')
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
     split_alternatives=[alt.replace('_',' ') for alt in alternatives.split(' ')]
     target_phones=target_phones.replace('_', ' ')
-    merged_phonetics=merge_list(split_phonetics)
+    # merged_phonetics=merge_list(split_phonetics)
+    merged_phonetics=[merge_list(el) for el in split_phonetics]
+
+    # put back the target phones as one entry
+    merged_phonetics=[[p if p!='TAR' else target_phones for p in w ] for w in merged_phonetics]
 
     print(target_phones)
     print(alternatives)
