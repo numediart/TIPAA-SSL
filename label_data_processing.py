@@ -451,39 +451,44 @@ def make_grammar_from_dct(path_dct='test.dct',
             ps=ps.unique()
     except:
         pdb.set_trace()
-    ws=df[w_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)#.unique()
     
-    # the diff evaluates if there is a jump of indices, meaning that there are phoneme between words: words -> phonemes -> words
-    listA=np.diff(ws.index)-1
-    # this locates where is the jump (we assume here there is one or zero)
-    res = [i for i, val in enumerate(listA) if val]
-    if len(res)>0:
-        # this is the case : words -> phonemes -> words
-        ws1=ws.iloc[:res[0]+1].unique()
-        ws2=ws.iloc[res[0]+1:].unique()
-    else:
-        # This is the case  phonemes -> words   OR    words -> phonemes
-
-        if symbols[0][0]=='w':
-            # This is the case : words -> phonemes
-            ws2=[]
-            try:
-                if len(ws)>0:
-                    ws1=ws.unique()
-                else:
-                    ws1=[]
-            except:
-                pdb.set_trace()
+    if len(df[w_list])>0:
+        ws=df[w_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)#.unique()
+    
+        # the diff evaluates if there is a jump of indices, meaning that there are phoneme between words: words -> phonemes -> words
+        listA=np.diff(ws.index)-1
+        # this locates where is the jump (we assume here there is one or zero)
+        res = [i for i, val in enumerate(listA) if val]
+        if len(res)>0:
+            # this is the case : words -> phonemes -> words
+            ws1=ws.iloc[:res[0]+1].unique()
+            ws2=ws.iloc[res[0]+1:].unique()
         else:
-            # This is the case : phonemes -> words
-            ws1=[]
-            try:
-                if len(ws)>0:
-                    ws2=ws.unique()
-                else:
-                    ws2=[]
-            except:
-                pdb.set_trace()
+            # This is the case  phonemes -> words   OR    words -> phonemes
+
+            if symbols[0][0]=='w':
+                # This is the case : words -> phonemes
+                ws2=[]
+                try:
+                    if len(ws)>0:
+                        ws1=ws.unique()
+                    else:
+                        ws1=[]
+                except:
+                    pdb.set_trace()
+            else:
+                # This is the case : phonemes -> words
+                ws1=[]
+                try:
+                    if len(ws)>0:
+                        ws2=ws.unique()
+                    else:
+                        ws2=[]
+                except:
+                    pdb.set_trace()
+    else:
+        ws, ws1, ws2=[],[],[]
+    
     try:
         os=df[o_list].apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
     except:
