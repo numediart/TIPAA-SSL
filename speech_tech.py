@@ -541,7 +541,9 @@ def phonemeContrast_from_formatted_phonetics_audio(
     merged_phonetics=[merge_list(el) for el in split_phonetics]
 
     # put back the target phones as one entry
-    merged_phonetics=[[p if p!='TAR' else target_phones for p in w ] for w in merged_phonetics]
+    # merged_phonetics=[[p if p!='TAR' else target_phones for p in w ] for w in merged_phonetics]
+
+    merged_phonetics=[[p if 'TAR' not in p else p.replace('TAR',target_phones) for p in w ] for w in merged_phonetics]
 
     print(target_phones)
     print(alternatives)
