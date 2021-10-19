@@ -408,6 +408,10 @@ def phoneme_contrast_api():
     syl_idx=int(syl_idx)
 
     # split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+
+    if word_idx>=len(phonetics.split(' ')):
+        return Response("error: word_idx >= number of words",status=400,mimetype="application/json")
+    
     # extract the syllables which contain the target
     syls_with_target=[syl for syl in phonetics.split(' ')[word_idx].split('|') if target in syl]
     idx_syls_with_target=[i for i,syl in enumerate(phonetics.split(' ')[word_idx].split('|')) if target in syl]
@@ -430,7 +434,7 @@ def phoneme_contrast_api():
         # phonetic_detection=result
         return Response(status,status=200,mimetype="application/json")
 
-    if phonetic_detection==[]: Response("error: phonetic detection is empty",status=200,mimetype="application/json")
+    if phonetic_detection==[]: return Response("success: phonetic detection is empty",status=200,mimetype="application/json")
     # syls_detection=[syl.replace(target, phonetic_detection[i]) for i,syl in enumerate(syls_with_target)]
     syls_detection=[]
     for i,syl in enumerate(syls_with_target):
