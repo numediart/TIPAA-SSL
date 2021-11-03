@@ -1,15 +1,17 @@
 # API docs for Flowspeech (making speech procesing requests)
 
 See the requests here on the EC2 accessible at:
+
 https://speech-processing.flowchase.app/swagger-ui/
 
-http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/swagger-ui/
+http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com/swagger-ui/
 
 or
 
 https://dev-speech-processing.flowchase.app/swagger-ui/
 
-http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com/swagger-ui/
+http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/swagger-ui/
+
 
 <!-- Or on ECS with Fargate (serverless):
 http://flows-loadb-19tm1yge5w0sm-b7204da6b43ea9e2.elb.eu-west-3.amazonaws.com:8000/swagger-ui/ -->
