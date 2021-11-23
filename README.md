@@ -56,7 +56,7 @@ b'{"text": "Kayla isn\'t angry at Tyler",
 ## Process for updating code on server
 - Do a pytest locally without container
 - docker compose build containers locally
-- docker compose up it locally, to check that it runs (I can also docker exec into it)
+- docker compose up it locally, to check that it runs, and use dummy client on localhost
 - On EC2: ssh to it, then, git pull and build flaskapp
 - On ECS: docker context use myecs, then docker compose push (see below), then docker compose up (then docker context use default)
 - or docker push on scaleway and see with Filipe
@@ -86,6 +86,7 @@ On AWS, I chose an Amazon Linux 2 with Docker installed.
 Check the command to ssh to it on AWS.
 ```
 ssh -i "~/flowspeech.pem" ec2-user@ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
+ssh -i "/mnt/c/Users/noe_t/Dropbox/contracts_info/flowchase/flowspeech.pem" ec2-user@ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
 ```
 
 But I had to install docker-compose like this:
@@ -236,20 +237,52 @@ To be able to use mp3 files with librosa library:
 conda install -c conda-forge ffmpeg
 ```
 
+
+
+## Data
+Data of actor recordings with sentenceID etc.
+```
+cd data
+git clone https://github.com/flowchase/audio-with-analysis-ids
+cd ..
+```
+
+You can use ```get_data()``` function.
+
+Librispeech data:
+https://www.openslr.org/12/
+
+I use dev-clean and test-clean sets.
+```
+cd data
+wget https://www.openslr.org/resources/12/dev-clean.tar.gz
+tar xvfz dev-clean.tar.gz
+rm dev-clean.tar.gz 
+wget https://www.openslr.org/resources/12/test-clean.tar.gz
+tar xvfz test-clean.tar.gz
+rm test-clean.tar.gz 
+cd ..
+```
+
+Get phonetic alignments data:
+```
+sudo apt install unzip
+cd data
+mkdir librispeech_alignments
+cd librispeech_alignments
+curl https://zenodo.org/record/2619474/files/librispeech_alignments.zip?download=1 --output librispeech_alignments.zip
+unzip librispeech_alignments.zip
+rm librispeech_alignments.zip
+cd ..
+cd ..
+```
+
+
 ## Test modules
 
 ```
 pytest
 ```
-
-## Data
-Data of actor recordings with sentenceID etc.
-```
-cd ..
-git clone https://github.com/flowchase/audio-with-analysis-ids
-```
-
-You can use ```get_data()``` function.
 
 ## Using AWS Polly
 

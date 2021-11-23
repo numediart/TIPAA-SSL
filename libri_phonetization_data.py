@@ -11,11 +11,11 @@ from glob import glob
 
 from text_processing import remove_stress_annots, cmu_1_char
 
-def get_phone_timings(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid',word_idx=8):
+def get_phone_timings(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid',word_idx=8):
     """Uses the (start,end) of a word and (starts,ends) of phonemes to retrieve phonemes corresponding to a word
 
     Args:
-        f (str, optional): [description]. Defaults to 'librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'.
+        f (str, optional): [description]. Defaults to 'data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'.
         word_idx (int, optional): [description]. Defaults to 8.
 
     Returns:
@@ -26,7 +26,7 @@ def get_phone_timings(f='librispeech_alignments/dev-clean/8842/304647/8842-30464
     filter=[tg[0][word_idx].overlaps(el) for el in tg[1]]
     return list(compress(tg[1], filter))
 
-def get_sentence(f='librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
+def get_sentence(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
     tg = textgrid.TextGrid.fromFile(f)
     words=[el.mark for el in tg[0]]
     # phones=[el.mark for el in tg[1]]
@@ -67,8 +67,8 @@ def phonetics_for_row(row, libri_words_df):
 
 def build_librispeech_words_df(
         data_set='dev-clean',
-        basepath='librispeech_alignments',
-        audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/',
+        basepath='data/librispeech_alignments',
+        audio_path='data/LibriSpeech/',
         n=None
         ):
     path=os.path.join(basepath, data_set)
@@ -90,7 +90,7 @@ def build_librispeech_words_df(
             word=el.mark
             start=el.minTime
             end=el.maxTime
-            wav_path=os.path.join(audio_path,'/'.join(f.split('/')[1:]).split('.')[0]+'.flac')
+            wav_path=os.path.join(audio_path,'/'.join(f.split('/')[2:]).split('.')[0]+'.flac')
             d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f, 'wav_path':wav_path}
             # d={'word':word, 'phones':" ".join(phones), 'file_idx':f_idx, 'word_idx':i, 'start':start, 'end':end, 'path':f, 'wav_path':wav_path, 'sentence':get_sentence(f)}
 
@@ -101,7 +101,7 @@ def build_librispeech_words_df(
 
 def libri_phonetics(
         data_set='dev-clean',
-        basepath='librispeech_alignments',
+        basepath='data/librispeech_alignments',
         audio_path='LibriSpeech/',
         # audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/',
         n=None
