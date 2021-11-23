@@ -14,7 +14,6 @@ from flask import Response
 from speech_tech import stress_from_formatted_phonetics, prepare_audio_file, vowel_stresses_from_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, merge_list
 import pandas as pd
 import json
-import speech_tech
 from text_processing import generate_prefill_csv, prefill_for_sentence, check_phonemes
 
 import uuid
@@ -567,7 +566,19 @@ def final_phoneme_api():
         # to discriminate between with/without termination, 
         # we put the pretermination in the target and put it at the start of each alternative + add it alone
         target_syl=[syl for syl in phonetics.split(' ')[word_idx].split('|')][syl_idx]
-        idx_target_in_syl=target_syl.replace(target,'TAR').split('_').index('TAR')
+        
+        # TODO: I take only the first occurence of target with this. So it assumes there is only one, which is not general
+        # the problem is that I will have a different preterminantion for each target then, and therefore different resulting targets, which is not usable with "phonemeContrast_from_formatted_phonetics_audio"
+
+        # maybe I should use the assumptions that tere is only one, but it is the last one (as we are in final_phoneme)
+
+        # idx_target_in_syl=target_syl.replace(target,'TAR').split('_').index('TAR')
+        idxs=[i for i,el in enumerate(target_syl.replace(target,'TAR').split('_')) if el=='TAR']
+        idx_target_in_syl=idxs[-1]
+        if idx_target_in_syl==0:
+            print("idx=0")
+            return Response("error: the target cannot be the first phoneme",status=400,mimetype="application/json")
+
         pretermination=target_syl.split('_')[idx_target_in_syl-1]
         alternatives=' '.join([pretermination+'_'+el for el in alternatives.split(' ')]+[pretermination])
         target=pretermination+'_'+target
@@ -598,7 +609,11 @@ def final_phoneme_api():
             phonetic_detection[i]
         except:
             return Response("error: index out of bounds in phonetic detection",status=500,mimetype="application/json")
-        syls_detection.append(syl.replace(target, phonetic_detection[i]))
+        if phonetic_detection[i]!='not pronounced':
+            syls_detection.append(syl.replace(target, phonetic_detection[i]))          
+        else:
+            # if it is "not pronounced", then remove the target, and make sure it is consistent in terms of "_" vy splitting, filtering empty strongs(None) and rejoining
+            syls_detection.append('_'.join(list(filter(None, syl.replace(target, '').split('_')))))        
 
     gs_t=[]
     gs_d=[]
@@ -607,8 +622,8 @@ def final_phoneme_api():
 
         g_d=[]
         for el in  syl_d.split('_'):
-            if el=='not pronounced': g_d.append(el)
-            elif not el[-1] in str([0,1,2]): g_d.append(cmu_to_gibberish[el])
+            # if el=='not pronounced': g_d.append(el)
+            if not el[-1] in str([0,1,2]): g_d.append(cmu_to_gibberish[el])
             else: g_d.append(cmu_to_gibberish[el[:-1]])
 
         # g_d=[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in syl_d.split('_')]
