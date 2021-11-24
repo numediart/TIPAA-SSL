@@ -1,6 +1,8 @@
 matplotlib
 librosa
 pandas
+textgrid
+openpyxl
 pyworld
 scipy
 pytest
@@ -20,3 +22,4 @@ pyyaml
 speechbrain
 # transformers==4.6.1
 # s3prl
+newrelic
