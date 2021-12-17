@@ -56,7 +56,7 @@ def pContrast_for_row(r, url = 'http://localhost:8000/phonemeContrast', client=r
 
 
 
-def test_GE_linguistic_data_content(base_url = 'http://localhost:8000'):
+def test_GE_linguistic_data_content(url = 'http://localhost:8000/phonemeContrast'):
     df=pd.read_csv('data/exercise_data_export.csv')
 
     # df.target_phoneme.dropna().unique()
@@ -64,7 +64,6 @@ def test_GE_linguistic_data_content(base_url = 'http://localhost:8000'):
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     df_pContrast.index=range(len(df_pContrast))
 
-    url=base_url+"/phonemeContrast"
     # client=app.test_client()
     with app.test_client() as client:
         results=[]
@@ -116,7 +115,9 @@ def test_GE_linguistic_data_content(base_url = 'http://localhost:8000'):
         for p in incorrect_alternatives_phrases2.target_phoneme.unique():
             print(p, incorrect_alternatives_phrases2[incorrect_alternatives_phrases2.target_phoneme==p].fk_phrase_id.tolist())
 
-def test_particular_cases(base_url = 'http://localhost:8000'):
+        return results
+
+def test_particular_cases(url = 'http://localhost:8000/phonemeContrast'):
     
     df=pd.read_csv('data/exercise_data_export.csv')
 
@@ -124,10 +125,10 @@ def test_particular_cases(base_url = 'http://localhost:8000'):
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     
-    url=base_url+"/phonemeContrast"
     # client=app.test_client()
 
     # indices selected of historical errors from above function that are therefore interesting test cases 
+    # selected_idxs=[1524] 
     selected_idxs=[968, 1123, 1524] 
     with app.test_client() as client:
         results=[]
@@ -145,8 +146,20 @@ def test_particular_cases(base_url = 'http://localhost:8000'):
             results.append(result)
         
         results=pd.DataFrame.from_records(results)
+        return results
+
+
+def result_analysis():
+    rpC=pd.read_csv('results/test_api_phonemeContrast.csv')
+    r_ter=pd.read_csv('results/test_api_termination_contrast.csv')
+
+    rpC[~(r_ter==rpC).gibberish_detected][rpC.target_phoneme=='D']
+    r_ter[~(r_ter==rpC).gibberish_detected][r_ter.target_phoneme=='D']
+
+
 
 if __name__ == '__main__':
     # test_api()
     # test_GE_linguistic_data_content()
+    test_GE_linguistic_data_content('http://localhost:8000/termination_contrast')
     test_particular_cases()
