@@ -515,8 +515,8 @@ properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
 @doc(description='Phoneme contrast', tags=['phonemeContrast'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/final_phoneme', methods=['POST'])
-def final_phoneme_api():
+@app.route('/termination_contrast', methods=['POST'])
+def termination_contrast_api():
     final_phoneme=True
 
     content = request.form
@@ -570,18 +570,22 @@ def final_phoneme_api():
         # TODO: I take only the first occurence of target with this. So it assumes there is only one, which is not general
         # the problem is that I will have a different preterminantion for each target then, and therefore different resulting targets, which is not usable with "phonemeContrast_from_formatted_phonetics_audio"
 
-        # maybe I should use the assumptions that tere is only one, but it is the last one (as we are in final_phoneme)
+        # maybe I should use the assumptions that there is only one, but it is the last one (as we are in final_phoneme)
 
         # idx_target_in_syl=target_syl.replace(target,'TAR').split('_').index('TAR')
         idxs=[i for i,el in enumerate(target_syl.replace(target,'TAR').split('_')) if el=='TAR']
         idx_target_in_syl=idxs[-1]
         if idx_target_in_syl==0:
             print("idx=0")
-            return Response("error: the target cannot be the first phoneme",status=400,mimetype="application/json")
+            # return Response("error: the target cannot be the first phoneme",status=400,mimetype="application/json")
 
-        pretermination=target_syl.split('_')[idx_target_in_syl-1]
-        alternatives=' '.join([pretermination+'_'+el for el in alternatives.split(' ')]+[pretermination])
-        target=pretermination+'_'+target
+            # if the target is the first phoneme, then there is no pretermination, let it be ''
+            pretermination=''
+        else:
+            pretermination=target_syl.split('_')[idx_target_in_syl-1]
+
+            alternatives=' '.join([pretermination+'_'+el for el in alternatives.split(' ')]+[pretermination])
+            target=pretermination+'_'+target
 
     status,result=phonemeContrast_from_formatted_phonetics_audio(rID, phonetics, word_idx, target, alternatives)
     print('status:',status)
@@ -601,7 +605,8 @@ def final_phoneme_api():
     if final_phoneme:
         phonetic_detection=[el.replace(pretermination+'_','') if el!=pretermination else 'not pronounced' for el in phonetic_detection]
         # remove the pretermination that was added at the start of target
-        target='_'.join(target.split('_')[1:])
+        if pretermination!='':
+            target='_'.join(target.split('_')[1:])
 
     syls_detection=[]
     for i,syl in enumerate(syls_with_target):
@@ -612,16 +617,15 @@ def final_phoneme_api():
         if phonetic_detection[i]!='not pronounced':
             syls_detection.append(syl.replace(target, phonetic_detection[i]))          
         else:
-            # if it is "not pronounced", then remove the target, and make sure it is consistent in terms of "_" vy splitting, filtering empty strongs(None) and rejoining
+            # if it is "not pronounced", then remove the target, and make sure it is consistent in terms of "_" vy splitting, filtering empty strings (None) and rejoining
             syls_detection.append('_'.join(list(filter(None, syl.replace(target, '').split('_')))))        
 
     gs_t=[]
     gs_d=[]
     for syl_t,syl_d in zip(syls_with_target,syls_detection):
         g_t=[cmu_to_gibberish[el] if not el[-1] in str([0,1,2]) else cmu_to_gibberish[el[:-1]] for el in syl_t.split('_')]
-
         g_d=[]
-        for el in  syl_d.split('_'):
+        for el in syl_d.split('_'):
             # if el=='not pronounced': g_d.append(el)
             if not el[-1] in str([0,1,2]): g_d.append(cmu_to_gibberish[el])
             else: g_d.append(cmu_to_gibberish[el[:-1]])
@@ -637,6 +641,9 @@ def final_phoneme_api():
             gs_d[target_idx]=gs_t[target_idx]
     if target=='D' or target=='T':
         if phonetic_detection[target_idx]=='D' or phonetic_detection[target_idx]=='T':
+            phonetic_detection[target_idx]=target
+            gs_d[target_idx]=gs_t[target_idx]
+        if 'Y' in pretermination and "IH" in phonetic_detection[target_idx]:
             phonetic_detection[target_idx]=target
             gs_d[target_idx]=gs_t[target_idx]
     
