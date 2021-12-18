@@ -3,11 +3,10 @@ from dummy_client import *
 import os
 os.environ['FLOWSPEECH_KEY']="ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"
 import ast
-from label_data_processing import get_data_new_content, get_data
 
-def test_api():
+def test_api(c=app.test_client()):
     # c=app.test_client()
-    with app.test_client() as c:
+    # with app.test_client() as c:
         # res=send_audio_base64(client=c)
         res=send_audio_base64(path='audio_recordings/ended.mp3', client=c)
         assert res.status_code == 200
@@ -27,7 +26,6 @@ def test_api():
         res=ast.literal_eval(res.data.decode('utf-8'))
         rID=res['rID']
         res=call_module(rID, fake_mistake=True, client=c)
-
 
         base_url = 'http://localhost:8000'
         crash_test(base_url=base_url, client=c)
@@ -52,69 +50,128 @@ def pContrast_for_row(r, url = 'http://localhost:8000/phonemeContrast', client=r
                                 'syl_idx':str(ast.literal_eval(r.target_syllable_indexes)[0]), 
                                 'alternatives':' '.join(ast.literal_eval(r.alternative_phonemes)), 
                                 'target':r.target_phoneme})
+
     return res
 
 
-
-def test_GE_linguistic_data_content(base_url = 'http://localhost:8000'):
+def a_test_GE_linguistic_data_content(base_url = 'http://localhost:8000'):
     df=pd.read_csv('data/exercise_data_export.csv')
 
     # df.target_phoneme.dropna().unique()
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
+
+    mask=df_pContrast.apply(lambda r:sum([str(i) == r.target_phoneme[-1] for i in range(3)]), axis=1)
+    df_ed=df_pContrast[~mask.astype(bool)]
+    df_v=df_pContrast[mask.astype(bool)]
+
     df_pContrast.index=range(len(df_pContrast))
 
-    url=base_url+"/phonemeContrast"
-    # client=app.test_client()
-    with app.test_client() as client:
-        results=[]
-        for i,r in df_pContrast.iterrows():
-            res=pContrast_for_row(r, url = url, client=client)
+    df_ed.index=range(len(df_ed))
+    df_v.index=range(len(df_v))
 
-            if '''"phonetic_detection":''' in res.data.decode('utf-8'):
-                result=ast.literal_eval(res.data.decode('utf-8'))
-            else:
-                result={}
-                result['status']=res.data.decode('utf-8')
-                result['phonetic_detection']=''
-                result['gibberish_truth']=''
-                result['gibberish_detected']=''
-            results.append(result)
-        
-        results=pd.DataFrame.from_records(results)
-
+    def get_results(df_pContrast, url = 'http://localhost:8000/phonemeContrast'):
+        # client=app.test_client()
+        with app.test_client() as client:
+            results=[]
+            for i,r in df_pContrast.iterrows():
+                res=pContrast_for_row(r, url = url, client=client)
+                if '''"phonetic_detection":''' in res.data.decode('utf-8'):
+                    result=ast.literal_eval(res.data.decode('utf-8'))
+                else:
+                    result={}
+                    result['status']=res.data.decode('utf-8')
+                    result['phonetic_detection']=''
+                    result['gibberish_truth']=''
+                    result['gibberish_detected']=''
+                results.append(result)
+            
+            results=pd.DataFrame.from_records(results)
+            # row=df_pContrast.iloc[results[results.status!='success'].index.tolist()].iloc[2]
+            # pContrast_for_row(row, url = url, client=client)
         results['target_phoneme']=df_pContrast['target_phoneme']
         results['alternative_phonemes']=df_pContrast['alternative_phonemes']
         results['audio_file_url']=df_pContrast['audio_file_url']
-        
-        results[results.status!='success']
-        results[results.status!='success'].index.tolist()
+        return results
+    
+    # row=df_ed[df_ed.text.str.contains('showed')].iloc[0]
+    # res=pContrast_for_row(row, url = 'http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com/phonemeContrast')
 
-        ratio=len(results[results.gibberish_truth==results.gibberish_detected])/len(results)
-        results[results.gibberish_truth!=results.gibberish_detected]
-        results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('F1')]
-        results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('F2')]
-        results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('M1')]
-        results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('M_')]
-        results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('F_')]
 
-        row=df_pContrast.iloc[results[results.status!='success'].index.tolist()].iloc[2]
-        pContrast_for_row(row, url = url, client=client)
+    # results=get_results(df_ed[df_ed.text.str.contains('showed')], url=base_url+"/phonemeContrast")
 
-        # select phrases for which the target is not the first alternative (which indicates it is a wrong set of alternatives)
-        incorrect_alternatives_phrase_ids=df_pContrast[(df_pContrast.target_phoneme!=df_pContrast['alternative_phonemes'].apply(lambda r:ast.literal_eval(r)[0]))
-                        &(~df_pContrast.target_phoneme.isin(['D','T','IH0_D']))].fk_phrase_id.unique()
-        incorrect_alternatives_phrases=df_pContrast[df_pContrast.fk_phrase_id.isin(incorrect_alternatives_phrase_ids)].drop_duplicates(subset='fk_phrase_id', keep="first")
-        
-        for p in incorrect_alternatives_phrases.target_phoneme.unique():
-            print(p, incorrect_alternatives_phrases[incorrect_alternatives_phrases.target_phoneme==p].fk_phrase_id.tolist())
-        
-        # select phrases for which there are more than stress variation in the alternatives, which should not happen
-        incorrect_alternatives_phrase_ids2=df_pContrast[(df_pContrast.apply(lambda r:len(set([el[-1] for el in ast.literal_eval(r['alternative_phonemes'])])), axis=1)>1)&(~df_pContrast.target_phoneme.isin(['D','T','IH0_D']))].fk_phrase_id.unique()
-        incorrect_alternatives_phrases2=df_pContrast[df_pContrast.fk_phrase_id.isin(incorrect_alternatives_phrase_ids2)].drop_duplicates(subset='fk_phrase_id', keep="first")
-        
-        for p in incorrect_alternatives_phrases2.target_phoneme.unique():
-            print(p, incorrect_alternatives_phrases2[incorrect_alternatives_phrases2.target_phoneme==p].fk_phrase_id.tolist())
+    # df_pContrast=df_pContrast.iloc[424:425]
+    # df_pContrast=df_pContrast.iloc[424:425]
+    # df_pContrast=df_pContrast.iloc[102:103]
+    # df_ed=df_ed[-1:]
+
+    df_pContrast.words.apply(lambda r:len(r))
+    df_pContrast[-1:].cmu_phonetics
+    
+    # results=get_results(df_pContrast, url=base_url+"/phonemeContrast")
+    results=get_results(df_pContrast, url=base_url+"/final_phoneme")
+    # df_ed=df_ed[-2:]
+    results_ed=get_results(df_ed, url=base_url+"/final_phoneme")
+    # results_v=get_results(df_v, url=base_url+"/phonemeContrast")
+
+    
+    # results_v[results_v.status!='success']
+    results_ed[results_ed.status!='success']
+
+    results[results.status!='success']
+    results[results.status!='success'].index.tolist()
+
+    results[~results.status.str.contains('success')]
+    # results[~results.status.str.contains('success')].iloc[0].status
+    
+    vowels=['IH','IY','OW','AO','AA']
+    eds=['T','D','IH0_D']
+
+    mask=results.apply(lambda r:sum([str(i)== r.target_phoneme[-1] for i in range(3)]), axis=1)
+    results_ed=results[~mask.astype(bool)]
+    results_vowels=results[mask.astype(bool)]
+
+    # ratio_vowels=len(results_vowels[results_vowels.gibberish_truth==results_vowels.gibberish_detected])/len(results_vowels)
+    # ratio_ed=len(results_ed[results_ed.gibberish_truth==results_ed.gibberish_detected])/len(results_ed)
+
+    # results[results.gibberish_truth!=results.gibberish_detected]
+    # results[results.target_phoneme.str.contains('IY')]
+    # results[results.target_phoneme.str.contains('OW')]
+
+    for v in vowels:
+        res=results_vowels[results_vowels.target_phoneme.str.contains(v)]
+        errors=results_vowels[results_vowels.gibberish_truth!=results_vowels.gibberish_detected][results_vowels.target_phoneme.str.contains(v)&~results_vowels.target_phoneme.str.contains('_')]
+        print('Target is', v, len(errors)/len(res), 'n:', len(res))
+        confusion_ps=errors.phonetic_detection.unique()
+        for p in confusion_ps:
+            error_part=res[res.phonetic_detection==p]
+            print(p, len(error_part)/len(res))
+    
+    for term in eds:
+        res=results_ed[results_ed.target_phoneme==term]
+        errors=results_ed[results_ed.gibberish_truth!=results_ed.gibberish_detected][results_ed.target_phoneme==term]
+        print('Target is', term, len(errors)/len(res))
+        confusion_ps=errors.phonetic_detection.unique()
+        for p in confusion_ps:
+            error_part=res[res.phonetic_detection==p]
+            print(p, len(error_part)/len(res))
+    
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme.str.contains('IH')&~results.target_phoneme.str.contains('_')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme.str.contains('IY')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme.str.contains('OW')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme.str.contains('AO')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme.str.contains('AA')]
+
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme=='D']
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme=='T']
+    results[results.gibberish_truth!=results.gibberish_detected][results.target_phoneme=='IH0_D']
+    
+    results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('F1')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('F2')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('M1')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('M_')]
+    results[results.gibberish_truth!=results.gibberish_detected][results.audio_file_url.str.contains('F_')]
+
 
 def test_particular_cases(base_url = 'http://localhost:8000'):
     
@@ -143,10 +200,9 @@ def test_particular_cases(base_url = 'http://localhost:8000'):
                 result['gibberish_truth']=''
                 result['gibberish_detected']=''
             results.append(result)
-        
         results=pd.DataFrame.from_records(results)
 
 if __name__ == '__main__':
-    # test_api()
-    # test_GE_linguistic_data_content()
-    test_particular_cases()
+    test_api()
+    # a_test_GE_linguistic_data_content()
+    # test_particular_cases()
