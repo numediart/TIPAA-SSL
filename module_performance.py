@@ -10,6 +10,7 @@ import pickle
 # Performance tests
 import seaborn as sns
 
+
 from label_data_processing import target_to_alternatives, graphemes_to_alternatives
 
 def make_dir(path):
@@ -211,7 +212,9 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
             detected_transcription=results[1]
             confidence_scores=results[0].iloc[:,3].tolist()
             phonetic_detection=results[0][results[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
-            d={'detected_phone':phonetic_detection,'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'confidence_scores':confidence_scores, 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
+            
+            phonetic_detection_timings=results[0][results[0].iloc[:,2].str.contains('_')].iloc[:,0:2].to_numpy()
+            d={'detected_phone':phonetic_detection,'phonetic_detection_timings':phonetic_detection_timings,'phones':row.phones,'detected_transcription':' '.join(detected_transcription), 'confidence_scores':confidence_scores, 'status':status, 'path':row.path, 'wav_path':row.wav_path, 'sentence':sentence, 'phonetics':phonetics, 'word_idx':row.word_idx, 'file_idx':row.file_idx}
             detected_transcriptions.append(detected_transcription)
         else:
             detected_transcriptions.append([])
@@ -419,6 +422,26 @@ def edAnalysis_from_audiobook_data(data_set='dev-clean', n=None):
         pickle.dump(all_results, open('performance_results/ed_performance_'+data_set+'_from_'+str(n)+'egs.p', 'wb'))
     return all_results
 
+def edAnalysis_experiment(data_set='dev-clean'):
+    with open('performance_results/ed_performance_'+data_set+'.p', 'rb') as f: ed_perf=pickle.load(f)
+    ed_perf['results_dfs'].keys()
+    ed_perf['results_dfs']['N']
+    
+    # Select rows with 'T' as first element and get their timings
+    mask=ed_perf['results_dfs']['N'].detected_phone.apply(lambda x:x[0]=='D')
+    df=ed_perf['results_dfs']['N'][mask]
+    timings=ed_perf['results_dfs']['N'][mask].phonetic_detection_timings.apply(lambda x:x[0])
+
+    voicing=[]
+    for i,r in df.iterrows():
+        s,fs=load_audio(r.wav_path)
+        start=int(timings[i][0]*fs)
+        end=int(timings[i][1]*fs)
+        p_signal=s[start:end]
+        f0Samples=getf0Samples(p_signal,fs)
+        voicing.append(len(f0Samples[~np.isnan(f0Samples)])/len(f0Samples))
+
+
 def final_s_from_audiobook_data(data_set='dev-clean', n=None):
     
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
@@ -474,7 +497,7 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None):
 
     return all_results, all_results_s
             
-    
+
 def confusion_analysis_of_pContrast(phone_set, n=100):
     confusion_records=[]
     for p in phone_set:
@@ -880,6 +903,8 @@ if False:
 
 
 if __name__ == "__main__":
+
+    edAnalysis_from_audiobook_data()
 
     df=stress_ranking_test()
 
