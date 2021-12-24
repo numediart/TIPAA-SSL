@@ -158,7 +158,7 @@ Body (FormData): {
     rID: string
     word_idx: number
     syl_idx: number
-    alternatives: string
+    // alternatives: string
     target: string
 }
 ```
@@ -186,7 +186,7 @@ For example, for a recording containing “I visited Italy”, and a request to 
     "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
     "word_idx": 1,
     "syl_idx": 1,
-    "alternatives": "IH0 IY0",
+    // "alternatives": "IH0 IY0", // now ignored, it is deduced in the SP-API from the target
     "target": "IH0"
 }
 ```
@@ -204,6 +204,42 @@ The response will be:
 
 And as there are two `IH0`, the detection and alternatives for both are included.
 
+
+## Call the termination_contrast module
+
+> The logic behind this one is to use text and audio as input. The text is automatically phonetized and "grammarized", then htk model is used.
+
+It is mostly the same as phonemeContrast. The main difference is that the phoneme that comes before the target is included in the target in the speech backend to allow having the absence of termination as alternative.
+
+In fact, as implemented now, a call of `termination_contrast` would also work for vowel contrasts and include an alternative of "not pronounced" vowel. But I don't know if it is wished and it will alter the performance result. I could eventually merge endpoints and have a flag `allow_silent_alternative`.
+
+The `termination_contrast` module gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes):
+
+```
+POST /termination_contrast
+Body (FormData): {
+    phonetics: string
+    rID: string
+    word_idx: number
+    syl_idx: number
+    // alternatives: string
+    target: string
+}
+```
+
+As before, the phonetics is consituted of CMU phonemes with separators for phonemes (`_`), syllables (`|`) and words (` `). For alternatives, one alternative is considered a word of several phonemes.
+
+The response payload has the following schema:
+
+```typescript
+type Response = {
+    status: 'success'|'error'
+    phonetic_detection: string
+    gibberish_truth: string
+    gibberish_detected: string
+}
+```
+
 ### Example for final ed
 
 To study e.d. the "-ed" termination, you would need to input `'target': 'IH0_D'` and e.g. `'alternatives': "T D IH0_D"`.
@@ -216,7 +252,7 @@ For the same sentence “I visited Italy”, we want to study the -ed terminatio
     "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
     "word_idx": 1,
     "syl_idx": 1,
-    "alternatives": "IH0_D D T",
+    // "alternatives": "IH0_D D T", // now ignored, it is deduced in the SP-API from the target
     "target": "IH0_D"
 }
 ```
@@ -229,6 +265,27 @@ This time the output (if pronounced correctly) will be:
     "phonetic_detection": "IH0_D",
     "gibberish_truth": "t_i_d",
     "gibberish_detected": "t_i_d"
+}
+```
+
+If the termination is incorrect:
+```json
+{
+    "status": "success",
+    "phonetic_detection": "IH0_D",
+    "gibberish_truth": "t_i_d",
+    "gibberish_detected": "t_d"
+}
+```
+
+If the termination is not pronounced:
+
+```json
+{
+    "status": "success",
+    "phonetic_detection": "not pronounced",
+    "gibberish_truth": "t_i_d",
+    "gibberish_detected": "t"
 }
 ```
 
