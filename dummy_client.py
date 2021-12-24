@@ -20,7 +20,7 @@ def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http:/
         files = {'file': file}
         res = client.post(url, files=files)
     # This is for compatibility between requests module and flask's test_client
-    if '_content' in res.__dict__.keys(): res.data=res._content
+    if client==requests: res.data=res._content
     return res
 
 def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 'http://localhost:8000', client=requests):
@@ -29,7 +29,7 @@ def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 
     res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID})
     
     # This is for compatibility between requests module and flask's test_client
-    if '_content' in res.__dict__.keys(): res.data=res._content
+    if client==requests: res.data=res._content
     
     return res
 
@@ -47,8 +47,8 @@ def call_module(rID, text='I would love to go to ireland!', module='sentenceStre
     res = client.post(url+module, data={"text":text, "phonetics":phonetics, 'rID':rID})
 
     # This is for compatibility between requests module and flask's test_client
-    if '_content' in res.__dict__.keys(): res.data=res._content
-    
+    if client==requests: res.data=res._content
+
     return res
 
 def call_phoneme_contrast(rID, text='turned around', word_idx=0, syl_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', client=requests):
@@ -60,7 +60,7 @@ def call_phoneme_contrast(rID, text='turned around', word_idx=0, syl_idx=0, targ
     res = client.post(url, data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'syl_idx':syl_idx, 'alternatives':alternatives, 'target':target})
     
     # This is for compatibility between requests module and flask's test_client
-    if '_content' in res.__dict__.keys(): res.data=res._content
+    if client==requests: res.data=res._content
     
     return res
 
@@ -80,7 +80,7 @@ def send_audio_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 
     res = client.post(base_url+"/send_base64_audio", data={"audio":encode_string, "API_KEY":"ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"})
 
     # This is for compatibility between requests module and flask's test_client
-    if '_content' in res.__dict__.keys(): res.data=res._content
+    if client==requests: res.data=res._content
     
     return res
 
@@ -130,6 +130,9 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
 
 
 if __name__ == "__main__":
+    crash_test(base_url="https://dev-speech-processing.flowchase.app/")
+
+
     res=send_audio_base64(path='audio_recordings/turned_around.mp3').data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
     res=call_phoneme_contrast(rID)
@@ -171,11 +174,28 @@ if __name__ == "__main__":
     call_vowel_stresses(rID.decode('utf-8'))
     
     res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav').data
+
     res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com").data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
     res=call_module(rID, base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
 
-    
+    res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', base_url="http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com").data
+    rID=ast.literal_eval(res.decode('utf-8'))['rID']
+    res=call_module(rID, base_url="http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com")
+
+    # base_url="http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com"
+    # base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com"
+    base_url="http://localhost:8000"
+    res=send_audio_base64(path='data/scaleway-audio-files/F1/F1-277.mp3', base_url=base_url)
+    assert res.status_code == 200
+    res=ast.literal_eval(res.data.decode('utf-8'))
+    assert res['status']=='success'
+    rID=res['rID']
+    print(res)
+    data={'phonetics': 'SH_IY1 SH_OW1_D M_IY1 DH_AH0 W_EY1', 'rID': rID, 'word_idx': '1', 'syl_idx': '0', 'alternatives': 'T D IH0_D', 'target': 'D'}
+    res = requests.post(base_url+"/phonemeContrast", data=data)
+    print(res.__dict__)
+
     res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.data
     call_module(rID.decode('utf-8'), module="wordStress")
