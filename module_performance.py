@@ -543,11 +543,7 @@ def vowels_consonants_confusions_from_audiobook_data(n=100):
 
 if __name__ == "__main__":
 
-<<<<<<< HEAD
-    edAnalysis_from_audiobook_data()
-=======
     stress_performance_test()
->>>>>>> 6f5d8a4b1dfc499b8c4e3c9b37dc6597ed857cea
 
     df=stress_ranking_test()
 
