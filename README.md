@@ -88,6 +88,8 @@ Check the command to ssh to it on AWS.
 ssh -i "~/flowspeech.pem" ec2-user@ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
 ssh -i "/mnt/c/Users/noe_t/Dropbox/contracts_info/flowchase/flowspeech.pem" ec2-user@ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
 ```
+You may have to `chmod 600 /mnt/c/Users/noe_t/Dropbox/contracts_info/flowchase/flowspeech.pem`
+Under WSL, I had problems for changing these permissions, and followed the accepted answer here: https://superuser.com/questions/1323645/unable-to-change-file-permissions-on-ubuntu-bash-for-windows-10
 
 But I had to install docker-compose like this:
 ```
