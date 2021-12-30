@@ -46,6 +46,10 @@ def get_annotated_signal(rand_fileName, wav_name):
     except FileNotFoundError:
         return "error: audio file not found", None, None, None
     s=s/32767
+
+    f0Samples=getIntonation(s, fs)
+    if sum([el!=el for el in f0Samples])==len(f0Samples):
+        return "success: no voiced sound detected (no pitch detected)", None, None, None
     try:
         # import pdb;pdb.set_trace()
         textgridData, out=get_textgrid_data(rand_fileName, wav_name)
@@ -251,6 +255,10 @@ def vowel_stresses(
 
     indxVowels, nVowelsPerWord=vowels(textgridData)
     weighted_score=compute_stress_score(textgridData, s,  fs, indxVowels)
+    
+    if sum([el!=el for el in weighted_score])==len(weighted_score):
+        return "success: no voiced sound detected inside supposed vowels (no pitch detected)", []
+
     # print(weighted_score)
     # fig=plt.figure()
     # plt.plot(weighted_score)
