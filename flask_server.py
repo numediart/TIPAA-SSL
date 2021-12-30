@@ -199,8 +199,8 @@ def vowel_stresses_api():
     
     # print(request.__dict__)
     print(content)
-    print(content['phonetics'])
-    print(content['rID'])
+    # print(content['phonetics'])
+    # print(content['rID'])
     rID=content['rID']
     phonetics=ast.literal_eval(content['phonetics'])
     status,result=vowel_stresses_from_phonetics_audio(rID, phonetics)
@@ -261,7 +261,7 @@ def send_audio():
             status=400,
             mimetype="application/json"
         )
-    print(request.__dict__.keys())
+    # print(request.__dict__.keys())
     # print(content)
     # print(content['audio'])
     # print(content['extension'])
@@ -368,8 +368,8 @@ def module_api(module):
 
     # print(request.__dict__)
     print(content)
-    print(content['phonetics'])
-    print(content['rID'])
+    # print(content['phonetics'])
+    # print(content['rID'])
     rID=content['rID']
     # phonetics=ast.literal_eval(content['phonetics'])
     phonetics=content['phonetics']
@@ -680,7 +680,7 @@ def prefill_from_phrase():
     # import pdb;pdb.set_trace()
     # print(request.__dict__)
     print(content)
-    print(content['phrase'])
+    # print(content['phrase'])
 
     d=prefill_for_sentence(content['phrase'], syllables)
     # print(d)
