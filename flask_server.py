@@ -59,26 +59,81 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 # https://github.com/marshmallow-code/apispec/issues/193
 app.config["JSON_SORT_KEYS"] = False
 
+
 @app.route('/')
 @debug_only
 def index():
     return send_from_directory( './html/','index.html')
 
+upload_path="./upload_files/"
+if False:
 
-@app.route('/app.js')
-@debug_only
-def record_app():
-    return send_from_directory( './html/','app.js')
+    @app.route('/app.js')
+    @debug_only
+    def record_app():
+        return send_from_directory( './html/','app.js')
 
-@app.route('/phonemeContrast.html')
-@debug_only
-def phonemeContrast_html():
-    return send_from_directory( './html/','phonemeContrast.html')
+    @app.route('/phonemeContrast.html')
+    @debug_only
+    def phonemeContrast_html():
+        return send_from_directory( './html/','phonemeContrast.html')
 
-@app.route('/vowel_stresses.html')
-@debug_only
-def vowel_stresses_html():
-    return send_from_directory( './html/','vowel_stresses.html')
+    @app.route('/vowel_stresses.html')
+    @debug_only
+    def vowel_stresses_html():
+        return send_from_directory( './html/','vowel_stresses.html')
+
+
+    
+    @app.route('/upload', methods=['POST'])
+    @debug_only
+    def upload_file():
+        # import pdb;pdb.set_trace()
+        try:
+            uploaded_file = request.files['file']
+        except:
+            return Response(
+                "error: could not access request.files['file']",
+                status=400,
+                mimetype="application/json"
+            )
+        if uploaded_file.filename != '':
+            try:
+                uploaded_file.save(upload_path+uploaded_file.filename)
+            except:
+                return Response(
+                    "error: could not save uploaded file",
+                    status=500,
+                    mimetype="application/json"
+                )
+            try:
+                # import pdb;pdb.set_trace()
+                status_conversion, rID = prepare_audio_file(upload_path+uploaded_file.filename)
+                print(rID)
+            except:
+                return Response(
+                    "error: could not convert uploaded file",
+                    status=500,
+                    mimetype="application/json"
+                )
+            try:
+                os.remove(upload_path+uploaded_file.filename)
+            except:
+                return Response(
+                    "error: could not remove uploaded file",
+                    status=500,
+                    mimetype="application/json"
+                )
+        else:
+            return Response(
+                    "error: filename is empty",
+                    status=400,
+                    mimetype="application/json"
+                )
+        return rID
+
+
+
 
 @app.route('/prefill_from_phrases.html', methods=['GET'])
 def prefill_from_phrases_html():
@@ -134,55 +189,6 @@ def prefill_from_phrases():
                 mimetype="application/json"
                 )
 
-
-
-upload_path="./upload_files/"
-@app.route('/upload', methods=['POST'])
-@debug_only
-def upload_file():
-    # import pdb;pdb.set_trace()
-    try:
-        uploaded_file = request.files['file']
-    except:
-        return Response(
-            "error: could not access request.files['file']",
-            status=400,
-            mimetype="application/json"
-        )
-    if uploaded_file.filename != '':
-        try:
-            uploaded_file.save(upload_path+uploaded_file.filename)
-        except:
-            return Response(
-                "error: could not save uploaded file",
-                status=500,
-                mimetype="application/json"
-            )
-        try:
-            # import pdb;pdb.set_trace()
-            status_conversion, rID = prepare_audio_file(upload_path+uploaded_file.filename)
-            print(rID)
-        except:
-            return Response(
-                "error: could not convert uploaded file",
-                status=500,
-                mimetype="application/json"
-            )
-        try:
-            os.remove(upload_path+uploaded_file.filename)
-        except:
-            return Response(
-                "error: could not remove uploaded file",
-                status=500,
-                mimetype="application/json"
-            )
-    else:
-        return Response(
-                "error: filename is empty",
-                status=400,
-                mimetype="application/json"
-            )
-    return rID
 
 
 
