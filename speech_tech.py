@@ -472,7 +472,12 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
     # https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
     # Speech rate is always between 5 and 8 syl/second
     n_syllables_tot=sum([len(el.split('|')) for el in phonetics.split(' ')])
-    f=sf.SoundFile('./inputs/'+ rID+ '.wav')
+    
+    try:
+        f=sf.SoundFile('./inputs/'+ rID+ '.wav')
+    except FileNotFoundError:
+        return {"status": "error: audio file not found", "stress_intensities": [], "stress_binaries": []}
+
     duration=f.frames / f.samplerate
     speech_rate=n_syllables_tot/duration
     if speech_rate>max_speech_rate: 
@@ -566,7 +571,10 @@ def phonemeContrast_from_formatted_phonetics_audio(
     # https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
     # Speech rate is always between 5 and 8 syl/second
     n_syllables_tot=sum([len(el.split('|')) for el in phonetics.split(' ')])
-    f=sf.SoundFile('./inputs/'+ rID+ '.wav')
+    try:
+        f=sf.SoundFile('./inputs/'+ rID+ '.wav')
+    except FileNotFoundError:
+        return {"status": "error: audio file not found", "stress_intensities": [], "stress_binaries": []}
     duration=f.frames / f.samplerate
     speech_rate=n_syllables_tot/duration
     if speech_rate>max_speech_rate: 
