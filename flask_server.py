@@ -515,7 +515,7 @@ properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
 @doc(description='Phoneme contrast', tags=['phonemeContrast'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/termination_contrast', methods=['POST'])
+@app.route('/terminationContrast', methods=['POST'])
 def termination_contrast_api():
     final_phoneme=True
 

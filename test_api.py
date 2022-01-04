@@ -5,6 +5,7 @@ os.environ['FLOWSPEECH_KEY']="ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"
 import ast
 from tqdm import tqdm
 import shutil
+import numpy as np
 
 def make_dir(path):
     if not os.path.exists(path): os.makedirs(path)
@@ -202,6 +203,8 @@ def test_particular_cases(base_url = 'http://localhost:8000', endpoint='/phoneme
     results=get_results(df_selected_idx, base_url = base_url, endpoint=endpoint, client=client)
 
     return results
+def test_termination_contrast():
+    test_GE_linguistic_data_content(endpoint='/terminationContrast')
 
 def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_audios=1, n_ex_by_ex_type=1, all_results_path='performance_results/user_recording_all_results.csv'):
     """[summary]
@@ -251,7 +254,6 @@ def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_cli
 
         results=get_results(df_records, base_url = base_url, endpoint=endpoint_dict[module_type], client=client)
         results=pd.concat([results,df_records], axis=1)
-
         all_results.append(results)
 
     # for results, module_type in zip(all_results, df_errors.module_type.unique()[1:2]):
@@ -281,7 +283,10 @@ def detection_tests(all_results_path='performance_results/user_recording_all_res
         prob=run_VAD(s).numpy().flatten()
         probs.append(prob)
     all_results["VAD probs"]=probs
-    all_results["VAD max prob"]=all_results["VAD max"].apply(lambda r: max(r))
+    all_results["VAD max prob"]=all_results["VAD probs"].apply(lambda r: max(r))
+
+    np.histogram(all_results["VAD max prob"])
+
 
     # all_results.to_csv(all_results_path)
 
@@ -313,30 +318,28 @@ def get_server_and_local_results():
     res={}
 
     res['rpC_dev']=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/phonemeContrast', client=requests)
-    res['r_ter_dev']=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/termination_contrast', client=requests)
+    res['r_ter_dev']=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/terminationContrast', client=requests)
 
     res['rpC_prod']=test_GE_linguistic_data_content('https://speech-processing.flowchase.app', endpoint='/phonemeContrast', client=requests)
-    res['r_ter_prod']=test_GE_linguistic_data_content('https://speech-processing.flowchase.app', endpoint='/termination_contrast', client=requests)
+    res['r_ter_prod']=test_GE_linguistic_data_content('https://speech-processing.flowchase.app', endpoint='/terminationContrast', client=requests)
 
     res['rpC_local']=test_GE_linguistic_data_content('http://localhost:8000', endpoint='/phonemeContrast')
-    res['r_ter_local']=test_GE_linguistic_data_content('http://localhost:8000', endpoint='/termination_contrast')
+    res['r_ter_local']=test_GE_linguistic_data_content('http://localhost:8000', endpoint='/terminationContrast')
 
     for k in res: res[k].to_csv('performance_results/'+k+'.csv')
 
 def server_comparison_analysis():
     
     # rpC=test_GE_linguistic_data_content('http://localhost:8000/phonemeContrast')
-    # r_ter=test_GE_linguistic_data_content('http://localhost:8000/termination_contrast')
+    # r_ter=test_GE_linguistic_data_content('http://localhost:8000/terminationContrast')
 
     # rpC.to_csv('performance_results/test_api_phonemeContrast.csv')
-    # r_ter.to_csv('performance_results/test_api_termination_contrast.csv')
+    # r_ter.to_csv('performance_results/test_api_terminationContrast.csv')
 
     
     ks=['rpC_dev', 'r_ter_dev', 'rpC_prod', 'r_ter_prod', 'rpC_local', 'r_ter_local']
     res={}
     for k in ks: res[k]=pd.read_csv('performance_results/'+k+'.csv')
-
-    
 
     # checking nans are either "success: all of the elements were out of vocab" or "success: phonetic detection is empty"
     res['rpC_dev'][res['rpC_dev'].isnull().any(1)]
@@ -383,18 +386,19 @@ if __name__ == '__main__':
     # rpC=test_GE_linguistic_data_content('http://localhost:8000/phonemeContrast')
 
     # rpC=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app/phonemeContrast')
-    # r_ter=test_GE_linguistic_data_content('http://localhost:8000/termination_contrast')
+    # r_ter=test_GE_linguistic_data_content('http://localhost:8000/terminationContrast')
+    test_user_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_audios=20, n_ex_by_ex_type=5, all_results_path='performance_results/user_recording_all_results.csv')
     test_user_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_audios=20, n_ex_by_ex_type=5, all_results_path='performance_results/user_recording_all_results_SE.csv')
     test_user_recordings()
 
     rpC_dev=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/phonemeContrast', client=requests)
-    r_ter_dev=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/termination_contrast', client=requests)
+    r_ter_dev=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/terminationContrast', client=requests)
 
     rpC_prod=test_GE_linguistic_data_content('https://speech-processing.flowchase.app', endpoint='/phonemeContrast', client=requests)
-    r_ter_prod=test_GE_linguistic_data_content('https://speech-processing.flowchase.app', endpoint='/termination_contrast', client=requests)
+    r_ter_prod=test_GE_linguistic_data_content('https://speech-processing.flowchase.app', endpoint='/terminationContrast', client=requests)
 
     rpC_local=test_GE_linguistic_data_content('http://localhost:8000', endpoint='/phonemeContrast')
-    r_ter_local=test_GE_linguistic_data_content('http://localhost:8000', endpoint='/termination_contrast')
+    r_ter_local=test_GE_linguistic_data_content('http://localhost:8000', endpoint='/terminationContrast')
     
     test_GE_linguistic_data_content()
 
