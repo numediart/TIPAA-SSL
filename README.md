@@ -242,7 +242,8 @@ conda install -c conda-forge ffmpeg
 
 
 ## Data
-Data of actor recordings with sentenceID etc.
+
+### Data of actor recordings with sentenceID etc.
 ```
 cd data
 git clone https://github.com/flowchase/audio-with-analysis-ids
@@ -251,7 +252,7 @@ cd ..
 
 You can use ```get_data()``` function.
 
-Librispeech data:
+### Librispeech data:
 https://www.openslr.org/12/
 
 I use dev-clean and test-clean sets.
@@ -279,6 +280,35 @@ cd ..
 cd ..
 ```
 
+### User recordings:
+
+In my case, I have a .aws folder in my $HOME, with a config and credentials file (among others). 
+
+I know you can have multiple profiles, so that you can work with different AWS regions and credentials. If you know how to set that up, great. I'm going to show you how my CLI is configured, that's what you'd need to grab the audio files. (edited)
+
+My config (only the relevant bits):
+
+```
+...
+
+[default]
+region = fr-par
+s3 =
+    endpoint_url = https://s3.fr-par.scw.cloud
+    signature_version = s3v4
+    max_concurrent_requests = 100
+    max_queue_size = 1000
+    multipart_threshold = 50MB
+    multipart_chunksize = 10MB
+s3api =
+    endpoint_url = https://s3.fr-par.scw.cloud
+```
+
+credentials: ask Filipe if I don't have it in twist or 1password.
+
+Which means you can now download ~20GB of user recordings by running aws s3 sync s3://flwc-user-recordings ., but that's quite a lot. I can also give you just a sample, e.g. just our most active users or something like that.
+
+Then symlink this folder in data/
 
 ## Test modules
 
