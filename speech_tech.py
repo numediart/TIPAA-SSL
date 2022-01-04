@@ -5,7 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from time import time
 from audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
+import soundfile as sf
 from htk_utils import get_textgrid_data, clean_htk_files
+
 
 from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
 from text_processing import phonetics_from_sentence, chunk_text
@@ -50,6 +52,7 @@ def get_annotated_signal(rand_fileName, wav_name):
     f0Samples=getIntonation(s, fs)
     if sum([el!=el for el in f0Samples])==len(f0Samples):
         return "success: no voiced sound detected (no pitch detected)", None, None, None
+    
     try:
         # import pdb;pdb.set_trace()
         textgridData, out=get_textgrid_data(rand_fileName, wav_name)
@@ -458,7 +461,23 @@ def wordStress_from_phonetics_audio(
     weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
     return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
 
-def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", text="I would love to go to Ireland!", level="word", chunking_chars=[',',';','.','!','?', ':']): #'[\,\?\.\!\;\:\"\*]'
+def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
+                                    text="I would love to go to Ireland!", 
+                                    level="word", 
+                                    chunking_chars=[',',';','.','!','?', ':'],
+                                    max_speech_rate=8): #'[\,\?\.\!\;\:\"\*]'
+    
+    # I first detect if the audio is too short to have a realistic speech rate
+    #     https://www.science.org/doi/10.1126/sciadv.aaw2594
+    # https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
+    # Speech rate is always between 5 and 8 syl/second
+    n_syllables_tot=sum([len(el.split('|')) for el in phonetics.split(' ')])
+    f=sf.SoundFile('./inputs/'+ rID+ '.wav')
+    duration=f.frames / f.samplerate
+    speech_rate=n_syllables_tot/duration
+    if speech_rate>max_speech_rate: 
+        return {"status": "success: audio is too short compared to the expected number of syllables", "stress_intensities": [], "stress_binaries": []}
+    
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
     lens=[len(el) for el in split_phonetics]
     merged_phonetics=merge_list(split_phonetics)
@@ -538,8 +557,21 @@ def phonemeContrast_from_formatted_phonetics_audio(
                     word_idx=0, 
                     target_phones='D', 
                     # alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
-                    alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D'
+                    alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D',
+                    max_speech_rate=8
                     ):
+
+    # I first detect if the audio is too short to have a realistic speech rate
+    #     https://www.science.org/doi/10.1126/sciadv.aaw2594
+    # https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
+    # Speech rate is always between 5 and 8 syl/second
+    n_syllables_tot=sum([len(el.split('|')) for el in phonetics.split(' ')])
+    f=sf.SoundFile('./inputs/'+ rID+ '.wav')
+    duration=f.frames / f.samplerate
+    speech_rate=n_syllables_tot/duration
+    if speech_rate>max_speech_rate: 
+        return "success: audio is too short compared to the expected number of syllables", []
+
     # I want to keep the target as one entry (and not split it in several phonemes for e.g. IH0_D)
     phonetics=phonetics.replace(target_phones, 'TAR')
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
@@ -566,316 +598,6 @@ def phonemeContrast_from_formatted_phonetics_audio(
     
     print('phonemeContrast_from_formatted_phonetics_audio result:', result)
     return status, result
-
-# obsolete functions backup
-if False:
-    
-    def wordStress(
-        rand_fileName, wav_name
-        # p=set_params(sentenceID=111, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-        ):
-        """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
-        a value by vowel representing a stress intensity, and take the max by word and build a binary vector with ones on maximums
-
-        Args:
-            p (dict, optional): global parameters. Defaults to set_params().
-
-        Returns:
-            string, list of binaries: status, stress results by vowel (0=no stress,  1=stress)
-        """
-        
-        # if wav_name is None:
-        #     wav_name=rand_fileName
-        status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
-
-        if weighted_score_by_word == []:
-            return {"status": status, "stress_intensities": [], "stress_binaries": []}
-
-
-        def max_by_line(a):
-            a_max=[]
-            for el in a:
-                a_max.append((el == np.max(el)).astype(int))
-            return a_max
-
-        bin_score_by_word=max_by_line(weighted_score_by_word)
-        # binResult=np.concatenate(bin_score_by_word)
-
-        weighted_score_by_word=[[int(x*100) for x  in sublist] for sublist in weighted_score_by_word]
-
-        return {"status": "success", "stress_intensities": weighted_score_by_word, "stress_binaries": [el.tolist() for el in bin_score_by_word]}
-
-    def sentenceStress(
-        rand_fileName, wav_name
-        ):
-        """calls vowels_stresses() that compute prosody features (intesity, pitch, ...) to compute 
-        a value by vowel representing a stress intensity, and 
-        -take the max by word 
-        -take the max of these max to have the most stressed word
-        and build a binary vector with a one on this word index
-
-        Args:
-            p ([type], optional): [description]. Defaults to set_params().
-
-        Returns:
-            string, list of binaries: status, stress results by word (0=no stress,  1=stress)
-        """
-        
-        status, weighted_score_by_word=vowel_stresses(rand_fileName, wav_name)
-
-        
-        if weighted_score_by_word == []:
-            return {"status": status, "stress_intensities": [], "stress_binaries": []}
-
-
-
-        
-        max_scores_by_word=[max(el) for el in weighted_score_by_word]
-        stress_intensities=[int(el*100) for el in max_scores_by_word]
-
-        # Try to remove downwards trend
-        x=range(len(stress_intensities))
-        model = np.polyfit(x, y, 1)
-        a=model[0]
-        b=model[1]
-        stress_intensities=stress_intensities-(a*x+b)
-
-        # max_scores_by_word=[np.median(el) for el in weighted_score_by_word]
-        binResult=np.zeros(len(stress_intensities)).astype(int)
-        binResult[np.argmax(stress_intensities)]=1
-        print("------------")
-        print(stress_intensities)
-
-        return {"status": "success", "stress_intensities": stress_intensities, "stress_binaries": binResult.tolist()}
-
-        # return "success", [max_scores_by_word, binResult]
-
-
-    # these are not valid anymore, I removed audio information from the rID
-    def vowel_stresses_from_text_audio(text='I would love to go to Ireland!', audio_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'):
-        """This uses text to get phonetics, to build annotation files for htk.
-        Then it calls vowel_stresses module with this information.
-        Returns:
-            string, list of float list: status, stress intensities by word
-        """
-        p=set_params()
-        make_all_phones_annotation_files(p,text)
-        status,result=vowel_stresses(p['rand_fileName'])
-        return status, result
-    def phonemeContrast_from_text_audio(
-                        text='turned around', 
-                        word_idx=0, 
-                        target_phones='D', 
-                        alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-        """This uses text to get phonetics, and target phones as well as alternatives to build annotation files for htk.
-        Then it calls phonemeContrast module with this information. It also prints where are the differences in the phonetic entries
-        between ground truth and predictions (might be returned in the future)
-
-        Returns:
-            string, [DataFrame, list]: status, [textgridData, detected_transcription as a list of phonemes]
-        """
-        p=set_params()
-        make_pContrast_annotation_files(p,text=text, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-        status,result=phonemeContrast(p['rand_fileName'])
-        phonetic_GT=phonetics_from_sentence(text)[int(word_idx)]
-        print('difference between ground truth and prediction:', [int(el[0]!=el[1]) for el in zip(result[-1], phonetic_GT)])
-        return status, result
-
-
-    # generalized and replaced by phoneme contrast
-    def edAnalysis(
-        p=set_params(sentenceID=1, module="edAnalysis")
-        ):
-        status, textgridData, s = get_annotated_signal(p)
-        if textgridData is None:
-            return status, []
-        
-        # print(textgridData)
-        
-        # TODO: this is for the verification and it is not finished
-        nWords, indxWords = number_and_indices(textgridData, 'w')
-        nPho, indxPho = number_and_indices(textgridData, 'p')
-        nSil, indxSil = number_and_indices(textgridData, 's')
-        nOutOfVoc, indxOutOfVoc = number_and_indices(textgridData, 'o')
-        binResult = 0
-        # check pronunciation
-        for i in range(nPho):
-            if '*cor' in textgridData[2][indxPho[i]]:
-                status = 0
-                binResult = 2
-            elif '*err' in textgridData[2][indxPho[i]]:
-                status = 0
-                binResult = 1
-        
-        return "success", [binResult]
-
-
-    # generalized and replaced by phoneme contrast
-    def iContrast(
-        p=set_params(module="iContrast")
-        ):
-        """Use textgridData to have the timings of vowels 
-        (and check if the vowel detected is a short or long vowel. -> I removed that part with no noticeable change in performance)
-
-        Args:
-            p ([type], optional): [description]. Defaults to set_params(module="iContrast").
-
-        Returns:
-            int: 0 if short, 1 if long
-        """
-        status, textgridData, s = get_annotated_signal(p)
-        if textgridData is None:
-            return status, []
-
-        # find the number of words and phonemes per word in the input phrase
-        # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
-        # if there is no '_', it is e.g. "o4". We put 1 in that case and else, the number of phonemes
-        # l=[el.split('_') for el in textgridData.iloc[:,2].tolist()]
-        # phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
-
-        # TODO: this is for the verification and it is not finished
-        nWords, indxWords = number_and_indices(textgridData, 'w')
-        nPho, indxPho = number_and_indices(textgridData, 'p')
-        nSil, indxSil = number_and_indices(textgridData, 's')
-
-        # TODO: weird, he does a loop for every phoneme, check if it is a short or long, and repeat, but does not record results.
-        # only the last result will be kept (maybe it works because there is only one vowel that needs to be checked)
-        for i,el in enumerate(textgridData.iloc[:,2].tolist()):
-            # print(el[-2:])
-            if el[-2:]=='*s':
-                binResult=0
-            elif el[-2:]=='*l':
-                binResult=1
-                # if textgridData.iloc[i, 1]-textgridData.iloc[i, 0]<0.07:
-                #     binResult=0
-        return "success", binResult
-
-    
-    def sentenceStress_old(
-        p=set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress')
-        ):
-        """Use textgridData to have the timings of words and compute prosody features (intesity, pitch) to compute 
-        a value by word representing a stress intensity
-
-        Args:
-            p (dict, optional): global parameters. Defaults to set_params(sentenceID=1, waveFileAddress='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', module='sentenceStress').
-
-        Returns:
-            string, list of binaries: status, stress results by word (0=no stress,  1=stress)
-        """
-        status, textgridData, s = get_annotated_signal(p)
-        if textgridData is None:
-            return status, []
-
-        # find the number of words and phonemes per word in the input phrase
-        # the '_' delimits the information of the word and number of phonemes, e.g. for "w2_7", there are 7 phonemes
-        # if there is no '_', it is e.g. "o4". We put 1 in that case and else, the number of phonemes
-        l=[el.split('_') for el in textgridData.iloc[:,2].tolist()]
-        phonemesPerWord=[1 if len(el)==1 else int(el[-1]) for el in l]
-
-        # each word start and end position expressed in samples
-        startPositions_samples = (round(p['fs_target']*textgridData.iloc[:,0])+1).astype(int)
-        stopPositions_samples = round(p['fs_target']*textgridData.iloc[:,1]).astype(int)
-
-        # to make sure we don t go beyond the end of the signal
-        assert stopPositions_samples.iloc[-1]<len(s), "The end of the last phoneme should be inside the signal"
-
-        # TODO: verification of alignment
-
-        # f0Samples=getIntonation(s, p['fs_target'])
-        f0Samples=getIntonation(s.astype(np.float64), p['fs_target'])
-        intensity=getIntensity(s, p['fs_target'])
-
-        # plt.plot(f0Samples)
-        # plt.show()
-        
-        # plt.plot(intensity)
-        # plt.show()
-
-        Dur=(textgridData.iloc[:,1]-textgridData.iloc[:,0])/(np.array(phonemesPerWord)+1)  # +1 assuming stressed phonemes = 2*other phonemes
-        Dur=np.array(Dur.tolist())
-        # plt.plot(Dur)
-        # plt.show()
-
-        startPositions_samples=startPositions_samples.tolist()
-        stopPositions_samples=stopPositions_samples.tolist()
-        
-        # this
-        Imax=np.zeros(len(textgridData))
-        Fmax=np.zeros(len(textgridData))
-        for i in range(len(textgridData)):
-            if phonemesPerWord[i] == 1:
-                Dur[i] = 0.6 * Dur[i]
-            elif phonemesPerWord[i] == 2:
-                Dur[i] = 0.8 * Dur[i]
-            temp_sort = sorted(intensity[startPositions_samples[i]:stopPositions_samples[i]], reverse = True)
-            Imax[i] = np.median(temp_sort[0:np.round(0.05*len(temp_sort)).astype(int)])
-            temp_sort = sorted(f0Samples[startPositions_samples[i]:stopPositions_samples[i]], reverse = True)
-            Fmax[i] = np.median(temp_sort[0:np.round(0.05*len(temp_sort)).astype(int)])
-        
-        # normalization of features (projection to [0 1] range)
-        zImax = normalize(Imax)
-        zFmax = normalize(Fmax)
-        zDur = normalize(Dur)
-
-        # plt.plot(zImax)
-        # plt.show()
-        
-        # plt.plot(zFmax)
-        # plt.show()
-
-        # combine the features into a final result
-        # weighted_score = (0.6*zImax + 0.4*zFmax + 0.2*zDur)/1.2;
-        # weighted_score = (0.6*zImax + 0.4*zFmax)/1.0 # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
-        # weighted_score = zImax*zFmax # needs fine-tuning once enough user data are available - in the long term consider additional features and train a classifier with annotated user data
-        weighted_score=zImax
-
-        weighted_score=normalize(weighted_score)
-
-        rateThreshold = 1.01
-        nWords=len(textgridData)
-        binResult = np.zeros(nWords)
-        
-        fig=plt.figure()
-        plt.plot(weighted_score)
-        # plt.plot(zFmax)
-        plt.savefig('sentence_curve.png')
-
-        # The original method from georgious does something with the evolution of the weighted_score
-        # and then does a threshold. If the threshold is very high (0.98), with my normalization, 
-        # it is almost the same (exactly the same for the examples I have) as just taking the max.
-
-        # The second is thus a lot more simple: put one at the max of weighted_score
-        if False:
-            if nWords == 1:
-                binResult[0] = 1
-            elif nWords == 2:
-                sWS_id=np.argsort(weighted_score)[::-1]
-                sWS_val=weighted_score[sWS_id]
-                # TODO : I have to check if this make any sense. 
-                # in the case with only two words, we ckeck if the higher is at least 1% higher than the other and put 1 there... (why this 1% ?)
-                if sWS_val[0] > rateThreshold*sWS_val[1]:
-                    binResult[sWS_id[0]] = 1
-            else:
-                #TODO : this mean score has to be adapted because he uses a normalization that led to values in a small range 
-                # meanScore = 0.90*max(weighted_score)
-                # meanScore= weighted_score.mean()
-                meanScore=0.98
-
-                if (weighted_score[0] > rateThreshold*weighted_score[1]) and (weighted_score[0] > meanScore):
-                    binResult[0] = 1
-                elif (weighted_score[1] > rateThreshold*max(weighted_score[[0, 2]])) and (weighted_score[1] > meanScore):
-                    binResult[1] = 1
-                elif (weighted_score[-1] > rateThreshold*weighted_score[-2]) and (weighted_score[-1] > meanScore):
-                    binResult[-1] = 1
-                if nWords > 3:
-                    for i in range(2,nWords-1):
-                        if (weighted_score[i] > rateThreshold*max(weighted_score[[i-1, i+1]])) and (weighted_score[i] > meanScore):
-                            binResult[i] = 1
-        else:
-            binResult[np.argmax(weighted_score)]=1
-
-        return "success", binResult
 
 
 
