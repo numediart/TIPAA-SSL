@@ -43,10 +43,77 @@ The response object is a JSON payload with the following schema:
 
 ```typescript
 type Response = {
-    status: 'success'|'error: [message]',
+    status: 'success'|'success: [message]'|'error: [message]',
     rID: string
 }
 ```
+
+## Status messages
+
+These messages are either in `speech_tech.py` or in `flask_server.py`.
+If everything went fine, the message is just "success".
+Success messages if the code ran as expected but the audio is invalid or too noisy:
+
+```
+"success: audio is too short compared to the expected number of syllables"
+```
+I first detect if the audio is too short to have a realistic speech rate
+https://www.science.org/doi/10.1126/sciadv.aaw2594
+https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
+Speech rate is always between 5 and 8 syl/second in english. Thereofore if the audio length makes the assumed speech rate greater than 8, it's too short to be a actual pronunciation of the assumed phrase.
+
+```
+"success: no voiced sound detected (no pitch detected)"
+```
+This can happen for samples that do not contain any speech (sometimes very short samples). It can also contain whispered speech sometimes. Or very noisy samples with speech.
+
+```
+"success: part or all the phrase was not recognized in expected phonemes"
+```
+These sample contain a fundamental frequency. But sometimes it is not speech (instrument in the background or other sound).
+I can also be e.g., speech heard from the television.
+Some audios contain only a part of the phrase or even only one word.
+
+```
+"success: no voiced sound detected inside supposed vowels (no pitch detected)"
+```
+This one is only checked for "stress" related endpoints. If there is no pitch detected in neither of the vowels, we assume we can't deduce a stress.
+This message can come either from a failed alignment (audio to noisy, pronunciation really too bad, etc.).
+
+```
+"success: all of the elements were out of vocabulary"
+```
+Often the phrase is not pronounced well enough for the model.
+Sometimes remainings that were not catch by the previous (noisy samples)
+sometimes the speech seem fine but the model could not recognize it.
+
+```
+"success: phonetic detection is empty"
+```
+This one is only checked for "phonetics contrasts" related endpoints
+Probably some parts of the phrase were recognized but not the part containing the target. Or this part is not pronounced well enough for the model.
+
+
+
+
+Error messages if there is a bug e.g. file management or htk processing, this is not exhaustive. If this happens, it means there is something to be debugged in the speech tech.
+```
+'error: could not access "'+property+'" property of the request'
+
+"error: wrong API key"
+"error: could not save uploaded file"
+"error: could not convert uploaded file"
+"error: could not remove uploaded file"
+
+"error: "+not_p+" is not a phoneme"
+
+"error: "+audio_file+" could not be loaded"
+"error: audio file not found"
+"error: could not get textgridData, htk error is:"+out.stderr.decode('utf-8')
+"error: could not get textgridData, check htk error"
+"error: index out of bounds in phonetic detection"
+```
+
 
 ## Call the sentenceStress module
 
@@ -68,7 +135,7 @@ The HTTP status codes are either 200 (for success), 400 - bad request or 500 - s
 ```typescript
 type Response = {
     // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
-    status: 'success'|'error: [message]',
+    status: 'success'|'success: [message]'|'error: [message]',
     // a list of stress intensities between 0 and 100 for each word
     stress_intensities: number[],
     // a list of 0/1 for each word, the 1 being the sentence stress
@@ -114,7 +181,7 @@ The HTTP status codes are either 200 (for success), 400 or 500 (for errors)
 ```typescript
 type Response = {
     // this success means a technical success in the sense that there were no failure, but not that the recognition was successful
-    status: 'success'|'error: [message]'
+    status: 'success'|'success: [message]'|'error: [message]',
     // a list of stress intensities for each syllable of each word between 0 and 100 by word
     stress_intensities: number[][],
     // a list of 0/1 for each syllable of each word, the 1 being the word stress
