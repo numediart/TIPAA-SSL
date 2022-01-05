@@ -54,19 +54,27 @@ These messages are either in `speech_tech.py` or in `flask_server.py`.
 If everything went fine, the message is just "success".
 Success messages if the code ran as expected but the audio is invalid or too noisy:
 
+### Audio too short
 ```
 "success: audio is too short compared to the expected number of syllables"
 ```
 I first detect if the audio is too short to have a realistic speech rate
+
 https://www.science.org/doi/10.1126/sciadv.aaw2594
+
 https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
+
 Speech rate is always between 5 and 8 syl/second in english. Thereofore if the audio length makes the assumed speech rate greater than 8, it's too short to be a actual pronunciation of the assumed phrase.
+
+
+### No pitch at all (pitch=fundamental frequency)
 
 ```
 "success: no voiced sound detected (no pitch detected)"
 ```
 This can happen for samples that do not contain any speech (sometimes very short samples). It can also contain whispered speech sometimes. Or very noisy samples with speech.
 
+### Not recognized
 ```
 "success: part or all the phrase was not recognized in expected phonemes"
 ```
@@ -74,12 +82,14 @@ These sample contain a fundamental frequency. But sometimes it is not speech (in
 I can also be e.g., speech heard from the television.
 Some audios contain only a part of the phrase or even only one word.
 
+### No pitch in any of the vowels
 ```
 "success: no voiced sound detected inside supposed vowels (no pitch detected)"
 ```
 This one is only checked for "stress" related endpoints. If there is no pitch detected in neither of the vowels, we assume we can't deduce a stress.
 This message can come either from a failed alignment (audio to noisy, pronunciation really too bad, etc.).
 
+### Not recognized
 ```
 "success: all of the elements were out of vocabulary"
 ```
@@ -87,6 +97,7 @@ Often the phrase is not pronounced well enough for the model.
 Sometimes remainings that were not catch by the previous (noisy samples)
 sometimes the speech seem fine but the model could not recognize it.
 
+### The target was not recognized
 ```
 "success: phonetic detection is empty"
 ```
@@ -95,7 +106,7 @@ Probably some parts of the phrase were recognized but not the part containing th
 
 
 
-
+### Error messages (bugs in the code)
 Error messages if there is a bug e.g. file management or htk processing, this is not exhaustive. If this happens, it means there is something to be debugged in the speech tech.
 ```
 'error: could not access "'+property+'" property of the request'
