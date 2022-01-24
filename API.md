@@ -1,4 +1,4 @@
-# API docs for Flowspeech (making speech procesing requests)
+# API docs for Flowspeech (making speech processing requests)
 
 See the requests here on the EC2 accessible at:
 
@@ -108,15 +108,22 @@ Probably some parts of the phrase were recognized but not the part containing th
 
 ### Error messages (bugs in the code)
 Error messages if there is a bug e.g. file management or htk processing, this is not exhaustive. If this happens, it means there is something to be debugged in the speech tech.
-```
-'error: could not access "'+property+'" property of the request'
 
+With code 400 (bad request):
+```
+"error: could not access request.files['file']"
+'error: could not access "'+property+'" property of the request'
 "error: wrong API key"
+"error: "+not_p+" is not a phoneme"
+
+"error: no such module"
+```
+
+With code 500 (internal server error):
+```
 "error: could not save uploaded file"
 "error: could not convert uploaded file"
 "error: could not remove uploaded file"
-
-"error: "+not_p+" is not a phoneme"
 
 "error: "+audio_file+" could not be loaded"
 "error: audio file not found"
