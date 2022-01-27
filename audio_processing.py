@@ -50,7 +50,7 @@ def getf0Samples(s, fs):
     # convert in semitones
     f0Frames=40*np.log10(f0)
 
-    # replace any inf due to the log operation with nan (which are treaded below)
+    # replace any inf due to the log operation with nan (which are treated below)
     f0Frames[f0Frames==-np.inf]=np.nan
 
     from scipy.interpolate import interp1d
