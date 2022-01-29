@@ -22,19 +22,38 @@ def get_phone_timings(f='data/librispeech_alignments/dev-clean/8842/304647/8842-
         list of Intervals: each element is a phoneme with attributes element.min, element.max and element.mark
     """
     tg = textgrid.TextGrid.fromFile(f)
-    tg[0][word_idx]
     filter=[tg[0][word_idx].overlaps(el) for el in tg[1]]
     return list(compress(tg[1], filter))
 
-def get_sentence(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
-    tg = textgrid.TextGrid.fromFile(f)
-    words=[el.mark for el in tg[0]]
-    # phones=[el.mark for el in tg[1]]
+def get_all_phone_with_timings(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
+    """get all phonemes of a sentence located in tg[1], and filter silence and empty parts, then convert to DataFrame
 
+    Args:
+        f (str, optional): [description]. Defaults to 'data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'.
+        word_idx (int, optional): [description]. Defaults to 8.
+
+    Returns:
+        [type]: [description]
+    """
+    tg = textgrid.TextGrid.fromFile(f)
     # get phones and drop "sp", "sil" and empty strings
-    phones=[el.mark for el in tg[1] if el.mark not in ['sil','sp','','spn']]
-    # drop empty strings
-    words = [x for x in words if x]
+    phones=[[el.minTime, el.maxTime, el.mark] for el in tg[1] if el.mark not in ['sil','sp','','spn']]
+    phones=pd.DataFrame(phones)
+    phones.columns=["start", "end", "phone"]
+    return phones
+
+def get_sentence(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
+    """get all words of a sentence located in tg[0]
+
+    Args:
+        f (str, optional): [description]. Defaults to 'data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'.
+
+    Returns:
+        [type]: [description]
+    """
+    tg = textgrid.TextGrid.fromFile(f)
+    # get words and drop empty strings
+    words=[el.mark for el in tg[0] if el.mark]
     return ' '.join(words)
 
 
@@ -97,7 +116,6 @@ def build_librispeech_words_df(
             records.append(d)
     libri_words_df=pd.DataFrame.from_records(records)
     return libri_words_df
-
 
 def libri_phonetics(
         data_set='dev-clean',
