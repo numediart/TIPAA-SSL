@@ -55,7 +55,7 @@ app.config.update({
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-# for not breaking the order of functions in thr doc:
+# for not breaking the order of functions in the doc:
 # https://github.com/marshmallow-code/apispec/issues/193
 app.config["JSON_SORT_KEYS"] = False
 
@@ -397,6 +397,7 @@ def module_api(module):
         res=stress_from_formatted_phonetics(rID, phonetics, level="word")
     else:
         res={"status": "error: no such module"}
+        return Response(json.dumps(res),status=400,mimetype="application/json")
     response=json.dumps(res)
 
     if res['status'].split(':')[0]=='error':
