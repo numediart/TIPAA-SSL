@@ -199,9 +199,7 @@ def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D',
         phonetics=phonetics_for_row(row, libri_words_df)
         phonetics=[p.split(' ') for p in phonetics]
 
-        status_audio, rID=prepare_audio_file(row.wav_path)
-        # status, results = phonemeContrast_from_phonetics_audio(rID, phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives)
-        
+        status_audio, rID=prepare_audio_file(row.wav_path)        
         make_pContrast_annotation_files_from_phonetics(rID,phonetics=phonetics, word_idx=row.word_idx, target_phones=target_phones, alternatives=alternatives)
         status,results=phonemeContrast(rID, rID)
         
@@ -500,17 +498,13 @@ def confusion_analysis_of_pContrast(phone_set, n=100):
     confusion_records=[]
     for p in phone_set:
         r=pContrast_from_audiobook_data(data_set='dev-clean', target_phones=p, alternatives=phone_set, n=n)
-        # results[p]=r
-
         dict_count_prediction={}
         for phone in phone_set: dict_count_prediction[phone]=0
-
         if r!=[]:
             for i,row in r['results_df'].iterrows(): 
                 # row.detected_phone
                 for el in row.detected_phone: dict_count_prediction[el]+=1
         confusion_records.append(dict_count_prediction)
-
     confusion_df=pd.DataFrame.from_records(confusion_records)
     confusion_df.index=phone_set
     return confusion_df
@@ -525,21 +519,20 @@ def vowels_consonants_confusions_from_audiobook_data(n=100):
 
     vowel_confusion_df=confusion_analysis_of_pContrast(cmu_vowels, n=n)
     vowel_confusion_df_norm=(vowel_confusion_df.div(vowel_confusion_df.sum(axis=1), axis=0)*100).round(1)
-    vowel_confusion_df.to_csv('performance_results/vowel_confusion_df.csv')
-    vowel_confusion_df_norm.to_csv('performance_results/vowel_confusion_df_norm.csv')
+    vowel_confusion_df.to_csv('performance_results/vowel_confusion_df_n_'+str(n)+'.csv')
+    vowel_confusion_df_norm.to_csv('performance_results/vowel_confusion_df_norm_n_'+str(n)+'.csv')
     
     consonant_confusion_df=confusion_analysis_of_pContrast(cmu_consonants, n=n)
     consonant_confusion_df_norm=(consonant_confusion_df.div(consonant_confusion_df.sum(axis=1), axis=0)*100).round(1)
-    consonant_confusion_df.to_csv('performance_results/consonant_confusion_df.csv')
-    consonant_confusion_df_norm.to_csv('performance_results/consonant_confusion_df_norm.csv')
+    consonant_confusion_df.to_csv('performance_results/consonant_confusion_df_n_'+str(n)+'.csv')
+    consonant_confusion_df_norm.to_csv('performance_results/consonant_confusion_df_norm_n_'+str(n)+'.csv')
 
-    
     plt.clf()
     sns.heatmap(vowel_confusion_df_norm, annot=True, cmap='YlGnBu')
-    plt.savefig('performance_results/vowel_contrast_confusion.png')
+    plt.savefig('performance_results/vowel_contrast_confusion_n_'+str(n)+'.png')
     plt.clf()
     sns.heatmap(consonant_confusion_df_norm, annot=True, cmap='YlGnBu')
-    plt.savefig('performance_results/consonant_contrast_confusion.png')
+    plt.savefig('performance_results/consonant_contrast_confusion_n_'+str(n)+'.png')
 
 if __name__ == "__main__":
 
