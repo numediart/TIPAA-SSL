@@ -141,6 +141,13 @@ def show_alternatives_distributions():
 
 
 
+# expand some words as Mr or Mrs to Mister and Misses
+expand_dict={'mr':'mister',
+            'mrs':'misses',
+            'Mr':'Mister',
+            'Mrs':'Misses'
+            }
+
 def get_cmudict_info(word='university'):
     """get the first possible phonetisation of a word from cmudict
 
@@ -315,8 +322,8 @@ def syllables_data(syl_sep='|'):
     # http://www.delphiforfun.org/programs/Syllables.htm
     # syllables=pd.read_csv('Syllables.txt',sep='=', header=None)
     syllables=pd.read_csv('data/mhyph.txt', header=None)
-    mhyph_syl_sep=syllables[0][0][5]
-    syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(mhyph_syl_sep,syl_sep)
+    # mhyph_syl_sep=syllables[0][0][5]
+    # syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(mhyph_syl_sep,syl_sep)
 
     # This file contains additional solutions that we can change. For example, I added "tem|pera|ture"
     # because only tem|pe|ra|ture was present. The following of the function will take care of choosing
@@ -627,6 +634,14 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
 
     words=remove_special_characters(normalize_numbers(sentence), lowercase=False).split(' ')
 
+    word_groups=[remove_special_characters(normalize_numbers(w), lowercase=False) for w in sentence.split(' ')]
+    lens=[len(w.split(' ')) for w in word_groups]
+
+    words=[expand_dict[word] if word in expand_dict else word for word in words]
+
+    norm_words=words
+    
+
     # If all letters are capital (acronym), put syl_sep between all letters
     # I need to do that before putting in lowercase, that is why I cannot put that in e.g. syllabified_text()
     ws=[]
@@ -666,7 +681,9 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
         syls_texts[i]=words[i]
         used_method_syllables[i]='acronym'
 
-    case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), remove_special_characters(sentence, lowercase=False), syl_sep=syl_sep)        
+    print('syls_texts', syls_texts)
+    print('norm_words', norm_words)
+    case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), ' '.join(norm_words), syl_sep=syl_sep)        
     
     # case_syls_texts=add_special_char(sentence, case_syls_texts)
 
