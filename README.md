@@ -124,7 +124,7 @@ docker exec -it flaskapp bash
 
 To show terminal output:
 ```
-docker logs flaskapp
+docker logs flaskapp > docker_logs.txt
 ```
 
 ## Docker application on ECR and ECS
@@ -319,6 +319,18 @@ pytest
 ## Using AWS Polly
 
 Get an access ID from AWS: https://www.youtube.com/watch?v=VtuXrzfGLKQ&ab_channel=ActivePresenter
+
+I created a profile called `iam_user` with the two lines in `~/.aws/credentials`
+```
+[user1]
+aws_access_key_id=...
+aws_secret_access_key=...
+```
+Then used `aws configure --profile iam_user`.
+
+see:
+https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html
+
 
 Doc:
 https://docs.aws.amazon.com/polly/latest/dg/get-started-cli-exercise.html
