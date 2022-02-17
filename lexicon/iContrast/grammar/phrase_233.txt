@@ -1,7 +1,0 @@
-$bla = [o4 o4 o4 o4 o4 o4 o4 o4];
-$blabla = (w3 sp w2 sp w1) | (w6 sp w5 sp w4);
-$phrase = ((w1 sp w2 sp w3 sp ((p1 (p2 | *err) p3 p4) | $bla) sp w4 sp w5 sp w6) | ({$bla} | $blabla));
-
-(
-[sil] $phrase [sil]
-)

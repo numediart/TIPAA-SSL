@@ -1,7 +1,0 @@
-$other = o1 | o2 | o3 | o4 | o5;
-$blabla = (w6 sp w5 sp w4) | (w3 sp w2 sp w1);
-$phrase = ((w1 sp w2 sp w3 sp w4 sp w5 sp w6) | {sp ($other | $blabla)});
-
-(
-({sil} | sp) $phrase ({sil} | sp)
-)

@@ -1,5 +1,0 @@
-$phrase = (d1 sp d2 d3 d4 d5 d6 sp d7 d8 d9);
-
-(
-([sil] | sp) $phrase ([sil] | sp)
-)
