@@ -6,6 +6,7 @@ import ast
 from tqdm import tqdm
 import shutil
 import numpy as np
+import soundfile as sf
 
 def make_dir(path):
     if not os.path.exists(path): os.makedirs(path)
@@ -94,6 +95,7 @@ def get_results(df_pContrast, base_url = 'http://localhost:8000', endpoint='/pho
         results.append(result)
     
     results=pd.DataFrame.from_records(results)
+    results.index=df_pContrast.index
     # row=df_pContrast.iloc[results[results.status!='success'].index.tolist()].iloc[2]
     # request_for_audio_file(row, url = url, client=client)
     results['target_phoneme']=df_pContrast['target_phoneme']
@@ -203,6 +205,7 @@ def test_particular_cases(base_url = 'http://localhost:8000', endpoint='/phoneme
     results=get_results(df_selected_idx, base_url = base_url, endpoint=endpoint, client=client)
 
     return results
+
 def test_termination_contrast():
     test_GE_linguistic_data_content(endpoint='/terminationContrast')
 
@@ -225,13 +228,14 @@ def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_cli
     endpoint_dict={
         'SENTENCE_STRESS':'/flowspeech/sentenceStress',
         'WORD_STRESS':'/flowspeech/wordStress',
-        'FINAL_ED':'/phonemeContrast',
+        'FINAL_ED':'/terminationContrast',
         'VOWEL_CONTRAST':'/phonemeContrast'
     }
 
     all_results=[]
+    all_dfs=[]
     # for module_type in df_errors.module_type.unique()[1:2]:
-    for module_type in df_errors.module_type.unique():
+    for module_type in endpoint_dict.keys():
         print('module '+module_type, len(df_errors[df_errors.module_type==module_type]))
         # module_type='VOWEL_CONTRAST'
         df_vc=df_errors[df_errors.module_type==module_type]
@@ -252,9 +256,18 @@ def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_cli
         if module_type in ['FINAL_ED', 'VOWEL_CONTRAST']:
             df_records=df_records.loc[df_records.target_phoneme.dropna().index]
 
+        all_dfs.append(df_records)
+        df_records['size']=df_records.apply(lambda r:os.path.getsize(r.audio_file_url), axis=1)
+
+        # Here I filter examples to be smaller than 400KB, because above, I can have an error 413 "Request Entity Too Large". Not sure exactly where it
+        # comes from
+        df_records=df_records[df_records['size']<400*1024]
+
         results=get_results(df_records, base_url = base_url, endpoint=endpoint_dict[module_type], client=client)
         results=pd.concat([results,df_records], axis=1)
         all_results.append(results)
+    
+    # all_dfs=pd.concat(all_df)
 
     # for results, module_type in zip(all_results, df_errors.module_type.unique()[1:2]):
     for results, module_type in zip(all_results, df_errors.module_type.unique()):
@@ -263,7 +276,7 @@ def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_cli
         for status in results.status.unique():
             df=results[results.status==status].sample(frac = 1)[:n_audios]
             if "DOCTYPE HTML PUBLIC" in status: status="Internal_Server_Error"
-            path='performance_results/user_data_analysis/'+module_type+'/'+status.replace(' ','_').replace(':','').replace('/','')
+            path='performance_results/user_data_analysis_terminationContrast/'+module_type+'/'+status.replace(' ','_').replace(':','').replace('/','')
             make_dir(path)
             
             df.to_csv(path+'/data.csv')
@@ -271,21 +284,35 @@ def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_cli
                 shutil.copy(r.audio_file_url.iloc[0], path)
             dfs.append(df)
 
-    all_results=pd.concat(all_results)
-    all_results.to_csv(all_results_path)
+    all_results_df=pd.concat(all_results)
+    all_results_df.to_csv(all_results_path)
+
+    return all_results_df
 
 def detection_tests(all_results_path='performance_results/user_recording_all_results.csv'):
     all_results=pd.read_csv(all_results_path)
-    from DL_speech_tech import run_VAD, load_audio_with_preprocessing
+    from DL_speech_tech import run_VAD, load_audio_with_preprocessing, speech_enhancement
     probs=[]
     for i,r in tqdm(all_results.iterrows()):
         s,fs=load_audio_with_preprocessing(r[:-1].audio_file_url)
+
+        # I wanted to try after speech enhancement, but the problem is we don't know the influence it will have on the VAD
+        # which is trained on noisy speech. After a quick look, it does not seem better
+        # s=speech_enhancement(s)
         prob=run_VAD(s).numpy().flatten()
         probs.append(prob)
     all_results["VAD probs"]=probs
     all_results["VAD max prob"]=all_results["VAD probs"].apply(lambda r: max(r))
 
     np.histogram(all_results["VAD max prob"])
+
+    selection_low_VAD=all_results[all_results["VAD max prob"]<0.3]
+    selection_low_VAD[selection_low_VAD.status.str.contains('pitch')]
+    uncatched_low_VAD=selection_low_VAD[~selection_low_VAD.status.str.contains('pitch')&~selection_low_VAD.status.str.contains('audio')]
+    path='performance_results/low_VAD/'
+    make_dir(path)
+    for i,r in uncatched_low_VAD.iterrows():
+        shutil.copy(r.audio_file_url, path)
 
 
     # all_results.to_csv(all_results_path)
@@ -358,6 +385,10 @@ def server_comparison_analysis():
     res['rpC_local'][~(res['r_ter_local']==res['rpC_local']).gibberish_detected]#[res['rpC_local'].target_phoneme=='D']
     res['r_ter_local'][~(res['r_ter_local']==res['rpC_local']).gibberish_detected]#[res['rpC_local'].target_phoneme=='D']
 
+    
+    res['rpC_dev'][~(res['r_ter_dev']==res['rpC_dev']).gibberish_detected]#[res['rpC_local'].target_phoneme=='D']
+    res['r_ter_dev'][~(res['r_ter_dev']==res['rpC_dev']).gibberish_detected]#[res['rpC_local'].target_phoneme=='D']
+
     # rpC=pd.read_csv('performance_results/test_api_phonemeContrast.csv')
     # r_ter=pd.read_csv('performance_results/test_api_termination_contrast.csv')
 
@@ -387,9 +418,10 @@ if __name__ == '__main__':
 
     # rpC=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app/phonemeContrast')
     # r_ter=test_GE_linguistic_data_content('http://localhost:8000/terminationContrast')
-    test_user_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_audios=20, n_ex_by_ex_type=5, all_results_path='performance_results/user_recording_all_results.csv')
-    test_user_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_audios=20, n_ex_by_ex_type=5, all_results_path='performance_results/user_recording_all_results_SE.csv')
+    all_results=test_user_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_audios=20, n_ex_by_ex_type=5, all_results_path='performance_results/user_recording_all_results_local.csv')
+    # all_results=test_user_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_audios=20, n_ex_by_ex_type=5, all_results_path='performance_results/user_recording_all_results_SE.csv')
     test_user_recordings()
+    all_results=test_user_recordings(base_url = 'https://dev-speech-processing.flowchase.app', client=requests, n_audios=20, n_ex_by_ex_type=5, all_results_path='performance_results/user_recording_all_results_dev.csv')
 
     rpC_dev=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/phonemeContrast', client=requests)
     r_ter_dev=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app', endpoint='/terminationContrast', client=requests)
