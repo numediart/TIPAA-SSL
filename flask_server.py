@@ -14,13 +14,12 @@ from flask import Response
 from speech_tech import stress_from_formatted_phonetics, prepare_audio_file, vowel_stresses_from_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, merge_list
 import pandas as pd
 import json
-from text_processing import generate_prefill_csv, prefill_for_sentence, check_phonemes
+from utils.text_processing import generate_prefill_csv, prefill_for_sentence, check_phonemes, cmu_to_gibberish
 
 import uuid
 import base64
 
 import ast
-from text_processing import cmu_to_gibberish
 import os
 
 from functools import wraps

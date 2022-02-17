@@ -4,13 +4,13 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from time import time
-from audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
+from utils.audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
 import soundfile as sf
-from htk_utils import get_textgrid_data, clean_htk_files
+from utils.htk_utils import get_textgrid_data, clean_htk_files
 
 
-from label_data_processing import make_all_phones_annotation_files, make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics, make_pContrast_annotation_files
-from text_processing import phonetics_from_sentence, chunk_text
+from utils.label_data_processing import make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics
+from utils.text_processing import phonetics_from_sentence, chunk_text
 import uuid
 import time
 from glob import glob
@@ -151,28 +151,7 @@ def vowels(textgridData):
         nVowelsPerWord.append(len(vowels_df[vowels_df.iloc[:,0]==w]))
     return indxVowels, nVowelsPerWord
 
-def check_words_duration():
-    pass
-    # number of phoneme per entry in dct file this is set to 1 when vowel ELSE corresponds to the integer at the end of "w1_v1_1"
-    # phoPerEntry=[int(r[2].split('_')[-1]) for i,r in textgridData.iterrows()]
-    
-    # TODO: check words duration
 
-    # potErrors = 0;
-    # grosErrors = 0;
-    # for i = 1:nEntries
-    #     if (textgridData{2}(i) - textgridData{1}(i) < 0.040*phoPerEntry(i)) || (textgridData{2}(i) - textgridData{1}(i) > 0.230*phoPerEntry(i))
-    #         potErrors = potErrors + 1;
-    #     end
-    #     if textgridData{2}(i) - textgridData{1}(i) > 0.450*phoPerEntry(i)
-    #         grosErrors = grosErrors + 1;
-    #     end
-    # end
-    # if doVerification == 1 && (potErrors > 0.5*nEntries || grosErrors > 0)
-    #     status = -500;
-    #     result = createJSON(binResult, status, rand_fileName);
-    #     return;
-    # end
 
 def compute_stress_score(textgridData, s, fs, indxVowels):
     """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 

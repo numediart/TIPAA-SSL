@@ -291,7 +291,7 @@ def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_cli
 
 def detection_tests(all_results_path='performance_results/user_recording_all_results.csv'):
     all_results=pd.read_csv(all_results_path)
-    from DL_speech_tech import run_VAD, load_audio_with_preprocessing, speech_enhancement
+    from utils.DL_speech_tech import run_VAD, load_audio_with_preprocessing, speech_enhancement
     probs=[]
     for i,r in tqdm(all_results.iterrows()):
         s,fs=load_audio_with_preprocessing(r[:-1].audio_file_url)

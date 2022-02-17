@@ -1,11 +1,11 @@
 import requests
 import json
-from text_processing import phonetics_from_sentence, prefill_for_sentence
+from utils.text_processing import phonetics_from_sentence, prefill_for_sentence
 import pandas as pd
 import os
 syllables_data=pd.read_csv('data/syllables.csv')
 
-from label_data_processing import get_data
+from utils.label_data_processing import get_data
 import time
 import base64
 import ast

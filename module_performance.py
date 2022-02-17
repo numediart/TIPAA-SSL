@@ -1,17 +1,14 @@
 from speech_tech import *
-from label_data_processing import *
-from text_processing import *
+# from utils.label_data_processing import *
+from utils.text_processing import *
 from glob import glob
 import os
 import pandas as pd
-from libri_phonetization_data import *
+from utils.libri_phonetization_data import *
 from tqdm import tqdm
 import pickle
-# Performance tests
 import seaborn as sns
-
-
-from label_data_processing import target_to_alternatives, graphemes_to_alternatives
+from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, make_all_phones_annotation_files
 
 def make_dir(path):
     if not os.path.exists(path): os.makedirs(path)

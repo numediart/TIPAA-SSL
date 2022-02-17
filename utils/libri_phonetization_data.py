@@ -9,7 +9,7 @@ import pandas as pd
 import os
 from glob import glob
 
-from text_processing import remove_stress_annots, cmu_1_char
+from utils.text_processing import remove_stress_annots, cmu_1_char
 
 def get_phone_timings(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid',word_idx=8):
     """Uses the (start,end) of a word and (starts,ends) of phonemes to retrieve phonemes corresponding to a word

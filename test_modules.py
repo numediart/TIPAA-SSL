@@ -1,8 +1,8 @@
 from speech_tech import *
 
-from text_processing import word_stress_from_text
+from utils.text_processing import word_stress_from_text
 from module_performance import *
-from label_data_processing import *
+from utils.label_data_processing import *
 def test_audio_formats():
     prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf')
     prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a')
@@ -20,7 +20,7 @@ def test_vowel_stresses():
     wordStress_from_phonetics_audio(rID)
 
 def test_stress_with_level():
-    from text_processing import prefill_for_sentence
+    from utils.text_processing import prefill_for_sentence
     sentence="i would love to go to ireland"
 
     syllables_data=pd.read_csv('data/syllables.csv')

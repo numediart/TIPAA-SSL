@@ -2,12 +2,8 @@ import pandas as pd
 import numpy as np
 import pdb
 from glob import glob
-from shutil import copy
-import cmudict
-import os
-from text_processing import phonetics_from_sentence, remove_special_characters, remove_stress_annots
-import uuid
-from htk_utils import process_grammar
+from utils.text_processing import phonetics_from_sentence, remove_special_characters, remove_stress_annots
+from utils.htk_utils import process_grammar
 import itertools
 
 target_to_alternatives={
