@@ -681,8 +681,8 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
         syls_texts[i]=words[i]
         used_method_syllables[i]='acronym'
 
-    print('syls_texts', syls_texts)
-    print('norm_words', norm_words)
+    # print('syls_texts', syls_texts)
+    # print('norm_words', norm_words)
     case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), ' '.join(norm_words), syl_sep=syl_sep)        
     
     # case_syls_texts=add_special_char(sentence, case_syls_texts)
