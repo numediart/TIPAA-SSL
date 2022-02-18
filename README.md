@@ -124,7 +124,8 @@ docker exec -it flaskapp bash
 
 To show terminal output:
 ```
-docker logs flaskapp > docker_logs.txt
+docker logs flaskapp > docker_logs.txt # to get history
+docker-compose logs --tail=0 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
 ```
 
 ## Docker application on ECR and ECS
