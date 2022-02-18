@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 
 
-def send_audio(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
+def send_audio(path='data/audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/upload"
     # print(url)
     with open(path, 'rb') as file:
@@ -73,7 +73,7 @@ def call_prefill_for_sentence(sentence, base_url = 'http://localhost:8000', clie
     
     return res
 
-def send_audio_base64(path='audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
+def send_audio_base64(path='data/audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
     # based on :
     # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
     encode_string = base64.b64encode(open(path, "rb").read())
@@ -88,7 +88,7 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
     rIDs=[]
     print("uploads starting")
     for i in tqdm(range(100)):
-        res=send_audio_base64(path='audio_recordings/turned_around.mp3', base_url=base_url, client=client)
+        res=send_audio_base64(path='data/audio_recordings/turned_around.mp3', base_url=base_url, client=client)
         res=ast.literal_eval(res.data.decode('utf-8'))
         assert res['status']=='success'
         rID=res['rID']
@@ -133,20 +133,20 @@ if __name__ == "__main__":
     crash_test(base_url="https://dev-speech-processing.flowchase.app/")
 
 
-    res=send_audio_base64(path='audio_recordings/turned_around.mp3').data
+    res=send_audio_base64(path='data/audio_recordings/turned_around.mp3').data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
     res=call_phoneme_contrast(rID)
     res.data
 
-    res=send_audio(path='audio_recordings/turned_around.mp3')
+    res=send_audio(path='data/audio_recordings/turned_around.mp3')
     rID1=res.data.decode('utf-8')
     res=call_phoneme_contrast(rID)
     res.data
 
-    res=send_audio(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
+    res=send_audio(path='data/audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     rID=res.data.decode('utf-8')
 
-    res=send_audio_base64(path='audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com").data
+    res=send_audio_base64(path='data/audio_recordings/turned_around.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com").data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
 
     call_phoneme_contrast( rID, base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
@@ -154,32 +154,32 @@ if __name__ == "__main__":
     call_prefill_for_sentence( "Kayla isn't angry at Tyler", base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     call_prefill_for_sentence("Kayla isn't angry at Tyler")
     
-    res=send_audio(path='audio_recordings/I_visited_italy.mp3')
+    res=send_audio(path='data/audio_recordings/I_visited_italy.mp3')
     rID2=res.data
     call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=1, target='IH0', alternatives="IH0 IY0")
 
     
-    res=send_audio(path='audio_recordings/I_visited_italy.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
+    res=send_audio(path='data/audio_recordings/I_visited_italy.mp3', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     rID2=res.data
     call_phoneme_contrast(rID2.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=1, target='IH0', alternatives="IH0 IY0", base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
     
-    res=send_audio(path='audio_recordings/I_visited_italy.mp3')
+    res=send_audio(path='data/audio_recordings/I_visited_italy.mp3')
     rID=res.data
     call_phoneme_contrast(rID.decode('utf-8'), text='I visited italy', word_idx=1, syl_idx=2, target='IH0_D', alternatives="T D IH0_D", base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
 
-    res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    res=send_audio(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.data
     call_module(rID.decode('utf-8')).data
     call_module(rID.decode('utf-8'), fake_mistake=True).data
     call_vowel_stresses(rID.decode('utf-8'))
     
-    res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav').data
+    res=send_audio_base64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav').data
 
-    res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com").data
+    res=send_audio_base64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com").data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
     res=call_module(rID, base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com")
 
-    res=send_audio_base64(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', base_url="http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com").data
+    res=send_audio_base64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf', base_url="http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com").data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
     res=call_module(rID, base_url="http://ec2-15-188-10-194.eu-west-3.compute.amazonaws.com")
 
@@ -196,36 +196,36 @@ if __name__ == "__main__":
     res = requests.post(base_url+"/phonemeContrast", data=data)
     print(res.__dict__)
 
-    res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    res=send_audio(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     rID=res.data
     call_module(rID.decode('utf-8'), module="wordStress")
 
-    res=send_audio(path='audio_recordings/WS_111_toothpaste.wav')
+    res=send_audio(path='data/audio_recordings/WS_111_toothpaste.wav')
     rID=res.data
     call_module(rID.decode('utf-8'), text="toothpaste", module="wordStress")
 
-    # res=send_audio(path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    # res=send_audio(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     # rID=res.data
     # call_sentenceStress(rID.decode('utf-8'))
 
-    res=send_audio(path='audio_recordings/iC_111_slip.wav')
+    res=send_audio(path='data/audio_recordings/iC_111_slip.wav')
     rID=res.data
     # call_module(rID, filename='iC_111_slip.wav', module="iContrast")
     # call_vowel_stresses()
     call_vowel_stresses(rID, text='sleep')
 
-    send_audio('audio_recordings/turned_around.mp3')
+    send_audio('data/audio_recordings/turned_around.mp3')
     call_phoneme_contrast()
 
-    send_audio('audio_recordings/Laaw_MP3.mp3')
+    send_audio('data/audio_recordings/Laaw_MP3.mp3')
     alternatives="['AO0', 'OW0','AO1', 'OW1','AO2', 'OW2']"
     call_phoneme_contrast(filename='Laaw_MP3.mp3', text='law',  word_idx=0, target='AO1', alternatives=alternatives)
 
-    send_audio('audio_recordings/iC_112_leave.wav')
+    send_audio('data/audio_recordings/iC_112_leave.wav')
     alternatives="['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2']"
     call_phoneme_contrast(filename='iC_112_leave.wav', text='leave',  word_idx=0, target='IY1', alternatives=alternatives)
     
-    send_audio('audio_recordings/ed_acceptEED.wav')
+    send_audio('data/audio_recordings/ed_acceptEED.wav')
     # alternatives="['IH0', 'IY0','IH1', 'IY1','IH2', 'IY2']"
     alternatives="['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']"
     # alternatives="['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']"

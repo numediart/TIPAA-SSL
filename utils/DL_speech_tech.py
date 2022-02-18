@@ -141,7 +141,7 @@ if __name__=="__main__":
     processor = Wav2Vec2Processor.from_pretrained(path)
     model = Wav2Vec2ForCTC.from_pretrained(path+'/checkpoint-10700')
     # model.to(device)
-    path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
     s,fs=librosa.load(path, sr=16000)
     result=inference(model, processor, s,fs)
     print(result)
@@ -149,7 +149,7 @@ if __name__=="__main__":
     # load model and processor
     processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-lv-60-espeak-cv-ft")
     model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-lv-60-espeak-cv-ft")
-    path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
+    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav'
     s,fs=librosa.load(path, sr=16000)
     inference(model, processor, s, fs)
 

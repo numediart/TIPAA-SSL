@@ -4,19 +4,19 @@ from utils.text_processing import word_stress_from_text
 from module_performance import *
 from utils.label_data_processing import *
 def test_audio_formats():
-    prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf')
-    prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a')
-    prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland_stereo.m4a')
+    prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf')
+    prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a')
+    prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland_stereo.m4a')
 
 
 def test_vowel_stresses():
-    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     vowel_stresses_from_phonetics_audio(rID)
 
-    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     sentenceStress_from_phonetics_audio(rID)
 
-    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     wordStress_from_phonetics_audio(rID)
 
 def test_stress_with_level():
@@ -27,21 +27,21 @@ def test_stress_with_level():
     d=prefill_for_sentence(sentence, syllables_data)
     d['cmu_phonetics']
     
-    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     stress_from_formatted_phonetics(rID, d['cmu_phonetics'], level='sentence')
     
-    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     stress_from_formatted_phonetics(rID, d['cmu_phonetics'], level='word')
     
-    status_audio, rID=prepare_audio_file('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     vowel_stresses_from_phonetics_audio(rID)
 
 
 def test_phonemeContrast():
-    status_audio, rID=prepare_audio_file('audio_recordings/turned_around.mp3')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
     phonemeContrast_from_phonetics_audio(rID)
 
-    status_audio, rID=prepare_audio_file('audio_recordings/turned_around.mp3')
+    status_audio, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
     phonemeContrast_from_formatted_phonetics_audio(rID)
 
 def test_text_processing():

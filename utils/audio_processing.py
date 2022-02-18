@@ -138,18 +138,18 @@ def normalize(x):
     return y/max(y)
 
 
-def slow_down_audiotsm(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_0.8.wav', speed_rate=0.8):    
+def slow_down_audiotsm(input_filename='data/audio_recordings/WS_111_toothpaste.wav', output_filename='data/audio_recordings/WS_111_toothpaste_0.8.wav', speed_rate=0.8):    
     with WavReader(input_filename) as reader:
         with WavWriter(output_filename, reader.channels, reader.samplerate) as writer:
             tsm = phasevocoder(reader.channels, speed=speed_rate)
             tsm.run(reader, writer)
 
-def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_filename='audio_recordings/WS_111_toothpaste_pytsmod_0.8.wav', speed_rate=0.8):
+def slow_down(input_filename='data/audio_recordings/WS_111_toothpaste.wav', output_filename='data/audio_recordings/WS_111_toothpaste_pytsmod_0.8.wav', speed_rate=0.8):
     """change speed of audio without modifying the pitch. 
 
     Args:
-        input_filename (str, optional): Defaults to 'audio_recordings/WS_111_toothpaste.wav'.
-        output_filename (str, optional): Defaults to 'audio_recordings/WS_111_toothpaste_pytsmod_0.8.wav'.
+        input_filename (str, optional): Defaults to 'data/audio_recordings/WS_111_toothpaste.wav'.
+        output_filename (str, optional): Defaults to 'data/audio_recordings/WS_111_toothpaste_pytsmod_0.8.wav'.
         speed_rate (float, optional): Defaults to 0.8.
     """
     x, sr = sf.read(input_filename)
@@ -161,8 +161,8 @@ def slow_down(input_filename='audio_recordings/WS_111_toothpaste.wav', output_fi
 
 def align_audios(
     reference_path='../audio-with-analysis-ids/audio/dbb2b8be-50f6-4b69-8ec1-a53a4bb307bf.wav', 
-    # recording_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', 
-    recording_path='audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
+    # recording_path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', 
+    recording_path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav',
     fs=16000
     ):
     """Performs Dynamic Time Warping on the mel-spectrograms of a reference audio and a recording
@@ -182,8 +182,8 @@ def align_audios(
         numpy array: waveform of the merged audio that are time-aligned
     """
 
-    # reference,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', sr=16000)
-    # recording,fs=librosa.load('audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', sr=16000)
+    # reference,fs=librosa.load('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav', sr=16000)
+    # recording,fs=librosa.load('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland_FR.wav', sr=16000)
     
     
     # reference,fs=load_audio(reference_path)
@@ -225,7 +225,7 @@ def align_audios(
     recording_aligned=pad_zeros_to_len(recording_aligned, max_len)
     out=recording_aligned+reference
 
-    sf.write('audio_recordings/SS_1_i_would_love_to_go_to_ireland_merge.wav', out,  fs)
+    sf.write('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland_merge.wav', out,  fs)
 
     return out
 
