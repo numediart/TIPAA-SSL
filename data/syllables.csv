@@ -161711,7 +161711,7 @@
 161711,the|oph|i|lus,theophilus,4,
 161712,the|op|a|thy,theopathy,4,
 161713,the|or|bist,theorbist,3,
-161714,the|or|bo,theorbo,3,
+161714,the|or|bo,theorbo,3,3.0
 161715,the|os|o|phism,theosophism,4,
 161716,the|os|o|phist,theosophist,4,
 161717,the|os|o|phy,theosophy,4,
@@ -187186,4 +187186,7 @@
 11,doub|led,doubled,2,2.0
 12,ne|go|ti|a|ted,negotiated,5,5.0
 13,rhy|thm,rhythm,2,2.0
-14,should|'ve,should've,2,2.0
+14,rhy|thms,rhythms,2,2.0
+15,should|'ve,should've,2,2.0
+16,cli|ent,client,2,2.0
+17,cli|ents,clients,2,2.0
