@@ -131,6 +131,7 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
 
 if __name__ == "__main__":
     crash_test(base_url="https://dev-speech-processing.flowchase.app/")
+    crash_test(base_url='http://localhost:8000')
 
 
     res=send_audio_base64(path='data/audio_recordings/turned_around.mp3').data
