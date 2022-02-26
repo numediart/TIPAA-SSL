@@ -221,10 +221,11 @@ def test_user_recordings(base_url = 'http://localhost:8000', client=app.test_cli
     Returns:
         [type]: [description]
     """
-    from user_audio_data import df_errors, exs_sort_by_n_errors, n_errors, exercise_data
+    from user_audio_data import get_errors_examples, exercise_data
     # "cmu_phonetics", "target_word_indexes", 
     # "target_syllable_indexes", "alternative_phonemes", "target_phoneme"
-
+    df_errors, exs_sort_by_n_errors=get_errors_examples()
+    
     endpoint_dict={
         'SENTENCE_STRESS':'/flowspeech/sentenceStress',
         'WORD_STRESS':'/flowspeech/wordStress',
