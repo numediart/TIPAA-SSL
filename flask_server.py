@@ -40,7 +40,8 @@ syllables=pd.read_csv('data/syllables.csv')
 
 
 app = Flask(__name__)  # Flask app instance initiated
-api = Api(app)  # Flask restful wraps Flask app around it.
+# api = Api(app)  # Flask restful wraps Flask app around it.
+
 app.config.update({
     'APISPEC_SPEC': APISpec(
         title='Flowspeech Project',
@@ -695,14 +696,17 @@ def prefill_from_phrase():
     return Response(response,status=200,mimetype="application/json")
 
 
-def run_app():
-    app.run(debug=True, host='0.0.0.0', port=8000)
 
-docs = FlaskApiSpec(app)
-docs.register(send_audio)
-docs.register(prefill_from_phrase)
-docs.register(phoneme_contrast_api)
-docs.register(module_api)
+debug=True
+def run_app():
+    app.run(debug=debug, host='0.0.0.0', port=8000)
+
+if False:
+    docs = FlaskApiSpec(app)
+    docs.register(send_audio)
+    docs.register(prefill_from_phrase)
+    docs.register(phoneme_contrast_api)
+    docs.register(module_api)
 
 if __name__ == '__main__':
     run_app()
