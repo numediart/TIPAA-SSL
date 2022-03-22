@@ -26,20 +26,25 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     cron \
     # These two are  necessary for pyworld library (f0 extraction)
     g++ \
-    libsndfile-dev\  
+    libsndfile-dev \
+    # this is for git cloning  
+    git-lfs \ 
     # clean up apt cache to save space
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && git lfs install
 
 # Python packages from conda
 # This is necessary so that librosa is able to read mp3 files (in 2 steps to avoid conda memory error...)
 # RUN conda install -c anaconda -y python=3 && conda install -c conda-forge nettle ffmpeg
-RUN conda install -c conda-forge nettle ffmpeg && \
+# RUN conda install -c conda-forge nettle ffmpeg && \
+RUN conda install ffmpeg && \
 # For using e.g. MelGAN or wav2vec2
    conda install pytorch torchaudio cpuonly -c pytorch && \
 # clean unnecessary setup files 
    conda clean --all -y
 
-COPY ./ $HOME/
+COPY ./requirements.txt $HOME/requirements.txt
+# COPY ./ $HOME/
 
 # pip
 RUN pip install --upgrade pip && pip install pyworld && pip install -r requirements.txt
@@ -54,6 +59,7 @@ RUN rm -rf $HOME/htk/ &&\
     cd $HOME/htk/ && ./configure --disable-hslab && \
     make all && \
     make install
+
 
 # from https://stackoverflow.com/questions/37458287/how-to-run-a-cron-job-inside-a-docker-container
 # copy crontabs for root user
