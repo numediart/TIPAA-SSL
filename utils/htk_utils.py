@@ -6,7 +6,7 @@ def clean_htk_files(rand_fileName):
     """Clean the files generated for and by the HTK model (as it uses input and output files)
     In the future, just delete the specific files after processing, by putting name in parameters (inputs and results files)
     """
-    print('rand_fileName',rand_fileName)
+    # print('rand_fileName',rand_fileName)
     input_extensions=['.net', '.wav', '.rec', '.dct', '.txt']
     # input_extensions=['.wav']
     output_extensions=['.rec']
@@ -59,7 +59,7 @@ def htk_recognition(modelName, rand_fileName, wav_name):
     # out2 = os.popen(cmd2).read()
     out2=subprocess.run(cmd2.split(' '), capture_output=True)
     # out2.stdout
-    print('stderr',out2.stderr)
+    # print('stderr',out2.stderr)
     # out2=os.system(cmd2)
     # print('out2', out2)
     if out2.stderr.decode('utf-8')!='':
@@ -76,8 +76,8 @@ def htk_recognition(modelName, rand_fileName, wav_name):
 
     # compensate a 10ms biased in the results
     if (textgridData.iloc[:,1].iloc[-1]-textgridData.iloc[:,0].iloc[-1])>0.01:
-        textgridData.iloc[:,0].iloc[1:] += 0.01
-        textgridData.iloc[:,1].iloc[:-1] += 0.01
+        textgridData.iloc[1:,0] += 0.01
+        textgridData.iloc[:-1,1] += 0.01
 
     return textgridData, out2
 
