@@ -14,6 +14,7 @@ g2p = G2p()
 
 cmudict_dict=cmudict.dict()
 
+syllables_df=pd.read_csv('data/syllables.csv')
 
 cmu_to_gibberish={'AA':'o',
                 'AE':'a',
@@ -615,13 +616,13 @@ def add_special_char(s_orig, s_modified):
 
     return ' '.join(s_modified_with_special_chars)
 
-def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_data=pd.read_csv('data/syllables.csv'), syl_sep='|'):
+def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_df=pd.read_csv('data/syllables.csv'), syl_sep='|'):
     """This function extract information of syllabified texts and phonetics. 
     It uses a combination of datasets (CMUdict, data from syllable_data() ) and algorithm (SonoriPy)
 
     Args:
         sentence (str): a phrase to be processed. It can contain captial letters and punctuation.
-        syllables_data (DataFrame): The syllables dataset built from syllables_data()
+        syllables_df (DataFrame): The syllables dataset built from syllables_data()
         syl_sep (str, optional): [description]. Defaults to '|'.
 
     Returns:
@@ -668,13 +669,13 @@ def prefill_for_sentence(sentence='I would love to go to Ireland!', syllables_da
             syls_texts_parts=[]
             used_method_syllables_parts=[]
             for w_part in word.split('-'):
-                syls_texts_parts.append(syllabified_text(w_part, syllables_data)[0])
-                used_method_syllables_parts.append(syllabified_text(w_part, syllables_data)[1])
+                syls_texts_parts.append(syllabified_text(w_part, syllables_df)[0])
+                used_method_syllables_parts.append(syllabified_text(w_part, syllables_df)[1])
             syls_texts.append('|-'.join(syls_texts_parts))
             used_method_syllables.append('-'.join(used_method_syllables_parts))
         else:
-            syls_texts.append(syllabified_text(word, syllables_data)[0])
-            used_method_syllables.append(syllabified_text(word, syllables_data)[1])
+            syls_texts.append(syllabified_text(word, syllables_df)[0])
+            used_method_syllables.append(syllabified_text(word, syllables_df)[1])
     
     # put back acronyms in syls_texts, and ignore what was there
     for i in acronym_idxs:
@@ -779,12 +780,10 @@ def prefill_content(sentences, syl_sep='|'):
     Returns:
         [type]: [description]
     """
-    # syllables=syllables_data()
-    syllables_data=pd.read_csv('data/syllables.csv')
     records=[]
     for s in sentences:
         try:
-            record=prefill_for_sentence(s, syllables_data, syl_sep=syl_sep)
+            record=prefill_for_sentence(s, syllables_df, syl_sep=syl_sep)
         except:
             print('Error with sentence: '+s)
             raise
@@ -898,7 +897,6 @@ if __name__ == "__main__":
     plt.savefig('sonoripy_comfortable.png')
     xticks(np.arange(len(word)), word)
 
-    syllables_df=syllables_data()
     word='enjoyed'
     syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
     print(syls_text)

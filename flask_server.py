@@ -10,11 +10,10 @@ from flask_apispec import marshal_with, doc, use_kwargs
 from flask import send_from_directory
 from flask import Response
 
-# from speech_tech import *
 from speech_tech import stress_from_formatted_phonetics, prepare_audio_file, vowel_stresses_from_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, merge_list
 import pandas as pd
 import json
-from utils.text_processing import generate_prefill_csv, prefill_for_sentence, check_phonemes, cmu_to_gibberish
+from utils.text_processing import generate_prefill_csv, prefill_for_sentence, check_phonemes, cmu_to_gibberish, syllables_df
 
 import uuid
 import base64
@@ -36,7 +35,7 @@ def debug_only(f):
     return wrapped
 
 
-syllables=pd.read_csv('data/syllables.csv')
+# syllables=pd.read_csv('data/syllables.csv')
 
 
 app = Flask(__name__)  # Flask app instance initiated
@@ -67,7 +66,6 @@ def index():
 
 upload_path="./upload_files/"
 if False:
-
     @app.route('/app.js')
     @debug_only
     def record_app():
@@ -83,8 +81,6 @@ if False:
     def vowel_stresses_html():
         return send_from_directory( './html/','vowel_stresses.html')
 
-
-    
     @app.route('/upload', methods=['POST'])
     @debug_only
     def upload_file():
@@ -318,16 +314,17 @@ def send_audio():
 def set_alternatives_from_target(target):
     ED_targets=['_T','_D','_IH0_D']
 
-    # target_to_alternatives={
-    #     'IH':['IH','IY','AA','AO','AW','AY','ER','OY'], # from   https://docs.google.com/spreadsheets/d/1tzb7ZKQOifCHXh-Aoz4PdAKPlIquThzk80EvXW1UxLw/edit#gid=0
-    #     'IY':['IY','IH','AA','AE','AH','AO','AW','AY','EH','ER','OW','OY','UH'],
-    #     'AO':['AO','OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
-    #     'AA':['AA','OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
-    #     'OW':['OW','AA','AO','AE','AY','ER','EY','IH','IY','OY','UH'],
-    #     "IH0_D":['T', 'D', 'IH0_D'],
-    #     "D":['T', 'D', 'IH0_D'],
-    #     "T":['T', 'D', 'IH0_D']
-    # }
+    if False:
+        target_to_alternatives={
+            'IH':['IH','IY','AA','AO','AW','AY','ER','OY'], # from   https://docs.google.com/spreadsheets/d/1tzb7ZKQOifCHXh-Aoz4PdAKPlIquThzk80EvXW1UxLw/edit#gid=0
+            'IY':['IY','IH','AA','AE','AH','AO','AW','AY','EH','ER','OW','OY','UH'],
+            'AO':['AO','OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
+            'AA':['AA','OW','AW','EH','ER','EY','IH','IY','OY','UH','UW'],
+            'OW':['OW','AA','AO','AE','AY','ER','EY','IH','IY','OY','UH'],
+            "IH0_D":['T', 'D', 'IH0_D'],
+            "D":['T', 'D', 'IH0_D'],
+            "T":['T', 'D', 'IH0_D']
+        }
 
     # New version based on a_test_GE_linguistic_data_content results in test_api
     target_to_alternatives={
@@ -364,9 +361,6 @@ properties=["phonetics","rID","text"]
 @app.route('/flowspeech/<module>', methods=['POST'])
 def module_api(module):
     content = request.form
-
-    # import pdb;pdb.set_trace()
-    
     properties=["phonetics","rID","text"]
     for prop in properties:
         err=access_property_error(content, prop)
@@ -379,17 +373,12 @@ def module_api(module):
     rID=content['rID']
     # phonetics=ast.literal_eval(content['phonetics'])
     phonetics=content['phonetics']
-
-    
     split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
     merged_phonetics=[merge_list(word) for word in split_phonetics]    
     not_p=check_phonemes(merge_list(merged_phonetics))
     if not_p is not None: 
         err="error: "+not_p+" is not a phoneme"
         return Response(err,status=400,mimetype="application/json")
-
-
-
     if module=='sentenceStress':
         text=content['text']
         res=stress_from_formatted_phonetics(rID, phonetics, text, level="sentence")
@@ -689,7 +678,7 @@ def prefill_from_phrase():
     print(content)
     # print(content['phrase'])
 
-    d=prefill_for_sentence(content['phrase'], syllables)
+    d=prefill_for_sentence(content['phrase'], syllables_df)
     # print(d)
     response=json.dumps(d)
     # print(response)
