@@ -3,18 +3,9 @@ version: '3'
 services:
   flaskapp:
     image: 937215464284.dkr.ecr.eu-west-3.amazonaws.com/speech_api
-    build: ./
+    # build: ./
     # command: gunicorn -b 0.0.0.0:8000 flask_server:app
     container_name: flaskapp
     # network_mode: host
     ports:
-      - 8000
-
-  # nginx:
-  #   image: 937215464284.dkr.ecr.eu-west-3.amazonaws.com/nginx
-  #   build: ./nginx
-  #   container_name: nginx
-  #   environment:
-  #     - SERVER_NAME=0.0.0.0 # This is to be change by the public AWS IP !!!!
-  #   restart: always
-  #   network_mode: host
+      - 8000:8000
