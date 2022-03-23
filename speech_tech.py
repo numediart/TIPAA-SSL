@@ -368,9 +368,6 @@ def phonemeContrast_from_phonetics_audio(
 
         make_pContrast_annotation_files_from_phonetics(uid,phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
 
-        # with open(path_cached_filenames, 'w') as fp:
-        #     json.dump(cached_filenames, fp)
-
     status,result=phonemeContrast(cached_filenames[p_idx], rID)
     return status, result
 
@@ -388,8 +385,6 @@ def vowel_stresses_from_phonetics_audio(
         cached_filenames[p_idx]=uid
 
         make_all_phones_annotation_files_from_phonetics(uid,phonetics)
-        # with open(path_cached_filenames, 'w') as fp:
-        #     json.dump(cached_filenames, fp)
 
     status,result=vowel_stresses(cached_filenames[p_idx], rID)
     return status, result
@@ -566,8 +561,8 @@ def phonemeContrast_from_formatted_phonetics_audio(
 
     merged_phonetics=[[p if 'TAR' not in p else p.replace('TAR',target_phones) for p in w ] for w in merged_phonetics]
 
-    print(target_phones)
-    print(alternatives)
+    # print(target_phones)
+    # print(alternatives)
     status, result=phonemeContrast_from_phonetics_audio(rID,
                     phonetics=merged_phonetics, 
                     # p=p, 
@@ -577,7 +572,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
     if result!=[]:
         result[0].detected_transcription=result[0].detected_transcription.str.replace(' ','_')
     
-    print('phonemeContrast_from_formatted_phonetics_audio result:', result)
+    # print('phonemeContrast_from_formatted_phonetics_audio result:', result)
     return status, result
 
 
