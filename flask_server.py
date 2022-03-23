@@ -130,6 +130,26 @@ if False:
 
 
 
+# ===================== API with DOC (above is less necessary:  ) =============
+
+def properties_to_args(properties, required=True):
+    args={}
+    for prop in properties:
+        args[prop]=fields.String(required=required)
+    return args
+
+def access_property_error(content, property):
+    try:
+        content[property]
+        return 0
+    except:
+        response='error: could not access "'+property+'" property of the request'
+        return response
+    
+# docs: https://flask-apispec.readthedocs.io/en/latest/usage.html#decorators
+
+# how to do a schema with a dict:
+# https://marshmallow.readthedocs.io/en/stable/quickstart.html#declaring-schemas
 
 @app.route('/prefill_from_phrases.html', methods=['GET'])
 def prefill_from_phrases_html():
@@ -186,6 +206,43 @@ def prefill_from_phrases():
                 )
 
 
+record={'text':fields.Str(),
+        'cmu_phonetics':fields.Str(),
+        'pronounciation_guide':fields.Str(),
+        'pronounciation_guide_hr':fields.Str(),
+        'syllable_parts':fields.Str(),
+        'n_syl_mismatch':fields.Integer(),
+        'n_syl_mismatches':fields.List(fields.Integer),
+        'used_method_for_syl_text':fields.List(fields.Str()),
+        'cmu_phonetics_alt':fields.List(fields.List(fields.Str())),
+        'pronounciation_guide_alt':fields.List(fields.List(fields.Str())),
+        'pronounciation_guide_hr_alt':fields.List(fields.List(fields.Str())),
+        'n_alternatives':fields.List(fields.Integer)
+        }
+responseSchema=Schema.from_dict(record, name="prefill response")
+@doc(description='Prefill from phrase', tags=['prefill'])
+@use_kwargs({'phrase':fields.String(required=True, description="Text sentence to be processed. It can contain special characters etc.")}, location=('form'))
+@marshal_with(responseSchema, code=200)  # marshalling
+@app.route('/prefill_from_phrase', methods=['POST'])
+@debug_only
+def prefill_from_phrase():
+    content = request.form
+    
+    err=access_property_error(content, "phrase")
+    if err: return Response(err,status=400,mimetype="application/json")
+
+    # import pdb;pdb.set_trace()
+    # print(request.__dict__)
+    print(content)
+    # print(content['phrase'])
+
+    d=prefill_for_sentence(content['phrase'], syllables_df)
+    # print(d)
+    response=json.dumps(d)
+    # print(response)
+    return Response(response,status=200,mimetype="application/json")
+
+
 
 
 @app.route('/vowel_stresses', methods=['POST'])
@@ -217,27 +274,6 @@ def vowel_stresses_api():
     return response
 
 
-# ===================== API with DOC (above is less necessary:  ) =============
-
-def properties_to_args(properties, required=True):
-    args={}
-    for prop in properties:
-        args[prop]=fields.String(required=required)
-    return args
-
-
-def access_property_error(content, property):
-    try:
-        content[property]
-        return 0
-    except:
-        response='error: could not access "'+property+'" property of the request'
-        return response
-    
-# docs: https://flask-apispec.readthedocs.io/en/latest/usage.html#decorators
-
-# how to do a schema with a dict:
-# https://marshmallow.readthedocs.io/en/stable/quickstart.html#declaring-schemas
 
 responseSchema=Schema.from_dict(
     {
@@ -454,8 +490,8 @@ def phoneme_contrast_api():
     target_idx=idx_syls_with_target.index(syl_idx)
     
     status,result=phonemeContrast_from_formatted_phonetics_audio(rID, phonetics, word_idx, target, alternatives)
-    print('status:',status)
-    print('result:',result)
+    # print('status:',status)
+    # print('result:',result)
     if not isinstance(result, list):
         result=result.tolist()
         print('result:',result)
@@ -584,8 +620,8 @@ def termination_contrast_api():
             target=pretermination+'_'+target
 
     status,result=phonemeContrast_from_formatted_phonetics_audio(rID, phonetics, word_idx, target, alternatives)
-    print('status:',status)
-    print('result:',result)
+    # print('status:',status)
+    # print('result:',result)
     if not isinstance(result, list):
         result=result.tolist()
         print('result:',result)
@@ -646,43 +682,6 @@ def termination_contrast_api():
     d={'status':status, 'phonetic_detection':phonetic_detection[target_idx], 'gibberish_truth':gs_t[target_idx], 'gibberish_detected':gs_d[target_idx]}
     response=json.dumps(d)
     return response
-
-
-record={'text':fields.Str(),
-        'cmu_phonetics':fields.Str(),
-        'pronounciation_guide':fields.Str(),
-        'pronounciation_guide_hr':fields.Str(),
-        'syllable_parts':fields.Str(),
-        'n_syl_mismatch':fields.Integer(),
-        'n_syl_mismatches':fields.List(fields.Integer),
-        'used_method_for_syl_text':fields.List(fields.Str()),
-        'cmu_phonetics_alt':fields.List(fields.List(fields.Str())),
-        'pronounciation_guide_alt':fields.List(fields.List(fields.Str())),
-        'pronounciation_guide_hr_alt':fields.List(fields.List(fields.Str())),
-        'n_alternatives':fields.List(fields.Integer)
-        }
-responseSchema=Schema.from_dict(record, name="prefill response")
-@doc(description='Prefill from phrase', tags=['prefill'])
-@use_kwargs({'phrase':fields.String(required=True, description="Text sentence to be processed. It can contain special characters etc.")}, location=('form'))
-@marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/prefill_from_phrase', methods=['POST'])
-@debug_only
-def prefill_from_phrase():
-    content = request.form
-    
-    err=access_property_error(content, "phrase")
-    if err: return Response(err,status=400,mimetype="application/json")
-
-    # import pdb;pdb.set_trace()
-    # print(request.__dict__)
-    print(content)
-    # print(content['phrase'])
-
-    d=prefill_for_sentence(content['phrase'], syllables_df)
-    # print(d)
-    response=json.dumps(d)
-    # print(response)
-    return Response(response,status=200,mimetype="application/json")
 
 
 
