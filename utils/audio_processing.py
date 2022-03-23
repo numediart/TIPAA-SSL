@@ -7,6 +7,8 @@ import pytsmod as tsm
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 from utils.DL_audio_processing import melgan_analysis_synthesis, speech_enhancement
+from scipy.interpolate import interp1d
+
 def load_audio(waveFileAddress, fs=16000, speech_correction=True):
     """Load audio, remove DC and normalize waveform
     speech_correction refers to the use of MetricGAN+. A speech enhancement system based on an adversarial loss and PESQ/STOI metrics 
@@ -47,22 +49,18 @@ def getf0Samples(s, fs):
     #  the /2**15  is for converting 16bit PCM to double between -1 and 1
     f0, sp, ap = pw.wav2world(s.astype(np.float64)/2**15, fs)
 
+    f0+=10**-10 #to avoid zeros going in the log, add a tiny number
+
     # convert in semitones
     f0Frames=40*np.log10(f0)
 
     # replace any inf due to the log operation with nan (which are treated below)
     f0Frames[f0Frames==-np.inf]=np.nan
-
-    from scipy.interpolate import interp1d
-
     x=np.arange(len(f0Frames))
     f = interp1d(x, f0Frames, kind='linear')
 
     xnew = np.floor(np.arange(len(s))/len(s)*len(f0Frames))
     f0Samples = f(xnew)
-
-    # from scipy import signal
-    # ynew = signal.resample(f0Frames, len(s))
 
     return f0Samples
 
@@ -89,7 +87,6 @@ def smooth(x,beta, window_len=11):
     s = np.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
     w = np.kaiser(window_len,beta)
     y = np.convolve(w/w.sum(),s,mode='valid')
-    # return y[5:len(y)-5]
     
     # replace nans with minimum value
     y=np.nan_to_num(y, nan= np.nanmin(y))
@@ -106,14 +103,12 @@ def getIntensity(s, fs):
     Returns:
         float: intensity of signal
     """
-
     # this is done similarly to praat:
     minimum_pitch = 70; # in Hz
     analysis_win = round((3.2/minimum_pitch)*fs)
 
     # smoothing the signal power using a moving average
     #  the /2**15  is for converting 16bit PCM to double between -1 and 1
-
     intensity=smooth((s/2**15)**2, 20, 2*analysis_win)
 
     # convert in db
@@ -121,7 +116,6 @@ def getIntensity(s, fs):
     int_db = 10*np.log10(intensity)
 
     #  remove any inf due to the log operation and replace them with the minimum value of intensity
-    # int_db(isinf(int_db)) = min(int_db(~isinf(int_db)));
     int_db[int_db==-np.inf]=min(int_db[int_db>-np.inf])
     return int_db
 
