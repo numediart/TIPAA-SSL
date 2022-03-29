@@ -8,6 +8,9 @@ from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 from utils.DL_audio_processing import melgan_analysis_synthesis, speech_enhancement
 from scipy.interpolate import interp1d
+import uuid
+from scipy.io.wavfile import write, read
+import os
 
 def load_audio(waveFileAddress, fs=16000, speech_correction=True):
     """Load audio, remove DC and normalize waveform
@@ -33,6 +36,15 @@ def load_audio(waveFileAddress, fs=16000, speech_correction=True):
     s = 0.90*s/max(abs(s))
     return s, fs
 
+def prepare_audio_file(audio_file, fs=16000, speech_correction=True):
+    rID=str(uuid.uuid4())
+    if os.path.exists(audio_file):
+        s,fs = load_audio(audio_file, fs=fs, speech_correction=speech_correction)
+    else:
+        return "error: "+audio_file+" could not be loaded", None
+    write('./inputs/'+ rID+ '.wav', fs, (s*32767).astype(np.int16))
+
+    return "success", rID
 
 # signal processing (pitch, instensity, normalization...)
 def getf0Samples(s, fs):
@@ -113,7 +125,7 @@ def getIntensity(s, fs):
 
     # convert in db
     intensity /= 4.0e-10
-    int_db = 10*np.log10(intensity)
+    int_db = 10*np.log10(intensity+10**-10)
 
     #  remove any inf due to the log operation and replace them with the minimum value of intensity
     int_db[int_db==-np.inf]=min(int_db[int_db>-np.inf])

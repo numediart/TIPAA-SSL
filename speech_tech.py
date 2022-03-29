@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from time import time
-from utils.audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples
+from utils.audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples, prepare_audio_file
 import soundfile as sf
 from utils.htk_utils import get_textgrid_data, clean_htk_files
 
@@ -19,15 +19,7 @@ for f in inputs: os.remove(f)
 
 cached_filenames={}
 
-def prepare_audio_file(audio_file, fs=16000):
-    rID=str(uuid.uuid4())
-    if os.path.exists(audio_file):
-        s,fs = load_audio(audio_file, fs=fs)
-    else:
-        return "error: "+audio_file+" could not be loaded", None
-    write('./inputs/'+ rID+ '.wav', fs, (s*32767).astype(np.int16))
 
-    return "success", rID
 
 def get_annotated_signal(rand_fileName, wav_name):
     """Load audio file and annotation files corresponding to parameters, 
@@ -497,7 +489,7 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         
         # Remove downwards trends: it seems to have a positive impact on the performance. But it would be good to test
         # with more examples
-        scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
+        # scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
         def intensity_to_bin(score_by_word, n_max=2):
             bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
             
