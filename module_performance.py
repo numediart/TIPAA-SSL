@@ -1,6 +1,6 @@
 from speech_tech import *
-# from utils.label_data_processing import *
 from utils.text_processing import *
+from utils.audio_processing import prepare_audio_file
 from glob import glob
 import os
 import pandas as pd
@@ -126,53 +126,124 @@ def stress_performance_test(level='sentence', audio_path="data/audio-with-analys
     compute_errors(preds, GTs)
     return errors
 
-def stress_ranking_test():
-    
+
+
+def stress_GE_performance_test(level='sentence'):
     df=get_data_new_content()
     stress_intensities=[]
     stress_binaries=[]
-
     for i,row in df.iterrows():
         formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
-        _, rID=prepare_audio_file(row.audio_path)
-        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=row.text, level="sentence")
+        _, rID=prepare_audio_file(row.audio_path, speech_correction=False)
+        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=row.text, level=level)
         print(res)
         stress_intensities.append(res['stress_intensities'])
         stress_binaries.append(res['stress_binaries'])
     df['stress_intensities']=stress_intensities
     df['stress_binaries']=stress_binaries
 
-    sum_df=df.bins.apply(lambda r:sum(r))
-    df=df[sum_df==1]
+    if level=='sentence':
+        # Here we filter out sentences with more than a stressed word
+        sum_df=df.bins.apply(lambda r:sum(r))
+        df=df[sum_df==1]
+        
+        # get the index of the chunk containing the stress, which is the "chunk of interest"
+        n_word_by_chunk=df.text.apply(lambda r:chunk_text(r))
+        cumsum=n_word_by_chunk.apply(lambda r:np.cumsum([0]+r))
+        idx_1=df.bins.apply(lambda r:r.index(1))
 
-    n_word_by_chunk=df.text.apply(lambda r:chunk_text(r))
-    cumsum=n_word_by_chunk.apply(lambda r:np.cumsum([0]+r))
-    idx_1=df.bins.apply(lambda r:r.index(1))
+        def get_range(cumsum,idx_1):
+            range_df=pd.concat([cumsum,idx_1], axis=1)
+            ranges=[]
+            for i,r in range_df.iterrows():
+                idx=r.bins
+                ns=r.text
+                for i,n in enumerate(ns[::-1]):
+                    if idx>=n: 
+                        range_of_i=[r.text[len(ns)-i-1],r.text[len(ns)-i]]
+                        ranges.append(range_of_i)
+                        break
+            range_df['ranges']=ranges
+            return range_df
+        
+        # get the range in terms of words for the "chunk of interest"
+        range_df=get_range(cumsum,idx_1)
+        df_all=pd.concat([df, range_df[['ranges']]], axis=1)
+        # df_all.apply(lambda r: r['stress_intensities'], axis=1)
 
-    def get_range(cumsum,idx_1):
-        range_df=pd.concat([cumsum,idx_1], axis=1)
-        ranges=[]
-        for i,r in range_df.iterrows():
-            idx=r.bins
-            ns=r.text
-            for i,n in enumerate(ns[::-1]):
-                if idx>=n: 
-                    range_of_i=[r.text[len(ns)-i-1],r.text[len(ns)-i]]
-                    ranges.append(range_of_i)
-                    break
-        range_df['ranges']=ranges
-        return range_df
-    
-    range_df=get_range(cumsum,idx_1)
+        # COI = Chunk Of Interest
+        df_all['COI_stress_intensities']=df_all.apply(lambda r: r['stress_intensities'][r.ranges[0]:r.ranges[1]], axis=1)
+        df_all['COI_bins']=df_all.apply(lambda r: r['bins'][r.ranges[0]:r.ranges[1]], axis=1)
+        df_all['COI_stress_binaries']=df_all.apply(lambda r: r['stress_binaries'][r.ranges[0]:r.ranges[1]], axis=1)
 
-    df_all=pd.concat([df, range_df[['ranges']]], axis=1)
-    df_all.apply(lambda r: r['stress_intensities'], axis=1)
+        all_bins=sum(df_all.COI_bins.tolist(),[])
+        rate_of_1=sum(all_bins)/len(all_bins)
+        print('rate_of_1',rate_of_1)
 
-    # COI = Chunk Of Interest
-    df_all['COI_stress_intensities']=df_all.apply(lambda r: r['stress_intensities'][r.ranges[0]:r.ranges[1]], axis=1)
-    df_all['COI_bins']=df_all.apply(lambda r: r['bins'][r.ranges[0]:r.ranges[1]], axis=1)
+        all_bins_pred=sum(df_all.COI_stress_binaries.tolist(),[])
+        rate_of_1_pred=sum(all_bins_pred)/len(all_bins_pred)
+        print('rate_of_1_pred',rate_of_1_pred)
 
-    return df_all
+        failures=df_all[df_all.COI_stress_intensities.apply(lambda r: len(r))==0]
+        rate_of_failures=len(failures)/len(df_all)
+
+        df_all=df_all[df_all.COI_stress_intensities.apply(lambda r: len(r))!=0]
+
+        # check if the 1 in COI_bins was predicted as 1 inside COI_stress_binaries. Let's call it the "Binary of Interest" or BOI
+        BOI=df_all.apply(lambda r:r['COI_stress_binaries'][r['COI_bins'].index(1)], axis=1)
+        rate_BOI=BOI.sum()/len(BOI)
+        print('rate_BOI',rate_BOI)
+        return df_all
+    elif level=='word':
+        phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
+        split_phonetics=lambda phonetics: [p.replace('|','_').split('_') for p in phonetics.split(' ')]
+
+
+        df.index=range(len(df))
+        word_stress_binaries=df.text.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(prefill_for_sentence(r)['cmu_phonetics'])])
+
+        # I realized some words have all "syllables" stresses (even though they are > 1 syl). In fact, it corresponds to acronyms
+        # here I remove them
+        
+        # To see them:
+        # word_stress_binaries[word_stress_binaries.apply(lambda r: sum([(np.prod(el)==1)&(len(el)>1) for el in r]))>0]
+
+        # only keep whn it's not the case
+        word_stress_binaries=word_stress_binaries[word_stress_binaries.apply(lambda r: sum([(np.prod(el)==1)&(len(el)>1) for el in r]))==0]
+        df=df.loc[word_stress_binaries.index,:]
+
+        # word_stress_binaries[word_stress_binaries.apply(lambda r: [1,1] in r)]
+        # word_stress_binaries[word_stress_binaries.apply(lambda r: [1,1,1,1] in r)]
+
+        def select_by_len(stress_binaries):
+            all_word_bins=sum(stress_binaries.tolist(),[])
+            max_len=max([len(el) for el in all_word_bins])
+            min_len=min([len(el) for el in all_word_bins])
+            print('min_len',min_len)
+            print('max_len',max_len)
+            all_word_bins_by_len=[]
+            for l in range(max_len):
+                all_word_bins_by_len.append([el for el in all_word_bins if len(el)==l+1])
+            return all_word_bins_by_len
+        
+        # filter out examples with different number of words
+        # see them:
+        # (word_stress_binaries.apply(lambda r: len(r))!=df['stress_binaries'].apply(lambda r: len(r))).sum()
+        word_stress_binaries=word_stress_binaries[word_stress_binaries.apply(lambda r: len(r))==df['stress_binaries'].apply(lambda r: len(r))]
+        df=df.loc[word_stress_binaries.index]
+
+        assert len(sum(word_stress_binaries.tolist(),[])) == len(sum(df['stress_binaries'].tolist(),[]))
+
+        GT_by_len=select_by_len(word_stress_binaries)
+        preds_by_len=select_by_len(df['stress_binaries'])
+
+        # these should be the same
+        print([len(el) for el in GT_by_len])
+        print([len(el) for el in preds_by_len])
+
+        for l, (GT,pred) in enumerate(zip(GT_by_len, preds_by_len)):
+            error_rate=sum(sum(np.abs(np.array(GT)-np.array(pred))))/np.prod(np.array(pred).shape)
+            print('words of len '+str(l+1)+' error rate:'+str(error_rate))
 
 
 def compute_prediction_results(selection, libri_words_df, target_phones='IH0 D', 
@@ -348,6 +419,55 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alt
     return all_results
 
 
+def pContrast_for_actor_recordings(target_phones='AO1'):
+    df=pd.read_csv('data/exercise_data_export.csv')
+    df['audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
+    # those who don't have NaN in target
+    df_pContrast=df.loc[df.target_phoneme.dropna().index]
+    selection=df_pContrast[df_pContrast.target_phoneme==target_phones]    
+    selection['split_phonetics']=selection.apply(lambda r: [p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], axis=1)
+    selection['fpath']=selection.audio_file_url
+    selection['audio_file_idx']=selection.fk_audio_recording_id
+
+    phones=cmudict.phones()
+    cmu_vowels=[p[0]+'1' for p in phones if p[1][0]=='vowel']
+
+    alternatives=cmu_vowels
+    statuss=[]
+    result_records=[]
+    detected_transcriptions=[]
+    for i,row in selection.iterrows():    
+        target_word_idx=ast.literal_eval(row.target_word_indexes)[0]
+        target_syllable_idx=ast.literal_eval(row.target_syllable_indexes)[0]
+        status_audio, rID=prepare_audio_file(row.fpath)        
+        make_pContrast_annotation_files_from_phonetics(rID,phonetics=row.split_phonetics, word_idx=target_word_idx, target_phones=target_phones, alternatives=alternatives)
+        status,results=phonemeContrast(rID, rID)
+
+        statuss.append(status)
+        if results!=[]:
+            detected_transcription=results[1]
+            confidence_scores=results[0].iloc[:,3].tolist()
+            phonetic_detection=results[0][results[0].iloc[:,2].str.contains('_')].detected_transcription.tolist()
+            phonetic_detection_timings=results[0][results[0].iloc[:,2].str.contains('_')].iloc[:,0:2].to_numpy()
+            d={'detected_phone':phonetic_detection,'phonetic_detection_timings':phonetic_detection_timings,'phones':row.cmu_phonetics,'detected_transcription':' '.join(detected_transcription), 'confidence_scores':confidence_scores, 'status':status,'wav_path':row.fpath}
+            detected_transcriptions.append(detected_transcription)
+        else:
+            detected_transcriptions.append([])
+            d={'detected_phone':'','phones':row.cmu_phonetics, 'detected_transcription':'', 'confidence_scores':[], 'status':status, 'wav_path':row.fpath}
+        result_records.append(d)
+    results_df=pd.DataFrame.from_records(result_records)
+
+    phonetic_detections=results_df.detected_phone.apply(lambda r: r[0] if len(r)>0 else 'err').tolist()
+    d=Counter(phonetic_detections)
+    # print(d)
+    d = pd.DataFrame.from_dict(d, orient='index')
+    d.columns=[target_phones]
+    d=d.sort_values(by=target_phones, ascending=False)
+    d=d / d.sum()*100
+
+    return phonetic_detections, d
+
+
 def unpredictable_vowels_from_audiobook_data(data_set='dev-clean', target_phones='IY1', target_graphemes='ea', alternatives=['IY1', 'EH1'], n=None):
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
 
@@ -491,10 +611,10 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None):
     return all_results, all_results_s
             
 
-def confusion_analysis_of_pContrast(phone_set, n=100):
+def confusion_analysis_of_pContrast(phone_set, n=100, data_set='dev-clean'):
     confusion_records=[]
     for p in phone_set:
-        r=pContrast_from_audiobook_data(data_set='dev-clean', target_phones=p, alternatives=phone_set, n=n)
+        r=pContrast_from_audiobook_data(data_set=data_set, target_phones=p, alternatives=phone_set, n=n)
         dict_count_prediction={}
         for phone in phone_set: dict_count_prediction[phone]=0
         if r!=[]:
@@ -506,7 +626,7 @@ def confusion_analysis_of_pContrast(phone_set, n=100):
     confusion_df.index=phone_set
     return confusion_df
 
-def vowels_consonants_confusions_from_audiobook_data(n=100):
+def vowels_consonants_confusions_from_audiobook_data(n=100, data_set='dev-clean'):
     import cmudict
     phones=cmudict.phones()
 
@@ -514,22 +634,37 @@ def vowels_consonants_confusions_from_audiobook_data(n=100):
     cmu_consonants=[p[0] for p in phones if p[1][0]!='vowel']
     # results={}
 
-    vowel_confusion_df=confusion_analysis_of_pContrast(cmu_vowels, n=n)
+    vowel_confusion_df=confusion_analysis_of_pContrast(cmu_vowels, n=n, data_set=data_set)
     vowel_confusion_df_norm=(vowel_confusion_df.div(vowel_confusion_df.sum(axis=1), axis=0)*100).round(1)
-    vowel_confusion_df.to_csv('performance_results/vowel_confusion_df_n_'+str(n)+'.csv')
-    vowel_confusion_df_norm.to_csv('performance_results/vowel_confusion_df_norm_n_'+str(n)+'.csv')
+    vowel_confusion_df.to_csv('performance_results/vowel_confusion_df_n_'+str(n)+'_'+data_set+'.csv')
+    vowel_confusion_df_norm.to_csv('performance_results/vowel_confusion_df_norm_n_'+str(n)+'_'+data_set+'.csv')
     
-    consonant_confusion_df=confusion_analysis_of_pContrast(cmu_consonants, n=n)
+    consonant_confusion_df=confusion_analysis_of_pContrast(cmu_consonants, n=n, data_set=data_set)
     consonant_confusion_df_norm=(consonant_confusion_df.div(consonant_confusion_df.sum(axis=1), axis=0)*100).round(1)
-    consonant_confusion_df.to_csv('performance_results/consonant_confusion_df_n_'+str(n)+'.csv')
-    consonant_confusion_df_norm.to_csv('performance_results/consonant_confusion_df_norm_n_'+str(n)+'.csv')
+    consonant_confusion_df.to_csv('performance_results/consonant_confusion_df_n_'+str(n)+'_'+data_set+'.csv')
+    consonant_confusion_df_norm.to_csv('performance_results/consonant_confusion_df_norm_n_'+str(n)+'_'+data_set+'.csv')
 
     plt.clf()
     sns.heatmap(vowel_confusion_df_norm, annot=True, cmap='YlGnBu')
-    plt.savefig('performance_results/vowel_contrast_confusion_n_'+str(n)+'.png')
+    plt.savefig('performance_results/vowel_contrast_confusion_n_'+str(n)+'_'+data_set+'.png')
     plt.clf()
     sns.heatmap(consonant_confusion_df_norm, annot=True, cmap='YlGnBu')
-    plt.savefig('performance_results/consonant_contrast_confusion_n_'+str(n)+'.png')
+    plt.savefig('performance_results/consonant_contrast_confusion_n_'+str(n)+'_'+data_set+'.png')
+
+
+def vowels_confusions_actor_recordings():
+    # for actors recordings, take only the true targets
+    vowels=['IY1','IH1','AO1','AA1','OW1']
+    results=[]
+    for v in vowels: 
+        print("vowel:",v)
+        # predictions[v]=pContrast_from_audiobook_data(data_set='dev-clean', target_phones=v, n=n)
+        # _, predictions[v]=pContrast_for_actor_recordings(target_phones=v)
+        _, rates=pContrast_for_actor_recordings(target_phones=v)
+        # _, predictions[v].to_csv('performance_results/vowel_accuracies_'+v+'.csv')
+        results.append(rates)
+
+    return results
 
 if __name__ == "__main__":
 
