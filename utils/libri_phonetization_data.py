@@ -120,40 +120,60 @@ def build_librispeech_words_df(
 def libri_phonetics(
         data_set='dev-clean',
         basepath='data/librispeech_alignments',
-        audio_path='LibriSpeech/',
+        audio_path='data/LibriSpeech/',
         # audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/',
         n=None
         ):
-    
-    libri_words_df=build_librispeech_words_df(
-        data_set=data_set,
-        basepath=basepath,
-        audio_path=audio_path,
-        n=n
-    )
-    # paths=libri_words_df.path.unique()
+    """Build a dataframe witha all sentences of the set. columns are ['text', 'phone_df', 'path', 'wav_path']
+    where phone_df is itself a dataframe for which columns are ["start", "end", "cmu_phone", "ipa_phone"]
 
-    libri_rows=libri_words_df.drop_duplicates(subset='path')
-    ps=[]
-    texts=[]
-    for i,r in tqdm(libri_rows.iterrows()):
-        texts.append(get_sentence(r.path))
-        ps.append(phonetics_for_row(r, libri_words_df))
-    
-    libri_rows['text']=texts
-    libri_rows['phonetics']=ps
+    Args:
+        data_set (str, optional): [description]. Defaults to 'dev-clean'.
+        basepath (str, optional): [description]. Defaults to '/data/librispeech_alignments'.
+        audio_path (str, optional): [description]. Defaults to '/data/LibriSpeech/'.
+        n ([type], optional): [description]. Defaults to None.
 
-    libri_rows=libri_rows[['file_idx','path','wav_path', 'text', 'phonetics']]
+    Returns:
+        [type]: [description]
+    """
+    path=os.path.join(basepath, data_set)
+    files = glob(path+'/*/*/*.TextGrid')
+    if n is not None: files=files[:n]
 
-    ids=libri_rows.path.apply(lambda r:r.split('/')[-1].split('.')[0])
-    libri_rows['id']=ids
 
-    cmu_1_char['spn']=''
-    ipa=libri_rows.phonetics.apply(lambda r: ' '.join([''.join([cmu_1_char[p] for p in remove_stress_annots(w.split(' '))]) for w in r]))
-    ipa=ipa.apply(lambda r: r.replace('  ',' '))
-    libri_rows['ipa']=ipa
+    records=[]
+    records_with_timings=[]
 
-    libri_rows.to_csv('data/libri_text_ipa_'+data_set+'.csv')
+    for f in files:
+        wav_path=os.path.join(audio_path,'/'.join(f.split('/')[-4:]).split('.')[0]+'.flac')
+        phone_df=get_all_phone_with_timings(f)
+        text=get_sentence(f)
+        d={'text':text, 'phones':' '.join(phone_df['ipa_phone'].tolist()), 'path':f, 'wav_path':wav_path}
+        d_with_timings={'text':text, 'phone_df':phone_df, 'path':f, 'wav_path':wav_path}
+        records.append(d)
+        records_with_timings.append(d_with_timings)
+    libri_phonetics_df=pd.DataFrame.from_records(records)
+    libri_phonetics_df_with_timings=pd.DataFrame.from_records(records_with_timings)
+
+
+    libri_phonetics_df_with_timings.to_json('data/libri_text_ipa_timings_'+data_set+'.json')
+    libri_phonetics_df.to_json('data/libri_text_ipa_'+data_set+'.json')
+
+    return libri_phonetics_df_with_timings, libri_phonetics_df
+
+def libri_phonetics_data(
+        data_set='dev-clean',
+        # audio_path='/mnt/c/Users/noe_t/Downloads/LibriSpeech/',
+        ):
+    path_df_t='data/libri_text_ipa_timings_'+data_set+'.json'
+    path_df='data/libri_text_ipa_'+data_set+'.json'
+    if os.path.exists(path_df_t) and os.path.exists(path_df):
+        libri_phonetics_df_with_timings=pd.read_json(path_df_t)
+        libri_phonetics_df=pd.read_json(path_df)
+    else:
+        libri_phonetics_df_with_timings, libri_phonetics_df=libri_phonetics(data_set=data_set)
+
+    return libri_phonetics_df_with_timings, libri_phonetics_df
 
 
 
