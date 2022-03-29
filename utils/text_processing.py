@@ -126,6 +126,9 @@ arpabet_to_ipa = {
 
 cmu_phones=[el[0] for el in cmudict.phones()]
 
+phones=cmudict.phones()
+cmu_vowels=[p[0] for p in phones if p[1][0]=='vowel']
+
 # CMU is a subset of arpabet
 cmu_1_char={}
 cmu_1_char_to_gibberish={}
@@ -206,13 +209,39 @@ def phonetics_from_sentence(sentence="Where's the best place to have coffee?"):
     return words_phones
 
 
+unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 
 def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
-    l=[]
-    for el in transcription:
-        if el[-1] in str([0,1,2]): l.append(el[:-1])
-        else: l.append(el)
-    return l
+    return [unstress(el) for el in transcription]
+
+def phonetics_indexed_df_from_formatted_phonetics(phonetics):
+    word_split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
+    n_phone_by_word=[len(w) for w in word_split_phonetics]
+    
+    word_indices=[]
+    for i,n in enumerate(n_phone_by_word): word_indices+= [i]*n
+    split_phonetics=[[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+    n_phone_by_syl=[[len(s) for s in w] for w in split_phonetics]
+
+    all_syl_indices=[]
+    for n_phones in n_phone_by_syl:
+        syl_indices=[]
+        for i,n in enumerate(n_phones): syl_indices+= [i]*n
+        all_syl_indices+=syl_indices
+
+    phone_list=sum(sum(split_phonetics, []),[])
+
+    phonetics_indexed_df=pd.DataFrame()
+    phonetics_indexed_df['phones']=phone_list
+    phonetics_indexed_df['word_idx']=word_indices
+    phonetics_indexed_df['syl_idx']=all_syl_indices
+
+    phonetics_indexed_df.apply(lambda r: r['phones'], axis=1)
+    
+    remove_stress_annots(phone_list)
+
+    return phonetics_indexed_df
+
 
 
 def check_phonemes(phonemes):
