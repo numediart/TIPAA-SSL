@@ -61,25 +61,29 @@ b'{"text": "Kayla isn\'t angry at Tyler",
 - On ECS: docker context use myecs, then docker compose push (see below), then docker compose up (then docker context use default)
 - or docker push on scaleway and see with Filipe
 
-## Docker application on EC2
+## Docker application on EC2 or similar
 
-NOTE: To have debug mode on EC2, change in run_server.sh the line gunicorn to the commented "python flask_server.py"
+Please see [this documentation file](/DEPLOYMENT.md).
+
+
+Additional notes: 
+
+To have debug mode on EC2, change in run_server.sh the line gunicorn to the commented "python flask_server.py"
 
 You can also build the Dockerfile that will install everything and serve the application with Flask with nginx backend.
 I used this info to do that: 
 https://github.com/srcecde/flask-docker-ec2
 <!-- https://github.com/ram-ch/Building-microservices-with-docker-on-AWS -->
 
-First, clone this repo, then in it:
-
-```
-sudo docker-compose build
-sudo docker-compose up -d
-```
 
 To kill all containers, e.g. to restart afterwards:
 ```
 docker container kill $(docker ps -q)
+```
+
+To remove all images:
+```
+docker system prune -a
 ```
 
 On AWS, I chose an Amazon Linux 2 with Docker installed. 
@@ -196,6 +200,17 @@ After a local `docker compose build`,
 the usual flow seems to be `docker tag flowspeech_flaskapp:latest rg.fr-par.scw.cloud/flowspeech/flowspeech_flaskapp:latest` + `docker push rg.fr-par.scw.cloud/flowspeech/flowspeech_flaskapp:latest`
 
 ## Manual Installation
+### Download codes and models
+
+```
+git clone https://github.com/flowchase/flowspeech
+cd flowspeech
+git clone https://github.com/noetits/charsiu
+sudo apt-get install git-lfs
+git lfs install
+python scripts/download_models.py
+```
+
 ### Install HTK
 
 Either use the Dockerfile from https://github.com/loretoparisi/htk 
