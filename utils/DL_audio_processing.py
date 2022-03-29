@@ -8,8 +8,8 @@ import soundfile as sf
 
 from utils.text_processing import cmu_1_char_to_gibberish
 import pandas as pd
-from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2CTCTokenizer, Wav2Vec2ForCTC, TrainingArguments, Trainer
-from scipy.io.wavfile import write, read
+from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
+from scipy.io.wavfile import read
 
 device = 'cpu' # cuda or cpu
 
@@ -33,10 +33,14 @@ def melgan_analysis_synthesis(s):
     return s.numpy().flatten()
 
 from speechbrain.pretrained import SpectralMaskEnhancement
+# enhance_model = SpectralMaskEnhancement.from_hparams(
+#         source="speechbrain/metricgan-plus-voicebank",
+#         savedir="pretrained_models/metricgan-plus-voicebank",
+# )
 enhance_model = SpectralMaskEnhancement.from_hparams(
-        source="speechbrain/metricgan-plus-voicebank",
-        savedir="pretrained_models/metricgan-plus-voicebank",
+        source="hf_models/speechbrain/metricgan-plus-voicebank"
 )
+
 
 def speech_enhancement(s):
     s=torch.from_numpy(s.astype(np.float32))[None]
@@ -45,6 +49,8 @@ def speech_enhancement(s):
     return enhanced.numpy().flatten()
 
 if False:
+    # If we want to use one of these, download them with scripts/downloas_models.py instead as for enhance_model
+
     from speechbrain.pretrained import VAD
     # Model is downloaded from the speechbrain HuggingFace repo
     VAD_model = VAD.from_hparams(
