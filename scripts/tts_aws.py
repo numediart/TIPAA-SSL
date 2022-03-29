@@ -45,9 +45,6 @@ def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',path
     sentence=sentence.replace("'","&apos;").replace('"','&quot;')
     text=replace_with_tag(sentence, tag=tag, options=options)
     # reserved characters : https://docs.aws.amazon.com/polly/latest/dg/escapees.html
-    
-    # print('name',name)
-    # print('text',text)
 
     cmd= "aws polly synthesize-speech \
     --text-type ssml \
@@ -70,10 +67,8 @@ def synthesize_cmu(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk_i
     futures = []
     for w in tqdm(words):
         name=spk_id+'_'+remove_special_characters(w, chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"\']')
-        # synthesize(w, root_folder=root_folder, synth_technique='standard',voice_id=voice_id, name=name)
-
         futures.append(executor.submit(
-            synthesize, w, tag='prosody', options='rate="70%" volume="+20dB"',root_folder=root_folder,synth_technique='standard',voice_id=voice_id, name=name))
+            synthesize, w, tag='prosody', options='rate="70%" volume="+20dB"',path=root_folder,synth_technique='standard',voice_id=voice_id, name=name))
 
     proc_list = [future.result() for future in tqdm(futures)]
 
