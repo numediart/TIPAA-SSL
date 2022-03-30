@@ -16,6 +16,7 @@ import cmudict
 phones=cmudict.phones()
 
 cmudict_dict=cmudict.dict()
+unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 
 # Python code to convert string to list character-wise
 # https://www.geeksforgeeks.org/python-program-convert-string-list/
@@ -32,6 +33,8 @@ def define_categories(mode='CMU'):
         approximates,vowels,nasals,fricatives,affricates,stops=[],[],[],[],[],[]
         for p in phones:
             if p[-1][0]=='vowel':
+                # I add with and without stress so that it works with both converntions
+                vowels.append(p[0].lower())
                 vowels.append(p[0].lower()+str(0))
                 vowels.append(p[0].lower()+str(1))
                 vowels.append(p[0].lower()+str(2))
@@ -145,8 +148,9 @@ def SonoriPy(word, mode='CMU'):
             vowel_ending_in_consonant=['w','y','r']
             idx_to_insert_liquid=[]
             for i,el in enumerate(word):
-                if el[-1] in str([0,1,2]) and el[-2].lower() in vowel_ending_in_consonant:
-                    # print(el)
+                # print(el)
+                # print(el[1])
+                if el.lower() in vowels and el[1].lower() in vowel_ending_in_consonant:
                     idx_to_insert_liquid.append(i)
             for idx in idx_to_insert_liquid[::-1]:
                 # insert liquid, e.g. 'r', it does not really matter that it is the true one. Because it will just 
