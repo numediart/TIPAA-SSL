@@ -9,15 +9,27 @@ import soundfile as sf
 from utils.htk_utils import get_textgrid_data, clean_htk_files
 
 from utils.label_data_processing import make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics
-from utils.text_processing import phonetics_from_sentence, chunk_text, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, unstress
+from utils.text_processing import phonetics_from_sentence, chunk_text, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, unstress, split_phonetics,  cmu_to_gibberish, SonoriPy
+
 import uuid
 import time
 
 from utils.charsiu_utils import charsiu_phone_forced_aligner
+drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
+
+from itertools import groupby
+drop_consecutive_elements= lambda L: [key for key, _group in groupby(L)]
 
 # initialize model
 model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
+target_accepted_alternatives={
+    'AA': ['AA', 'AO'],
+    'AO': ['AA', 'AO'],
+    'D': ['D', 'T'],
+    'T': ['D', 'T'],
+    'IH': ['IH', 'AH']
+}
 
 def compute_stress_score(textgridData, s, fs):
     """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
@@ -186,25 +198,115 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
     elif level=="sentence":
         return {"status": "success", "stress_intensities": sum(scores_grouped_by_chunk,[]), "stress_binaries": sum(bins_by_chunk,[])}
     else:
-        print("No such level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.")
         return {"status": "error: "+level+"is not a valid level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.", "stress_intensities": [], "stress_binaries": []}
 
 
 def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|AW1_N_D', 
-                            # p=set_params(), 
                             target_word_idx=0, 
                             target_syllable_idx=0, 
-                            # alternatives=['T', 'D', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']
-                            # alternatives='T D IH0_D IH1_D IH2_D EH2_D AH0_D',
                             target_phones='D',
                             max_speech_rate=8
                     ):
     status, s = audio_load_and_check(rID, phonetics, max_speech_rate=max_speech_rate)
+    g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+    if status=="success":
+        phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones)
+
+        if detected_syllable!=detected_syllable: 
+            return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
+        g_d=[cmu_to_gibberish[unstress(p)] for p in detected_syllable]
+        
+        # post-correction: for the target, when we are in a case of accepted alternative in prediction, we replace it with the GT
+        if unstress(target_phones) in target_accepted_alternatives:
+            if unstress(phonetic_detection) in target_accepted_alternatives[unstress(target_phones)]:
+                phonetic_detection=unstress(target_phones)
+                g_d=g_t
+        
+        # phonetic detection needs to be the stressed version for backwards compatibility
+        if phonetic_detection==unstress(target_phones): phonetic_detection=target_phones
+        return {"status": "success", "phonetic_detection": phonetic_detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
+    else:
+        return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+    
+
+def phonetic_content_analysis(s, phonetics):
+    phonetic_content=model.analyze_phonetic_content(s, phonetics)
+    if len(phonetic_content)==0: return phonetic_content
+    
+    
+    def syl_analysis(syl_df):
+        # inside a syllable or word, there cannot be several times the same phoneme consecutively
+        collapsed_syl=drop_consecutive_duplicates(syl_df[['pred_phones_audio']])
+
+        # one syllable in ground truth can correspond in several syllables in prediction, e.g. moved -> movED
+        # or also in "0 syllable" if there is no vowel. If that's the case,  I have to consider it is 1 syllable
+        pred_syls=SonoriPy(collapsed_syl.pred_phones_audio.tolist())[0]
+        if pred_syls==[]: pred_syls=[collapsed_syl.pred_phones_audio.tolist()]
+
+        
+        # extract syllable indices for predicted syls
+        pred_syls_indxs=sum([[i]*n for i,n in enumerate([len(syl) for syl in pred_syls])], [])
+
+        collapsed_syl.loc[:,'pred_syls_indxs_inside_GT_syl']=pred_syls_indxs
+
+        # I align the collapsed syllable to the timed one. This leads to NaNs that have to be filled
+        syl_df.loc[:,'pred_syls_indxs_inside_GT_syl']=collapsed_syl.loc[:,'pred_syls_indxs_inside_GT_syl'].astype(int)
+        syl_df=syl_df.fillna(method="ffill")
+
+        # in each syllable in prediction, I only keep one vowel, by majority vote, i.e. I drop all vowels except max frames in each syl
+        for i in syl_df.pred_syls_indxs_inside_GT_syl.unique():
+            s=syl_df.loc[syl_df.pred_syls_indxs_inside_GT_syl==i]
+            v=s[s.pred_phones_audio.isin(cmu_vowels)]
+            if len(v)>0:
+                m=v.n_frames.idxmax()
+                l=[el for el in v.index.tolist() if el != m]
+                syl_df=syl_df.drop(l)
+        
+        return syl_df
+
+    # reduction: we go in each syllable
+    dfs=[]
+    for w_idx in range(phonetic_content.word_idx.values[-1]+1):
+        w_df=phonetic_content[phonetic_content.word_idx==w_idx]
+        for s_idx in range(w_df.syl_idx.values[-1]+1):
+            s_df=w_df[phonetic_content.syl_idx==s_idx]
+            syl_df=syl_analysis(s_df)
+            dfs.append(syl_df)
+    phonetic_content=pd.concat(dfs)
+
+    # post-correction : for each row when we are in a case of accepted alternative in prediction, we replace it with the GT
+    for i,r in phonetic_content.iterrows():
+        if r.pred_phones in target_accepted_alternatives:
+            if r.pred_phones_audio in target_accepted_alternatives[r.pred_phones]:
+                phonetic_content.loc[i, 'pred_phones_audio']=r.pred_phones
+
+    
+    # phonetic_content=phonetic_content[phonetic_content.n_frames>1]
+    phonetic_content=phonetic_content[phonetic_content.pred_phones_audio!='[SIL]']
+
+    # phonetic_content.loc[phonetic_content.pred_phones_audio=='[SIL]','pred_phones_audio']=''
+
+    phonetic_content=phonetic_content.loc[drop_consecutive_duplicates(phonetic_content[['pred_phones','pred_phones_audio']]).index,:]
+    return phonetic_content
+
+def syllable_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|AW1_N_D', 
+                            target_word_idx=0, 
+                            target_syllable_idx=0, 
+                            max_speech_rate=8
+                    ):
+    status, s = audio_load_and_check(rID, phonetics, max_speech_rate=max_speech_rate)
+    g_t=drop_consecutive_elements([cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]])
 
     if status=="success":
-        phonetic_detection=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones)
-        return {"status": "success", "phonetic_detection": phonetic_detection}
+        phonetic_content=phonetic_content_analysis(s, phonetics)
+        if len(phonetic_content)==0: return {"status": status,  "gibberish_truth":  "null", "gibberish_detected":  "null"}
+
+        syllable_content=phonetic_content[phonetic_content.word_idx==target_word_idx][phonetic_content.syl_idx==target_syllable_idx]
+        detected_syllable=syllable_content.pred_phones_audio.tolist()
+        g_d=drop_consecutive_elements([cmu_to_gibberish[unstress(p)] for p in detected_syllable])
+
+        return {"status": "success", "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
-        return {"status": status, "phonetic_detection": float('nan')}
-    
+        return {"status": status,  "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
     
