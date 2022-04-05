@@ -9,12 +9,14 @@ import sys
 import torch
 import numpy as np
 from charsiu.src.utils import seq2duration,forced_align
-from utils.text_processing import remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, unstress
+from utils.text_processing import remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, unstress, SonoriPy
 from utils.audio_processing import getIntonation, getIntensity, normalize
 from collections import Counter
 
+drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
 
-class charsiu_phone_forced_aligner(charsiu_forced_aligner):    
+
+class charsiu_phone_forced_aligner(charsiu_forced_aligner):
     def align_phones(self, audio, phones):
         '''
         Perform forced alignment
@@ -23,8 +25,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         ----------
         audio : np.ndarray [shape=(n,)]
             time series of speech signal
-        text : str
-            The transcription
+        phones : phones must be a list of list of 1 phone line this: phones=[['EH'], ['N'], ['D'], ['IH'], ['D']]
 
         Returns
         -------
@@ -39,17 +40,19 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         with torch.no_grad():
             out = self.aligner(audio)
         
-        hidden_states= out.hidden_states
-        last_hidden_state=hidden_states[-1]
-        logits=out.logits
+        # hidden_states= out.hidden_states
+        # last_hidden_state=hidden_states[-1]
+        # logits=out.logits
 
         cost = torch.softmax(out.logits,dim=-1).detach().cpu().numpy().squeeze()
+
+        # np.argmax(cost, axis=1)
+        pred_probas=np.max(cost, axis=1)
 
         pred_ids_audio = torch.argmax(out.logits.squeeze(),dim=-1)
         pred_ids_audio = pred_ids_audio.detach().cpu().numpy()
         pred_phones_audio = [self.charsiu_processor.mapping_id2phone(int(i)) for i in pred_ids_audio]
         # pred_phones = seq2duration(pred_phones,resolution=self.resolution)
-        
         
         sil_mask = self._get_sil_mask(cost)
         nonsil_idx = np.argwhere(sil_mask!=self.charsiu_processor.sil_idx).squeeze()
@@ -60,24 +63,60 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             pred_phones = self._merge_silence(aligned_phones,sil_mask)
             alignment_phones = seq2duration(pred_phones,resolution=self.resolution)
 
-            
-
             # for each alignment, go inside the corresponding frames of per frame predictions from audio and do a majority vote
             timestep=self.resolution
-            most_pred_phones_audio=[]
+            # most_pred_phones_audio=[]
+            max_proba_mean_phones_audio=[]
             for a in alignment_phones:
                 start=a[0]
                 end=a[1]
-                select=pred_phones_audio[round(start/timestep):round(end/timestep)]
-                c = Counter(select)
-                value, count = c.most_common()[0]
-                most_pred_phones_audio.append(value)
+                select_cost=cost[round(start/timestep):round(end/timestep)]
+                idx_mean_max=np.argmax(select_cost.mean(axis=0))
+                max_proba_mean_phones_audio.append(self.charsiu_processor.mapping_id2phone(int(idx_mean_max)))
+
+                # select=pred_phones_audio[round(start/timestep):round(end/timestep)]
+                # c = Counter(select)
+                # value, count = c.most_common()[0]
+                # most_pred_phones_audio.append(value)
         else:
             sil='[SIL]'
             alignment_phones=[(0, len(pred_ids_audio)*self.resolution, sil)]
-            most_pred_phones_audio=[sil]
+            # most_pred_phones_audio=[sil]
+            max_proba_mean_phones_audio=[sil]
+            pred_phones=[sil]*len(pred_ids_audio)
+        
+        
+        df=pd.DataFrame()
+        df.loc[:,'pred_phones']=pred_phones
+        df.loc[:,'pred_phones_audio']=pred_phones_audio
+        
+        GT_idxs=self.charsiu_processor.get_phone_ids([[el] for el in df.pred_phones.tolist()])[1:-1]
+        GT_probas=np.array([cost[i,idx] for i,idx in enumerate(GT_idxs)])
 
-        return alignment_phones, most_pred_phones_audio
+        # for i,idx in enumerate(GT_idxs):print(i,idx)
+        
+        # df['probas']=probas
+        detailed_alignment_phones=drop_consecutive_duplicates(df)
+
+        # to get the number of frames of each consecutive combination of pred_phones_audio and pred_phones
+        # I look at differences of indices. For the last one, we need to make diff with len(df)
+        n_frames=np.diff(detailed_alignment_phones.index).tolist()
+        n_frames.append(len(df)-detailed_alignment_phones.index[-1])
+        detailed_alignment_phones.loc[:,'n_frames']=n_frames
+
+        # Compute average probas for each row
+        idxs_for_ranges=detailed_alignment_phones.index.tolist()+[len(df)]
+        pred_proba_means=[]
+        GT_proba_means=[]
+        for i in range(len(detailed_alignment_phones)):
+            # print(idxs_for_ranges[i])
+            # print(idxs_for_ranges[i+1])
+            pred_proba_means.append(pred_probas[idxs_for_ranges[i]:idxs_for_ranges[i+1]].mean())
+            GT_proba_means.append(GT_probas[idxs_for_ranges[i]:idxs_for_ranges[i+1]].mean())
+        detailed_alignment_phones.loc[:,'pred_proba_means']=pred_proba_means
+        detailed_alignment_phones.loc[:,'GT_proba_means']=GT_proba_means
+
+        return alignment_phones, max_proba_mean_phones_audio, detailed_alignment_phones
     
     def force_and_predict(self, audio, phones):
         """phones must be a list of phonemes, e.e.: phones=['EH1', 'N', 'D', 'IH0', 'D']
@@ -86,10 +125,10 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
         # print('seq_p', seq_p)
         # charsiu.charsiu_processor.get_phone_ids(seq_p)
-        alignment_phones, pred_phones_audio = self.align_phones(audio=audio,phones=seq_p)
+        alignment_phones, max_proba_mean_phones_audio, _ = self.align_phones(audio=audio,phones=seq_p)
         df_segmented=pd.DataFrame(alignment_phones)
         df_segmented.columns=['start','end','cmu_phones']
-        df_segmented['pred_phones_audio']=pred_phones_audio
+        df_segmented.loc[:,'pred_phones_audio']=max_proba_mean_phones_audio
         return df_segmented
     
     def predict_word(self, audio, phonetics, target_word_idx):
@@ -112,7 +151,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             word=phonetics.split(' ')[target_word_idx]
             syllables=[syl.split('_') for syl in word.split('|')]
             syllable=syllables[target_syllable_idx]
-            
             syl=remove_stress_annots(syllable)
 
             # find the phoneme index:
@@ -123,8 +161,57 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             phonetic_detection=df_word.iloc[p_idx_global].pred_phones_audio
         else:
             phonetic_detection=float('nan')
+            syllable=float('nan')
 
-        return phonetic_detection
+        return phonetic_detection, syllable
+
+    def analyze_phonetic_content(self, audio, phonetics):
+        """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
+        """
+        split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
+        phones=sum(split_phonetics,[])
+        seq_p=[[p] for p in  remove_stress_annots(phones)]
+        alignment_phones, pred_phones_audio, detailed_alignment_phones = self.align_phones(audio=audio,phones=seq_p)
+
+        detailed_alignment_phones=detailed_alignment_phones[detailed_alignment_phones.pred_phones != '[SIL]']
+
+        if len(detailed_alignment_phones)==0: return detailed_alignment_phones
+        
+        # if I filter out silences contained in pred_phones_audio, it can sometimes remove phones from pred_phones, which is problematic for 
+        # the following alignment
+        #[detailed_alignment_phones.pred_phones_audio != '[SIL]']
+
+        phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
+
+        # here we align phonetics_indexed_df to the detailed_alignment_phones to be able to get an indexation on the "really pronounced phonetics"
+        # from part of audio that corresponded to specific phones in ground truth (according to forced-alignment)
+        orig_phones=remove_stress_annots(phones)
+        pred_phones=detailed_alignment_phones.pred_phones.tolist()
+        assert orig_phones[0] == pred_phones[0], "The first phone of alignment pred and ground truth should be the same"
+        indx_in_phones=0
+        pred_phones_original_indices=[]
+        for i,p in enumerate(pred_phones):
+            if p == orig_phones[indx_in_phones]:
+                pred_phones_original_indices.append(indx_in_phones)
+            else:
+                indx_in_phones+=1
+                # Given it was not equal to the previous element, after going to the next element of ground truth, it should be the same"
+                # except if there was twice the same phoneme (because it was the end of last word and start of current word)
+                if p == orig_phones[indx_in_phones]:
+                    pred_phones_original_indices.append(indx_in_phones)
+                else:
+                    assert orig_phones[indx_in_phones]==orig_phones[indx_in_phones-1], "This should correspond to the case of two consecutiva identical phonemes, because they are in two consecutive words"
+                    indx_in_phones+=1
+                    assert p == orig_phones[indx_in_phones], "This should correspond to the case of two consecutiva identical phonemes, because they are in two consecutive words"
+                    pred_phones_original_indices.append(indx_in_phones)
+
+        # detailed_alignment_phones.loc[:,'p_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'p_idx'].tolist()
+        detailed_alignment_phones.loc[:,'word_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'word_idx'].tolist()
+        detailed_alignment_phones.loc[:,'syl_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'syl_idx'].tolist()
+        # detailed_alignment_phones=detailed_alignment_phones[['word_idx','syl_idx','p_idx','pred_phones', 'GT_proba_means', 'pred_phones_audio', 'pred_proba_means', 'n_frames']]
+        detailed_alignment_phones=detailed_alignment_phones[['word_idx','syl_idx','pred_phones', 'GT_proba_means', 'pred_phones_audio', 'pred_proba_means', 'n_frames']]
+
+        return detailed_alignment_phones
 
     def compute_stress_score(self, audio, phonetics):
         """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
@@ -145,12 +232,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         textgridData=self.force_and_predict(audio,split_phonetics)
         textgridData=textgridData[textgridData.cmu_phones != '[SIL]']
 
-        # print(textgridData)
-        
-        a=textgridData
-        a.loc[a.cmu_phones.shift(-1) == a.cmu_phones]
-        # if len(a.loc[a.cmu_phones.shift(-1) == a.cmu_phones])>0:  print(a.loc[a.cmu_phones.shift(-1) == a.cmu_phones]); import pdb;pdb.set_trace()
-
         # I have to collapse if several consecutive vowels are the same. it can happen when the predictions are not the same.
         # I thus have to group the timings (first start until last end)
 
@@ -170,10 +251,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         drop_duplicates=lambda a: a.loc[a.shift(+1) != a]
         filtered_df=textgridData.loc[drop_duplicates(textgridData.cmu_phones).index]
 
-        # here in the filtered_df containg only the first occurence for equal consecutive examples, we replace the 'end' value with the ine in the "ends"
+        # here in the filtered_df containg only the first occurence for equal consecutive examples, we replace the 'end' value with the line in the "ends"
         for rownum,(indx,val) in enumerate(starts.iteritems()): filtered_df.loc[indx,'end']=textgridData.loc[ends.index[rownum],'end']
-
-        # indxVowels=textgridData[textgridData.cmu_phones.isin(cmu_vowels)].index.tolist()
         filtered_df=filtered_df[filtered_df.cmu_phones.isin(cmu_vowels)]#.index.tolist()
 
         f0Samples=getIntonation(audio, self.sr)
@@ -184,9 +263,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         startPositions_samples = (round(self.sr*filtered_df.iloc[:,0])+1).astype(int).tolist()
         stopPositions_samples = round(self.sr*filtered_df.iloc[:,1]).astype(int).tolist()
 
-        # print('startPositions_samples',startPositions_samples)
-        # print('stopPositions_samples',stopPositions_samples)
-        
         # to make sure we don t go beyond the end of the signal
         assert stopPositions_samples[-1]<len(audio), "The end of the last phoneme should be inside the signal"
 
@@ -248,19 +324,27 @@ if __name__=="__main__":
 
     # actor recordings
     df=pd.read_csv('data/exercise_data_export.csv')
-    df['audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
+    df.loc[:,'audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     target_phones="IH0_D"
     selection=df_pContrast[df_pContrast.target_phoneme==target_phones]
-    example=selection.iloc[10]
+    # example=selection.iloc[10]
+    example=selection.loc[1131]
 
     path=example.audio_file_url
     s,fs=librosa.load(path, sr=16000)
     phonetics=example.cmu_phonetics
     split_phonetics=sum([p.replace('|','_').split('_') for p in phonetics.split(' ')],[])
+    phones=[[p] for p in  remove_stress_annots(split_phonetics)]
+
+    example=df.iloc[1539]
+    phonetics='AY1 K_AE1_N_T W_EY1|T_IH0_D F_AO1_R AW1_R S_AH1|M_ER0 R_OW1_D|T_R_IH2_P'
 
     df_segmented=charsiu.force_and_predict(s,split_phonetics)
+    from DL_speech_tech import phonetic_content_analysis
+    phonetic_content=phonetic_content_analysis(s,phonetics)
+    
 
     charsiu.predict_phone(s, phonetics, 0, 1, 'D')
 
