@@ -214,6 +214,11 @@ unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
     return [unstress(el) for el in transcription]
 
+
+drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
+
+split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
+
 def phonetics_indexed_df_from_formatted_phonetics(phonetics):
     word_split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
     n_phone_by_word=[len(w) for w in word_split_phonetics]
@@ -237,8 +242,17 @@ def phonetics_indexed_df_from_formatted_phonetics(phonetics):
     phonetics_indexed_df['syl_idx']=all_syl_indices
 
     phonetics_indexed_df.apply(lambda r: r['phones'], axis=1)
+
+    # # to get the number of rows of each sequence of syl_idx
+    # # I look at differences of indices. For the last one, we need to make diff with len(df)
+    # d=drop_consecutive_duplicates(phonetics_indexed_df[['syl_idx']])
+    # n_rows=np.diff(d.index).tolist()
+    # n_rows.append(len(phonetics_indexed_df)-d.index[-1])
+    # # build phone index which are indeices inside a syllable
+    # p_idx=sum([np.arange(n).tolist() for n in n_rows],[])
+    # phonetics_indexed_df['p_idx']=p_idx
     
-    remove_stress_annots(phone_list)
+    # remove_stress_annots(phone_list)
 
     return phonetics_indexed_df
 
