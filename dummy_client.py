@@ -33,10 +33,11 @@ def call_vowel_stresses(rID, text='I would love to go to ireland !', base_url = 
     
     return res
 
-def call_module(rID, text='I would love to go to ireland!', module='sentenceStress', base_url = 'http://localhost:8000', client=requests, fake_mistake=False):
-    url=base_url+"/flowspeech/"
+def call_module(rID, text='I would love to go to ireland!', module='sentenceStress', base_url = 'http://localhost:8000', route='/flowspeech/', client=requests, fake_mistake=False):
+    url=base_url+route
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
+    print(phonetics)
 
     # Here I alter the phonetics on purpose to see if the server catches the error
     if fake_mistake:
@@ -51,8 +52,8 @@ def call_module(rID, text='I would love to go to ireland!', module='sentenceStre
 
     return res
 
-def call_phoneme_contrast(rID, text='turned around', word_idx=0, syl_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', client=requests):
-    url=base_url+"/phonemeContrast"
+def call_phoneme_contrast(rID, text='turned around', word_idx=0, syl_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests):
+    url=base_url+endpoint
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
     # phonetics=phonetics_from_sentence(text)
@@ -95,7 +96,7 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
         rIDs.append(rID)
     
     print("phoneme contrast calls starting")
-    for rID in rIDs:
+    for rID in tqdm(rIDs):
         res=call_phoneme_contrast(rID, base_url=base_url, client=client)
         res=ast.literal_eval(res.data.decode('utf-8'))
         assert res['status']=='success'
@@ -130,14 +131,23 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
 
 
 if __name__ == "__main__":
-    crash_test(base_url="https://dev-speech-processing.flowchase.app/")
-    crash_test(base_url='http://localhost:8000')
 
+    
+    res=send_audio_base64(path='data/be-ws2-aset4-act3-ex5__P0__A1__UAQaJcB1Ob1c1WJD0H5Et__1648567198444.mp3')
+    rID=ast.literal_eval(res.data.decode('utf-8'))['rID']
+    res=call_module(rID, module="wordStress")
+    res=call_module(rID, route='/w2v/stress/', module="word")
+
+
+    crash_test(base_url="https://dev-speech-processing.flowchase.app/")
+    crash_test(base_url='http://localhost:8000', client=app.test_client())
 
     res=send_audio_base64(path='data/audio_recordings/turned_around.mp3').data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
     res=call_phoneme_contrast(rID)
+    res=call_phoneme_contrast(rID, endpoint='/w2v/contrast/phoneme')
     res.data
+
 
     res=send_audio(path='data/audio_recordings/turned_around.mp3')
     rID1=res.data.decode('utf-8')
@@ -197,13 +207,12 @@ if __name__ == "__main__":
     res = requests.post(base_url+"/phonemeContrast", data=data)
     print(res.__dict__)
 
-    res=send_audio(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
-    rID=res.data
-    call_module(rID.decode('utf-8'), module="wordStress")
+
+
 
     res=send_audio(path='data/audio_recordings/WS_111_toothpaste.wav')
-    rID=res.data
-    call_module(rID.decode('utf-8'), text="toothpaste", module="wordStress")
+    rID=ast.literal_eval(res.data.decode('utf-8'))['rID']
+    call_module(rID, text="toothpaste", module="wordStress")
 
     # res=send_audio(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.wav')
     # rID=res.data
