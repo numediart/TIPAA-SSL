@@ -15,6 +15,9 @@ docker-compose build
 docker-compose up -d
 ```
 
+If neither `docker compose` or `docker-compose` work, install it: https://docs.docker.com/compose/install/
+
+
 Restart container:
 ```
 docker-compose restart flaskapp
