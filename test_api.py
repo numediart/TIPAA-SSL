@@ -91,7 +91,7 @@ def get_results(df_pContrast, base_url = 'http://localhost:8000', endpoint='/pho
     # client=app.test_client()
     # with app.test_client() as client:
     results=[]
-    print(len((df_pContrast))
+    print(len(df_pContrast))
     for i,r in tqdm(df_pContrast.iterrows()):
         res=request_for_audio_file(r, base_url = base_url, endpoint=endpoint, client=client)
         if '''"phonetic_detection":''' in res.data.decode('utf-8'):
