@@ -229,7 +229,6 @@ def get_sentenceStress_annotation(path='data/audio-with-analysis-ids/learning_co
     return binDict, textDict
 
 # New database content processing
-
 def build_data(F, n_F,  df_focus_word, df_data):
     glob_F=glob(F+'/*')
     records=[]
@@ -275,7 +274,21 @@ def get_data_new_content():
     df_tot=pd.concat([df_F1, df_F2, df_M1], axis=0)
 
     return df_tot
+
+# Actor recordings 31/03 (GE and BE)
+
+def actor_recordings():
+    df=pd.read_csv('data/flwc-phrase-audios/flwc-phrase-audios.csv')
+    df['audio_file_url']='data/flwc-phrase-audios/'+df['audio_file_url']
+
+    # those who don't have NaN in target_phoneme
     
+    df_pContrast=df.loc[df.target_phoneme.dropna().index]
+    df_sentence_stress=df.loc[df.stress_category.dropna().index]
+    df_word_stress=df.drop(df_pContrast.index).drop(df_sentence_stress.index)
+
+    return df
+
 
 # User recordings data
 def build_user_data_df():
