@@ -1,8 +1,9 @@
 from speech_tech import *
-
+from utils.audio_processing import prepare_audio_file
 from utils.text_processing import word_stress_from_text
-from module_performance import *
+from module_performance import stress_GE_performance_test, edAnalysis_from_audiobook_data, final_s_from_audiobook_data, pContrast_from_audiobook_data
 from utils.label_data_processing import *
+import os
 def test_audio_formats():
     prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf')
     prepare_audio_file('data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a')
@@ -49,8 +50,8 @@ def test_text_processing():
     df=generate_prefill_csv()
 
 def test_performance_tests():
-    stress_performance_test()
-    stress_performance_test(level='word')
+    stress_GE_performance_test()
+    stress_GE_performance_test(level='word')
     
     edAnalysis_from_audiobook_data(data_set='dev-clean', n=100)
     pContrast_from_audiobook_data(n=100)

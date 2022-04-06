@@ -8,7 +8,10 @@ from utils.libri_phonetization_data import *
 from tqdm import tqdm
 import pickle
 import seaborn as sns
-from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, make_all_phones_annotation_files
+from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, make_all_phones_annotation_files, actor_recordings
+import ast
+
+from collections import Counter
 
 def make_dir(path):
     if not os.path.exists(path): os.makedirs(path)
@@ -53,78 +56,80 @@ def compute_errors(preds, GTs):
 
     return example_errors
 
-def stress_performance_test(level='sentence', audio_path="data/audio-with-analysis-ids/audio/"):
-    d=get_data()
-    if level=="sentence":
-        a,textDict=get_sentenceStress_annotation()
-        focusType='sentencestress'
-        d=d[d.focusType==focusType]
-    elif level=="word":
-        focus='wordstress'
-        d=d[d.focusType==focus]
-        # a=d.text.apply(lambda r:word_stress_from_text(r) )
-        a={}
-        for i,row in tqdm(d.iterrows()):
-            a[row.analysisId]=word_stress_from_text(row.text) 
-    else:
-        print("level should be 'word' or 'sentence'")
-        raise "level should be 'word' or 'sentence'"
 
-    
-    preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
-    d.text=d.apply(lambda r:remove_special_characters(r['text']), axis=1)
-    analysed_ids=[]
-    for id,bin in a.items():
-        if level=='sentence':
-            row=d[d.text==remove_special_characters(textDict[id])]
-        elif level=='word':
-            row=d[d.analysisId==id]
-        if len(row)>0:
-            path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
-            _, rID=prepare_audio_file(path)
-            make_all_phones_annotation_files(rID,remove_special_characters(row.text.values[0]))
+if False:
+    def stress_performance_test(level='sentence', audio_path="data/audio-with-analysis-ids/audio/"):
+        d=get_data()
+        if level=="sentence":
+            a,textDict=get_sentenceStress_annotation()
+            focusType='sentencestress'
+            d=d[d.focusType==focusType]
+        elif level=="word":
+            focus='wordstress'
+            d=d[d.focusType==focus]
+            # a=d.text.apply(lambda r:word_stress_from_text(r) )
+            a={}
+            for i,row in tqdm(d.iterrows()):
+                a[row.analysisId]=word_stress_from_text(row.text) 
+        else:
+            print("level should be 'word' or 'sentence'")
+            raise "level should be 'word' or 'sentence'"
 
-            # phonetics=phonetics_from_sentence(row.text.values[0])
-            formatted_phonetics=prefill_for_sentence(row.text.values[0])['cmu_phonetics']
-            # sentence=textDict[id]
-            try:
-                if level=='sentence':
-                    sentence=textDict[id]
-                    res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=sentence, level="sentence")
-                    # res=sentenceStress(rID,rID)
-                    pred=res['stress_binaries']
-                elif level=='word':
-                    res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, level="word")
-                    # res=wordStress(rID,rID)
-                    # I merge word results to word word with compute_errors
-                    pred=merge_list(res['stress_binaries'])
-                else:
-                    print("level should be 'word' or 'sentence'")
-                    raise "level should be 'word' or 'sentence'"
-                
-                status=res['status']
-                statuss.append(status)
-                preds.append(pred)
-                GTs.append(bin)
-                analysed_ids.append(id)
-            except  Exception as e:
-                # import pdb;pdb.set_trace()
-                print('Error with:')
-                print(row)
-                print(e)
-                errors.append(row)
-                p_errors.append(path)
-    
-    print('preds:',preds)
-    print('GTs:',GTs)
-    all_zero_baseline=[np.zeros(len(el)) for el in GTs]
-    print(errors)
-    print("all zero baseline")
-    compute_errors(all_zero_baseline, GTs)
+        
+        preds, statuss, GTs, errors, p_errors = [],[],[],[],[]
+        d.text=d.apply(lambda r:remove_special_characters(r['text']), axis=1)
+        analysed_ids=[]
+        for id,bin in a.items():
+            if level=='sentence':
+                row=d[d.text==remove_special_characters(textDict[id])]
+            elif level=='word':
+                row=d[d.analysisId==id]
+            if len(row)>0:
+                path=os.path.join(audio_path, row.primaryKey.values[0]+'.wav')
+                _, rID=prepare_audio_file(path)
+                make_all_phones_annotation_files(rID,remove_special_characters(row.text.values[0]))
 
-    print("algo performance")
-    compute_errors(preds, GTs)
-    return errors
+                # phonetics=phonetics_from_sentence(row.text.values[0])
+                formatted_phonetics=prefill_for_sentence(row.text.values[0])['cmu_phonetics']
+                # sentence=textDict[id]
+                try:
+                    if level=='sentence':
+                        sentence=textDict[id]
+                        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=sentence, level="sentence")
+                        # res=sentenceStress(rID,rID)
+                        pred=res['stress_binaries']
+                    elif level=='word':
+                        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, level="word")
+                        # res=wordStress(rID,rID)
+                        # I merge word results to word word with compute_errors
+                        pred=merge_list(res['stress_binaries'])
+                    else:
+                        print("level should be 'word' or 'sentence'")
+                        raise "level should be 'word' or 'sentence'"
+                    
+                    status=res['status']
+                    statuss.append(status)
+                    preds.append(pred)
+                    GTs.append(bin)
+                    analysed_ids.append(id)
+                except  Exception as e:
+                    # import pdb;pdb.set_trace()
+                    print('Error with:')
+                    print(row)
+                    print(e)
+                    errors.append(row)
+                    p_errors.append(path)
+        
+        print('preds:',preds)
+        print('GTs:',GTs)
+        all_zero_baseline=[np.zeros(len(el)) for el in GTs]
+        print(errors)
+        print("all zero baseline")
+        compute_errors(all_zero_baseline, GTs)
+
+        print("algo performance")
+        compute_errors(preds, GTs)
+        return errors
 
 
 
@@ -420,14 +425,15 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alt
 
 
 def pContrast_for_actor_recordings(target_phones='AO1'):
-    df=pd.read_csv('data/exercise_data_export.csv')
-    df['audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
+    df=actor_recordings()
+    # df=pd.read_csv('data/exercise_data_export.csv')
+    # df['audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     selection=df_pContrast[df_pContrast.target_phoneme==target_phones]    
     selection['split_phonetics']=selection.apply(lambda r: [p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], axis=1)
     selection['fpath']=selection.audio_file_url
-    selection['audio_file_idx']=selection.fk_audio_recording_id
+    # selection['audio_file_idx']=selection.fk_audio_recording_id
 
     phones=cmudict.phones()
     cmu_vowels=[p[0]+'1' for p in phones if p[1][0]=='vowel']
