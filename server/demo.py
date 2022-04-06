@@ -64,20 +64,20 @@ def upload_file():
 @app.route('/')
 @debug_only
 def index():
-    return send_from_directory( './static/','index.html')
+    return send_from_directory( './html/','index.html')
 
 @app.route('/app.js')
 @debug_only
 def record_app():
-    return send_from_directory( './static/','app.js')
+    return send_from_directory( './html/','app.js')
 
 @app.route('/phonemeContrast.html')
 @debug_only
 def phonemeContrast_html():
-    return send_from_directory( './static/','phonemeContrast.html')
+    return send_from_directory( './html/','phonemeContrast.html')
 
 @app.route('/vowel_stresses.html')
 @debug_only
 def vowel_stresses_html():
-    return send_from_directory( './static/','vowel_stresses.html')
+    return send_from_directory( './html/','vowel_stresses.html')
 
