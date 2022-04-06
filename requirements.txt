@@ -20,7 +20,9 @@ flask-apispec
 # torch
 pyyaml
 speechbrain
-transformers==4.6.1
+transformers==4.16.2
 # s3prl
 newrelic
 webrtcvad
+praatio
+g2pM
