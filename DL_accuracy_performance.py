@@ -149,8 +149,6 @@ def stress_GE_performance_test(level='sentence'):
             print('words of len '+str(l+1)+' error rate:'+str(error_rate))
 
 
-
-
 def compute_predictions_with_syl_idx(selection, model, target_phones='AO1'):
     phonetic_detections=[]
 
@@ -173,27 +171,29 @@ def compute_predictions_with_syl_idx(selection, model, target_phones='AO1'):
     
     return phonetic_detections
 
-def compute_predictions(selection, model, target_phones='AO1'):
-    dfs=[]
-    failures=[]
-    print('number of examples:', len(selection))
-    for i,r in tqdm(selection.iterrows()):
-        # phonetics=r.cmu_phonetics
-        s,fs=librosa.load(r.fpath, sr=16000)
-        target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
-        df_word=model.predict_word(s, r.split_phonetics, target_word_idx)
-        dfs.append(df_word)
-    
-    # removing stress info if necessary
-    target = target_phones[:-1] if target_phones[-1] in str([0,1,2]) else target_phones
+if False:
+    # obsolete
+    def compute_predictions(selection, model, target_phones='AO1'):
+        dfs=[]
+        failures=[]
+        print('number of examples:', len(selection))
+        for i,r in tqdm(selection.iterrows()):
+            # phonetics=r.cmu_phonetics
+            s,fs=librosa.load(r.fpath, sr=16000)
+            target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
+            df_word=model.predict_word(s, r.split_phonetics, target_word_idx)
+            dfs.append(df_word)
+        
+        # removing stress info if necessary
+        target = target_phones[:-1] if target_phones[-1] in str([0,1,2]) else target_phones
 
-    df_targets=[]
-    # select targets in words
-    for df_word in dfs:
-        df_targets.append(df_word[df_word.cmu_phones==target])
+        df_targets=[]
+        # select targets in words
+        for df_word in dfs:
+            df_targets.append(df_word[df_word.cmu_phones==target])
 
-    df_targets=pd.concat(df_targets)
-    return df_targets, failures
+        df_targets=pd.concat(df_targets)
+        return df_targets, failures
 
 
 
@@ -234,12 +234,6 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001):
     # df_targets, _=compute_predictions(df, charsiu, target_phones=target_phones)
     phonetic_detections=compute_predictions_with_syl_idx(df, charsiu, target_phones=target_phones)
 
-    def count_values(phonetic_detections):
-        d=Counter(phonetic_detections)
-        d = pd.DataFrame.from_dict(d, orient='index')
-        d=d.sort_values(by=0, ascending=False)
-        d=d / d.sum()*100
-        return d
     d=count_values(phonetic_detections)
     d.columns=[target_phones]
 
@@ -392,14 +386,15 @@ def syllable_contrast_for_actor_recordings():
 def pContrast_for_actor_recordings(target_phones='AO1'):
     charsiu = charsiu_phone_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms', device='cpu')
 
-    df=pd.read_csv('data/exercise_data_export.csv')
-    df['audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
+    # df=pd.read_csv('data/exercise_data_export.csv')
+    # df['audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
+    df=actor_recordings()
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     selection=df_pContrast[df_pContrast.target_phoneme==target_phones]    
     selection['split_phonetics']=selection.apply(lambda r: [p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], axis=1)
     selection['fpath']=selection.audio_file_url
-    selection['audio_file_idx']=selection.fk_audio_recording_id
+    # selection['audio_file_idx']=selection.fk_audio_recording_id
 
     phonetic_detections=compute_predictions_with_syl_idx(selection, charsiu, target_phones=target_phones)
 
@@ -434,16 +429,11 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', n=N
         df_targets.append(df_word[df_word.cmu_phones==target])
 
     df_targets=pd.concat(df_targets)
-    # df_segmented=dfs[2]
-    # df_segmented[df_segmented.cmu_phones != df_segmented.pred_phones_audio]
-
-    d=Counter(df_targets.pred_phones_audio.tolist())
-    d = pd.DataFrame.from_dict(d, orient='index')
+    
+    d=count_values(df_targets.pred_phones_audio.tolist())
     d.columns=[target_phones]
-    d=d.sort_values(by=target_phones, ascending=False)
-    d=d / d.sum()*100
 
-    return df_targets
+    return df_targets, d
 
 
 
@@ -454,8 +444,6 @@ def vowels_confusions_actor_recordings():
     results={}
     for v in vowels: 
         print("vowel:",v)
-        # predictions[v]=pContrast_from_audiobook_data(data_set='dev-clean', target_phones=v, n=n)
-        # _, predictions[v]=pContrast_for_actor_recordings(target_phones=v)
         _, rates=pContrast_for_actor_recordings(target_phones=v)
         # _, predictions[v].to_csv('performance_results/vowel_accuracies_'+v+'.csv')
         results[v]=rates
@@ -467,7 +455,6 @@ def vowels_confusions_user_recordings(frac=0.001):
     results={}
     for v in vowels: 
         print("vowel:",v)
-        # predictions[v]=pContrast_from_audiobook_data(data_set='dev-clean', target_phones=v, n=n)
         _, rates=pContrast_for_user_data(target_phones=v, frac=frac)
         # pickle.dump(predictions[v], open('vowel_accuracies'+v+'.p','wb'))
         results[v]=rates
@@ -481,20 +468,16 @@ def vowels_consonants_confusions_from_audiobook_data(n=100, data_set='dev-clean'
     cmu_consonants=[p[0] for p in phones if p[1][0]!='vowel']
 
     predictions={}
+    results={}
     for v in tqdm(cmu_vowels): 
-        predictions[v]=pContrast_from_audiobook_data(data_set=data_set, target_phones=v, n=n)
-        # predictions[v]=pContrast_for_actor_recordings(target_phones=v)
-        pickle.dump(predictions[v], open('performance_results/'+data_set+'_vowel_accuracies'+v+'.p','wb'))
-    # pickle.dump(predictions, open('vowel_accuracies.p','wb'))
+        predictions[v], rates=pContrast_from_audiobook_data(data_set=data_set, target_phones=v, n=n)
+        results[v]=rates
+    
+    for c in tqdm(cmu_consonants):
+        predictions[c], rates=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n)
+        results[c]=rates
 
-    # predictions={}
-    # for c in tqdm(cmu_consonants):
-    #     # predictions[c]=pContrast_from_audiobook_data(data_set='dev-clean', target_phones=c, n=n)
-    #     predictions[c]=pContrast_for_actor_recordings(target_phones=c)
-    #     pickle.dump(predictions[c], open('consonant_accuracies'+c+'.p','wb'))
-    # # pickle.dump(predictions, open('consonant_accuracies.p','wb'))
-
-    return predictions
+    return predictions, rates
 
 
 import seaborn as sns
@@ -528,15 +511,13 @@ if __name__=='__main__':
     results=vowels_confusions_user_recordings(frac=0.01)
     
     target_phones='AO1'
-    df=pd.read_csv('/data/exercise_data_export.csv')
-    df['audio_file_url']='/data/scaleway-audio-files/'+df['audio_file_url']
+    df=actor_recordings()
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     selection=df_pContrast[df_pContrast.target_phoneme==target_phones]    
     charsiu = charsiu_phone_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms', device='cpu')
     selection['split_phonetics']=selection.apply(lambda r: [p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], axis=1)
     selection['fpath']=selection.audio_file_url
-    selection['audio_file_idx']=selection.fk_audio_recording_id
 
     r=selection.iloc[24]
     
@@ -566,10 +547,12 @@ if __name__=='__main__':
 
     from time import time
     start=time()
-    predictions=vowels_consonants_confusions_from_audiobook_data(n=None)
+    predictions, results=vowels_consonants_confusions_from_audiobook_data(n=None)
     duration=time()-start
 
-    predictions=vowels_consonants_confusions_from_audiobook_data(n=100, data_set='test-other')
+    predictions, results=vowels_consonants_confusions_from_audiobook_data(n=30, data_set='test-other')
+    plot_confusion_results(results, name='vowels_consonant_contrast_audiobook_test-other_w2v_n_10')
+
 
     results=vowels_confusions_actor_recordings()
     plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v')
