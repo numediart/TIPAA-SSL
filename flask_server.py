@@ -37,8 +37,8 @@ if True:
     docs.register(phoneme_contrast_api)
     docs.register(module_api)
 
-    docs.register(DL_module_api)
-    docs.register(DL_phoneme_contrast_api)
+    docs.register(dl_module_api)
+    docs.register(dl_phoneme_contrast_api)
     # docs.register(DL_syllable_contrast_api)
 
 if __name__ == '__main__':

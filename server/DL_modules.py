@@ -6,12 +6,10 @@ from flask import Response
 
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, syllable_contrast_from_formatted_phonetics_audio
 import json
-from utils.text_processing import check_phonemes, cmu_to_gibberish
-import ast
-from server.utils import debug_only
+from utils.text_processing import check_phonemes
 
 from app_definition import app
-from server.utils import debug_only, access_property_error, properties_to_args
+from server.utils import access_property_error, properties_to_args
 
 
 def check_request(d, properties):
@@ -38,7 +36,7 @@ properties=["phonetics","rID","text"]
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @app.route('/w2v/stress/<module>', methods=['POST'])
-def DL_module_api(module):
+def dl_module_api(module):
     d = request.form
     print(d)
     properties=["phonetics","rID","text"]
@@ -73,7 +71,7 @@ properties=["phonetics","rID","word_idx","target","syl_idx"]
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @app.route('/w2v/contrast/vowel', methods=['POST'])
-def DL_phoneme_contrast_api():
+def dl_phoneme_contrast_api():
     d = request.form
     properties=["phonetics","rID","word_idx","target","syl_idx"]
     err=check_request(d, properties)
@@ -113,7 +111,7 @@ properties=["phonetics","rID","word_idx","syl_idx"]
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @app.route('/w2v/contrast/syllable', methods=['POST'])
-def DL_syllable_contrast_api():
+def dl_syllable_contrast_api():
     d = request.form
     properties=["phonetics","rID","word_idx","syl_idx"]
     err=check_request(d, properties)
