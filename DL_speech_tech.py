@@ -1,24 +1,11 @@
-from scipy.io.wavfile import write, read
+from scipy.io.wavfile import  read
 import numpy as np
-import os
 import pandas as pd
-import matplotlib.pyplot as plt
-from time import time
-from utils.audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples, prepare_audio_file
+from utils.audio_processing import getIntonation, getIntensity, normalize
 import soundfile as sf
-from utils.htk_utils import get_textgrid_data, clean_htk_files
 
-from utils.label_data_processing import make_all_phones_annotation_files_from_phonetics, make_pContrast_annotation_files_from_phonetics
-from utils.text_processing import phonetics_from_sentence, chunk_text, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, unstress, split_phonetics,  cmu_to_gibberish, SonoriPy
-
-import uuid
-import time
-
+from utils.text_processing import remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, chunk_text, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, cmu_consonants, unstress, split_phonetics,  cmu_to_gibberish, SonoriPy
 from utils.charsiu_utils import charsiu_phone_forced_aligner
-drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
-
-from itertools import groupby
-drop_consecutive_elements= lambda L: [key for key, _group in groupby(L)]
 
 # initialize model
 model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
@@ -28,7 +15,7 @@ target_accepted_alternatives={
     'AO': ['AA', 'AO'],
     'D': ['D', 'T'],
     'T': ['D', 'T'],
-    'IH': ['IH', 'AH']
+    'IH': ['IH', 'AH', 'EH']
 }
 
 def compute_stress_score(textgridData, s, fs):
@@ -151,7 +138,7 @@ def intensity_to_bin(score_by_word, n_max=2):
 def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
                                     text="I would love to go to Ireland!", 
                                     level="word", 
-                                    chunking_chars=[',',';','.','!','?', ':'],
+                                    chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
@@ -185,7 +172,7 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
         scores_grouped_by_chunk.append(max_word_intensities[cumsum:cumsum+n])
         cumsum+=n
     
-    # I tried thisx on General English data, and in the end, it does not seem to improve
+    # I tried this on General English data, and in the end, it does not seem to improve
     # scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
 
     bins_by_chunk=[]
@@ -204,13 +191,16 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
 def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
                             target_syllable_idx=0, 
-                            target_phones='D',
-                            max_speech_rate=8
+                            target_occurence_idx=0, # will be 0  all the time for vowels, and most of the time for consonants
+                            target_phones='ER1',
+                            alternatives=cmu_vowels,
+                            max_speech_rate=8, **kwargs
                     ):
+    phonetics=phonetics.replace('-',' ')
     status, s = audio_load_and_check(rID, phonetics, max_speech_rate=max_speech_rate)
     g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
-        phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones)
+        phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx, phoneme_set=alternatives)
 
         if detected_syllable!=detected_syllable: 
             return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
@@ -229,6 +219,71 @@ def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
     
+def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|AW1_N_D', 
+                            target_word_idx=0, 
+                            target_phones='D',
+                            # termination_basis='[UNK]_D',
+                            termination_basis='IH0_D',
+                            max_speech_rate=8, **kwargs
+                    ):
+    phonetics=phonetics.replace('-',' ')
+    status, s = audio_load_and_check(rID, phonetics, max_speech_rate=max_speech_rate)
+
+    phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics.split(' ')[target_word_idx])
+    idx_syl_ter=phonetics_indexed_df.syl_idx.iloc[-1]
+    df_syl_GT=phonetics_indexed_df[phonetics_indexed_df.syl_idx==idx_syl_ter]
+    syl_GT=remove_stress_annots(df_syl_GT.phones.tolist())
+    g_t=[cmu_to_gibberish[unstress(p)] for p in syl_GT]
+    # g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+    if status=="success":
+
+        n_p_target=len(target_phones.split('_'))
+        split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
+        target_word=split_phonetics[target_word_idx]
+        split_phonetics[target_word_idx]=target_word[:-n_p_target]+termination_basis.split('_')
+        
+        # same change for indexes
+        syl_idxs=phonetics_indexed_df.syl_idx.tolist()
+        syl_idxs=syl_idxs[:-n_p_target]+[syl_idxs[-1]]*len(termination_basis.split('_'))
+
+        df_word=model.predict_word(s, split_phonetics, target_word_idx)
+        df_word['syl_idx']=syl_idxs
+        df_syl=df_word[df_word.syl_idx==syl_idxs[-1]]
+
+        pred_phones=df_syl[df_syl.pred_phones_audio!='[SIL]']
+        syl_detected=drop_consecutive_duplicates(pred_phones[['pred_phones_audio']]).pred_phones_audio.tolist()
+
+        # root based on GT
+        root=syl_GT[:-n_p_target-1]
+        # detected termination
+        ter=syl_detected[-n_p_target-1:]
+        GT=syl_GT[-n_p_target-1:]
+        
+        if len(ter)==len(GT):
+            ter_post=[]
+            for i,p in enumerate(ter):
+                # post-correction: for the target, when we are in a case of accepted alternative in prediction, we replace it with the GT
+                if unstress(GT[i]) in target_accepted_alternatives:
+                    if unstress(p) in target_accepted_alternatives[unstress(GT[i])]:
+                        ter_post.append(unstress(GT[i]))
+                    else:
+                        ter_post.append(unstress(p))
+                else:
+                    ter_post.append(unstress(p))
+        else: ter_post=ter
+
+        # there might be consecutive duplicates when we concatenate root and ter_post
+        g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in root+ter_post])
+        
+        # phonetic detection needs to be the stressed version for backwards compatibility 
+        # (however, here I convert to stressed version only when correct, it might work, but could cause problems?)
+        detection=ter_post[1:]
+        if target_phones!='': # case of final -s
+            if detection==remove_stress_annots(target_phones.split('_')): detection=target_phones.split('_')
+
+        return {"status": "success", "phonetic_detection": '_'.join(detection), "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
+    else:
+        return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
 def phonetic_content_analysis(s, phonetics):
     phonetic_content=model.analyze_phonetic_content(s, phonetics)
@@ -292,19 +347,20 @@ def phonetic_content_analysis(s, phonetics):
 
 def syllable_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
-                            target_syllable_idx=0, 
+                            target_syllable_idx=0,
                             max_speech_rate=8
                     ):
+    phonetics=phonetics.replace('-',' ')
     status, s = audio_load_and_check(rID, phonetics, max_speech_rate=max_speech_rate)
-    g_t=drop_consecutive_elements([cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]])
+    g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
 
     if status=="success":
         phonetic_content=phonetic_content_analysis(s, phonetics)
-        if len(phonetic_content)==0: return {"status": status,  "gibberish_truth":  "null", "gibberish_detected":  "null"}
+        if len(phonetic_content)==0: return {"status": "phonetic_content is empty" ,  "gibberish_truth":  "null", "gibberish_detected":  "null"}
 
         syllable_content=phonetic_content[phonetic_content.word_idx==target_word_idx][phonetic_content.syl_idx==target_syllable_idx]
         detected_syllable=syllable_content.pred_phones_audio.tolist()
-        g_d=drop_consecutive_elements([cmu_to_gibberish[unstress(p)] for p in detected_syllable])
+        g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in detected_syllable])
 
         return {"status": "success", "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
