@@ -487,8 +487,8 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
                 p_part=[g2p(w_part)]
             p_parts.append(p_part)
 
-        # TODO: Here I could generate all alternatives instead of taking the firs teverytime.
-        # It would correspond to cmu alternatives for other words
+        # Here I generate all alternatives of combination of word parts
+        # It corresponds to cmu alternatives for other words
         ps=list(itertools.product(*p_parts))
         syls_ps=[[SonoriPy(p)[0] for p in alt] for alt in ps]
         
