@@ -37,7 +37,7 @@ def call_module(rID, text='I would love to go to ireland!', module='sentenceStre
     url=base_url+route
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
-    print(phonetics)
+    # print(phonetics)
 
     # Here I alter the phonetics on purpose to see if the server catches the error
     if fake_mistake:
@@ -52,13 +52,13 @@ def call_module(rID, text='I would love to go to ireland!', module='sentenceStre
 
     return res
 
-def call_phoneme_contrast(rID, text='turned around', word_idx=0, syl_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests):
+def call_phoneme_contrast(rID, text='turned around', word_idx=0, syl_idx=0, target_occurence_idx=0, target='D', alternatives="T D IH0_D", base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests):
     url=base_url+endpoint
     d=prefill_for_sentence(text, syllables_data)
     phonetics=d['cmu_phonetics']
     # phonetics=phonetics_from_sentence(text)
     # res = client.post(url, data={"phonetics":json.dumps(phonetics), 'rID':rID, 'word_idx':word_idx, 'alternatives':alternatives, 'target':target})
-    res = client.post(url, data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'syl_idx':syl_idx, 'alternatives':alternatives, 'target':target})
+    res = client.post(url, data={"phonetics":phonetics, 'rID':rID, 'word_idx':word_idx, 'syl_idx':syl_idx, 'alternatives':alternatives, 'target':target, 'target_occurence_idx':target_occurence_idx})
     
     # This is for compatibility between requests module and flask's test_client
     if client==requests: res.data=res._content
@@ -85,7 +85,7 @@ def send_audio_base64(path='data/audio_recordings/WS_111_toothpaste.wav', base_u
     
     return res
 
-def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/", audio_path="data/audio-with-analysis-ids/audio/", client=requests):
+def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com/", audio_path="data/audio-with-analysis-ids/audio/", pC_endpoint='/phonemeContrast', SS_endpoint='/flowspeech/sentenceStress', client=requests):
     rIDs=[]
     print("uploads starting")
     for i in tqdm(range(100)):
@@ -97,7 +97,7 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
     
     print("phoneme contrast calls starting")
     for rID in tqdm(rIDs):
-        res=call_phoneme_contrast(rID, base_url=base_url, client=client)
+        res=call_phoneme_contrast(rID, target='D', base_url=base_url, endpoint=pC_endpoint, client=client)
         res=ast.literal_eval(res.data.decode('utf-8'))
         assert res['status']=='success'
     
@@ -124,8 +124,11 @@ def crash_test(base_url="http://ec2-13-37-107-52.eu-west-3.compute.amazonaws.com
     start=time.time()
     tot_d=pd.concat([d]*n)
     tot_d['rID']=rIDs
+
+    route='/'.join(SS_endpoint.split('/')[:-1])+'/'
+    module=SS_endpoint.split('/')[-1]
     for i,row  in tot_d.iterrows():
-        call_module(row['rID'], text=row.text, module='sentenceStress', base_url = base_url, client=client)
+        call_module(row['rID'], text=row.text, module=module, route=route, base_url = base_url, client=client)
     avg_duration=(time.time()-start)/(len(d)*n)
     print('avg duration processing sentenceStress:', avg_duration)
 
@@ -135,17 +138,19 @@ if __name__ == "__main__":
     
     res=send_audio_base64(path='data/be-ws2-aset4-act3-ex5__P0__A1__UAQaJcB1Ob1c1WJD0H5Et__1648567198444.mp3')
     rID=ast.literal_eval(res.data.decode('utf-8'))['rID']
-    res=call_module(rID, module="wordStress")
+    # res=call_module(rID, module="wordStress")
     res=call_module(rID, route='/w2v/stress/', module="word")
 
 
     crash_test(base_url="https://dev-speech-processing.flowchase.app/")
-    crash_test(base_url='http://localhost:8000', client=app.test_client())
+    crash_test(base_url='http://localhost:8000', client=requests)
+    crash_test(base_url='http://localhost:8000', pC_endpoint='/w2v/contrast/consonant', SS_endpoint='/w2v/stress/sentence', client=requests)
 
     res=send_audio_base64(path='data/audio_recordings/turned_around.mp3').data
     rID=ast.literal_eval(res.decode('utf-8'))['rID']
-    res=call_phoneme_contrast(rID)
-    res=call_phoneme_contrast(rID, endpoint='/w2v/contrast/phoneme')
+    # res=call_phoneme_contrast(rID)
+    # res=call_phoneme_contrast(rID, endpoint='/w2v/contrast/vowel', target='ER1')
+    res=call_phoneme_contrast(rID, endpoint='/w2v/contrast/consonant', target='D')
     res.data
 
 
