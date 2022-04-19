@@ -567,8 +567,11 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None):
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
 
+    # I don't know why, but the word_in_s was bugging without redefining cmudict_dict, maybe I'm changing this cmudict somewhere?
+    cmudict_dict=cmudict.dict()
     # words that finish in "s" with phoneme "S" that also exist without an "s" and with last phoneme then not being "S"
     words_in_s=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='S' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='S']
+
     words_in_s=set(words_in_s)
 
     selections=[]
@@ -579,19 +582,19 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None):
     # rests_dfs_s=[]
 
     libri_words_list=libri_words_df.word.unique()
-    for word in libri_words_list:
-        if word+'s' in words_in_s:
-            selection, selection_s = selection_with_and_without_s(libri_words_df, word)
-            if len(selection)>0 and len(selection_s)>0:
-                target=selection.iloc[0].phones.split(' ')[-1]
-                results_df=compute_prediction_results(selection, libri_words_df, target_phones=target, 
-                                alternatives=[target, target + ' S'])
-                results_df_s=compute_prediction_results(selection_s, libri_words_df, target_phones=target+ ' S', 
-                                alternatives=[target, target + ' S'])
-                selections.append(selection)
-                selections_s.append(selection_s)
-                results_dfs.append(results_df)
-                results_dfs_s.append(results_df_s)
+    libri_words_in_s=[el for el in libri_words_list if el in words_in_s]
+    
+    # word=libri_words_in_s[3]
+    for word in libri_words_in_s:
+        selection, selection_s = selection_with_and_without_s(libri_words_df, word[:-1])
+        if len(selection)>0 and len(selection_s)>0:
+            target=selection.iloc[0].phones.split(' ')[-1]
+            results_df=compute_prediction_results(selection, libri_words_df, target_phones=target, alternatives=[target, target + ' S'])
+            results_df_s=compute_prediction_results(selection_s, libri_words_df, target_phones=target+ ' S', alternatives=[target, target + ' S'])
+            selections.append(selection)
+            selections_s.append(selection_s)
+            results_dfs.append(results_df)
+            results_dfs_s.append(results_df_s)
     
     sdf=pd.concat(selections)
     rdf=pd.concat(results_dfs)
