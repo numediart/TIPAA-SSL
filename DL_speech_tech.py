@@ -213,8 +213,12 @@ def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|
                 phonetic_detection=unstress(target_phones)
                 g_d=g_t
         
-        # phonetic detection needs to be the stressed version for backwards compatibility
-        if phonetic_detection==unstress(target_phones): phonetic_detection=target_phones
+        # phonetic detection needs to be the stressed version for backwards compatibility (when correct, when it's not, we don't care)
+        print("phonetic_detection",phonetic_detection)
+        print("target_phones",target_phones)
+        if phonetic_detection==unstress(target_phones): 
+            phonetic_detection=target_phones
+            g_d=g_t
         return {"status": "success", "phonetic_detection": phonetic_detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
