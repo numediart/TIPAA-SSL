@@ -426,9 +426,10 @@ def wordStress_from_phonetics_audio(
 def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
                                     text="I would love to go to Ireland!", 
                                     level="word", 
-                                    chunking_chars=[',',';','.','!','?', ':'],
+                                    chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8): #'[\,\?\.\!\;\:\"\*]'
     
+    phonetics=phonetics.replace('-',' ')
     # I first detect if the audio is too short to have a realistic speech rate
     #     https://www.science.org/doi/10.1126/sciadv.aaw2594
     # https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
@@ -526,6 +527,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
                     max_speech_rate=8
                     ):
 
+    phonetics=phonetics.replace('-',' ')
     # I first detect if the audio is too short to have a realistic speech rate
     #     https://www.science.org/doi/10.1126/sciadv.aaw2594
     # https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
