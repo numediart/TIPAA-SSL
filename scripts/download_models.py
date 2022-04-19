@@ -14,4 +14,5 @@ hf_path_base="hf_models"
 hf_rep='charsiu'
 download_hf_model(hf_path_base=hf_path_base, hf_rep=hf_rep, hf_model='en_w2v2_fc_10ms')
 download_hf_model(hf_path_base=hf_path_base, hf_rep=hf_rep, hf_model='tokenizer_en_cmu')
+download_hf_model(hf_path_base=hf_path_base, hf_rep=hf_rep, hf_model='tokenizer_zh_pinyin')
 download_hf_model(hf_path_base=hf_path_base, hf_rep="speechbrain", hf_model="metricgan-plus-voicebank")
