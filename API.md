@@ -5,7 +5,7 @@ Summary of available endpoints (see also on /swagger-ui on the server)
 Prefill
 ```
 /prefill_from_phrases
-/prefill_from_phrases.html'
+/prefill_from_phrases.html
 ```
 
 Sending audio:
