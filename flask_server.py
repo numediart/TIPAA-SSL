@@ -38,8 +38,10 @@ if True:
     docs.register(module_api)
 
     docs.register(dl_module_api)
-    docs.register(dl_phoneme_contrast_api)
-    # docs.register(DL_syllable_contrast_api)
+    docs.register(dl_vowel_contrast_api)
+    docs.register(dl_consonant_contrast_api)
+    docs.register(dl_termination_contrast_api)
+    # docs.register(dl_syllable_contrast_api)
 
 if __name__ == '__main__':
     run_app()
