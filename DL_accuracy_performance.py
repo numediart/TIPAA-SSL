@@ -1,5 +1,5 @@
 from utils.libri_phonetization_data import build_librispeech_words_df
-from utils.libri_phonetization_data import phonetics_for_row
+from utils.libri_phonetization_data import phonetics_for_row, select
 from tqdm import tqdm
 import pandas as pd
 import pickle
@@ -12,12 +12,12 @@ from collections import Counter
 from utils.label_data_processing import build_user_data_df, get_errors_examples
 exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, termination_contrast_from_formatted_phonetics_audio
 from utils.audio_processing import prepare_audio_file
-
 
 from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, make_all_phones_annotation_files, actor_recordings
 from utils.text_processing import *
+from utils.libri_phonetization_data import *
 
 from tqdm import tqdm
 
@@ -27,8 +27,6 @@ warnings.filterwarnings("ignore", category=UserWarning)
 import pandas as pd
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
-
-drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
 
 
 def stress_GE_performance_test(level='sentence'):
@@ -72,7 +70,6 @@ def stress_GE_performance_test(level='sentence'):
         # get the range in terms of words for the "chunk of interest"
         range_df=get_range(cumsum,idx_1)
         df_all=pd.concat([df, range_df[['ranges']]], axis=1)
-        # df_all.apply(lambda r: r['stress_intensities'], axis=1)
 
         # COI = Chunk Of Interest
         df_all['COI_stress_intensities']=df_all.apply(lambda r: r['stress_intensities'][r.ranges[0]:r.ranges[1]], axis=1)
@@ -105,7 +102,7 @@ def stress_GE_performance_test(level='sentence'):
         df.index=range(len(df))
         word_stress_binaries=df.text.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(prefill_for_sentence(r)['cmu_phonetics'])])
 
-        # I realized some words have all "syllables" stresses (even though they are > 1 syl). In fact, it corresponds to acronyms
+        # I realized some words have all "syllables" stressed (even though they are > 1 syl). In fact, it corresponds to acronyms
         # here I remove them
         
         # To see them:
@@ -149,27 +146,36 @@ def stress_GE_performance_test(level='sentence'):
             print('words of len '+str(l+1)+' error rate:'+str(error_rate))
 
 
-def compute_predictions_with_syl_idx(selection, model, target_phones='AO1'):
+def compute_predictions(selection, model, target_phones='AO1', tech_function=phonemeContrast_from_formatted_phonetics_audio, termination_basis='IH0_D'):
     phonetic_detections=[]
-
+    records=[]
     print('number of examples:', len(selection))
     for i,r in tqdm(selection.iterrows()):
         # phonetics=r.cmu_phonetics
         # s,fs=librosa.load(r.fpath, sr=16000)
-        target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
-        target_syllable_idx=ast.literal_eval(r.target_syllable_indexes)[0]
+        if type(r.target_word_indexes)==str:
+            target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
+            target_syllable_idx=ast.literal_eval(r.target_syllable_indexes)[0]
+        else:
+            target_word_idx=r.target_word_indexes
+            target_syllable_idx=r.target_syllable_indexes
+
 
         status_audio, rID=prepare_audio_file(r.fpath, speech_correction=False) 
-        res=phonemeContrast_from_formatted_phonetics_audio(
-                                rID,
-                                phonetics=r.cmu_phonetics, 
-                                target_word_idx=target_word_idx, 
-                                target_syllable_idx=target_syllable_idx,
-                                target_phones=target_phones
-                                )
+        res=tech_function(rID,
+                        phonetics=r.cmu_phonetics, 
+                        target_word_idx=target_word_idx, 
+                        target_syllable_idx=target_syllable_idx,
+                        target_occurence_idx=0,
+                        target_phones=target_phones,
+                        termination_basis=termination_basis,
+                        alternatives=cmu_vowels
+                        )
         phonetic_detections.append(res['phonetic_detection'])
+        records.append(res)
+        result_df=pd.DataFrame.from_records(records)
     
-    return phonetic_detections
+    return phonetic_detections, result_df
 
 if False:
     # obsolete
@@ -200,8 +206,9 @@ if False:
 def count_values(phonetic_detections):
     d=Counter(phonetic_detections)
     d = pd.DataFrame.from_dict(d, orient='index')
-    d=d.sort_values(by=0, ascending=False)
-    d=d / d.sum()*100
+    if len(d)>0:
+        d=d.sort_values(by=0, ascending=False)
+        d=d / d.sum()*100
     return d
 
 def pContrast_for_user_data( target_phones='AO1', frac=0.001):
@@ -232,7 +239,7 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001):
     df['split_phonetics']=df.apply(lambda r: [p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], axis=1)
 
     # df_targets, _=compute_predictions(df, charsiu, target_phones=target_phones)
-    phonetic_detections=compute_predictions_with_syl_idx(df, charsiu, target_phones=target_phones)
+    phonetic_detections,_=compute_predictions(df, charsiu, target_phones=target_phones)
 
     d=count_values(phonetic_detections)
     d.columns=[target_phones]
@@ -242,14 +249,47 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001):
 
 def syllable_contrast_for_actor_recordings():
     df=actor_recordings()
+    df_pContrast=df.loc[df.target_phoneme.dropna().index]
+    df_sentence_stress=df.loc[df.stress_category.dropna().index]
+    df_word_stress=df.drop(df_pContrast.index).drop(df_sentence_stress.index)
+
+    vowels=['IH','IY','OW','AO','AA']
+    eds=['T','D','IH0_D']
+
+    df_v=df_pContrast[~df_pContrast.target_phoneme.isin(eds)]
+    df_ed=df_pContrast[df_pContrast.target_phoneme.isin(eds)]
+
+    charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+
+    # final -ed based on force_and_predict logic
+    preds=[]
+    len(df_ed)
+    df_words=[]
+    pred_records=[]
+    for i,r in tqdm(df_ed.iterrows()):
+        target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
+        # syl_idx=ast.literal_eval(r.target_syllable_indexes)[0]
+        s,fs=librosa.load(r.audio_file_url, sr=16000)
+        # split_phonetics=sum([p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], [])
+        
+        phonetics=r.cmu_phonetics
+        _, rID=prepare_audio_file(r.audio_file_url, speech_correction=False)
+        res=termination_contrast(rID,phonetics=phonetics, 
+                            target_word_idx=target_word_idx, 
+                            target_phones=r.target_phoneme)
+        pred_records.append(res)
+    
+    syl_pred_df=pd.DataFrame.from_records(pred_records)
+    success_rate=len(syl_pred_df[syl_pred_df.gibberish_truth==syl_pred_df.gibberish_detected])/len(syl_pred_df)
+    syl_pred_df[syl_pred_df.gibberish_truth!=syl_pred_df.gibberish_detected]
 
     # contrast on all phones with force_and_predict (i.e. predict based on frames allocated to a phoneme)
-    charsiu = charsiu_phone_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms', device='cpu')
     pred_dfs=[]
     for i,r in tqdm(df.iterrows()):
         s,fs=librosa.load(r.audio_file_url, sr=16000)
         split_phonetics=sum([p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], [])
-        p_df=charsiu.force_and_predict(s, split_phonetics)
+        _, p_df, _ = charsiu.align_phones(audio=s,phones=split_phonetics)
+        # p_df=charsiu.force_and_predict(s, split_phonetics)
         pred_dfs.append(p_df)
     pred_df=pd.concat(pred_dfs)
     match_rate=1-len(pred_df[pred_df.cmu_phones!=pred_df.pred_phones_audio])/len(pred_df)
@@ -380,7 +420,68 @@ def syllable_contrast_for_actor_recordings():
     
     
 
+def termination_contrast_for_actor_recordings(target_phones='D'):
+    df=actor_recordings()
+    # df_pContrast=df.loc[df.target_phoneme.dropna().index]
+    # df_sentence_stress=df.loc[df.stress_category.dropna().index]
+    # df_word_stress=df.drop(df_pContrast.index).drop(df_sentence_stress.index)
 
+    # vowels=['IH','IY','OW','AO','AA']
+    # eds=['T','D','IH0_D']
+
+    # df_v=df_pContrast[~df_pContrast.target_phoneme.isin(eds)]
+    # df_ed=df_pContrast[df_pContrast.target_phoneme.isin(eds)]
+
+    charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+
+    df['fpath']=df['audio_file_url']
+
+    selection=df[df.target_phoneme==target_phones]
+    phonetic_detections,result_df=compute_predictions(selection, charsiu, target_phones=target_phones, tech_function=termination_contrast_from_formatted_phonetics_audio)
+    success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
+    print('errors:',result_df[result_df.gibberish_truth!=result_df.gibberish_detected])
+    print(success_rate)
+    
+    # selection=df[df.target_phoneme=='IH0_D']
+    # phonetic_detections,result_df=compute_predictions(selection, charsiu, target_phones='IH0_D', tech_function=termination_contrast_from_formatted_phonetics_audio)
+    # success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
+    # print(success_rate)
+    
+    # selection=df[df.target_phoneme=='T']
+    # phonetic_detections,result_df=compute_predictions(selection, charsiu, target_phones='T', tech_function=termination_contrast_from_formatted_phonetics_audio)
+    # success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
+    # print(success_rate)
+
+    # final -ed based on force_and_predict logic
+    
+    # preds=[]
+    # print(len(df_ed))
+    # df_words=[]
+    # pred_records=[]
+    # for i,r in tqdm(df_ed.iterrows()):
+    #     target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
+    #     s,fs=librosa.load(r.audio_file_url, sr=16000)        
+    #     phonetics=r.cmu_phonetics
+    #     _, rID=prepare_audio_file(r.audio_file_url, speech_correction=False)
+    #     res=termination_contrast_from_formatted_phonetics_audio(rID,phonetics=phonetics, 
+    #                         target_word_idx=target_word_idx, 
+    #                         target_phones=r.target_phoneme)
+    #     pred_records.append(res)
+    
+    # syl_pred_df=pd.DataFrame.from_records(pred_records)
+    # success_rate=len(syl_pred_df[syl_pred_df.gibberish_truth==syl_pred_df.gibberish_detected])/len(syl_pred_df)
+    # print('success rate',success_rate)
+
+    # syl_pred_df['cmu_phonetics']=df_ed['cmu_phonetics'].tolist()
+    # syl_pred_df['audio_file_url']=df_ed['audio_file_url'].tolist()
+    # syl_pred_df[syl_pred_df.gibberish_truth!=syl_pred_df.gibberish_detected]
+
+    # return syl_pred_df
+
+    d=count_values(phonetic_detections)
+    d.columns=[target_phones]
+    return phonetic_detections, d
+    
 
 
 def pContrast_for_actor_recordings(target_phones='AO1'):
@@ -396,44 +497,168 @@ def pContrast_for_actor_recordings(target_phones='AO1'):
     selection['fpath']=selection.audio_file_url
     # selection['audio_file_idx']=selection.fk_audio_recording_id
 
-    phonetic_detections=compute_predictions_with_syl_idx(selection, charsiu, target_phones=target_phones)
+    phonetic_detections,_=compute_predictions(selection, charsiu, target_phones=target_phones)
 
     d=count_values(phonetic_detections)
     d.columns=[target_phones]
 
     return phonetic_detections, d
 
-def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', n=None):
+
+def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
+    # retrieve phonetics by word thanks to 'phonetics_fot_row'
+    selection['split_phonetics']=selection.apply(lambda r: [p.split(' ') for p in phonetics_for_row(r, libri_words_df)], axis=1)
+    # Generate formatted_phonetics by syllabifying each word with sonoripy, then joining phonemes, syllables and words with separators
+    selection['cmu_phonetics']=selection.apply(lambda r: ' '.join(['|'.join(['_'.join(syl) for syl in SonoriPy(w)[0]]) for w in r.split_phonetics]), axis=1)
+    
+    # I figured out there are empty elements resulting in double space in formatted phonetics. This is problematic. 
+    # As a fix, I insert a "AH0" to have something very neutral close to silence
+    selection['cmu_phonetics']=selection.apply(lambda r: r['cmu_phonetics'].replace('  ', ' AH0 '), axis=1)
+
+    selection['target_word_indexes']=selection['word_idx']
+    selection['fpath']=selection['wav_path']
+
+    # to extract a target_syllable_index, I use a function that find the first element containing a string
+    def find_first(lst, predicate): return next((i for i,j in enumerate(lst) if predicate(j)), -1)
+    find_first_containing_target=lambda l: find_first(l, lambda x: target_phones in x)
+
+    if target_phones is not None:
+        selection['target_syllable_indexes']=selection.apply(lambda r: find_first_containing_target(r['cmu_phonetics'].split(' ')[r['word_idx']].split('|')), axis=1)
+    else:
+        # this is for termination contrasts
+        selection['target_syllable_indexes']=-1
+    return selection
+
+def termination_contrast_from_audiobook_data(data_set='test-other', target_phones='D', n=None):
+    charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+
+    libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
+    # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
+    libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
+
+    selection=select(select(libri_words_df,'D', option='endswith'), 'ed', column='word', option='endswith')
+    selection_id=select(selection, 'IH0 D', option="endswith")
+    selection_d=selection[~selection.index.isin(selection_id.index.tolist())]
+    selection_t=select(select(libri_words_df,'T', option='endswith'), 'ed', column='word', option='endswith')
+
+    selections={}
+    selections['D']=selection_d
+    selections['IH0_D']=selection_id
+    selections['T']=selection_t
+    
+    selection=formatted_audiobook_data(selections[target_phones], libri_words_df)
+    phonetic_detections,result_df=compute_predictions(selection, charsiu, target_phones=target_phones, tech_function=termination_contrast_from_formatted_phonetics_audio)
+    success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
+    print('errors:',result_df[result_df.gibberish_truth!=result_df.gibberish_detected])
+    result_df[result_df.gibberish_truth!=result_df.gibberish_detected].iloc[-1]
+    print(success_rate)
+    selection=selection.reset_index(drop=True)
+    result_df['cmu_phonetics']=selection['cmu_phonetics']
+    result_df['fpath']=selection['fpath']
+
+    d=count_values(phonetic_detections)
+    d.columns=[target_phones]
+    return phonetic_detections, d
+    
+
+def final_s_from_audiobook_data(data_set='dev-clean', n=None):
+    charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+
+    libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
+    # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
+    libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
+
+    # words that finish in "s" with phoneme "S" that also exist without an "s" and with last phoneme then not being "S"
+    words_in_s=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='S' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='S']
+    words_in_s=set(words_in_s)
+
+    words_in_z=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='Z' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='Z']
+    words_in_z=set(words_in_z)
+
+    libri_words_list=libri_words_df.word.unique()
+    libri_words_in_s=[el for el in libri_words_list if el in words_in_s]
+    
+    word=libri_words_in_s[3]
+
+    selections=[]
+    selections_s=[]
+    print(len(libri_words_in_s))
+    for word in tqdm(libri_words_in_s):
+        selection, selection_s = selection_with_and_without_s(libri_words_df, word[:-1])
+
+        if len(selection)>0 and len(selection_s)>0:
+            selection=formatted_audiobook_data(selection, libri_words_df)
+            selection_s=formatted_audiobook_data(selection_s, libri_words_df)
+
+            selections.append(selection)
+            selections_s.append(selection_s)
+
+    selections=pd.concat(selections)
+    selections_s=pd.concat(selections_s)
+
+    freq_words=count_values(selections.word.tolist()).index[:2].tolist()
+    freq_words_s=count_values(selections_s.word.tolist()).index[:2].tolist()
+
+    selections=selections[~selections.word.isin(freq_words)]
+    selections_s=selections_s[~selections_s.word.isin(freq_words_s)]
+
+    # filter our first ones like "it" or "its" tat are too frequent
+
+    phonetic_detections,result_df=compute_predictions(selections, charsiu, target_phones='', tech_function=termination_contrast_from_formatted_phonetics_audio, termination_basis='S')
+    phonetic_detections_s,result_df_s=compute_predictions(selections_s, charsiu, target_phones='S', tech_function=termination_contrast_from_formatted_phonetics_audio, termination_basis='S')
+
+    # success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
+    # print('errors:',result_df[result_df.gibberish_truth!=result_df.gibberish_detected])
+    # result_df[result_df.gibberish_truth!=result_df.gibberish_detected].iloc[-1]
+    # print(success_rate)
+
+    selections=selections.reset_index(drop=True)
+    result_df['cmu_phonetics']=selections['cmu_phonetics']
+    result_df['fpath']=selections['fpath']
+
+    d_s=count_values(phonetic_detections)
+
+    d=count_values(phonetic_detections_s)
+
+    return phonetic_detections, d
+
+def pContrast_from_audiobook_data(data_set='test-other', target_phones='AO1', n=None):
+    # charsiu = charsiu_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms')
+    charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+    
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
     selection=libri_words_df[libri_words_df.phones.str.contains(target_phones)]
 
-    # charsiu = charsiu_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms')
-    charsiu = charsiu_phone_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms', device='cpu')
+    selection=formatted_audiobook_data(selection, libri_words_df, target_phones=target_phones)
 
-    selection['split_phonetics']=selection.apply(lambda r: [p.split(' ') for p in phonetics_for_row(r, libri_words_df)], axis=1)
-
-    dfs=[]
-    # inference on librispeech takes approx 1.5s/sentence. (they are long phrases)
-    for i,row in tqdm(selection.iterrows()):
-        df_word=charsiu.predict_word(row.wav_path, row.split_phonetics, row.word_idx)
-        dfs.append(df_word)
+    phonetic_detections,_=compute_predictions(selection, charsiu, target_phones=target_phones)
     
-    # removing stress info if necessary
-    target = target_phones[:-1] if target_phones[-1] in str([0,1,2]) else target_phones
-
-    df_targets=[]
-    # select targets in words
-    for df_word in dfs:
-        df_targets.append(df_word[df_word.cmu_phones==target])
-
-    df_targets=pd.concat(df_targets)
-    
-    d=count_values(df_targets.pred_phones_audio.tolist())
+    d=count_values(phonetic_detections)
     d.columns=[target_phones]
+    return phonetic_detections, d
 
-    return df_targets, d
+    # dfs=[]
+    # # inference on librispeech takes approx 1.5s/sentence. (they are long phrases)
+    # for i,row in tqdm(selection.iterrows()):
+    #     df_word=charsiu.predict_word(row.wav_path, row.split_phonetics, row.word_idx)
+    #     dfs.append(df_word)
+    
+    # # removing stress info if necessary
+    # target = target_phones[:-1] if target_phones[-1] in str([0,1,2]) else target_phones
+
+    # df_targets=[]
+    # # select targets in words
+    # for df_word in dfs:
+    #     df_targets.append(df_word[df_word.cmu_phones==target])
+
+    # df_targets=pd.concat(df_targets)
+    
+    # d=count_values(df_targets.pred_phones_audio.tolist())
+    # d.columns=[target_phones]
+
+    # return df_targets, d
 
 
 
@@ -477,8 +702,17 @@ def vowels_consonants_confusions_from_audiobook_data(n=100, data_set='dev-clean'
         predictions[c], rates=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n)
         results[c]=rates
 
-    return predictions, rates
+    return predictions, results
 
+def termination_confusions_from_audiobook_data(n=100, data_set='dev-clean'):
+    eds=['T','D','IH0_D']
+
+    predictions={}
+    results={}
+    for p in tqdm(eds): 
+        predictions[p], rates=termination_contrast_from_audiobook_data(data_set=data_set, target_phones=p, n=n)
+        results[p]=rates
+    return predictions, results
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -502,6 +736,9 @@ def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
     # plt.savefig('vowel_contrast_users_w2v.png')
 
 if __name__=='__main__':
+    pContrast_from_audiobook_data(n=100)
+
+    r=termination_contrast_for_actor_recordings()
 
     pContrast_for_actor_recordings(target_phones='AO1')
 
@@ -552,6 +789,12 @@ if __name__=='__main__':
 
     predictions, results=vowels_consonants_confusions_from_audiobook_data(n=30, data_set='test-other')
     plot_confusion_results(results, name='vowels_consonant_contrast_audiobook_test-other_w2v_n_10')
+
+    data_set='dev-clean'
+    # data_set='test-other'
+    n=300
+    predictions, results=termination_confusions_from_audiobook_data(n=n, data_set=data_set)
+    plot_confusion_results(results, name='termination_contrast_audiobook_'+data_set+'_w2v_n_'+str(n))
 
 
     results=vowels_confusions_actor_recordings()
