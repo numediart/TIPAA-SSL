@@ -29,6 +29,22 @@ Endpoints of wav2vec based tech:
 /w2v/stress/word
 ```
 
+Correspondance between modules and endpoints, old and new tech:
+
+For Vowel Contrast:
+/phonemeContrast ->/w2v/contrast/vowel
+
+For Final -ed:
+/phonemeContrast ->/w2v/contrast/termination
+
+For focus word:
+/flowspeech/sentenceStress -> /w2v/stress/sentence
+
+For stressed syllables:
+/flowspeech/wordStress -> /w2v/stress/word
+
+
+
 See the requests here on the EC2 accessible at:
 
 https://speech-processing.flowchase.app/swagger-ui/
@@ -266,7 +282,6 @@ Body (FormData): {
     rID: string
     word_idx: number
     syl_idx: number
-    // alternatives: string
     target: string
 }
 ```
@@ -294,7 +309,6 @@ For example, for a recording containing “I visited Italy”, and a request to 
     "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
     "word_idx": 1,
     "syl_idx": 1,
-    // "alternatives": "IH0 IY0", // now ignored, it is deduced in the SP-API from the target
     "target": "IH0"
 }
 ```
@@ -330,7 +344,6 @@ Body (FormData): {
     rID: string
     word_idx: number
     syl_idx: number
-    // alternatives: string
     target: string
 }
 ```
@@ -360,7 +373,6 @@ For the same sentence “I visited Italy”, we want to study the -ed terminatio
     "phonetics": "AY1 V_IH1|Z_IH0|T_IH0_D IH1|T_AH0|L_IY0",
     "word_idx": 1,
     "syl_idx": 1,
-    // "alternatives": "IH0_D D T", // now ignored, it is deduced in the SP-API from the target
     "target": "IH0_D"
 }
 ```
