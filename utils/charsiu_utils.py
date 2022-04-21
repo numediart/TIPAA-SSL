@@ -18,6 +18,9 @@ drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).asty
 
 
 class charsiu_phone_forced_aligner(charsiu_forced_aligner):
+    def __init__(self, aligner, sil_threshold=4, **kwargs):
+        super().__init__(aligner, sil_threshold, **kwargs)
+        self.status="success"
     def align_phones(self, audio, phones):
         '''
         Perform forced alignment
@@ -95,6 +98,10 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         df_segmented.columns=['start','end','cmu_phones']
         df_segmented.loc[:,'pred_phones_audio']=max_proba_mean_phones_audio
         df_segmented.loc[:,'proba_means']=proba_means
+        p_to_id=lambda p: self.charsiu_processor.mapping_phone2id(p)
+        
+        df_segmented['GT_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.cmu_phones)], axis=1)
+        df_segmented['pred_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.pred_phones_audio)], axis=1)
         
         df=pd.DataFrame()
         df.loc[:,'pred_phones']=pred_phones
@@ -116,30 +123,25 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         pred_proba_means=[]
         GT_proba_means=[]
         for i in range(len(detailed_alignment_phones)):
-            # print(idxs_for_ranges[i])
-            # print(idxs_for_ranges[i+1])
             pred_proba_means.append(pred_probas[idxs_for_ranges[i]:idxs_for_ranges[i+1]].mean())
             GT_proba_means.append(GT_probas[idxs_for_ranges[i]:idxs_for_ranges[i+1]].mean())
         detailed_alignment_phones.loc[:,'pred_proba_means']=pred_proba_means
         detailed_alignment_phones.loc[:,'GT_proba_means']=GT_proba_means
 
+        if df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean() > 0.2:
+            self.status="success"
+        else:
+            self.status="success: the phrase was not recognized in expected phonemes"
+
         return alignment_phones, df_segmented, detailed_alignment_phones
     
-    # def force_and_predict(self, audio, phones):
-    #     """phones must be a list of phonemes, e.g.: phones=['EH1', 'N', 'D', 'IH0', 'D']
-    #     """
-    #     alignment_phones, df_segmented, _ = self.align_phones(audio=audio,phones=phones)
-    #     # df_segmented=pd.DataFrame(alignment_phones)
-    #     # df_segmented.columns=['start','end','cmu_phones']
-    #     # df_segmented.loc[:,'pred_phones_audio']=max_proba_mean_phones_audio
-    #     return df_segmented
     
     def predict_word(self, audio, phonetics, target_word_idx):
         """phonetics must be a list of list of phonemes, e.g.: phonetics=[['AY1'],['EH1', 'N', 'D', 'IH0', 'D']]
         """
         # merge lists
         phones=sum(phonetics,[])
-        alignment_phones, df_segmented, _ = self.align_phones(audio=audio,phones=phones)
+        alignment_phones, df_segmented, phonetic_content = self.align_phones(audio=audio,phones=phones)
         df_segmented=df_segmented[df_segmented.cmu_phones != '[SIL]']
 
         # if phones contains twice the same phone, e.g. "PhiliP Paints well", both P will be collapsed when computing the timings from DTW.
@@ -365,7 +367,6 @@ if __name__=="__main__":
     example=selection.loc[1131]
     # "ended"
     example=df.iloc[968]
-    
     phonetics=example.cmu_phonetics
 
     example=df.iloc[1539]
@@ -375,7 +376,14 @@ if __name__=="__main__":
     s,fs=librosa.load(path, sr=16000)
     split_phonetics=sum([p.replace('|','_').split('_') for p in phonetics.split(' ')],[])
     # phones=[[p] for p in  remove_stress_annots(split_phonetics)]
-    _, df_segmented, _ = charsiu.align_phones(audio=s,phones=split_phonetics)
+    _, df_segmented, phonetic_content = charsiu.align_phones(audio=s,phones=split_phonetics)
+    df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.median()
+    df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean()
+
+    phonetic_content.GT_proba_means.median()
+    phonetic_content.GT_proba_means.mean()
+
+    df_segmented.apply(lambda r: r.proba_means.sum(), axis=1)
 
     
 

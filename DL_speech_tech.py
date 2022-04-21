@@ -18,65 +18,67 @@ target_accepted_alternatives={
     'IH': ['IH', 'AH', 'EH']
 }
 
-def compute_stress_score(textgridData, s, fs):
-    """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
-    a value by vowel representing a stress intensity
+if False:
 
-    Args:
-        textgridData ([type]): [description]
-        s (np array): audio signal
-        fs (int): frequency of sampling
-    Returns:
-        weighted_score [type]: stress intensity score
-    """
+    def compute_stress_score(textgridData, s, fs):
+        """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
+        a value by vowel representing a stress intensity
 
-    indxVowels=textgridData[textgridData.cmu_phones.isin(vowels)].index.tolist()
+        Args:
+            textgridData ([type]): [description]
+            s (np array): audio signal
+            fs (int): frequency of sampling
+        Returns:
+            weighted_score [type]: stress intensity score
+        """
 
-    f0Samples=getIntonation(s, fs)
-    intensity=getIntensity(s, fs)
+        indxVowels=textgridData[textgridData.cmu_phones.isin(vowels)].index.tolist()
 
-    # extract features
-    # each word start and end position expressed in samples
-    startPositions_samples = (round(fs*textgridData.iloc[:,0])+1).astype(int).tolist()
-    stopPositions_samples = round(fs*textgridData.iloc[:,1]).astype(int).tolist()
-    
-    # to make sure we don t go beyond the end of the signal
-    assert stopPositions_samples[-1]<len(s), "The end of the last phoneme should be inside the signal"
+        f0Samples=getIntonation(s, fs)
+        intensity=getIntensity(s, fs)
 
-    Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
-    nVowels=len(indxVowels)
-    sylType=np.zeros(nVowels)
-    for i in range(nVowels):
-        range_vowel=range(startPositions_samples[indxVowels[i]], stopPositions_samples[indxVowels[i]])
-        Ivowel=intensity[range_vowel]
-        Fvowel=f0Samples[range_vowel]
+        # extract features
+        # each word start and end position expressed in samples
+        startPositions_samples = (round(fs*textgridData.iloc[:,0])+1).astype(int).tolist()
+        stopPositions_samples = round(fs*textgridData.iloc[:,1]).astype(int).tolist()
         
-        Imax.append(max(Ivowel))
-        Imean.append(np.mean(Ivowel))
-        Fmax.append(max(Fvowel))
-        Fmean.append(np.mean(Fvowel))
+        # to make sure we don t go beyond the end of the signal
+        assert stopPositions_samples[-1]<len(s), "The end of the last phoneme should be inside the signal"
 
-        Dur.append(textgridData['end'].iloc[indxVowels[i]]-textgridData['start'].iloc[indxVowels[i]])
+        Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
+        nVowels=len(indxVowels)
+        sylType=np.zeros(nVowels)
+        for i in range(nVowels):
+            range_vowel=range(startPositions_samples[indxVowels[i]], stopPositions_samples[indxVowels[i]])
+            Ivowel=intensity[range_vowel]
+            Fvowel=f0Samples[range_vowel]
+            
+            Imax.append(max(Ivowel))
+            Imean.append(np.mean(Ivowel))
+            Fmax.append(max(Fvowel))
+            Fmean.append(np.mean(Fvowel))
+
+            Dur.append(textgridData['end'].iloc[indxVowels[i]]-textgridData['start'].iloc[indxVowels[i]])
+            
+            # phone_df=pd.DataFrame([r[2].split('_') for i,r in textgridData.iterrows()])
+            # # here we use the prediction of HMM model as an indication, as it has to classify 0, 1 or 2
+            # syltype_phone=int(phone_df[2].iloc[indxVowels[i]])
+            # if syltype_phone == 2:  # the sylType is 0 for unstressed, 0.5 for secondary stressed syllables and 1 for primary stressed syllables
+            #     sylType[i] = 0.5
+            # else:
+            #     sylType[i]=syltype_phone
         
-        # phone_df=pd.DataFrame([r[2].split('_') for i,r in textgridData.iterrows()])
-        # # here we use the prediction of HMM model as an indication, as it has to classify 0, 1 or 2
-        # syltype_phone=int(phone_df[2].iloc[indxVowels[i]])
-        # if syltype_phone == 2:  # the sylType is 0 for unstressed, 0.5 for secondary stressed syllables and 1 for primary stressed syllables
-        #     sylType[i] = 0.5
-        # else:
-        #     sylType[i]=syltype_phone
-    
-    # normalization of features (projection to [0 1] range)
-    zImax = normalize(Imax)
-    zImean = normalize(Imean)
-    zFmax = normalize(Fmax)
-    zFmean = normalize(Fmean)
-    zDur = normalize(Dur)
+        # normalization of features (projection to [0 1] range)
+        zImax = normalize(Imax)
+        zImean = normalize(Imean)
+        zFmax = normalize(Fmax)
+        zFmean = normalize(Fmean)
+        zDur = normalize(Dur)
 
-    # combine the features
-    # weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur + 0.4*sylType)/3.6  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
-    weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur)/3.2  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
-    return weighted_score
+        # combine the features
+        # weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur + 0.4*sylType)/3.6  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
+        weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur)/3.2  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
+        return weighted_score
 
 def audio_load_and_check(rID, phonetics, max_speech_rate=8):
     # I first detect if the audio is too short to have a realistic speech rate
@@ -146,6 +148,8 @@ def stress_from_formatted_phonetics(rID,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_O
     if status=="success":
         # print(phonetics)
         ws=model.compute_stress_score(s,phonetics)
+        if model.status!="success": return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
+
         phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
         is_vowel=phonetics_indexed_df.apply(lambda r: unstress(r.phones) in cmu_vowels, axis=1)
         vowels_indexed_df=phonetics_indexed_df[is_vowel]
@@ -201,6 +205,7 @@ def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|
     g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
         phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx, phoneme_set=alternatives)
+        if model.status!="success": return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
         if detected_syllable!=detected_syllable: 
             return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
@@ -251,6 +256,8 @@ def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D
         syl_idxs=syl_idxs[:-n_p_target]+[syl_idxs[-1]]*len(termination_basis.split('_'))
 
         df_word=model.predict_word(s, split_phonetics, target_word_idx)
+        if model.status!="success": return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
         df_word['syl_idx']=syl_idxs
         df_syl=df_word[df_word.syl_idx==syl_idxs[-1]]
 
@@ -360,7 +367,9 @@ def syllable_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER
 
     if status=="success":
         phonetic_content=phonetic_content_analysis(s, phonetics)
-        if len(phonetic_content)==0: return {"status": "phonetic_content is empty" ,  "gibberish_truth":  "null", "gibberish_detected":  "null"}
+        if model.status!="success": return {"status": model.status, "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
+        if len(phonetic_content)==0: return {"status": "phonetic_content is empty", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
         syllable_content=phonetic_content[phonetic_content.word_idx==target_word_idx][phonetic_content.syl_idx==target_syllable_idx]
         detected_syllable=syllable_content.pred_phones_audio.tolist()
