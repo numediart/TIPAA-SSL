@@ -12,7 +12,7 @@ import uuid
 from scipy.io.wavfile import write, read
 import os
 
-def load_audio(waveFileAddress, fs=16000, speech_correction=True):
+def load_audio(waveFileAddress, fs=16000):
     """Load audio, remove DC and normalize waveform
     speech_correction refers to the use of MetricGAN+. A speech enhancement system based on an adversarial loss and PESQ/STOI metrics 
     to improve audio quality. 
@@ -25,8 +25,8 @@ def load_audio(waveFileAddress, fs=16000, speech_correction=True):
     # fs, s = read(waveFileAddress)
     s,fs=librosa.load(waveFileAddress, sr=fs)
 
-    if speech_correction:
-        s=speech_enhancement(s)
+    # if speech_correction:
+    #     s=speech_enhancement(s)
 
     # trim silences
     # s, index = librosa.effects.trim(s, top_db=20)
@@ -36,10 +36,10 @@ def load_audio(waveFileAddress, fs=16000, speech_correction=True):
     s = 0.90*s/max(abs(s))
     return s, fs
 
-def prepare_audio_file(audio_file, fs=16000, speech_correction=True):
+def prepare_audio_file(audio_file, fs=16000):
     rID=str(uuid.uuid4())
     if os.path.exists(audio_file):
-        s,fs = load_audio(audio_file, fs=fs, speech_correction=speech_correction)
+        s,fs = load_audio(audio_file, fs=fs)
     else:
         return "error: "+audio_file+" could not be loaded", None
     write('./inputs/'+ rID+ '.wav', fs, (s*32767).astype(np.int16))
@@ -235,3 +235,33 @@ def align_audios(
 
     return out
 
+
+def test_audio_file_like():
+    import soundfile as sf
+    import io
+
+    from six.moves.urllib.request import urlopen
+
+    # url = "https://raw.githubusercontent.com/librosa/librosa/master/tests/data/test1_44100.wav"
+    # url="https://filesamples.com/samples/audio/caf/sample3.caf"
+    url="https://filesamples.com/samples/audio/m4a/sample3.m4a"
+
+    
+
+    import base64
+    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
+    # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
+    # path='data/audio_recordings/turned_around.mp3'
+    encode_string = base64.b64encode(open(path, "rb").read())
+
+    
+    decode_string = base64.b64decode(encode_string)
+
+    import soundfile as sf
+    sf.read(io.BytesIO(decode_string))
+
+
+
+    wav_file = open(path, "wb")
+    wav_file.write(decode_string)
+    wav_file.close()

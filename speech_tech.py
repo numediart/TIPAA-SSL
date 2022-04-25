@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from time import time
 from utils.audio_processing import load_audio, getIntonation, getIntensity, normalize, getf0Samples, prepare_audio_file
+from utils.DL_audio_processing import speech_enhancement
 import soundfile as sf
 from utils.htk_utils import get_textgrid_data, clean_htk_files
 
@@ -21,7 +22,7 @@ cached_filenames={}
 
 
 
-def get_annotated_signal(rand_fileName, wav_name):
+def get_annotated_signal(rand_fileName, wav_name, speech_correction=True):
     """Load audio file and annotation files corresponding to parameters, 
     and calls "textgridData" to obtain htk predictions of phonemes and
     their timings
@@ -37,6 +38,8 @@ def get_annotated_signal(rand_fileName, wav_name):
     # rand_fileName, inputPhoneticTranscription, inputGrammar = p['rand_fileName'], p['inputPhoneticTranscription'], p['inputGrammar']
     try:
         fs,s=read('./inputs/'+ wav_name+ '.wav')
+        if speech_correction:
+            s=speech_enhancement(s)
     except FileNotFoundError:
         return "error: audio file not found", None, None, None
     s=s/32767
@@ -98,7 +101,6 @@ def verification_n_of_phoneme(textgridData, p):
     count_total = len(phone_seq)
     count_unique = len(phone_set)
     return nEntries==0 or count_total!=nEntries or count_unique!=nEntries
-
 
 
 def chunking(
