@@ -205,8 +205,12 @@ def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|
     g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
         phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx, phoneme_set=alternatives)
+        # if the probabilities were too low, 
+        # maybe change this to empty if we want the other feedback "are you saying the right words", 
+        # or change null to "non-speech", nothing, nonsense or the pred_phones_audio
         if model.status!="success": return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
+        # if it's nan
         if detected_syllable!=detected_syllable: 
             return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
@@ -218,9 +222,11 @@ def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|
                 phonetic_detection=unstress(target_phones)
                 g_d=g_t
         
+        # print(phonetic_detection)
+        
         # phonetic detection needs to be the stressed version for backwards compatibility (when correct, when it's not, we don't care)
-        print("phonetic_detection",phonetic_detection)
-        print("target_phones",target_phones)
+        # print("phonetic_detection",phonetic_detection)
+        # print("target_phones",target_phones)
         if phonetic_detection==unstress(target_phones): 
             phonetic_detection=target_phones
             g_d=g_t
