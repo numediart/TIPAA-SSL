@@ -132,9 +132,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             self.status="success"
         else:
             self.status="success: the phrase was not recognized in expected phonemes"
-
         return alignment_phones, df_segmented, detailed_alignment_phones
-    
     
     def predict_word(self, audio, phonetics, target_word_idx):
         """phonetics must be a list of list of phonemes, e.g.: phonetics=[['AY1'],['EH1', 'N', 'D', 'IH0', 'D']]
@@ -143,7 +141,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         phones=sum(phonetics,[])
         alignment_phones, df_segmented, phonetic_content = self.align_phones(audio=audio,phones=phones)
         df_segmented=df_segmented[df_segmented.cmu_phones != '[SIL]']
-
         # if phones contains twice the same phone, e.g. "PhiliP Paints well", both P will be collapsed when computing the timings from DTW.
         # this results in a df_segmented shorter than "phones" list. I thus have to duplicate the corresponding row when it happens
         if len(phones)>len(df_segmented):
@@ -160,7 +157,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         df_word=df_segmented[start_idx:end_idx]
         return df_word
     
-    def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels):
+    def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
         """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
         """
         
@@ -183,17 +180,17 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             len_previous_syllables=sum([len(el) for el in syllables[:target_syllable_idx]])
             p_idx_global=len_previous_syllables+p_idx_local
 
-            # phonetic_detection=df_word.iloc[p_idx_global].pred_phones_audio
-
             phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
             proba_means=df_word.iloc[p_idx_global].proba_means
 
-            # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
-            filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
-
-            idx_mean_max=np.argmax(filtered_proba_means)
-            phonetic_detection=self.charsiu_processor.mapping_id2phone(int(idx_mean_max))
-
+            # if GT_proba is beyond the threshold, we take it as prediction
+            if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
+                phonetic_detection=target_phones
+            else:
+                # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
+                filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
+                idx_mean_max=np.argmax(filtered_proba_means)
+                phonetic_detection=self.charsiu_processor.mapping_id2phone(int(idx_mean_max))
             syl[p_idx_local]=phonetic_detection
             
         else:
