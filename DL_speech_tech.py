@@ -258,8 +258,6 @@ def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D
     # g_t=[cmu_to_gibberish[unstress(p)] for p in target_phones.split('_')]
     # g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
-
-
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         target_word=split_phonetics[target_word_idx]
         split_phonetics[target_word_idx]=target_word[:-n_p_target]+termination_basis.split('_')
@@ -268,20 +266,20 @@ def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D
         syl_idxs=phonetics_indexed_df.syl_idx.tolist()
         syl_idxs=syl_idxs[:-n_p_target]+[syl_idxs[-1]]*len(termination_basis.split('_'))
 
+        # a=model.align_phones(s, sum(split_phonetics,[]))
         df_word=model.predict_word(s, split_phonetics, target_word_idx)
         if model.status!="success": return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
         df_word['syl_idx']=syl_idxs
         df_syl=df_word[df_word.syl_idx==syl_idxs[-1]]
 
-        pred_phones=df_syl[df_syl.pred_phones_audio!='[SIL]']
-        syl_detected=drop_consecutive_duplicates(pred_phones[['pred_phones_audio']]).pred_phones_audio.tolist()
+        df_syl=df_syl[df_syl.pred_phones_audio!='[SIL]']
+        syl_detected=drop_consecutive_duplicates(df_syl[['pred_phones_audio']]).pred_phones_audio.tolist()
 
         # root based on GT
         root=df_syl.cmu_phones.tolist()[:-n_ter_basis]
         # detected termination
-        ter=syl_detected[-n_ter_basis-1:]
-        
+        ter=syl_detected[len(root)-1:]
         
         if len(ter)==len(GT):
             ter_post=[]
@@ -396,14 +394,28 @@ def syllable_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER
     
 
 if __name__=="__main__":
-    print('a')
+    from DL_speech_tech import *
+
     from utils.audio_processing import prepare_audio_file
     from utils.text_processing import *
+    from utils.label_data_processing import *
 
     formatted_phonetics=prefill_for_sentence('turned around')['cmu_phonetics']
     _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
+    # _, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
     termination_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
                             target_word_idx=0, 
                             target_phones='D',
+                            termination_basis='IH0_D',
+                    )
+    
+    df=actor_recordings()
+    target_phones='T'
+    selection=df[df.target_phoneme==target_phones]
+    row=selection.iloc[0]
+    _, rID=prepare_audio_file(row.audio_file_url)
+    termination_contrast_from_formatted_phonetics_audio(rID,phonetics=row.cmu_phonetics, 
+                            target_word_idx=0, 
+                            target_phones=target_phones,
                             termination_basis='IH0_D',
                     )
