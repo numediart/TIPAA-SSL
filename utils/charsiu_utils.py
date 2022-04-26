@@ -9,12 +9,9 @@ import sys
 import torch
 import numpy as np
 from charsiu.src.utils import seq2duration,forced_align
-from utils.text_processing import remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, cmu_consonants, unstress
+from utils.text_processing import cmu_vowels, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, cmu_consonants, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
 from utils.audio_processing import getIntonation, getIntensity, normalize
 from collections import Counter
-from utils.text_processing import cmu_vowels
-
-drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
 
 
 class charsiu_phone_forced_aligner(charsiu_forced_aligner):
@@ -136,8 +133,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             self.status="success: the phrase was not recognized in expected phonemes"
         
         self.phonetic_content=detailed_alignment_phones
-        
-        self.pred_phones_audio=drop_consecutive_duplicate_elements(phonetic_content[phonetic_content.pred_phones_audio!='[SIL]'].pred_phones_audio.tolist())
+        self.pred_phones_audio=drop_consecutive_duplicate_elements(detailed_alignment_phones[detailed_alignment_phones.pred_phones_audio!='[SIL]'].pred_phones_audio.tolist())
 
         return alignment_phones, df_segmented, detailed_alignment_phones
     
