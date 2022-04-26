@@ -15,7 +15,7 @@ target_accepted_alternatives={
     'AO': ['AA', 'AO'],
     'D': ['D', 'T'],
     'T': ['D', 'T'],
-    'IH': ['IH', 'AH', 'EH']
+    # 'IH': ['IH', 'AH', 'EH']
 }
 
 if False:
