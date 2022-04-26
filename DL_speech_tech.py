@@ -208,8 +208,16 @@ def phonemeContrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER0|
         # if the probabilities were too low, 
         # maybe change this to empty if we want the other feedback "are you saying the right words", 
         # or change null to "non-speech", nothing, nonsense or the pred_phones_audio
-        if model.status!="success": return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-
+        if model.status!="success": 
+            g_d=[cmu_to_gibberish[unstress(p)] for p in model.pred_phones_audio]
+            if g_d==[]:
+                return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
+            else:
+                if len(g_d)>10:
+                    return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nonsense'}
+                else:
+                    return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  '_'.join(g_d)}
+    
         # if it's nan
         if detected_syllable!=detected_syllable: 
             return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
@@ -267,9 +275,17 @@ def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D
         syl_idxs=syl_idxs[:-n_p_target]+[syl_idxs[-1]]*len(termination_basis.split('_'))
 
         # a=model.align_phones(s, sum(split_phonetics,[]))
-        df_word=model.predict_word(s, split_phonetics, target_word_idx)
-        if model.status!="success": return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-
+        df_word=model.predict_word(s, split_phonetics, target_word_idx)        
+        if model.status!="success": 
+            g_d=[cmu_to_gibberish[unstress(p)] for p in model.pred_phones_audio]
+            if g_d==[]:
+                return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
+            else:
+                if len(g_d)>10:
+                    return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nonsense'}
+                else:
+                    return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  '_'.join(g_d)}
+        
         df_word['syl_idx']=syl_idxs
         df_syl=df_word[df_word.syl_idx==syl_idxs[-1]]
 

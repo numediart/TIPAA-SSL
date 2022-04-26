@@ -21,6 +21,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
     def __init__(self, aligner, sil_threshold=4, **kwargs):
         super().__init__(aligner, sil_threshold, **kwargs)
         self.status="success"
+        self.phonetic_content=None
+        self.pred_phones_audio=""
     def align_phones(self, audio, phones):
         '''
         Perform forced alignment
@@ -132,6 +134,11 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             self.status="success"
         else:
             self.status="success: the phrase was not recognized in expected phonemes"
+        
+        self.phonetic_content=detailed_alignment_phones
+        
+        self.pred_phones_audio=drop_consecutive_duplicate_elements(phonetic_content[phonetic_content.pred_phones_audio!='[SIL]'].pred_phones_audio.tolist())
+
         return alignment_phones, df_segmented, detailed_alignment_phones
     
     def predict_word(self, audio, phonetics, target_word_idx):
