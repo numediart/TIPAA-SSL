@@ -13,8 +13,8 @@ model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms'
 target_accepted_alternatives={
     'AA': ['AA', 'AO'],
     'AO': ['AA', 'AO'],
-    'D': ['D', 'T'],
-    'T': ['D', 'T'],
+    # 'D': ['D', 'T'],
+    # 'T': ['D', 'T'],
     # 'IH': ['IH', 'AH', 'EH']
 }
 
@@ -248,11 +248,18 @@ def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D
     idx_syl_ter=phonetics_indexed_df.syl_idx.iloc[-1]
     df_syl_GT=phonetics_indexed_df[phonetics_indexed_df.syl_idx==idx_syl_ter]
     syl_GT=remove_stress_annots(df_syl_GT.phones.tolist())
-    g_t=[cmu_to_gibberish[unstress(p)] for p in syl_GT]
+
+    n_p_target=len(target_phones.split('_'))
+    n_ter_basis=len(termination_basis.split('_'))
+    GT=syl_GT[-n_p_target-1:]
+
+    g_t=[cmu_to_gibberish[unstress(p)] for p in GT]
+    # g_t=[cmu_to_gibberish[unstress(p)] for p in syl_GT]
+    # g_t=[cmu_to_gibberish[unstress(p)] for p in target_phones.split('_')]
     # g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
 
-        n_p_target=len(target_phones.split('_'))
+
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         target_word=split_phonetics[target_word_idx]
         split_phonetics[target_word_idx]=target_word[:-n_p_target]+termination_basis.split('_')
@@ -271,10 +278,10 @@ def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D
         syl_detected=drop_consecutive_duplicates(pred_phones[['pred_phones_audio']]).pred_phones_audio.tolist()
 
         # root based on GT
-        root=syl_GT[:-n_p_target-1]
+        root=df_syl.cmu_phones.tolist()[:-n_ter_basis]
         # detected termination
-        ter=syl_detected[-n_p_target-1:]
-        GT=syl_GT[-n_p_target-1:]
+        ter=syl_detected[-n_ter_basis-1:]
+        
         
         if len(ter)==len(GT):
             ter_post=[]
@@ -290,11 +297,13 @@ def termination_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D
         else: ter_post=ter
 
         # there might be consecutive duplicates when we concatenate root and ter_post
-        g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in root+ter_post])
+        # g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in root+ter_post])
+        g_d=[cmu_to_gibberish[unstress(p)] for p in ter_post]
         
         # phonetic detection needs to be the stressed version for backwards compatibility 
         # (however, here I convert to stressed version only when correct, it might work, but could cause problems?)
         detection=ter_post[1:]
+        # detection=ter_post
         if target_phones!='': # case of final -s
             if detection==remove_stress_annots(target_phones.split('_')): detection=target_phones.split('_')
 
@@ -385,3 +394,16 @@ def syllable_contrast_from_formatted_phonetics_audio(rID,phonetics='T_ER1_N_D ER
     else:
         return {"status": status,  "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
     
+
+if __name__=="__main__":
+    print('a')
+    from utils.audio_processing import prepare_audio_file
+    from utils.text_processing import *
+
+    formatted_phonetics=prefill_for_sentence('turned around')['cmu_phonetics']
+    _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
+    termination_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+                            target_word_idx=0, 
+                            target_phones='D',
+                            termination_basis='IH0_D',
+                    )
