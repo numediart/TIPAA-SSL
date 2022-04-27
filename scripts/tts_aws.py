@@ -54,21 +54,28 @@ def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',path
     --voice-id "+voice_id+" \
     --engine "+synth_technique+" \
     --profile iam_user \
-    "+path+name+".mp3  >/dev/null 2>&1"
+    "+path+'/'+name+".mp3  >/dev/null 2>&1"
 
-    if not os.path.exists(path+'/'+name+".mp3"):    os.system(cmd)
+    # print(path+'/'+name+".mp3")
+    if not os.path.exists(path+'/'+name+".mp3"):    
+        os.system(cmd)
 
 def synthesize_cmu(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk_id="F_US"):
     import cmudict
     from tqdm import tqdm
     words=list(cmudict.dict().keys())
 
+    synth_technique='standard'
+    tag='prosody'
+    root_folder='/'.join([root_folder, synth_technique, tag, voice_id])
+
     executor = ProcessPoolExecutor(max_workers=25)    
     futures = []
     for w in tqdm(words):
         name=spk_id+'_'+remove_special_characters(w, chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"\']')
         futures.append(executor.submit(
-            synthesize, w, tag='prosody', options='rate="70%" volume="+20dB"',path=root_folder,synth_technique='standard',voice_id=voice_id, name=name))
+            synthesize, w, tag=tag, options='rate="70%" volume="+20dB"',path=root_folder,synth_technique=synth_technique,voice_id=voice_id, name=name))
+        # synthesize(w, tag='prosody', options='rate="70%" volume="+20dB"',path=root_folder,synth_technique='standard',voice_id=voice_id, name=name)
 
     proc_list = [future.result() for future in tqdm(futures)]
 
@@ -92,12 +99,14 @@ if __name__ == "__main__":
 
     # tag='emphasis'
     # options='level="strong"'
-    voices={'Joanna':'F_US', "Amy":"F_UK", "Matthew":"M_US", "Brian":"M_UK"}
+    # voices={'Joanna':'F_US', "Amy":"F_UK", "Matthew":"M_US", "Brian":"M_UK"}
+    voices={"Brian":"M_UK",  "Matthew":"M_US"}
     lang_dict={'US':'en-US', 'UK':'en-GB'}
 
     for k in voices:
         voice_id=k
         spk_id=voices[k]
+        print(k)
         synthesize_cmu(voice_id=voice_id, spk_id=spk_id)
 
     dest_folder="data/BE_english_DB_audio/"
