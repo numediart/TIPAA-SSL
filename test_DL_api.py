@@ -75,10 +75,12 @@ def test_actor_recordings(base_url = 'http://localhost:8000', client=app.test_cl
         success_rate = lambda df : len(df[df.gibberish_truth==df.gibberish_detected])/len(df) if len(df)>0 else float('nan')
         print('success rate for '+t, success_rate(res))
 
-
-
 def test_stress_detection(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
     df=actor_recordings()
+    len_t_seg=df.apply(lambda r: len(r.syllable_parts.split(' ')), axis=1)
+    len_p=df.apply(lambda r: len(r.cmu_phonetics.split(' ')), axis=1)
+    df[len_t_seg!=len_p]
+
 
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     df_sentence_stress=df.loc[df.stress_category.dropna().index]
@@ -139,6 +141,7 @@ def vowels_confusions_user_recordings(n_user=10, n_ex_by_ex_type=10):
 
 if __name__ == '__main__':
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
+    test_actor_recordings(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
 
     from test_DL_api import *;print(pContrast_for_user_data())
 
@@ -150,7 +153,7 @@ if __name__ == '__main__':
     print('duration:', duration) # 1800s = 30m
 
     # test_api()
-    r=test_GE_linguistic_data_content()
+    # r=test_GE_linguistic_data_content()
     
     # idx=r[r.status!='success'].index[0]
     # row=df_pContrast.loc[idx]
@@ -159,9 +162,9 @@ if __name__ == '__main__':
     import requests
     # try with local docker container
     test_stress_detection(client=requests)
-    test_GE_linguistic_data_content(client=requests)
+    # test_GE_linguistic_data_content(client=requests)
 
-    test_GE_linguistic_data_content(base_url = 'http://146.59.241.79/', client=requests)
+    # test_GE_linguistic_data_content(base_url = 'http://146.59.241.79/', client=requests)
 
     df, d=pContrast_for_user_data()
     print(d)
