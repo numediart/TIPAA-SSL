@@ -183,7 +183,7 @@ Body (FormData): {
 }
 ```
 
-The `phonetics` property should contain the CMU phonetics (with separators for phonemes ("_"), syllables ("|") and words (" ")).
+The `phonetics` property should contain the CMU phonetics (with separators for phonemes (`_`), syllables (`|`) and words (blank space: ` `)).
 
 The response object is a JSON payload with the following schema:
 
@@ -273,7 +273,7 @@ The HTTP status codes are either 200 (for success), 400 or 500 (for errors)
 
 > The logic behind this one is to use text and audio as input. The text is automatically phonetized and "grammarized", then htk model is used.
 
-The `phonemeContrast` module gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes):
+The `phonemeContrast` module gives you a detected transcription based on a target phoneme:
 
 ```
 POST /phonemeContrast
@@ -286,7 +286,7 @@ Body (FormData): {
 }
 ```
 
-As before, the phonetics is consituted of CMU phonemes with separators for phonemes (`_`), syllables (`|`) and words (` `). For alternatives, one alternative is considered a word of several phonemes.
+As before, the phonetics is consituted of CMU phonemes with separators for phonemes (`_`), syllables (`|`) and words (` `).
 
 The response payload has the following schema:
 
@@ -335,7 +335,7 @@ It is mostly the same as phonemeContrast. The main difference is that the phonem
 
 In fact, as implemented now, a call of `termination_contrast` would also work for vowel contrasts and include an alternative of "not pronounced" vowel. But I don't know if it is wished and it will alter the performance result. I could eventually merge endpoints and have a flag `allow_silent_alternative`.
 
-The `termination_contrast` module gives you a detected transcription based on a target phoneme and a set of alternatives (in CMU phonemes):
+The `termination_contrast` module gives you a detected transcription based on a target phoneme:
 
 ```
 POST /termination_contrast
@@ -348,7 +348,7 @@ Body (FormData): {
 }
 ```
 
-As before, the phonetics is consituted of CMU phonemes with separators for phonemes (`_`), syllables (`|`) and words (` `). For alternatives, one alternative is considered a word of several phonemes.
+As before, the phonetics is consituted of CMU phonemes with separators for phonemes (`_`), syllables (`|`) and words (` `).
 
 The response payload has the following schema:
 
@@ -363,7 +363,7 @@ type Response = {
 
 ### Example for final ed
 
-To study e.d. the "-ed" termination, you would need to input `'target': 'IH0_D'` and e.g. `'alternatives': "T D IH0_D"`.
+To study e.d. the "-ed" termination, you would need to input `'target': 'IH0_D'`.
 
 For the same sentence “I visited Italy”, we want to study the -ed termination of “visited”, therefore the request is:
 
