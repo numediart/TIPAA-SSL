@@ -173,7 +173,7 @@ def get_cmudict_info(word='university'):
     """
     return cmudict_dict[word][0]
 
-def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\;\:\"\*]'):
+def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\;\:\"\*\{\}]'):
     """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
 
     Args:
@@ -669,7 +669,7 @@ def add_special_char(s_orig, s_modified):
 
     return ' '.join(s_modified_with_special_chars)
 
-def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 14 million dollars early-stage start-up!", syllables_df=pd.read_csv('data/syllables.csv'), syl_sep='|'):
+def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up!", syllables_df=pd.read_csv('data/syllables.csv'), syl_sep='|'):
     """This function extract information of syllabified texts and phonetics. 
     It uses a combination of datasets (CMUdict, data from syllable_data() ) and algorithm (SonoriPy)
 
@@ -687,13 +687,18 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     # sentence.split(' ')
 
     # special_chars = [',','?','.','!',';',':','"','*']
-    special_chars = [',','?','.','!',';',':','"']
+    special_chars = [',','?','.','!',';',':','"', '{', '}']
 
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
     for c in special_chars: sentence=sentence.replace(' '+c, c)
 
     norm_sent=normalize_numbers(sentence)
+
+    # norm_sent_list=[normalize_numbers(word) for word in sentence.split(' ')]
+    # norm_sent="{"+"}, {".join(norm_sent_list)+"}"
+
+
 
     special_chars_dict={}
     for i,w in enumerate(norm_sent.split(' ')):
@@ -702,8 +707,9 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
 
     words=remove_special_characters(norm_sent, lowercase=False).split(' ')
 
-    word_groups=[remove_special_characters(normalize_numbers(w), lowercase=False) for w in sentence.split(' ')]
-    lens=[len(w.split(' ')) for w in word_groups]
+    # word_groups=[remove_special_characters(normalize_numbers(w), lowercase=False) for w in sentence.split(' ')]
+    # lens=[len(w.split(' ')) for w in word_groups]
+    
     words=[expand_dict[word] if word in expand_dict else word for word in words]
     norm_words=words
     
@@ -837,7 +843,7 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
         'cmu_phonetics':p_0,
         'pronounciation_guide':g_0,
         'pronounciation_guide_hr':g_hr_0,
-        'syllable_parts':case_syls_texts_special_chars,
+        'segmented_text':case_syls_texts_special_chars,
         # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
         'n_syl_mismatches':word_idxs_inconsitencies['n_syl'],
         'n_stress_inconsistencies':word_idxs_inconsitencies['stress'],
