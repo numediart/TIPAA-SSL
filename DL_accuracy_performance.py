@@ -1,3 +1,4 @@
+from cProfile import label
 from utils.libri_phonetization_data import build_librispeech_words_df
 from utils.libri_phonetization_data import phonetics_for_row, select
 from tqdm import tqdm
@@ -35,7 +36,7 @@ def stress_GE_performance_test(level='sentence'):
     stress_binaries=[]
     for i,row in df.iterrows():
         formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
-        _, rID=prepare_audio_file(row.audio_path, speech_correction=False)
+        _, rID=prepare_audio_file(row.audio_path)
         res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=row.text, level=level)
         print(res)
         stress_intensities.append(res['stress_intensities'])
@@ -151,8 +152,6 @@ def compute_predictions(selection, model, target_phones='AO1', tech_function=pho
     records=[]
     print('number of examples:', len(selection))
     for i,r in tqdm(selection.iterrows()):
-        # phonetics=r.cmu_phonetics
-        # s,fs=librosa.load(r.fpath, sr=16000)
         if type(r.target_word_indexes)==str:
             target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
             target_syllable_idx=ast.literal_eval(r.target_syllable_indexes)[0]
@@ -161,7 +160,7 @@ def compute_predictions(selection, model, target_phones='AO1', tech_function=pho
             target_syllable_idx=r.target_syllable_indexes
 
 
-        status_audio, rID=prepare_audio_file(r.fpath, speech_correction=False) 
+        status_audio, rID=prepare_audio_file(r.fpath) 
         res=tech_function(rID,
                         phonetics=r.cmu_phonetics, 
                         target_word_idx=target_word_idx, 
@@ -232,7 +231,7 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001):
             selections.append(selection[selection.user_id==u][selection.exercise_id==ex])
     df=pd.concat(selections)
 
-    charsiu = charsiu_phone_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms', device='cpu')
+    charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     
     df=df.sample(frac=frac, random_state=1234)
 
@@ -247,7 +246,17 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001):
     return phonetic_detections, d
 
 
+
+from utils.text_processing import cmu_vowels
+from scipy.stats import gaussian_kde
+def distrib(l):
+    x = np.linspace(0, 1, 1000)
+    kde = gaussian_kde(l, bw_method = 0.5)
+    y = kde(x)
+    return x,y
+
 def syllable_contrast_for_actor_recordings():
+    # from DL_accuracy_performance import *
     df=actor_recordings()
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     df_sentence_stress=df.loc[df.stress_category.dropna().index]
@@ -261,6 +270,131 @@ def syllable_contrast_for_actor_recordings():
 
     charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
+    # contrast on all phones with force_and_predict (i.e. predict based on frames allocated to a phoneme)
+    pred_dfs=[]
+    phonetic_contents=[]
+    print(len(df))
+    means=[]
+    medians=[]
+    for i,r in tqdm(df_pContrast.iterrows()):
+        s,fs=librosa.load(r.audio_file_url, sr=16000)
+        split_phonetics=sum([p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], [])
+        _, p_df, phonetic_content = charsiu.align_phones(audio=s,phones=split_phonetics)
+        # p_df=charsiu.force_and_predict(s, split_phonetics)
+        pred_dfs.append(p_df)
+        phonetic_contents.append(phonetic_content)
+        # phonetic_content.GT_proba_means.median()
+        means.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.mean())
+        medians.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.median())
+    correct_proba_means=np.histogram(means)
+    correct_proba_medians=np.histogram(medians)
+
+    all_phones_df=pd.concat(pred_dfs)
+
+    x,kde1_x=distrib(means)
+    plt.plot(x, kde1_x)
+    plt.savefig('gkde.png')
+
+    p_to_id=lambda p: charsiu.charsiu_processor.mapping_phone2id(p)
+    # target='IH'
+
+    def plot_vowel_distributions(target):
+        p_idx=p_to_id(target)
+        plt.cla()
+        for v in cmu_vowels:
+            l=all_phones_df[all_phones_df.cmu_phones==v].apply(lambda r: r.proba_means[p_idx], axis=1)
+            x,y=distrib(l)
+            if y[0]<10:
+                plt.plot(x,y, label=v)
+            else:
+                print('vowel', v)
+                print('max is', max(y))
+        plt.legend()
+        plt.title("Proba distributions for "+target)
+        plt.savefig('probas_'+target+'.png')
+
+    for v in cmu_vowels:
+        plot_vowel_distributions(v)
+    np.histogram(all_phones_df[all_phones_df.cmu_phones=="IY"].GT_proba)
+
+    s=all_phones_df[all_phones_df.cmu_phones=="IY"]
+    s[(s.GT_proba>0.2)&(s.GT_proba<0.5)]
+
+
+
+    
+    np.histogram(all_phones_df[all_phones_df.cmu_phones=="EH"].GT_proba)
+    np.histogram(all_phones_df[all_phones_df.cmu_phones=="IH"].GT_proba)
+    np.histogram(all_phones_df[all_phones_df.cmu_phones=="IY"].GT_proba)
+
+    np.histogram(all_phones_df[all_phones_df.cmu_phones=="AA"].GT_proba)
+    np.histogram(all_phones_df[(all_phones_df.cmu_phones=="AA")&(all_phones_df.pred_phones_audio=="AO")].pred_proba)
+
+    np.histogram(all_phones_df[all_phones_df.cmu_phones=="AO"].GT_proba)
+    np.histogram(all_phones_df[(all_phones_df.cmu_phones=="AO")&(all_phones_df.pred_phones_audio=="AA")].pred_proba)
+
+    np.histogram(all_phones_df[all_phones_df.cmu_phones=="OW"].GT_proba)
+
+    correct_proba_means=pd.DataFrame(correct_proba_means).T
+    correct_proba_means.columns=['N','target proba']
+    correct_proba_medians=pd.DataFrame(correct_proba_medians).T
+    correct_proba_medians.columns=['N','target proba']
+
+    medians[7]
+    df_pContrast.iloc[7]
+    pred_dfs[7]
+
+    # mismatches on purpose
+    pred_dfs=[]
+    phonetic_contents=[]
+    print(len(df))
+    means=[]
+    medians=[]
+    for i,r in tqdm(df_pContrast.iterrows()):
+        s,fs=librosa.load(r.audio_file_url, sr=16000)
+        # take random sentence in df_pContrast that is not the same
+
+        # recursive call until it works, as I pick randomly some phonetics and sometimes it fails to align in DTW algorithm
+        def inference():
+            try:
+                phonetics=df_pContrast[df_pContrast.cmu_phonetics!=r.cmu_phonetics].sample().cmu_phonetics.values[0]
+                split_phonetics=sum([p.replace('|','_').split('_') for p in phonetics.split(' ')], [])
+                _, p_df, phonetic_content = charsiu.align_phones(audio=s,phones=split_phonetics)
+                return p_df, phonetic_content
+            except:
+                return inference()
+        
+        p_df, phonetic_content=inference()
+        phonetic_content=phonetic_content[phonetic_content.pred_phones_audio!='[SIL]']
+        pred_phones_audio=drop_consecutive_duplicate_elements(phonetic_content.pred_phones_audio.tolist())
+
+        # p_df=charsiu.force_and_predict(s, split_phonetics)
+        pred_dfs.append(p_df)
+        phonetic_contents.append(phonetic_content)
+        # phonetic_content.GT_proba_means.median()
+        means.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.mean())
+        medians.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.median())
+    mismatch_proba_means=np.histogram(means)
+    mismatch_proba_medians=np.histogram(medians)
+
+    x,kde2_x=distrib(means)
+    plt.plot(x, kde2_x)
+    plt.savefig('proba_means_gkde.png')
+
+    # intersection of distributions
+    idx = np.argwhere(np.diff(np.sign(kde1_x - kde2_x))).flatten()
+    optimal_threshold=x[idx]
+
+    mismatch_proba_means=pd.DataFrame(mismatch_proba_means).T
+    mismatch_proba_means.columns=['N','target proba']
+    mismatch_proba_medians=pd.DataFrame(mismatch_proba_medians).T
+    mismatch_proba_medians.columns=['N','target proba']
+
+    match_rate=1-len(pred_df[pred_df.cmu_phones!=pred_df.pred_phones_audio])/len(pred_df)
+    pred_df=pred_df[pred_df.pred_phones_audio!='[SIL]']
+    match_rate=1-len(pred_df[pred_df.cmu_phones!=pred_df.pred_phones_audio])/len(pred_df)
+
+    
     # final -ed based on force_and_predict logic
     preds=[]
     len(df_ed)
@@ -273,7 +407,7 @@ def syllable_contrast_for_actor_recordings():
         # split_phonetics=sum([p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], [])
         
         phonetics=r.cmu_phonetics
-        _, rID=prepare_audio_file(r.audio_file_url, speech_correction=False)
+        _, rID=prepare_audio_file(r.audio_file_url)
         res=termination_contrast(rID,phonetics=phonetics, 
                             target_word_idx=target_word_idx, 
                             target_phones=r.target_phoneme)
@@ -282,19 +416,6 @@ def syllable_contrast_for_actor_recordings():
     syl_pred_df=pd.DataFrame.from_records(pred_records)
     success_rate=len(syl_pred_df[syl_pred_df.gibberish_truth==syl_pred_df.gibberish_detected])/len(syl_pred_df)
     syl_pred_df[syl_pred_df.gibberish_truth!=syl_pred_df.gibberish_detected]
-
-    # contrast on all phones with force_and_predict (i.e. predict based on frames allocated to a phoneme)
-    pred_dfs=[]
-    for i,r in tqdm(df.iterrows()):
-        s,fs=librosa.load(r.audio_file_url, sr=16000)
-        split_phonetics=sum([p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], [])
-        _, p_df, _ = charsiu.align_phones(audio=s,phones=split_phonetics)
-        # p_df=charsiu.force_and_predict(s, split_phonetics)
-        pred_dfs.append(p_df)
-    pred_df=pd.concat(pred_dfs)
-    match_rate=1-len(pred_df[pred_df.cmu_phones!=pred_df.pred_phones_audio])/len(pred_df)
-    pred_df=pred_df[pred_df.pred_phones_audio!='[SIL]']
-    match_rate=1-len(pred_df[pred_df.cmu_phones!=pred_df.pred_phones_audio])/len(pred_df)
     
     # an example of underlying align_phones
     r=df.iloc[2562]
@@ -485,7 +606,7 @@ def termination_contrast_for_actor_recordings(target_phones='D'):
 
 
 def pContrast_for_actor_recordings(target_phones='AO1'):
-    charsiu = charsiu_phone_forced_aligner(aligner='charsiu/en_w2v2_fc_10ms', device='cpu')
+    charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
     # df=pd.read_csv('data/exercise_data_export.csv')
     # df['audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
@@ -736,9 +857,12 @@ def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
     # plt.savefig('vowel_contrast_users_w2v.png')
 
 if __name__=='__main__':
+    from DL_accuracy_performance import *
     pContrast_from_audiobook_data(n=100)
 
     r=termination_contrast_for_actor_recordings()
+    r=termination_contrast_for_actor_recordings('T')
+    r=termination_contrast_for_actor_recordings("IH0_D")
 
     pContrast_for_actor_recordings(target_phones='AO1')
 
@@ -798,9 +922,10 @@ if __name__=='__main__':
 
 
     results=vowels_confusions_actor_recordings()
-    plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v')
+    plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v_thresh_0.2')
 
     results=vowels_confusions_user_recordings(frac=0.01)
+    plot_confusion_results(results, name='vowel_contrast_proba_means_user_data_w2v_thresh_0.2')
 
     
 
