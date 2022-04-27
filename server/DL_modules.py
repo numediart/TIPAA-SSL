@@ -23,41 +23,6 @@ def check_request(d, properties):
         err="error: "+not_p+" is not a phoneme"
         return err
 
-
-responseSchema=Schema.from_dict(
-    {
-        "status": fields.Str(), 
-        "stress_intensities":fields.List(fields.Integer), 
-        "stress_binaries":fields.List(fields.Integer)
-    }, name="stress_response"
-)
-properties=["phonetics","rID","text"]
-@doc(description='Detection sentence stress or word stress', tags=['stress'])
-@use_kwargs(properties_to_args(properties), location=('form'))
-@marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/w2v/stress/<module>', methods=['POST'])
-def dl_module_api(module):
-    d = request.form
-    properties=["phonetics","rID","text"]
-
-    err=check_request(d, properties)
-    if err is not None: return Response(err,status=400,mimetype="application/json")
-
-    if module=='sentence':
-        res=stress_from_formatted_phonetics(d['rID'], d['phonetics'], d['text'], level="sentence")
-    elif module=='word':
-        res=stress_from_formatted_phonetics(d['rID'], d['phonetics'], level="word")
-    else:
-        res={"status": "error: no such module"}
-        return Response(json.dumps(res),status=400,mimetype="application/json")
-    response=json.dumps(res)
-
-    if res['status'].split(':')[0]=='error':
-        return Response(response,status=500,mimetype="application/json")
-    else:
-        return Response(response,status=200,mimetype="application/json")
-
-
 def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_function=phonemeContrast_from_formatted_phonetics_audio, alternatives=cmu_vowels):
     err=check_request(d, properties)
     if err is not None: return Response(err,status=400,mimetype="application/json")
@@ -79,6 +44,45 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
         return Response(response,status=500,mimetype="application/json")
     else:
         return Response(response,status=200,mimetype="application/json")
+
+def request_stress(d, properties):
+    err=check_request(d, properties)
+    if err is not None: return Response(err,status=400,mimetype="application/json")
+
+    if module=='sentence':
+        res=stress_from_formatted_phonetics(d['rID'], d['phonetics'], d['text'], level="sentence")
+    elif module=='word':
+        res=stress_from_formatted_phonetics(d['rID'], d['phonetics'], level="word")
+    else:
+        res={"status": "error: no such module"}
+        return Response(json.dumps(res),status=400,mimetype="application/json")
+    response=json.dumps(res)
+
+    if res['status'].split(':')[0]=='error':
+        return Response(response,status=500,mimetype="application/json")
+    else:
+        return Response(response,status=200,mimetype="application/json")
+
+
+
+responseSchema=Schema.from_dict(
+    {
+        "status": fields.Str(), 
+        "stress_intensities":fields.List(fields.Integer), 
+        "stress_binaries":fields.List(fields.Integer)
+    }, name="stress_response"
+)
+properties=["phonetics","rID","text"]
+@doc(description='Detection sentence stress or word stress', tags=['stress'])
+@use_kwargs(properties_to_args(properties), location=('form'))
+@marshal_with(responseSchema, code=200)  # marshalling
+@app.route('/w2v/stress/<module>', methods=['POST'])
+def dl_module_api(module):
+    d = request.form
+    properties=["phonetics","rID","text"]
+    return request_stress(d, properties)
+
+    
 
 responseSchema=Schema.from_dict(
     {"status": fields.Str(), 
@@ -124,7 +128,7 @@ responseSchema=Schema.from_dict(
     "gibberish_detected":fields.Str()},
     name="termination_contrast_response"
 )
-properties=["phonetics","rID","word_idx","target","syl_idx", "target_occurence_idx"]
+properties=["phonetics","rID","word_idx","target"]
 @doc(description='Termination contrast', tags=['termination_contrast'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
