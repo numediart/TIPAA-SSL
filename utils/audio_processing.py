@@ -11,6 +11,7 @@ from scipy.interpolate import interp1d
 import uuid
 from scipy.io.wavfile import write, read
 import os
+import base64
 
 def load_audio(waveFileAddress, fs=16000):
     """Load audio, remove DC and normalize waveform
@@ -235,9 +236,15 @@ def align_audios(
 
     return out
 
+def audio64_from_file(path, fs=16000):
+    s,fs=librosa.load(path, sr=fs)
+    sf.write('temp.ogg',s,fs)
+    encode_string = base64.b64encode(open('temp.ogg', "rb").read())
+    return encode_string
+
+
 
 def test_audio_file_like():
-    import soundfile as sf
     import io
 
     from six.moves.urllib.request import urlopen
@@ -250,6 +257,7 @@ def test_audio_file_like():
 
     import base64
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
+    path='temp.ogg'
     # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
     # path='data/audio_recordings/turned_around.mp3'
     encode_string = base64.b64encode(open(path, "rb").read())
@@ -259,6 +267,7 @@ def test_audio_file_like():
 
     import soundfile as sf
     sf.read(io.BytesIO(decode_string))
+    librosa.load(io.BytesIO(decode_string), sr=fs)
 
 
 
