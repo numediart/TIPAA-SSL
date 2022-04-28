@@ -9,6 +9,7 @@ import numpy as np
 from collections import Counter
 import librosa
 import soundfile as sf
+from utils.audio_processing import audio64_from_file
 
 
 import warnings
@@ -46,7 +47,7 @@ def test_api(c=app.test_client()):
     # assert eval(call_module(module='wordStress', filename='WS_111_toothpaste.wav', sentenceID=111, client=c).data)['status']=='success'
 
 
-def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests):
+def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests, mode='file'):
     """makes a request with metadata contained in "r" and makes the call to the endpoint. It works locally or with a server, and with
     either requests module or flask's app.test_client()
 
@@ -63,27 +64,40 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
     """
     url=base_url+endpoint
     print(r['audio_file_url'])
+    if mode=='file':
+        res=send_audio_base64(path=r['audio_file_url'], base_url = base_url, client=client)
+        print(res)
+        print(res.data)
+        assert res.status_code == 200
+        # This is for compatibility between requests module and flask's test_client
+        if client==requests: res.data=res._content
+        res=ast.literal_eval(res.data.decode('utf-8'))
+        assert res['status']=='success'
+        rID=res['rID']
+        print(res)
 
-    res=send_audio_base64(path=r['audio_file_url'], base_url = base_url, client=client)
-    print(res)
-    print(res.data)
-    assert res.status_code == 200
-    # This is for compatibility between requests module and flask's test_client
-    if client==requests: res.data=res._content
-    res=ast.literal_eval(res.data.decode('utf-8'))
-    assert res['status']=='success'
-    rID=res['rID']
-    print(res)
-
-    # so that it works with Stress and stress
-    if 'tress' in endpoint:
-        res = client.post(url, data={"phonetics":r['cmu_phonetics'],"text":r['text'], 'rID':rID, 
-                                    'target':r['target_phoneme']})
+        # so that it works with Stress and stress
+        if 'tress' in endpoint:
+            res = client.post(url, data={"phonetics":r['cmu_phonetics'],"text":r['text'], 'rID':rID, 
+                                        'target':r['target_phoneme']})
+        else:
+            res = client.post(url, data={"phonetics":r['cmu_phonetics'], 'rID':rID, 
+                                        'word_idx':str(ast.literal_eval(r['target_word_indexes'])[0]), 
+                                        'syl_idx':str(ast.literal_eval(r['target_syllable_indexes'])[0]), 
+                                        'target':r['target_phoneme']})
     else:
-        res = client.post(url, data={"phonetics":r['cmu_phonetics'], 'rID':rID, 
-                                    'word_idx':str(ast.literal_eval(r['target_word_indexes'])[0]), 
-                                    'syl_idx':str(ast.literal_eval(r['target_syllable_indexes'])[0]), 
-                                    'target':r['target_phoneme']})
+        # so that it works with Stress and stress
+        # encode_string = base64.b64encode(open(r['audio_file_url'], "rb").read())
+        encode_string=audio64_from_file(r['audio_file_url'])
+        if 'tress' in endpoint:
+            res = client.post(url, data={"phonetics":r['cmu_phonetics'],"text":r['text'], 'audio64':encode_string, 
+                                        'target':r['target_phoneme']})
+        else:
+            res = client.post(url, data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string, 
+                                        'word_idx':str(ast.literal_eval(r['target_word_indexes'])[0]), 
+                                        'syl_idx':str(ast.literal_eval(r['target_syllable_indexes'])[0]), 
+                                        'target':r['target_phoneme']})
+
     if client==requests: res.data=res._content
     return res
 
@@ -601,6 +615,22 @@ if __name__ == '__main__':
     
 
     res=send_audio_base64(path='data/flwc-recordings/1AemA5FLTipViuoCLgorK/2021-12-15/yGWXA__P0__A1__1AemA5FLTipViuoCLgorK__1639600754876.m4a', base_url = 'https://dev-speech-processing.flowchase.app', client=requests)
+
+    
+    from test_api import *
+    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
+    from utils.text_processing import *
+
+    text="I would love to go to ireland"
+    r={}
+    r['cmu_phonetics']=formatted_phonetics=prefill_for_sentence(text)['cmu_phonetics']
+    r['text']=text
+    r['audio_file_url']=path
+    r['target_phoneme']=float('nan')
+    res=request_for_audio_file(r, endpoint='/v2/w2v/stress/sentence', client=app.test_client(), mode='base64')    # r['target_phoneme']
+    res=request_for_audio_file(r, endpoint='/v2/w2v/stress/sentence', client=requests, mode='base64')    # r['target_phoneme']
+    res=request_for_audio_file(r, endpoint='/w2v/stress/sentence', client=app.test_client(), mode='file')    # r['target_phoneme']
+
 
     # rpC=test_GE_linguistic_data_content('https://dev-speech-processing.flowchase.app/phonemeContrast')
     # r_ter=test_GE_linguistic_data_content('http://localhost:8000/terminationContrast')
