@@ -2,6 +2,9 @@
 Download codes and models:
 ```
 git clone https://github.com/flowchase/flowspeech
+# this is for deploying the w2v_dev branch
+git checkout w2v_dev
+
 cd flowspeech
 git clone https://github.com/noetits/charsiu
 sudo apt-get install git-lfs
