@@ -867,12 +867,13 @@ def prefill_content(sentences, syl_sep='|'):
         [type]: [description]
     """
     records=[]
-    for s in sentences:
+    print("n sentences", len(sentences))
+    for i,s in tqdm(enumerate(sentences)):
         try:
             record=prefill_for_sentence(s, syllables_df, syl_sep=syl_sep)
         except:
             print('Error with sentence: '+s)
-            raise
+            
         records.append(record)
     df=pd.DataFrame.from_records(records)
     return df
@@ -958,6 +959,9 @@ if __name__ == "__main__":
     sentences=pd.read_csv('data/phrases-for-noe.txt', sep='/', header=None)
     sentences=sentences.iloc[:,0].apply(lambda r: remove_special_characters(r)).tolist()
     df=prefill_content(sentences)
+
+    cmu_words=list(cmudict_dict.keys())
+    df=prefill_content(cmu_words)
 
     word=words[0]
     scores_p=[el[-1] for el in SonoriPy(str_to_list_of_char(word), mode='letters')[-1]]
