@@ -2,7 +2,7 @@ from flask import request
 
 from marshmallow import Schema, fields
 from flask_apispec import marshal_with, doc, use_kwargs
-from flask import Response
+from flask import Response, Blueprint
 
 from speech_tech import stress_from_formatted_phonetics, vowel_stresses_from_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, merge_list
 import json
@@ -10,8 +10,10 @@ from utils.text_processing import check_phonemes, cmu_to_gibberish
 import ast
 from server.utils import debug_only
 
-from app_definition import app
+# from app_definition import app
 from server.utils import debug_only, access_property_error, properties_to_args
+
+bp=Blueprint('modules', __name__, url_prefix='/')
 
 
 # set alternatives from targets
@@ -51,7 +53,7 @@ def set_alternatives_from_target(target):
     return alternatives
 
 
-@app.route('/vowel_stresses', methods=['POST'])
+@bp.route('/vowel_stresses', methods=['POST'])
 @debug_only
 def vowel_stresses_api():
     content = request.form
@@ -91,7 +93,7 @@ properties=["phonetics","rID","text"]
 @doc(description='Detection sentence stress or word stress', tags=['stress'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/flowspeech/<module>', methods=['POST'])
+@bp.route('/flowspeech/<module>', methods=['POST'])
 def module_api(module):
     content = request.form
     properties=["phonetics","rID","text"]
@@ -138,7 +140,7 @@ properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
 @doc(description='Phoneme contrast', tags=['phonemeContrast'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/phonemeContrast', methods=['POST'])
+@bp.route('/phonemeContrast', methods=['POST'])
 def phoneme_contrast_api():
     content = request.form
     # properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
@@ -244,7 +246,7 @@ properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
 @doc(description='Phoneme contrast', tags=['phonemeContrast'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/terminationContrast', methods=['POST'])
+@bp.route('/terminationContrast', methods=['POST'])
 def termination_contrast_api():
     final_phoneme=True
 

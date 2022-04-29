@@ -1,9 +1,9 @@
 # https://stackoverflow.com/questions/11994325/how-to-divide-flask-app-into-multiple-py-files
 import os
 import json
-from app_definition import app
+# from app_definition import app
 
-from flask import Response, request
+from flask import Response, request, Blueprint
 from marshmallow import Schema, fields
 from flask_apispec import marshal_with, doc, use_kwargs
 from server.utils import access_property_error, properties_to_args
@@ -14,6 +14,7 @@ import base64
 
 upload_path="./upload_files/"
 
+bp=Blueprint('upload', __name__, url_prefix='/')
 
 responseSchema=Schema.from_dict(
     {
@@ -25,7 +26,7 @@ properties=["audio", "API_KEY"]
 @doc(description='send audio API.', tags=['audio'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/send_base64_audio', methods=['POST'])
+@bp.route('/send_base64_audio', methods=['POST'])
 def send_audio():
     content = request.form
     properties=["audio", "API_KEY"]

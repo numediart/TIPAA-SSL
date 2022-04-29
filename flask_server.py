@@ -19,9 +19,21 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 # import routes of different parts of the server
 from server.prefill import *
+from server.prefill import bp as prefill_bp
 from server.upload import *
+from server.upload import bp as upload_bp
+
 from server.modules import *
+from server.modules import bp as modules_bp
 from server.DL_modules import *
+from server.DL_modules import bp as DL_modules_bp
+from server.DL_modules_v2 import bp as DL_modules_bp2
+
+app.register_blueprint(upload_bp, url_prefix='/')
+app.register_blueprint(prefill_bp, url_prefix='/')
+app.register_blueprint(modules_bp, url_prefix='/')
+app.register_blueprint(DL_modules_bp, url_prefix='/')
+app.register_blueprint(DL_modules_bp2, url_prefix='/v2')
 
 if False:
     from server.demo import *
@@ -31,17 +43,24 @@ def run_app():
     app.run(debug=debug, host='0.0.0.0', port=8000)
 
 if True:
+    # https://github.com/jmcarp/flask-apispec/issues/16
+    # use blueprints with flask apispec
     docs = FlaskApiSpec(app)
-    docs.register(send_audio)
-    docs.register(prefill_from_phrase)
-    docs.register(phoneme_contrast_api)
-    docs.register(module_api)
+    docs.register(send_audio, blueprint="upload")
+    docs.register(prefill_from_phrase, blueprint="prefill")
 
-    docs.register(dl_module_api)
-    docs.register(dl_vowel_contrast_api)
-    docs.register(dl_consonant_contrast_api)
-    docs.register(dl_termination_contrast_api)
+    docs.register(phoneme_contrast_api, blueprint="modules")
+    docs.register(module_api, blueprint="modules")
+
+    docs.register(dl_module_api, blueprint="DL_modules")
+    docs.register(dl_vowel_contrast_api, blueprint="DL_modules")
+    docs.register(dl_consonant_contrast_api, blueprint="DL_modules")
+    docs.register(dl_termination_contrast_api, blueprint="DL_modules")
     # docs.register(dl_syllable_contrast_api)
-
+    
+    docs.register(dl_module_api, blueprint="DL_modules_v2")
+    docs.register(dl_vowel_contrast_api, blueprint="DL_modules_v2")
+    docs.register(dl_consonant_contrast_api, blueprint="DL_modules_v2")
+    docs.register(dl_termination_contrast_api, blueprint="DL_modules_v2")
 if __name__ == '__main__':
     run_app()

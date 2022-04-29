@@ -1,9 +1,9 @@
 # https://stackoverflow.com/questions/11994325/how-to-divide-flask-app-into-multiple-py-files
 import os
 import json
-from app_definition import app
+# from app_definition import app
 
-from flask import send_from_directory, Response, request
+from flask import send_from_directory, Response, request, Blueprint
 from marshmallow import Schema, fields
 from flask_apispec import marshal_with, doc, use_kwargs
 
@@ -11,11 +11,13 @@ from utils.text_processing import generate_prefill_csv, prefill_for_sentence, sy
 from server.utils import debug_only, access_property_error
 from server.upload import upload_path
 
-@app.route('/prefill_from_phrases.html', methods=['GET'])
+bp=Blueprint('prefill', __name__, url_prefix='/')
+
+@bp.route('/prefill_from_phrases.html', methods=['GET'])
 def prefill_from_phrases_html():
     return send_from_directory( './html/','prefill_from_phrases.html')
 
-@app.route('/prefill_from_phrases', methods=['POST'])
+@bp.route('/prefill_from_phrases', methods=['POST'])
 def prefill_from_phrases():
     try:
         uploaded_file = request.files['file']
@@ -83,7 +85,7 @@ responseSchema=Schema.from_dict(record, name="prefill response")
 @doc(description='Prefill from phrase', tags=['prefill'])
 @use_kwargs({'phrase':fields.String(required=True, description="Text sentence to be processed. It can contain special characters etc.")}, location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
-@app.route('/prefill_from_phrase', methods=['POST'])
+@bp.route('/prefill_from_phrase', methods=['POST'])
 @debug_only
 def prefill_from_phrase():
     content = request.form
