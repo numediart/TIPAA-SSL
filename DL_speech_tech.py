@@ -93,12 +93,14 @@ def intensity_to_bin(score_by_word, n_max=2):
     return bin_score_by_word
 
 def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
-                                    text="I would love to go to Ireland!", 
+                                    # text="I would love to go to Ireland!", 
+                                    n_words_by_chunk=6,
                                     level="word", 
-                                    chunking_chars=[',',';','.','!','?', ':', '/'],
+                                    # chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8, mode='file'
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
+    phonetics=phonetics.replace('-',' ')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
     if status=="success":
         # print(phonetics)
@@ -122,26 +124,23 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
         word_bins.append(bins)
         word_intensities.append(word.stress_scores.tolist())
 
-    n_words_by_chunk=chunk_text(text, chunking_chars=chunking_chars)
-    max_word_intensities=[max(w) for w in word_intensities]
-
-    scores_grouped_by_chunk=[]
-    cumsum=0
-    for n in n_words_by_chunk:
-        scores_grouped_by_chunk.append(max_word_intensities[cumsum:cumsum+n])
-        cumsum+=n
-    
-    # I tried this on General English data, and in the end, it does not seem to improve
-    # scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
-
-    bins_by_chunk=[]
-    for chunk in scores_grouped_by_chunk:
-        bin=intensity_to_bin(chunk)
-        bins_by_chunk.append(bin)
-
     if level=="word":
         return {"status": "success", "stress_intensities": word_intensities, "stress_binaries": word_bins}
     elif level=="sentence":
+        max_word_intensities=[max(w) for w in word_intensities]
+        scores_grouped_by_chunk=[]
+        cumsum=0
+        for n in n_words_by_chunk:
+            scores_grouped_by_chunk.append(max_word_intensities[cumsum:cumsum+n])
+            cumsum+=n
+        
+        # I tried this on General English data, and in the end, it does not seem to improve
+        # scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
+
+        bins_by_chunk=[]
+        for chunk in scores_grouped_by_chunk:
+            bin=intensity_to_bin(chunk)
+            bins_by_chunk.append(bin)
         return {"status": "success", "stress_intensities": sum(scores_grouped_by_chunk,[]), "stress_binaries": sum(bins_by_chunk,[])}
     else:
         return {"status": "error: "+level+"is not a valid level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.", "stress_intensities": [], "stress_binaries": []}

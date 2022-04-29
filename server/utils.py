@@ -3,8 +3,9 @@ from functools import wraps
 from flask import current_app, abort
 from marshmallow import Schema, fields
 import json
+import ast
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, termination_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
-from utils.text_processing import check_phonemes, cmu_vowels, cmu_consonants
+from utils.text_processing import check_phonemes, cmu_vowels, cmu_consonants, chunk_text, split_phonetics
 from flask import Response
 
 # make functions available only in debug mode:
@@ -16,7 +17,6 @@ def debug_only(f):
             abort(404)
         return f(**kwargs)
     return wrapped
-
 
 def properties_to_args(properties, required=True):
     args={}
@@ -41,8 +41,9 @@ def check_request(d, properties):
     for prop in properties:
         err=access_property_error(d, prop)
         if err: return err
-    split_phonetics=[[s.split('_') for s in w.split('|')] for w in d['phonetics'].split(' ')]
-    merged_phonetics=[sum(word,[]) for word in split_phonetics]    
+
+def check_phonetics(phonetics):
+    merged_phonetics=[sum(word,[]) for word in split_phonetics(phonetics)]    
     not_p=check_phonemes(sum(merged_phonetics,[]))
     if not_p is not None: 
         err="error: "+not_p+" is not a phoneme"
@@ -50,8 +51,12 @@ def check_request(d, properties):
 
 def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_function=phonemeContrast_from_formatted_phonetics_audio, alternatives=cmu_vowels, mode='file'):
     # import pdb;pdb.set_trace()
+
     err=check_request(d, properties)
     if err is not None: return Response(err,status=400,mimetype="application/json")
+    err=check_phonetics(d['phonetics'])
+    if err is not None: return Response(err,status=400,mimetype="application/json")
+
     word_idx=int(d['word_idx'])
     syl_idx=int(d['syl_idx'])
     if word_idx>=len(d['phonetics'].split(' ')):
@@ -71,14 +76,12 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
     else:
         return Response(response,status=200,mimetype="application/json")
 
-def request_stress(d, properties, module, mode='file'):
-    err=check_request(d, properties)
-    if err is not None: return Response(err,status=400,mimetype="application/json")
 
+def call_stress_fn(audio, p, n_words_by_chunk, module, mode='file'):
     if module=='sentence':
-        res=stress_from_formatted_phonetics(d[audio_property_dict[mode]], d['phonetics'], d['text'], level="sentence", mode=mode)
+        res=stress_from_formatted_phonetics(audio, p, n_words_by_chunk, level=module, mode=mode)
     elif module=='word':
-        res=stress_from_formatted_phonetics(d[audio_property_dict[mode]], d['phonetics'], level="word", mode=mode)
+        res=stress_from_formatted_phonetics(audio, p, level=module, mode=mode)
     else:
         res={"status": "error: no such module"}
         return Response(json.dumps(res),status=400,mimetype="application/json")
@@ -89,6 +92,37 @@ def request_stress(d, properties, module, mode='file'):
     else:
         return Response(response,status=200,mimetype="application/json")
 
+def request_stress(d, properties, module, mode='file'):
+    err=check_request(d, properties)
+    if err is not None: return Response(err,status=400,mimetype="application/json")
+    err=check_phonetics(d['phonetics'])
+    if err is not None: return Response(err,status=400,mimetype="application/json")
+
+    p=d['phonetics']
+    n_words_by_chunk=chunk_text(d['text'])
+
+    audio=d[audio_property_dict[mode]]
+
+    return call_stress_fn(audio, p, n_words_by_chunk, module, mode=mode)
+
+def request_stress_v2(d, properties, module, mode='file'):
+    
+    print(d['phonetics'])
+    p=ast.literal_eval(d['phonetics'])
+    print("d['phonetics']", d['phonetics'])
+    print('p',p)
+
+    n_words_by_chunk=[len(c) for c in p]
+    p=' '.join(p)
+
+    err=check_request(d, properties)
+    if err is not None: return Response(err,status=400,mimetype="application/json")
+    err=check_phonetics(p)
+    if err is not None: return Response(err,status=400,mimetype="application/json")
+
+    audio=d[audio_property_dict[mode]]
+
+    return call_stress_fn(audio, p, n_words_by_chunk, module, mode=mode)
 
 
 stress_responseSchema=Schema.from_dict(

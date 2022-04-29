@@ -2,23 +2,24 @@ from flask import request
 from flask_apispec import marshal_with, doc, use_kwargs
 from flask import Response, Blueprint
 
+import ast
 import json
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, termination_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
 
 # from app_definition import app
-from server.utils import access_property_error, properties_to_args, check_request, request_phoneme_contrast, request_stress, stress_responseSchema, contrast_responseSchema, syl_contrast_responseSchema
+from server.utils import access_property_error, properties_to_args, check_request, request_phoneme_contrast, request_stress, request_stress_v2, stress_responseSchema, contrast_responseSchema, syl_contrast_responseSchema
 
 bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
 
-properties=["phonetics","audio64","text"]
+properties=["phonetics","audio64"]
 @doc(description='Detection sentence stress or word stress', tags=['stress'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(stress_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/stress/<module>', methods=['POST'])
 def dl_module_api(module):
     d = request.form
-    properties=["phonetics","audio64","text"]
-    return request_stress(d, properties, module, mode='base64')
+    properties=["phonetics","audio64"]
+    return request_stress_v2(d, properties, module, mode='base64')
 
 properties=["phonetics","audio64","word_idx","target","syl_idx"]
 @doc(description='Vowel contrast', tags=['vowel_contrast'])

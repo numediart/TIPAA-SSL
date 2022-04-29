@@ -10,7 +10,7 @@ from collections import Counter
 import librosa
 import soundfile as sf
 from utils.audio_processing import audio64_from_file
-
+from utils.text_processing import get_chunks, chunk_text
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -47,7 +47,7 @@ def test_api(c=app.test_client()):
     # assert eval(call_module(module='wordStress', filename='WS_111_toothpaste.wav', sentenceID=111, client=c).data)['status']=='success'
 
 
-def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests, mode='file'):
+def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests, mode='v1'):
     """makes a request with metadata contained in "r" and makes the call to the endpoint. It works locally or with a server, and with
     either requests module or flask's app.test_client()
 
@@ -64,7 +64,7 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
     """
     url=base_url+endpoint
     print(r['audio_file_url'])
-    if mode=='file':
+    if mode=='v1':
         res=send_audio_base64(path=r['audio_file_url'], base_url = base_url, client=client)
         print(res)
         print(res.data)
@@ -90,7 +90,16 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
         # encode_string = base64.b64encode(open(r['audio_file_url'], "rb").read())
         encode_string=audio64_from_file(r['audio_file_url'])
         if 'tress' in endpoint:
-            res = client.post(url, data={"phonetics":r['cmu_phonetics'],"text":r['text'], 'audio64':encode_string, 
+            n_words_by_chunk=chunk_text(r['text'])
+            p=r['cmu_phonetics']
+
+            cumsum=0
+            chunks_p=[]
+            for n in n_words_by_chunk:
+                chunks_p.append(' '.join(p.split(' ')[cumsum:cumsum+n])); cumsum+=n
+
+            print(chunks_p)
+            res = client.post(url, data={"phonetics":json.dumps(chunks_p), 'audio64':encode_string, 
                                         'target':r['target_phoneme']})
         else:
             res = client.post(url, data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string, 

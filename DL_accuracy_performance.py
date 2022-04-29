@@ -37,7 +37,9 @@ def stress_GE_performance_test(level='sentence'):
     for i,row in df.iterrows():
         formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
         _, rID=prepare_audio_file(row.audio_path)
-        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, text=row.text, level=level)
+        
+        n_words_by_chunk=chunk_text(text=row.text)
+        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, n_words_by_chunk=n_words_by_chunk, level=level)
         print(res)
         stress_intensities.append(res['stress_intensities'])
         stress_binaries.append(res['stress_binaries'])
