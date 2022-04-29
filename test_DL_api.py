@@ -14,14 +14,14 @@ from DL_accuracy_performance import count_values, plot_confusion_results
 
 
 
-def get_results(df_pContrast, base_url = 'http://localhost:8000', endpoint='/w2v/contrast/vowel', client=app.test_client()):
+def get_results(df_pContrast, base_url = 'http://localhost:8000', endpoint='/w2v/contrast/vowel', client=app.test_client(), mode='file'):
     df_pContrast.index=range(len(df_pContrast))
     results_records=[]
     failures=[]
     # r=df_pContrast.iloc[4]
     print(len(df_pContrast))
     for i,r in tqdm(df_pContrast.iterrows()):
-        res=request_for_audio_file(r, base_url = base_url, endpoint=endpoint, client=client)
+        res=request_for_audio_file(r, base_url = base_url, endpoint=endpoint, client=client, mode=mode)
         if 'success' in res.data.decode('utf-8'):
             d=ast.literal_eval(res.data.decode('utf-8'))
             d['cmu_phonetics']=r.cmu_phonetics
@@ -35,7 +35,8 @@ def get_results(df_pContrast, base_url = 'http://localhost:8000', endpoint='/w2v
     return results_df, failures
 
 
-def test_actor_recordings(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
+
+def test_actor_recordings(base_url = 'http://localhost:8000', route='/w2v/contrast/', client=app.test_client(), n_ex_by_module=10, mode='file'):
     df=actor_recordings()
 
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
@@ -48,10 +49,10 @@ def test_actor_recordings(base_url = 'http://localhost:8000', client=app.test_cl
     df_v=df_pContrast[~df_pContrast.target_phoneme.isin(eds)]
     df_ed=df_pContrast[df_pContrast.target_phoneme.isin(eds)]
 
-    route='/w2v/contrast/'
-    results_v, failures_v=get_results(df_v.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'vowel', client=client)
-    results_ed_s, failures_ed_s=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'syllable', client=client)
-    results_ed, failures_ed=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'termination', client=client)
+    
+    results_v, failures_v=get_results(df_v.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'vowel', client=client, mode=mode)
+    results_ed_s, failures_ed_s=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'syllable', client=client, mode=mode)
+    results_ed, failures_ed=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'termination', client=client, mode=mode)
 
     results_v[results_v.phonetic_detection!=results_v.target_phoneme]
     
@@ -75,6 +76,10 @@ def test_actor_recordings(base_url = 'http://localhost:8000', client=app.test_cl
         success_rate = lambda df : len(df[df.gibberish_truth==df.gibberish_detected])/len(df) if len(df)>0 else float('nan')
         print('success rate for '+t, success_rate(res))
 
+
+def test_actor_recordings_audio64():
+    test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/contrast/', client=app.test_client(), n_ex_by_module=10, mode='audio64')
+
 def test_stress_detection(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
     df=actor_recordings()
     len_t_seg=df.apply(lambda r: len(r.syllable_parts.split(' ')), axis=1)
@@ -89,7 +94,22 @@ def test_stress_detection(base_url = 'http://localhost:8000', client=app.test_cl
     results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint='/w2v/stress/sentence', client=client)
     results_ws, failures_ws=get_results(df_word_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint='/w2v/stress/word', client=client)
     
+def test_audio64(base_url = 'http://localhost:8000', client=app.test_client()):
+    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
+    from utils.text_processing import prefill_for_sentence
 
+    text="I would love to go to ireland"
+    r={}
+    r['cmu_phonetics']=formatted_phonetics=prefill_for_sentence(text)['cmu_phonetics']
+    r['text']=text
+    r['audio_file_url']=path
+    r['target_phoneme']=float('nan')
+    res=request_for_audio_file(r, endpoint='/v2/w2v/stress/sentence', client=client, mode='base64')    # r['target_phoneme']
+    print(res.data)
+    assert res.status_code==200
+    res=request_for_audio_file(r, endpoint='/w2v/stress/sentence', client=client, mode='file')    # r['target_phoneme']
+    print(res.data)
+    assert res.status_code==200
 
 # from utils.label_data_processing import exercise_data, build_user_data_df
 from utils.label_data_processing import build_user_data_df
@@ -118,6 +138,8 @@ def pContrast_for_user_data( target_phones='AO1', n_user=10, n_ex_by_ex_type=10)
     df=pd.concat(selections)
 
     results_df, failures=get_results(df)
+    results_df, failures=get_results(df, endpoint='/v2/w2v/contrast/vowel', mode='audio64')
+    
 
     df['phonetic_detection']=results_df['phonetic_detection']
     df['status']=results_df['status']
