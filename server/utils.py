@@ -107,12 +107,11 @@ def request_stress(d, properties, module, mode='file'):
 
 def request_stress_v2(d, properties, module, mode='file'):
     
-    print(d['phonetics'])
+    # print(d['phonetics'])
     p=ast.literal_eval(d['phonetics'])
-    print("d['phonetics']", d['phonetics'])
-    print('p',p)
-
-    n_words_by_chunk=[len(c) for c in p]
+    # print("d['phonetics']", d['phonetics'])
+    # print('p',p)
+    n_words_by_chunk=[len(c.split(' ')) for c in p]
     p=' '.join(p)
 
     err=check_request(d, properties)
