@@ -27,6 +27,7 @@ from server.modules import *
 from server.modules import bp as modules_bp
 from server.DL_modules import *
 from server.DL_modules import bp as DL_modules_bp
+from server.DL_modules_v2 import *
 from server.DL_modules_v2 import bp as DL_modules_bp2
 
 app.register_blueprint(upload_bp, url_prefix='/')
@@ -58,9 +59,18 @@ if True:
     docs.register(dl_termination_contrast_api, blueprint="DL_modules")
     # docs.register(dl_syllable_contrast_api)
     
-    docs.register(dl_module_api, blueprint="DL_modules_v2")
-    docs.register(dl_vowel_contrast_api, blueprint="DL_modules_v2")
-    docs.register(dl_consonant_contrast_api, blueprint="DL_modules_v2")
-    docs.register(dl_termination_contrast_api, blueprint="DL_modules_v2")
+    docs.register(dl_module_api_v2, blueprint="DL_modules_v2")
+    docs.register(dl_vowel_contrast_api_v2, blueprint="DL_modules_v2")
+    docs.register(dl_consonant_contrast_api_v2, blueprint="DL_modules_v2")
+    docs.register(dl_termination_contrast_api_v2, blueprint="DL_modules_v2")
+
+    # To hide "OPTIONS" endpoints
+    # https://github.com/jmcarp/flask-apispec/issues/111
+    for key, value in docs.spec._paths.items():
+        docs.spec._paths[key] = {
+            inner_key: inner_value
+            for inner_key, inner_value in value.items()
+            if inner_key != 'options'
+        }
 if __name__ == '__main__':
     run_app()
