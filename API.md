@@ -45,8 +45,14 @@ For stressed syllables:
 
 
 
-See the requests here on the EC2 accessible at:
+See the requests here online accessible at:
+OVH1:
+https://sp-ovh.flowchase.app/swagger-ui/
 
+OVH2:
+https://sp-ovh-w2v.flowchase.app/swagger-ui/
+
+Old servers on AWS:
 https://speech-processing.flowchase.app/swagger-ui/
 
 or
