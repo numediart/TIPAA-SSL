@@ -7,6 +7,33 @@ import ast
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, termination_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
 from utils.text_processing import check_phonemes, cmu_vowels, cmu_consonants, chunk_text, split_phonetics
 from flask import Response
+from utils.audio_processing import audio64_from_file
+
+
+def default_example():
+    audio64=audio64_from_file("data/audio_recordings/M1_two-hundred-dollars-way-too-expensive.mp3")
+    text="*Two* hundred *dollars*? That's *way* too expensive!"
+    p='T_UW1 HH_AH1_N|D_R_AH0_D D_AA1|L_ER0_Z DH_AE1_T_S W_EY1 T_UW1 IH0_K_S|P_EH1_N|S_IH0_V'
+    n_words_by_chunk=chunk_text(text)
+    cumsum=0
+    chunks_p=[]
+    for n in n_words_by_chunk:
+        chunks_p.append(' '.join(p.split(' ')[cumsum:cumsum+n]))
+        cumsum+=n
+    
+    d={"phonetics":p,
+        "phonetics_chunks":json.dumps(chunks_p),
+        "audio64":audio64.decode('utf-8'),
+        "vowel_target":"AA1",
+        "vowel_w_idx":"2",
+        "vowel_s_idx":"0",
+        "consonant_target":"DH",
+        "consonant_w_idx":"3",
+        "consonant_s_idx":"0",
+        "termination_target":"AH0_D",
+        "termination_w_idx":"1"
+    }
+    return d
 
 # make functions available only in debug mode:
 # https://stackoverflow.com/questions/55719252/make-a-route-only-accessible-in-debug-mode-with-flask
@@ -18,10 +45,17 @@ def debug_only(f):
         return f(**kwargs)
     return wrapped
 
-def properties_to_args(properties, required=True):
+def properties_to_args(properties, default=None, required=True):
     args={}
-    for prop in properties:
-        args[prop]=fields.String(required=required)
+    for i,prop in enumerate(properties):
+        if default is not None and prop in default: 
+            # print(prop)
+            d=default[prop]
+            # print(d)
+            args[prop]=fields.Str(required=required,example=d,default=d)
+        else:
+            args[prop]=fields.Str(required=required)
+
     return args
 
 def access_property_error(content, property):

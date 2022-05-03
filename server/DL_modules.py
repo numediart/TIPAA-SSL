@@ -11,7 +11,7 @@ from server.utils import access_property_error, properties_to_args, check_reques
 bp=Blueprint('DL_modules', __name__, url_prefix='/')
 
 properties=["phonetics","rID","text"]
-@doc(description='Detection sentence stress or word stress', tags=['stress'])
+@doc(description='Detection sentence stress or word stress', tags=['w2v_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(stress_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/stress/<module>', methods=['POST'])
@@ -21,7 +21,7 @@ def dl_module_api(module):
     return request_stress(d, properties, module)
 
 properties=["phonetics","rID","word_idx","target","syl_idx"]
-@doc(description='Vowel contrast', tags=['vowel_contrast'])
+@doc(description='Vowel contrast', tags=['w2v_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/vowel', methods=['POST'])
@@ -32,7 +32,7 @@ def dl_vowel_contrast_api():
 
 
 properties=["phonetics","rID","word_idx","target","syl_idx", "target_occurence_idx"]
-@doc(description='Consonant contrast', tags=['consonant_contrast'])
+@doc(description='Consonant contrast', tags=['w2v_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/consonant', methods=['POST'])
@@ -44,7 +44,7 @@ def dl_consonant_contrast_api():
 
 
 properties=["phonetics","rID","word_idx","target"]
-@doc(description='Termination contrast', tags=['termination_contrast'])
+@doc(description='Termination contrast', tags=['w2v_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/termination', methods=['POST'])
@@ -54,7 +54,7 @@ def dl_termination_contrast_api():
     return request_phoneme_contrast(d, properties, tech_function=termination_contrast_from_formatted_phonetics_audio)
 
 properties=["phonetics","rID","word_idx","syl_idx"]
-@doc(description='Syllable contrast', tags=['syllable_contrast'])
+@doc(description='Syllable contrast', tags=['w2v_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(syl_contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/syllable', methods=['POST'])

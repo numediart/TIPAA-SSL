@@ -90,7 +90,7 @@ responseSchema=Schema.from_dict(
     }, name="stress_response"
 )
 properties=["phonetics","rID","text"]
-@doc(description='Detection sentence stress or word stress', tags=['stress'])
+@doc(description='Detection sentence stress or word stress', tags=['HMM_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @bp.route('/flowspeech/<module>', methods=['POST'])
@@ -137,7 +137,7 @@ responseSchema=Schema.from_dict(
     name="phonemeContrast_response"
 )
 properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
-@doc(description='Phoneme contrast', tags=['phonemeContrast'])
+@doc(description='Phoneme contrast', tags=['HMM_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @bp.route('/phonemeContrast', methods=['POST'])
@@ -243,7 +243,7 @@ responseSchema=Schema.from_dict(
     name="phonemeContrast_response"
 )
 properties=["phonetics","rID","word_idx","target","syl_idx","alternatives"]
-@doc(description='Phoneme contrast', tags=['phonemeContrast'])
+@doc(description='Phoneme contrast', tags=['HMM_v1'])
 @use_kwargs(properties_to_args(properties), location=('form'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @bp.route('/terminationContrast', methods=['POST'])
