@@ -30,6 +30,7 @@ def default_example():
         "consonant_target":"DH",
         "consonant_w_idx":"3",
         "consonant_s_idx":"0",
+        "consonant_target_occurence_idx":"0",
         "termination_target":"AH0_D",
         "termination_w_idx":"1"
     }
@@ -92,16 +93,19 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
     if err is not None: return Response(err,status=400,mimetype="application/json")
 
     word_idx=int(d['word_idx'])
-    syl_idx=int(d['syl_idx'])
     if word_idx>=len(d['phonetics'].split(' ')):
         return Response("error: word_idx >= number of words",status=400,mimetype="application/json")
-    # extract the syllables which contain the target
-    syls_with_target=[syl for syl in d['phonetics'].split(' ')[word_idx].split('|') if d['target'] in syl]
-    idx_syls_with_target=[i for i,syl in enumerate(d['phonetics'].split(' ')[word_idx].split('|')) if d['target'] in syl]
-
-    if syl_idx not in idx_syls_with_target:
-        return Response("error: the syllable corresponding to syl_idx does not contain the target.",status=400,mimetype="application/json")
     
+    
+    if tech_function==phonemeContrast_from_formatted_phonetics_audio:
+        syl_idx=int(d['syl_idx'])
+        # extract the syllables which contain the target
+        syls_with_target=[syl for syl in d['phonetics'].split(' ')[word_idx].split('|') if d['target'] in syl]
+        idx_syls_with_target=[i for i,syl in enumerate(d['phonetics'].split(' ')[word_idx].split('|')) if d['target'] in syl]
+        if syl_idx not in idx_syls_with_target:
+            return Response("error: the syllable corresponding to syl_idx does not contain the target.",status=400,mimetype="application/json")
+    else:
+        syl_idx=None
     res=tech_function(d[audio_property_dict[mode]], d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, target_occurence_idx=target_occurence_idx, target_phones=d['target'], alternatives=alternatives, mode=mode)
     response=json.dumps(res)
 
