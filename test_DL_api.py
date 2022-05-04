@@ -77,10 +77,12 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/w2v/contra
         print(count_values(res[res.gibberish_detected!=res.gibberish_truth].gibberish_detected))
         success_rate = lambda df : len(df[df.gibberish_truth==df.gibberish_detected])/len(df) if len(df)>0 else float('nan')
         print('success rate for '+t, success_rate(res))
+    
+    return results_v, results_ed, results_ed_s
 
 
-def test_actor_recordings_v2():
-    test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/contrast/', client=app.test_client(), n_ex_by_module=10, mode='v2')
+def test_actor_recordings_v2(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
+    return test_actor_recordings(base_url = base_url, route='/v2/w2v/contrast/', client=client, n_ex_by_module=n_ex_by_module, mode='v2')
 
 def test_stress_detection(base_url = 'http://localhost:8000', route='/w2v/stress/', client=app.test_client(), n_ex_by_module=10, mode='v1'):
     df=actor_recordings()
@@ -95,8 +97,10 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/w2v/stress
     results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'sentence', client=client, mode=mode)
     results_ws, failures_ws=get_results(df_word_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'word', client=client, mode=mode)
 
-def test_stress_detection_v2():
-    test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/stress/', client=app.test_client(), n_ex_by_module=10, mode='v2')
+    return results_ss, failures_ss, results_ws, failures_ws
+
+def test_stress_detection_v2(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
+    return test_stress_detection(base_url = base_url, route='/v2/w2v/stress/', client=client, n_ex_by_module=n_ex_by_module, mode='v2')
 
 def test_audio64(base_url = 'http://localhost:8000', client=app.test_client()):
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
@@ -164,6 +168,47 @@ def vowels_confusions_user_recordings(n_user=10, n_ex_by_ex_type=10):
 if __name__ == '__main__':
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
     test_actor_recordings(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
+    test_stress_detection(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
+
+    test_actor_recordings_v2(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
+    test_stress_detection_v2(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
+
+    r=test_actor_recordings()
+    r=test_actor_recordings_v2(n_ex_by_module=100)
+    r=test_stress_detection()
+    r=test_stress_detection_v2()
+
+    
+    df=actor_recordings()
+    len_t_seg=df.apply(lambda r: len(r.syllable_parts.split(' ')), axis=1)
+    len_p=df.apply(lambda r: len(r.cmu_phonetics.split(' ')), axis=1)
+    df[len_t_seg!=len_p]
+    df_pContrast=df.loc[df.target_phoneme.dropna().index]
+    df_sentence_stress=df.loc[df.stress_category.dropna().index]
+    df_word_stress=df.drop(df_pContrast.index).drop(df_sentence_stress.index)
+
+    l=df_sentence_stress.apply(lambda r: len(r.text), axis=1)
+    df_sentence_stress[l>50].text.iloc[0]
+    df_sentence_stress[l>50].iloc[0]
+
+    from utils.audio_processing import audio64_from_file
+    df_sentence_stress[l>50].iloc[0].cmu_phonetics
+    audio64=audio64_from_file(df_sentence_stress[l>50].iloc[0].audio_file_url)
+
+    
+
+    # from utils.text_processing import chunk_text
+    r=df_sentence_stress[l>50].iloc[0]
+
+
+    
+
+    route='/v2/w2v/stress/'
+    mode='v2'
+    get_results(df_sentence_stress.iloc[3:4,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
+    request_for_audio_file(df_sentence_stress.iloc[3,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
+
+
 
     from test_DL_api import *;print(pContrast_for_user_data())
 
