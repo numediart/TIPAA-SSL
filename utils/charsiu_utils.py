@@ -136,7 +136,55 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         self.pred_phones_audio=drop_consecutive_duplicate_elements(detailed_alignment_phones[detailed_alignment_phones.pred_phones_audio!='[SIL]'].pred_phones_audio.tolist())
 
         return alignment_phones, df_segmented, detailed_alignment_phones
-    
+        
+    def analyze_phonetic_content(self, audio, phonetics):
+        """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
+        """
+        split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
+        phones=sum(split_phonetics,[])
+        # seq_p=[[p] for p in  remove_stress_annots(phones)]
+        alignment_phones, pred_phones_audio, detailed_alignment_phones = self.align_phones(audio=audio,phones=phones)
+
+        detailed_alignment_phones=detailed_alignment_phones[detailed_alignment_phones.pred_phones != '[SIL]']
+
+        if len(detailed_alignment_phones)==0: return detailed_alignment_phones
+        
+        # if I filter out silences contained in pred_phones_audio, it can sometimes remove phones from pred_phones, which is problematic for 
+        # the following alignment
+        #[detailed_alignment_phones.pred_phones_audio != '[SIL]']
+
+        phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
+
+        # here we align phonetics_indexed_df to the detailed_alignment_phones to be able to get an indexation on the "really pronounced phonetics"
+        # from part of audio that corresponded to specific phones in ground truth (according to forced-alignment)
+        orig_phones=remove_stress_annots(phones)
+        pred_phones=detailed_alignment_phones.pred_phones.tolist()
+        assert orig_phones[0] == pred_phones[0], "The first phone of alignment pred and ground truth should be the same"
+        indx_in_phones=0
+        pred_phones_original_indices=[]
+        for i,p in enumerate(pred_phones):
+            if p == orig_phones[indx_in_phones]:
+                pred_phones_original_indices.append(indx_in_phones)
+            else:
+                indx_in_phones+=1
+                # Given it was not equal to the previous element, after going to the next element of ground truth, it should be the same"
+                # except if there was twice the same phoneme (because it was the end of last word and start of current word)
+                if p == orig_phones[indx_in_phones]:
+                    pred_phones_original_indices.append(indx_in_phones)
+                else:
+                    assert orig_phones[indx_in_phones]==orig_phones[indx_in_phones-1], "This should correspond to the case of two consecutiva identical phonemes, because they are in two consecutive words"
+                    indx_in_phones+=1
+                    assert p == orig_phones[indx_in_phones], "This should correspond to the case of two consecutiva identical phonemes, because they are in two consecutive words"
+                    pred_phones_original_indices.append(indx_in_phones)
+
+        # detailed_alignment_phones.loc[:,'p_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'p_idx'].tolist()
+        detailed_alignment_phones.loc[:,'word_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'word_idx'].tolist()
+        detailed_alignment_phones.loc[:,'syl_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'syl_idx'].tolist()
+        # detailed_alignment_phones=detailed_alignment_phones[['word_idx','syl_idx','p_idx','pred_phones', 'GT_proba_means', 'pred_phones_audio', 'pred_proba_means', 'n_frames']]
+        detailed_alignment_phones=detailed_alignment_phones[['word_idx','syl_idx','pred_phones', 'GT_proba_means', 'pred_phones_audio', 'pred_proba_means', 'n_frames']]
+
+        return detailed_alignment_phones
+
     def predict_word(self, audio, phonetics, target_word_idx):
         """phonetics must be a list of list of phonemes, e.g.: phonetics=[['AY1'],['EH1', 'N', 'D', 'IH0', 'D']]
         """
