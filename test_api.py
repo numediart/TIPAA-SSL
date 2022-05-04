@@ -99,13 +99,22 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
                 chunks_p.append(' '.join(p.split(' ')[cumsum:cumsum+n])); cumsum+=n
 
             print(chunks_p)
-            res = client.post(url, data={"phonetics":json.dumps(chunks_p), 'audio64':encode_string, 
-                                        'target':r['target_phoneme']})
+
+            data={"phonetics":json.dumps(chunks_p), 'audio64':encode_string, 
+                                        'target':r['target_phoneme']}
+            # post works as well with both clients
+            # res = client.post(url,  data = data)
+            if client==requests: res = client.get(url,  params = data)
+            else: res = client.get(url,  query_string = data)
         else:
-            res = client.post(url, data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string, 
+            data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string, 
                                         'word_idx':str(ast.literal_eval(r['target_word_indexes'])[0]), 
                                         'syl_idx':str(ast.literal_eval(r['target_syllable_indexes'])[0]), 
-                                        'target':r['target_phoneme']})
+                                        'target':r['target_phoneme']}
+            # post works as well with both clients
+            # res = client.post(url,  data = data)
+            if client==requests: res = client.get(url,  params = data)
+            else: res = client.get(url,  query_string = data)
 
     if client==requests: res.data=res._content
     return res
