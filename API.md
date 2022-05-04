@@ -29,23 +29,22 @@ Endpoints of wav2vec based tech:
 /w2v/stress/word
 ```
 
-Correspondance between modules and endpoints, old and new tech:
+Correspondence between modules and endpoints, old and new tech:
 
-For Vowel Contrast:
-/phonemeContrast ->/w2v/contrast/vowel
+```
+vowel Contrast: /phonemeContrast ->/w2v/contrast/vowel
+final -ed: /phonemeContrast ->/w2v/contrast/termination
+focus word: /flowspeech/sentenceStress -> /w2v/stress/sentence
+stressed syllables: /flowspeech/wordStress -> /w2v/stress/word
+```
 
-For Final -ed:
-/phonemeContrast ->/w2v/contrast/termination
+In `/v2`, after the prefix, the endpoints `/w2v` are the same. The payloads are different because use `audio64` instead of an `rID`. Also, I switched from `formData` to `query` and from `POST` to `GET`.
 
-For focus word:
-/flowspeech/sentenceStress -> /w2v/stress/sentence
-
-For stressed syllables:
-/flowspeech/wordStress -> /w2v/stress/word
-
+Examples of requests as URLs [here](/REQUESTS.md)
 
 
 See the requests here online accessible at:
+
 OVH1:
 https://sp-ovh.flowchase.app/swagger-ui/
 

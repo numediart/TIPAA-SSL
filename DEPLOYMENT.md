@@ -2,8 +2,8 @@
 Download codes and models:
 ```
 git clone https://github.com/flowchase/flowspeech
-# this is for deploying the w2v_dev branch
-git checkout w2v_dev
+# this is for deploying a branch called e.g. w2v_dev
+# git checkout w2v_dev
 
 cd flowspeech
 git clone https://github.com/noetits/charsiu
