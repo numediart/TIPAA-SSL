@@ -38,9 +38,9 @@ focus word: /flowspeech/sentenceStress -> /w2v/stress/sentence
 stressed syllables: /flowspeech/wordStress -> /w2v/stress/word
 ```
 
-In `/v2`, after the prefix, the endpoints `/w2v` are the same. The payloads are different because use `audio64` instead of an `rID`. Also, I switched from `formData` to `query` and from `POST` to `GET`.
+In `/v2`, after the prefix, the endpoints `/w2v` are the same. The payloads are different because use `audio64` instead of an `rID`. 
 
-Examples of requests as URLs [here](/REQUESTS.md)
+<!-- Examples of requests as URLs [here](/REQUESTS.md) -->
 
 
 See the requests here online accessible at:
