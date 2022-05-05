@@ -191,11 +191,10 @@ stress_responseSchema=Schema.from_dict(
 word_stress_responseSchema_v2=Schema.from_dict(
     {
         "status": fields.Str(), 
-        "stress_intensities":fields.List(fields.Integer), 
-        "stress_binaries":fields.List(fields.Integer)
-    }, name="stress_response"
+        "stress_intensities":fields.List(fields.List(fields.Integer)), 
+        "stress_binaries":fields.List(fields.List(fields.Integer))
+    }, name="word_stress_response_v2"
 )
-
 sentence_stress_responseSchema_v2=Schema.from_dict(
     {
         "status": fields.Str(), 
