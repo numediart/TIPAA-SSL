@@ -59,7 +59,8 @@ if True:
     docs.register(dl_termination_contrast_api, blueprint="DL_modules")
     # docs.register(dl_syllable_contrast_api)
     
-    docs.register(dl_module_api_v2, blueprint="DL_modules_v2")
+    docs.register(dl_word_stress_api_v2, blueprint="DL_modules_v2")
+    docs.register(dl_sentence_stress_api_v2, blueprint="DL_modules_v2")
     docs.register(dl_vowel_contrast_api_v2, blueprint="DL_modules_v2")
     docs.register(dl_consonant_contrast_api_v2, blueprint="DL_modules_v2")
     docs.register(dl_termination_contrast_api_v2, blueprint="DL_modules_v2")

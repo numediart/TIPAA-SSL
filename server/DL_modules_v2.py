@@ -8,7 +8,8 @@ from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stres
 from utils.text_processing import check_phonemes, cmu_vowels, cmu_consonants, chunk_text, split_phonetics
 
 # from app_definition import app
-from server.utils import default_example, access_property_error, properties_to_args, check_request, request_phoneme_contrast, request_stress, request_stress_v2, stress_responseSchema, contrast_responseSchema, syl_contrast_responseSchema
+from server.utils import default_example, access_property_error, properties_to_args, check_request, request_phoneme_contrast, request_stress, request_stress_v2, stress_responseSchema, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
+
 
 bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
 
@@ -31,13 +32,23 @@ def params_def(properties, example=None):
 
 properties=["phonetics","audio64"]
 example={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
-@doc(description='Detection sentence stress or word stress', tags=['w2v_v2'], params=params_def(properties, example))
-@marshal_with(stress_responseSchema, code=200)  # marshalling
-@bp.route('/w2v/stress/<module>', methods=['GET','POST'])
-def dl_module_api_v2(module, **kwargs):
+@doc(description='Detection of sentence stress', tags=['w2v_v2'], params=params_def(properties, example))
+@marshal_with(sentence_stress_responseSchema_v2, code=200)  # marshalling
+@bp.route('/w2v/stress/sentence', methods=['GET','POST'])
+def dl_sentence_stress_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64"]
-    return request_stress_v2(d, properties, module, mode='base64')
+    return request_stress_v2(d, properties, "sentence", mode='base64')
+
+properties=["phonetics","audio64"]
+example={"phonetics":d["phonetics"], "audio64": d["audio64"]}
+@doc(description='Detection of word stress', tags=['w2v_v2'], params=params_def(properties, example))
+@marshal_with(word_stress_responseSchema_v2, code=200)  # marshalling
+@bp.route('/w2v/stress/word', methods=['GET','POST'])
+def dl_word_stress_api_v2(**kwargs):
+    d = request.values.to_dict()
+    properties=["phonetics","audio64"]
+    return request_stress_v2(d, properties, "word", mode='base64')
 
 properties=["phonetics","audio64","word_idx","target","syl_idx"]
 example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["vowel_w_idx"],"target":d["vowel_target"],"syl_idx":d["vowel_s_idx"]}

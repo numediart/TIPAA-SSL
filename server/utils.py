@@ -115,14 +115,28 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
         return Response(response,status=200,mimetype="application/json")
 
 
-def call_stress_fn(audio, p, n_words_by_chunk, module, mode='file'):
+def group_by_chunk(scores, n_words_by_chunk):
+    scores_grouped_by_chunk=[]
+    cumsum=0
+    for n in n_words_by_chunk:
+        scores_grouped_by_chunk.append(scores[cumsum:cumsum+n])
+        cumsum+=n
+    return scores_grouped_by_chunk
+
+def call_stress_fn(audio, p, module, n_words_by_chunk=[], mode='file', version='v1'):
     if module=='sentence':
         res=stress_from_formatted_phonetics(audio, p, n_words_by_chunk, level=module, mode=mode)
+        if version=='v2':
+            if res['status']=="success":
+                res['stress_intensities']=group_by_chunk(res['stress_intensities'], n_words_by_chunk)
+                res['stress_binaries']=group_by_chunk(res['stress_binaries'], n_words_by_chunk)
+
     elif module=='word':
         res=stress_from_formatted_phonetics(audio, p, level=module, mode=mode)
     else:
         res={"status": "error: no such module"}
         return Response(json.dumps(res),status=400,mimetype="application/json")
+    
     response=json.dumps(res)
 
     if res['status'].split(':')[0]=='error':
@@ -141,25 +155,29 @@ def request_stress(d, properties, module, mode='file'):
 
     audio=d[audio_property_dict[mode]]
 
-    return call_stress_fn(audio, p, n_words_by_chunk, module, mode=mode)
+    return call_stress_fn(audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode)
 
 def request_stress_v2(d, properties, module, mode='file'):
-    
-    # print(d['phonetics'])
-    p=ast.literal_eval(d['phonetics'])
-    # print("d['phonetics']", d['phonetics'])
-    # print('p',p)
-    n_words_by_chunk=[len(c.split(' ')) for c in p]
-    p=' '.join(p)
 
     err=check_request(d, properties)
     if err is not None: return Response(err,status=400,mimetype="application/json")
+
+    if module=='sentence':
+        p=ast.literal_eval(d['phonetics'])
+        n_words_by_chunk=[len(c.split(' ')) for c in p]
+        p=' '.join(p)
+    else:
+        p=d['phonetics']
+
     err=check_phonetics(p)
     if err is not None: return Response(err,status=400,mimetype="application/json")
 
     audio=d[audio_property_dict[mode]]
 
-    return call_stress_fn(audio, p, n_words_by_chunk, module, mode=mode)
+    if module=='sentence':
+        return call_stress_fn(audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode, version='v2')
+    else:
+        return call_stress_fn(audio, p, module, mode=mode, version='v2')
 
 
 stress_responseSchema=Schema.from_dict(
@@ -168,6 +186,22 @@ stress_responseSchema=Schema.from_dict(
         "stress_intensities":fields.List(fields.Integer), 
         "stress_binaries":fields.List(fields.Integer)
     }, name="stress_response"
+)
+
+word_stress_responseSchema_v2=Schema.from_dict(
+    {
+        "status": fields.Str(), 
+        "stress_intensities":fields.List(fields.Integer), 
+        "stress_binaries":fields.List(fields.Integer)
+    }, name="stress_response"
+)
+
+sentence_stress_responseSchema_v2=Schema.from_dict(
+    {
+        "status": fields.Str(), 
+        "stress_intensities":fields.List(fields.List(fields.Integer)), 
+        "stress_binaries":fields.List(fields.List(fields.Integer))
+    }, name="sentence_stress_response_v2"
 )
 
 contrast_responseSchema=Schema.from_dict(
