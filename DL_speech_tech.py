@@ -100,7 +100,7 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
                                     max_speech_rate=8, mode='file'
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
-    phonetics=phonetics.replace('-',' ')
+    phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
     if status=="success":
         # print(phonetics)
@@ -154,7 +154,7 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
                             alternatives=cmu_vowels,
                             max_speech_rate=8, mode='file', **kwargs
                     ):
-    phonetics=phonetics.replace('-',' ')
+    phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
     g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
@@ -203,7 +203,7 @@ def termination_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N
                             termination_basis='IH0_D',
                             max_speech_rate=8, mode='file', **kwargs
                     ):
-    phonetics=phonetics.replace('-',' ')
+    phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
 
     phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics.split(' ')[target_word_idx])
@@ -344,7 +344,7 @@ def syllable_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D 
                             target_syllable_idx=0,
                             max_speech_rate=8, mode='file'
                     ):
-    phonetics=phonetics.replace('-',' ')
+    phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
     g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
 
