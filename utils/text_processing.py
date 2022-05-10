@@ -10,15 +10,13 @@ from syllabipy.sonoripy import SonoriPy, str_to_list_of_char
 
 from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
+from itertools import groupby
+
 g2p = G2p()
 
 drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
-
-from itertools import groupby
 drop_consecutive_duplicate_elements= lambda L: [key for key, _group in groupby(L)]
-
 unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
-
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 
 
@@ -628,51 +626,52 @@ def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
     return ' '.join(s_case_sep)
 
 
-def add_special_char(s_orig, s_modified):
-    """This function adds punctuation marks to modified text (here with syllable separation symbols "|") 
-    at the end of words from an original sentence.
-    This assumes that punctuation marks are glued to words, which is the case in english. 
-    This assumption allows us to just check if the first and last characters are the same in original and modified text
-    "Hello, my name is John."
-    "hello my name is john"
-    -> hello and john do not have the last same character.
+# def add_special_char(s_orig, s_modified):
+#     """This function adds punctuation marks to modified text (here with syllable separation symbols "|") 
+#     at the end of words from an original sentence.
+#     This assumes that punctuation marks are glued to words, which is the case in english. 
+#     This assumption allows us to just check if the first and last characters are the same in original and modified text
+#     "Hello, my name is John."
+#     "hello my name is john"
+#     -> hello and john do not have the last same character.
 
-    "*Hello*," / "hello", we extract "*" and "*,"
+#     "*Hello*," / "hello", we extract "*" and "*,"
 
-    Example:
-    s_orig="I'm taking a Spanish class."
-    s_modified="I'm tak|ing a Span|ish class"
+#     Example:
+#     s_orig="I'm taking a Spanish class."
+#     s_modified="I'm tak|ing a Span|ish class"
 
-    output="I'm tak|ing a Span|ish class."
+#     output="I'm tak|ing a Span|ish class."
 
-    Args:
-        s_orig (str): original text
-        s_modified (str): modified text
+#     Args:
+#         s_orig (str): original text
+#         s_modified (str): modified text
 
-    Returns:
-        str: modified text with punctuation marks
-    """
-    s_modified_with_special_chars=[]
-    for w_orig, w_modified in zip(s_orig.split(' '), s_modified.split(' ')):
-        # n_spec_char=
-        def get_n_spec_char(location='start'):
-            # get the number of special character at the start or at the end of the word, 
-            # by looking at every character of the orig (containing the special characters)
-            for i in range(len(w_orig)):
-                if location=="end":
-                    if w_orig[-i]==w_modified[-1]:return i
-                if location=="start":
-                    if w_orig[i]==w_modified[0]:return i
-        # glue the special characters the to the body
-        if not get_n_spec_char(location='end'):
-            s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified+w_orig[-get_n_spec_char(location='end'):][1:])
-        else:
-            s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified)
+#     Returns:
+#         str: modified text with punctuation marks
+#     """
+#     s_modified_with_special_chars=[]
+#     for w_orig, w_modified in zip(s_orig.split(' '), s_modified.split(' ')):
+#         # n_spec_char=
+#         def get_n_spec_char(location='start'):
+#             # get the number of special character at the start or at the end of the word, 
+#             # by looking at every character of the orig (containing the special characters)
+#             for i in range(len(w_orig)):
+#                 if location=="end":
+#                     if w_orig[-i]==w_modified[-1]:return i
+#                 if location=="start":
+#                     if w_orig[i]==w_modified[0]:return i
+#         # glue the special characters the to the body
+#         if not get_n_spec_char(location='end'):
+#             s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified+w_orig[-get_n_spec_char(location='end'):][1:])
+#         else:
+#             s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified)
 
 
-    return ' '.join(s_modified_with_special_chars)
+#     return ' '.join(s_modified_with_special_chars)
 
-def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up!", syllables_df=pd.read_csv('data/syllables.csv'), syl_sep='|'):
+
+def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up!", syllables_df=pd.read_csv('data/syllables.csv'), syl_sep='|', special_chars = [',','?','.','!',';',':','"', '{', '}']):
     """This function extract information of syllabified texts and phonetics. 
     It uses a combination of datasets (CMUdict, data from syllable_data() ) and algorithm (SonoriPy)
 
@@ -684,35 +683,35 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     Returns:
         dict: see structure a the end of the function
     """
-    # this takes care of e.g. "2021", "$110"
-    # sentence=normalize_numbers(sentence)
-
-    # sentence.split(' ')
-
-    # special_chars = [',','?','.','!',';',':','"','*']
-    special_chars = [',','?','.','!',';',':','"', '{', '}']
-
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
     for c in special_chars: sentence=sentence.replace(' '+c, c)
 
-    norm_sent=normalize_numbers(sentence)
+    # this takes care of e.g. "2021", "$110"
+    # curly braces for numbers, if they are in several words
+    norm_sent_list=[]
+    for word in sentence.split(' '):
+        n_word=normalize_numbers(word)
+        if ' ' in n_word:
+            el="{"+n_word+"}"
+        else: el=n_word
+        norm_sent_list.append(el)
 
-    # norm_sent_list=[normalize_numbers(word) for word in sentence.split(' ')]
-    # norm_sent="{"+"}, {".join(norm_sent_list)+"}"
+    norm_sent=" ".join(norm_sent_list)
 
-
-
-    special_chars_dict={}
+    # memorize special characters glued before and after words
+    special_chars_dict_end={}
+    special_chars_dict_start={}
     for i,w in enumerate(norm_sent.split(' ')):
         if w[-1] in special_chars:
-            special_chars_dict[i]=w[-1] 
+            special_chars_dict_end[i]=w[-1] 
+        if w[0] in special_chars:
+            special_chars_dict_start[i]=w[0] 
 
+    
     words=remove_special_characters(norm_sent, lowercase=False).split(' ')
 
-    # word_groups=[remove_special_characters(normalize_numbers(w), lowercase=False) for w in sentence.split(' ')]
-    # lens=[len(w.split(' ')) for w in word_groups]
-    
+    # little dictionnary mapping e.g. Mr -> Mister
     words=[expand_dict[word] if word in expand_dict else word for word in words]
     norm_words=words
     
@@ -724,10 +723,10 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
         if w.isupper():
             acronym_idxs.append(w_idx)
             w='-'.join(w)
+            words[w_idx]=w
         ws.append(w)
-    words=ws
 
-    words=[word.lower() for word in words]
+    words=[word.lower() for word in ws]
 
     syls_texts=[]
     used_method_syllables=[]
@@ -752,39 +751,44 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
         syls_texts[i]=words[i]
         used_method_syllables[i]='acronym'
 
-    # print('syls_texts', syls_texts)
-    # print('norm_words', norm_words)
-    norm_words
-
-    for idx in acronym_idxs:
-        norm_words[idx]=ws[idx]
+    # for idx in acronym_idxs:
+    #     norm_words[idx]='{'+ws[idx]+'}'
 
     case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), ' '.join(norm_words), syl_sep=syl_sep)
-
     case_syls_texts_special_chars=case_syls_texts.split(' ')
 
-    for k in special_chars_dict:
-        case_syls_texts_special_chars[k]+=special_chars_dict[k]
-    case_syls_texts_special_chars=' '.join(case_syls_texts_special_chars)
+    def add_special_chars(split_text, special_chars_dict_start, special_chars_dict_end):
+        for k in special_chars_dict_end:
+            split_text[k]+=special_chars_dict_end[k]
+        for k in special_chars_dict_start:
+            split_text[k]=special_chars_dict_start[k]+split_text[k]
+        return split_text
+
+    def acronyms_hyphen_to_compound(split_text, acronym_idxs):
+        # remove '-' in acronyms
+        # And if it was only 1 letter, then it's not a compound word.
+        for i,el in enumerate(split_text):
+            if i in acronym_idxs:
+                if '-' in el:
+                    split_text[i]='{'+el.replace('-',' ')+'}'
+                else:
+                    split_text[i]=el.replace('{','').replace('}','')
+        return split_text
+
+    case_syls_texts_special_chars=acronyms_hyphen_to_compound(case_syls_texts_special_chars, acronym_idxs)
+    case_syls_texts_special_chars=add_special_chars(case_syls_texts_special_chars, special_chars_dict_start, special_chars_dict_end)
     
+
+    segmented_text=' '.join(case_syls_texts_special_chars)
 
     # p -> phonetics
     # g -> gibberish
-    p=[]
-    g=[]
-    for word in words:
-        ph,gb=generate_syl_phonetics_alternatives_from_word(word)
-        p.append(ph)
-        g.append(gb)
 
-    # phonetics for acronyms will be empty or maybe incorrect. I replace that by a lookup of every letter
-    for i in acronym_idxs:
-        # I separate the acronym in letters and lookup cmudict. I take the last, because
-        # there is only one alternative except for letter 'A' which has  [['AH0'], ['EY1']]
-        p[i]=['-'.join(['_'.join(cmudict_dict[w][-1]) for w in words[i].split('-')])]
-        # go through levels of the list (alternatives, words, syllables, phones) and then convert every phoneme in gibberish
-        g[i]=['-'.join(['_'.join([cmu_to_gibberish[unstress(p)] for p in s.split('_')]) for s in w.split('-')]) for w in p[i]]
+    p=[generate_syl_phonetics_alternatives_from_word(word)[0] for word in words]
 
+    # I separate the acronym in letters and lookup cmudict. I take the last, because
+    # there is only one alternative except for letter 'A' which has  [['AH0'], ['EY1']]
+    for i in acronym_idxs:  p[i]=['-'.join(['_'.join(cmudict_dict[w][-1]) for w in words[i].split('-')])]
 
     stress_inconsistencies=[]
     for w_i,w in enumerate(p):
@@ -799,26 +803,24 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     stress_inconsistencies=pd.DataFrame(stress_inconsistencies)
     
     n_alternatives=[len(el) for el in p]
-    g_hr=[[el.replace('_','') for el in w] for w  in g]
-
-    n_syls_in_g_hr=[[len(alt.split(syl_sep)) for alt in word] for word in g_hr]
+    n_syls_in_p=[[len(alt.split(syl_sep)) for alt in word] for word in p]
     n_syls_in_text=[len(word.split(syl_sep)) for word in syls_texts]
 
     # among alternatives of phonetics (or gibberish), take the first index for which the number of syllables is equal (i.e. difference=0)
     # if there are none, just take the first alternative (index=0)
     alternative_idxs_syls_consistent=[]
-    # memorize words for chich we couldn't find any consistent alternative
+    # memorize words for which we couldn't find any consistent alternative
     word_idxs_inconsitencies={}
     word_idxs_inconsitencies['stress']=[]
     word_idxs_inconsitencies['n_syl']=[]
-    for i,(syl_g,syl_t) in enumerate(zip(n_syls_in_g_hr, n_syls_in_text)):
+    for i,(syl_g,syl_t) in enumerate(zip(n_syls_in_p, n_syls_in_text)):
         inconsistency=(np.array(syl_g)-syl_t).tolist()
         if len(stress_inconsistencies)>0:
             if i in stress_inconsistencies.w_i.tolist():
                 # if there is a stress inconsistency in this word, add a one to the corresponding element in the inconsistency vector
                 for alt_idx in stress_inconsistencies[stress_inconsistencies.w_i==i].alt_i.tolist():
                     inconsistency[alt_idx]+=1
-        # searching a 0 in the onconsitency vector to select a consistent alternative
+        # searching a 0 in the consitency vector to select a consistent alternative
         if 0 in inconsistency:  
             alternative_idxs_syls_consistent.append(inconsistency.index(0))
         else:
@@ -826,8 +828,6 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
             alternative_idxs_syls_consistent.append(0)
             # Then I check what inconsistencies were present
             if syl_g[0]!=syl_t:
-                # print(syl_g)
-                # print(syl_t)
                 word_idxs_inconsitencies['n_syl'].append(i)
             if p[i][0].count('1')>p[i][0].count('-')+1:
                 word_idxs_inconsitencies['stress'].append(i)
@@ -835,25 +835,37 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     # Keep first alternative. 
     try:
         p_0=' '.join([el[alternative_idxs_syls_consistent[i]] for i,el in enumerate(p)])
-        g_0=' '.join([el[alternative_idxs_syls_consistent[i]] for i,el in enumerate(g)])
-        g_hr_0=' '.join([el[alternative_idxs_syls_consistent[i]] for i,el in enumerate(g_hr)])
     except IndexError:
         p_0=''
-        g_0=''
-        g_hr_0=''
+
+
+    split_phonetics = lambda phonetics: [[[s.split('_') for s in sub_w.split('|')] for sub_w in w.split('-')] for w in phonetics.split(' ')]
+    g_0=' '.join(['-'.join(['|'.join(['_'.join([cmu_to_gibberish[unstress(p)] for p in s]) for s in sub_w]) for sub_w in w]) for w in split_phonetics(p_0)])
     
+
+    brace_dict_start=dict(filter(lambda el: el[1] in ['{','}'], special_chars_dict_start.items()))
+    brace_dict_end=dict(filter(lambda el: el[1] in ['{','}'], special_chars_dict_end.items()))
+
+    p_0_special_chars=acronyms_hyphen_to_compound(p_0.split(' '), acronym_idxs)
+    p_0_special_chars=add_special_chars(p_0_special_chars, brace_dict_start, brace_dict_end)
+    p_0_special_chars=' '.join(p_0_special_chars)
+
+    g_0_special_chars=acronyms_hyphen_to_compound(g_0.split(' '), acronym_idxs)
+    g_0_special_chars=add_special_chars(g_0_special_chars, brace_dict_start, brace_dict_end)
+    g_0_special_chars=' '.join(g_0_special_chars)
+
     record={'text':sentence,
-        'cmu_phonetics':p_0,
-        'pronounciation_guide':g_0,
-        'pronounciation_guide_hr':g_hr_0,
-        'segmented_text':case_syls_texts_special_chars,
+        'cmu_phonetics':p_0_special_chars,
+        'pronounciation_guide':g_0_special_chars,
+        'pronounciation_guide_hr':g_0_special_chars.replace('_',''),
+        'segmented_text':segmented_text,
         # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
         'n_syl_mismatches':word_idxs_inconsitencies['n_syl'],
         'n_stress_inconsistencies':word_idxs_inconsitencies['stress'],
         'used_method_for_syl_text':used_method_syllables,
         'cmu_phonetics_alt':p,
-        'pronounciation_guide_alt':g,
-        'pronounciation_guide_hr_alt':g_hr,
+        # 'pronounciation_guide_alt':g,
+        # 'pronounciation_guide_hr_alt':g_hr,
         'n_alternatives':n_alternatives
         }
     return record
@@ -916,6 +928,7 @@ def word_selection():
     
 if __name__ == "__main__":
     from utils.text_processing import *
+    prefill_for_sentence()
     
     from utils.label_data_processing import actor_recordings
     df_phrases=actor_recordings()
