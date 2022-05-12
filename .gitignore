@@ -4,23 +4,29 @@ scripts/__pycache__/**
 scripts/synth_audio/**
 .vscode/**
 audio_recordings/edAnalysis/**
-@REM audio_recordings/**
+audio_recordings/**
 file_selection/**
 lexicon/**
 upload_files/**
-lexicon/**
-lexicon/sentenceStress/grammar/**
-lexicon/wordStress/grammar/**
-lexicon/wordStress/**
 inputs/**
 scripts/synth_audio/**
 synth_audio/**
+synth_audio\ -\ Copie/**
 performance_results/**
 dl_models/**
 results/**
-@REM data/**
-data/*/**
+data/librispeech_alignments/**
+data/LibriSpeech/**
+data/MLS/**
+data/speechocean762/**
+data/flwc-recordings/**
+data/BE_english_audio_DB/**
+data/BE_english_DB_audio_old/**
+data/new_content_audio/**
+data/scaleway-audio-files/**
+data/**
 syllabipy/__pycache__/**
+server/__pycache__/**
 .*/**
 pretrained_models/**
 bin/**
@@ -28,3 +34,4 @@ utils/__pycache__/**
 nltk_data/**
 *.png
 *.csv*
+*.txt
