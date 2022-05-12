@@ -38,7 +38,8 @@ from speechbrain.pretrained import SpectralMaskEnhancement
 #         savedir="pretrained_models/metricgan-plus-voicebank",
 # )
 enhance_model = SpectralMaskEnhancement.from_hparams(
-        source="hf_models/speechbrain/metricgan-plus-voicebank"
+        # source="hf_models/speechbrain/metricgan-plus-voicebank"
+        source="speechbrain/metricgan-plus-voicebank"
 )
 
 
