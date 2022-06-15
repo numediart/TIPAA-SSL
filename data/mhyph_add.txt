@@ -16,3 +16,5 @@ rhy|thms
 should|'ve
 cli|ent
 cli|ents
+ex|pe|ri|en|ces
+as|so|ci|ates
