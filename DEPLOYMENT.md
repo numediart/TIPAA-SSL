@@ -2,10 +2,17 @@
 Download codes and models:
 ```
 git clone https://github.com/flowchase/flowspeech
-# this is for deploying a branch called e.g. w2v_dev
-# git checkout w2v_dev
+
 
 cd flowspeech
+
+# this is for deploying a branch called e.g. w2v_dev
+# git checkout w2v_dev
+# this is for deploying the latest release
+# git checkout $(git describe --tags $(git rev-list --tags --max-count=1))
+# this is for deploying the release e.g. v1.3.0
+git checkout v1.3.0
+
 git clone https://github.com/noetits/charsiu
 sudo apt-get install git-lfs
 git lfs install
