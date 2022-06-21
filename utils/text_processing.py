@@ -20,7 +20,30 @@ unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 
 
-cmudict_dict=cmudict.dict()
+def get_augmented_cmudict():
+    cmudict_dict=cmudict.dict()
+
+    corrections={
+        'fourteen':[['F', 'AO2', 'R', 'T', 'IY1', 'N']],
+        'thirteen':[['TH', 'ER2', 'T', 'IY1', 'N']],
+        'fifteen':[['F', 'IH2', 'F', 'T', 'IY1', 'N']],
+        'sixteen':[['S', 'IH2', 'K', 'S', 'T', 'IY1', 'N']],
+        'seventeen':[['S', 'EH2', 'V', 'AH0', 'N', 'T', 'IY1', 'N']],
+        'eighteen':[['EY0', 'T', 'IY1', 'N'], ['EY2', 'T', 'IY1', 'N']],
+        'nineteen':[['N', 'AY2', 'N', 'T', 'IY1', 'N']],
+        'engineer':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R']],
+        'downstairs':[['D', 'AW0', 'N', 'S', 'T', 'EH1', 'R', 'Z']],
+        'trainee':[['T', 'R', 'EY0', 'N', 'IY1']],
+        'outside':[['AW0', 'T', 'S', 'AY1', 'D']],
+        'trespasser':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0']],
+        'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']]
+	}
+    for k in corrections:
+        cmudict_dict[k]=corrections[k]
+    return cmudict_dict
+
+
+cmudict_dict=get_augmented_cmudict()
 
 syllables_df=pd.read_csv('data/syllables.csv')
 
@@ -856,7 +879,7 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
 
     record={'text':sentence,
         'cmu_phonetics':p_0_special_chars,
-        'pronounciation_guide':g_0_special_chars,
+        # 'pronounciation_guide':g_0_special_chars,
         'pronounciation_guide_hr':g_0_special_chars.replace('_',''),
         'segmented_text':segmented_text,
         # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
