@@ -4,11 +4,18 @@ from flask import current_app, abort
 from marshmallow import Schema, fields
 import json
 import ast
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, termination_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, syllable_contrast_from_formatted_phonetics_audio
 from utils.text_processing import check_phonemes, cmu_vowels, cmu_consonants, chunk_text, split_phonetics
 from flask import Response
 from utils.audio_processing import audio64_from_file
 
+
+request_errors={
+    1:"could not access "'+property+'" property of the request",
+    2:"invalid phoneme in phonetics",
+    3:"the syllable corresponding to syl_idx does not contain the target.",
+    4:"word_idx >= number of words"
+}
 
 def default_example():
     audio64=audio64_from_file("data/audio_recordings/M1_two-hundred-dollars-way-too-expensive.mp3")
@@ -50,9 +57,7 @@ def properties_to_args(properties, default=None, required=True):
     args={}
     for i,prop in enumerate(properties):
         if default is not None and prop in default: 
-            # print(prop)
             d=default[prop]
-            # print(d)
             args[prop]=fields.Str(required=required,example=d,default=d)
         else:
             args[prop]=fields.Str(required=required)
@@ -84,17 +89,26 @@ def check_phonetics(phonetics):
         err="error: "+not_p+" is not a phoneme"
         return err
 
-def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_function=phonemeContrast_from_formatted_phonetics_audio, alternatives=cmu_vowels, mode='file'):
-    # import pdb;pdb.set_trace()
+def define_detected_flag(http_code, status):
+    if http_code != 200: flag = "N/A"
+    else:
+        if status=="success": flag = "speech"
+        elif "not recognized" in status: flag="nonsense"
+        else: flag = "nospeech"
+    return flag
 
+def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_function=phonemeContrast_from_formatted_phonetics_audio, alternatives=cmu_vowels, mode='file'):
     err=check_request(d, properties)
-    if err is not None: return Response(err,status=400,mimetype="application/json")
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
     err=check_phonetics(d['phonetics'])
-    if err is not None: return Response(err,status=400,mimetype="application/json")
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
 
     word_idx=int(d['word_idx'])
     if word_idx>=len(d['phonetics'].split(' ')):
-        return Response("error: word_idx >= number of words",status=400,mimetype="application/json")
+        
+        res={"status": "error: word_idx >= number of words"}
+        response=json.dumps(res)
+        return Response(response,status=400,mimetype="application/json")  
     
     
     if tech_function==phonemeContrast_from_formatted_phonetics_audio:
@@ -103,7 +117,9 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
         syls_with_target=[syl for syl in d['phonetics'].split(' ')[word_idx].split('|') if d['target'] in syl]
         idx_syls_with_target=[i for i,syl in enumerate(d['phonetics'].split(' ')[word_idx].split('|')) if d['target'] in syl]
         if syl_idx not in idx_syls_with_target:
-            return Response("error: the syllable corresponding to syl_idx does not contain the target.",status=400,mimetype="application/json")
+            res={"status": "error: the syllable corresponding to syl_idx does not contain the target."}
+            response=json.dumps(res)
+            return Response(response,status=400,mimetype="application/json")  
     else:
         syl_idx=None
     res=tech_function(d[audio_property_dict[mode]], d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, target_occurence_idx=target_occurence_idx, target_phones=d['target'], alternatives=alternatives, mode=mode)
@@ -113,6 +129,29 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
         return Response(response,status=500,mimetype="application/json")
     else:
         return Response(response,status=200,mimetype="application/json")
+
+
+# TODO: refactor with "request_phoneme_contrast" by parametrizing the function call
+def request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='file'):
+    err=check_request(d, properties)
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
+    err=check_phonetics(d['phonetics'])
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
+
+    word_idx=int(d['word_idx'])
+    syl_idx=int(d['syl_idx'])
+
+    if word_idx>=len(d['phonetics'].split(' ')):
+        res={"status": "error: word_idx >= number of words"}
+        response=json.dumps(res)
+        return Response(response,status=400,mimetype="application/json")    
+    res=tech_function(d['audio64'],phonetics=d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, mode=mode)
+    response=json.dumps(res)
+    if res['status'].split(':')[0]=='error':
+        return Response(response,status=500,mimetype="application/json")
+    else:
+        return Response(response,status=200,mimetype="application/json")
+
 
 
 def group_by_chunk(scores, n_words_by_chunk):
@@ -135,7 +174,7 @@ def call_stress_fn(audio, p, module, n_words_by_chunk=[], mode='file', version='
         res=stress_from_formatted_phonetics(audio, p, level=module, mode=mode)
     else:
         res={"status": "error: no such module"}
-        return Response(json.dumps(res),status=400,mimetype="application/json")
+        return Response(json.dumps(res),status=500,mimetype="application/json")
     
     response=json.dumps(res)
 
@@ -146,9 +185,9 @@ def call_stress_fn(audio, p, module, n_words_by_chunk=[], mode='file', version='
 
 def request_stress(d, properties, module, mode='file'):
     err=check_request(d, properties)
-    if err is not None: return Response(err,status=400,mimetype="application/json")
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
     err=check_phonetics(d['phonetics'])
-    if err is not None: return Response(err,status=400,mimetype="application/json")
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
 
     p=d['phonetics']
     n_words_by_chunk=chunk_text(d['text'])
@@ -160,7 +199,7 @@ def request_stress(d, properties, module, mode='file'):
 def request_stress_v2(d, properties, module, mode='file'):
 
     err=check_request(d, properties)
-    if err is not None: return Response(err,status=400,mimetype="application/json")
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
 
     if module=='sentence':
         p=ast.literal_eval(d['phonetics'])
@@ -170,7 +209,7 @@ def request_stress_v2(d, properties, module, mode='file'):
         p=d['phonetics']
 
     err=check_phonetics(p)
-    if err is not None: return Response(err,status=400,mimetype="application/json")
+    if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
 
     audio=d[audio_property_dict[mode]]
 

@@ -4,11 +4,11 @@ from flask import Response, Blueprint
 
 import ast
 import json
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, termination_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
 from utils.text_processing import check_phonemes, cmu_vowels, cmu_consonants, chunk_text, split_phonetics
 
 # from app_definition import app
-from server.utils import default_example, access_property_error, properties_to_args, check_request, request_phoneme_contrast, request_stress, request_stress_v2, stress_responseSchema, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
+from server.utils import default_example, access_property_error, properties_to_args, check_request, request_phoneme_contrast, request_syl_contrast, request_stress, request_stress_v2, stress_responseSchema, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
 
 
 bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
@@ -83,7 +83,7 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"target":d["termina
 def dl_termination_contrast_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64","word_idx","target"]
-    return request_phoneme_contrast(d, properties, tech_function=termination_contrast_from_formatted_phonetics_audio, mode='base64')
+    return request_phoneme_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='base64')
 
 properties=["phonetics","audio64","word_idx","syl_idx"]
 example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termination_w_idx"],"syl_idx":"1"}
@@ -92,21 +92,6 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termi
 @marshal_with(syl_contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/syllable', methods=['GET','POST'])
 def dl_syllable_contrast_api_v2(**kwargs):
-    # TODO: refactor with "request_phoneme_contrast" by parametrizing the function call
     d = request.values.to_dict()
     properties=["phonetics","audio64","word_idx","syl_idx"]
-    err=check_request(d, properties)
-    if err is not None: return Response(err,status=400,mimetype="application/json")
-
-    word_idx=int(d['word_idx'])
-    syl_idx=int(d['syl_idx'])
-
-    if word_idx>=len(d['phonetics'].split(' ')):
-        return Response("error: word_idx >= number of words",status=400,mimetype="application/json")    
-    res=syllable_contrast_from_formatted_phonetics_audio(d['audio64'],phonetics=d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, mode='base64')
-    response=json.dumps(res)
-    if res['status'].split(':')[0]=='error':
-        return Response(response,status=500,mimetype="application/json")
-    else:
-        return Response(response,status=200,mimetype="application/json")
-
+    return request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='base64')

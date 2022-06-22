@@ -3,7 +3,7 @@ from flask_apispec import marshal_with, doc, use_kwargs
 from flask import Response, Blueprint
 
 import json
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, termination_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
 
 # from app_definition import app
 from server.utils import access_property_error, properties_to_args, check_request, request_phoneme_contrast, request_stress, stress_responseSchema, contrast_responseSchema, syl_contrast_responseSchema
@@ -51,7 +51,7 @@ properties=["phonetics","rID","word_idx","target"]
 def dl_termination_contrast_api():
     d = request.form
     properties=["phonetics","rID","word_idx","target"]
-    return request_phoneme_contrast(d, properties, tech_function=termination_contrast_from_formatted_phonetics_audio)
+    return request_phoneme_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio)
 
 properties=["phonetics","rID","word_idx","syl_idx"]
 @doc(description='Syllable contrast', tags=['w2v_v1'])
