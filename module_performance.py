@@ -411,7 +411,8 @@ def pContrast_from_audiobook_data(data_set='dev-clean', target_phones='AO1', alt
 
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
-    selection=libri_words_df[libri_words_df.phones.str.contains(target_phones)]
+    # Select words containing a phone. For 'T', to avoid captureing also 'TH', it has to contain 'T '  or end by ' T'
+    selection=libri_words_df[libri_words_df.phones.str.endswith(' '+target_phones)|libri_words_df.phones.str.contains(target_phones+' ')]
 
     if len(selection)>0:
         results_df=compute_prediction_results(selection, libri_words_df, target_phones=target_phones, alternatives=alternatives)
