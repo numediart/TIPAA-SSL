@@ -54,16 +54,18 @@ RUN pip install --upgrade pip && pip install pyworld && pip install -r requireme
 
 # Install htk
 # remove if exists, in case it is a shortcut from git that was copied above
-RUN rm -rf $HOME/htk/ &&\
-    git clone https://github.com/loretoparisi/htk &&\
-    cd $HOME/htk/ && ./configure --disable-hslab && \
-    make all && \
-    make install
+
+# RUN rm -rf $HOME/htk/ &&\
+#     git clone https://github.com/loretoparisi/htk &&\
+#     cd $HOME/htk/ && ./configure --disable-hslab && \
+#     make all && \
+#     make install
 
 
 # from https://stackoverflow.com/questions/37458287/how-to-run-a-cron-job-inside-a-docker-container
 # copy crontabs for root user
-COPY cronjobs/remove_old_files /etc/crontabs/root
-RUN crontab /etc/crontabs/root
+
+# COPY cronjobs/remove_old_files /etc/crontabs/root
+# RUN crontab /etc/crontabs/root
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000

@@ -9,7 +9,8 @@ from flask_apispec import marshal_with, doc, use_kwargs
 
 from utils.text_processing import generate_prefill_csv, prefill_for_sentence, syllables_df
 from server.utils import debug_only, access_property_error
-from server.upload import upload_path
+# from server.upload import upload_path
+upload_path="./upload_files/"
 
 bp=Blueprint('prefill', __name__, url_prefix='/')
 

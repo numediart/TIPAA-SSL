@@ -37,13 +37,15 @@ from speechbrain.pretrained import SpectralMaskEnhancement
 #         source="speechbrain/metricgan-plus-voicebank",
 #         savedir="pretrained_models/metricgan-plus-voicebank",
 # )
-enhance_model = SpectralMaskEnhancement.from_hparams(
-        # source="hf_models/speechbrain/metricgan-plus-voicebank"
-        source="speechbrain/metricgan-plus-voicebank"
-)
+
 
 
 def speech_enhancement(s):
+    enhance_model = SpectralMaskEnhancement.from_hparams(
+        source="hf_models/speechbrain/metricgan-plus-voicebank"
+        # source="speechbrain/metricgan-plus-voicebank"
+    )
+    
     s=torch.from_numpy(s.astype(np.float32))[None]
     # Add relative length tensor
     enhanced = enhance_model.enhance_batch(s, lengths=torch.tensor([1.]))
