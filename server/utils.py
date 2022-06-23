@@ -89,12 +89,10 @@ def check_phonetics(phonetics):
         err="error: "+not_p+" is not a phoneme"
         return err
 
-def define_detected_flag(http_code, status):
-    if http_code != 200: flag = "N/A"
-    else:
-        if status=="success": flag = "speech"
-        elif "not recognized" in status: flag="nonsense"
-        else: flag = "nospeech"
+def define_detected_flag(status):
+    if status=="success": flag = "speech"
+    elif "not recognized" in status: flag="nonsense"
+    else: flag = "nospeech"
     return flag
 
 def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_function=phonemeContrast_from_formatted_phonetics_audio, alternatives=cmu_vowels, mode='file'):
@@ -201,12 +199,12 @@ def request_stress_v2(d, properties, module, mode='file'):
     err=check_request(d, properties)
     if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
 
-    if module=='sentence':
-        p=ast.literal_eval(d['phonetics'])
-        n_words_by_chunk=[len(c.split(' ')) for c in p]
-        p=' '.join(p)
-    else:
-        p=d['phonetics']
+    # if module=='sentence':
+    p=ast.literal_eval(d['phonetics'])
+    n_words_by_chunk=[len(c.split(' ')) for c in p]
+    p=' '.join(p)
+    # else:
+    #     p=d['phonetics']
 
     err=check_phonetics(p)
     if err is not None: return Response(json.dumps({"status":err}),status=400,mimetype="application/json")
