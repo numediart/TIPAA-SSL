@@ -32,6 +32,7 @@ pretrained_models/**
 bin/**
 utils/__pycache__/**
 nltk_data/**
+non_v2/**
 *.png
 *.csv*
 *.txt
