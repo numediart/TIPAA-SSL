@@ -34,7 +34,7 @@ properties=["phonetics","audio64"]
 example={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
 @doc(description='Detection of sentence stress', tags=['w2v_v2'], params=params_def(properties, example))
 @marshal_with(sentence_stress_responseSchema_v2, code=200)  # marshalling
-@bp.route('/w2v/stress/sentence', methods=['GET','POST'])
+@bp.route('/w2v/stress/sentence', methods=['POST'])
 def dl_sentence_stress_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64"]
@@ -44,7 +44,7 @@ properties=["phonetics","audio64"]
 example={"phonetics":d["phonetics"], "audio64": d["audio64"]}
 @doc(description='Detection of word stress', tags=['w2v_v2'], params=params_def(properties, example))
 @marshal_with(word_stress_responseSchema_v2, code=200)  # marshalling
-@bp.route('/w2v/stress/word', methods=['GET','POST'])
+@bp.route('/w2v/stress/word', methods=['POST'])
 def dl_word_stress_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64"]
@@ -54,7 +54,7 @@ properties=["phonetics","audio64","word_idx","target","syl_idx"]
 example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["vowel_w_idx"],"target":d["vowel_target"],"syl_idx":d["vowel_s_idx"]}
 @doc(description='Vowel contrast', tags=['w2v_v2'], params=params_def(properties, example))
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
-@bp.route('/w2v/contrast/vowel', methods=['GET','POST'])
+@bp.route('/w2v/contrast/vowel', methods=['POST'])
 def dl_vowel_contrast_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64","word_idx","target","syl_idx"]
@@ -66,7 +66,7 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["conso
 @doc(description='Consonant contrast', tags=['w2v_v2'], params=params_def(properties, example))
 # @use_kwargs(properties_to_args(properties), location="query")
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
-@bp.route('/w2v/contrast/consonant', methods=['GET','POST'])
+@bp.route('/w2v/contrast/consonant', methods=['POST'])
 def dl_consonant_contrast_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64","word_idx","target","syl_idx", "target_occurence_idx"]
@@ -79,7 +79,7 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"target":d["termina
 @doc(description='Termination contrast', tags=['w2v_v2'], params=params_def(properties, example))
 # @use_kwargs(properties_to_args(properties), location="query")
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
-@bp.route('/w2v/contrast/termination', methods=['GET','POST'])
+@bp.route('/w2v/contrast/termination', methods=['POST'])
 def dl_termination_contrast_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64","word_idx","target"]
@@ -90,7 +90,7 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termi
 @doc(description='Syllable contrast', tags=['w2v_v2'], params=params_def(properties, example))
 # @use_kwargs(properties_to_args(properties), location="query")
 @marshal_with(syl_contrast_responseSchema, code=200)  # marshalling
-@bp.route('/w2v/contrast/syllable', methods=['GET','POST'])
+@bp.route('/w2v/contrast/syllable', methods=['POST'])
 def dl_syllable_contrast_api_v2(**kwargs):
     d = request.values.to_dict()
     properties=["phonetics","audio64","word_idx","syl_idx"]
