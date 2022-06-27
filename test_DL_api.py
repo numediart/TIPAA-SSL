@@ -173,6 +173,11 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/str
     results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'sentence', client=client, mode=mode)
     results_ws, failures_ws=get_results(df_word_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'word', client=client, mode=mode)
 
+    df_test=df_word_stress[df_word_stress.text.str.contains("grandma")].iloc[-1:,:]
+    results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client, mode=mode)
+
+    request_for_audio_file(df_test.iloc[0], base_url = 'http://localhost:8000', endpoint=route+'word', client=requests, mode=mode)
+
     return results_ss, failures_ss, results_ws, failures_ws
 
 # def test_stress_detection_v2(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
