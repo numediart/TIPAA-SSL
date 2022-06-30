@@ -78,8 +78,8 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
             else: res = client.post(url,  query_string = data)
         else:
             data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string, 
-                                        'word_idx':str(ast.literal_eval(r['target_word_indexes'])[0]), 
-                                        'syl_idx':str(ast.literal_eval(r['target_syllable_indexes'])[0]), 
+                                        'word_idx':int(ast.literal_eval(r['target_word_indexes'])[0]), 
+                                        'syl_idx':int(ast.literal_eval(r['target_syllable_indexes'])[0]), 
                                         'target':r['target_phoneme']}
             # post works as well with both clients
             # res = client.post(url,  data = data)
@@ -176,7 +176,7 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/str
     df_test=df_word_stress[df_word_stress.text.str.contains("grandma")].iloc[-1:,:]
     results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client, mode=mode)
 
-    request_for_audio_file(df_test.iloc[0], base_url = 'http://localhost:8000', endpoint=route+'word', client=requests, mode=mode)
+    request_for_audio_file(df_test.iloc[0], base_url = base_url, endpoint=route+'word', client=client, mode=mode)
 
     return results_ss, failures_ss, results_ws, failures_ws
 

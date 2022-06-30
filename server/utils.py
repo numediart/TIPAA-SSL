@@ -32,14 +32,14 @@ def default_example():
         "phonetics_chunks":json.dumps(chunks_p),
         "audio64":audio64.decode('utf-8'),
         "vowel_target":"AA1",
-        "vowel_w_idx":"2",
-        "vowel_s_idx":"0",
+        "vowel_w_idx":2,
+        "vowel_s_idx":0,
         "consonant_target":"DH",
-        "consonant_w_idx":"3",
-        "consonant_s_idx":"0",
-        "consonant_target_occurence_idx":"0",
+        "consonant_w_idx":3,
+        "consonant_s_idx":0,
+        "consonant_target_occurence_idx":0,
         "termination_target":"AH0_D",
-        "termination_w_idx":"1"
+        "termination_w_idx":1
     }
     return d
 
