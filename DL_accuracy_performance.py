@@ -16,7 +16,7 @@ exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_12
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio
 from utils.audio_processing import prepare_audio_file
 
-from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, make_all_phones_annotation_files, actor_recordings
+from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings
 from utils.text_processing import *
 from utils.libri_phonetization_data import *
 
@@ -28,6 +28,9 @@ warnings.filterwarnings("ignore", category=UserWarning)
 import pandas as pd
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
+
+
+
 
 
 def stress_GE_performance_test(level='sentence'):
@@ -592,8 +595,12 @@ def termination_contrast_from_audiobook_data(data_set='test-other', target_phone
     selection=formatted_audiobook_data(selections[target_phones], libri_words_df)
     phonetic_detections,result_df=compute_predictions(selection, model, target_phones=target_phones, tech_function=start_end_contrast_from_formatted_phonetics_audio)
     success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
-    print('errors:',result_df[result_df.gibberish_truth!=result_df.gibberish_detected])
-    result_df[result_df.gibberish_truth!=result_df.gibberish_detected].iloc[-1]
+
+    errors_df=result_df[result_df.gibberish_truth!=result_df.gibberish_detected]
+    print('errors:',errors_df)
+
+    if len(errors_df)>0: print("last error:"); errors_df.iloc[-1]
+    
     print(success_rate)
     selection=selection.reset_index(drop=True)
     result_df['cmu_phonetics']=selection['cmu_phonetics']
