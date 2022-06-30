@@ -9,10 +9,14 @@ import sys
 import torch
 import numpy as np
 from charsiu.src.utils import seq2duration,forced_align
-from utils.text_processing import cmu_vowels, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, cmu_consonants, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
+from utils.text_processing import group_consecutive_duplicates, cmu_vowels, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, cmu_consonants, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
 from utils.audio_processing import getIntonation, getIntensity, normalize
-from collections import Counter
 
+# https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
+keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
+
+# get the blocks of consecutive identical rows in cols
+get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[cols].shift(-1) == a[cols]).any(axis=1)]
 
 class charsiu_phone_forced_aligner(charsiu_forced_aligner):
     def __init__(self, aligner, sil_threshold=4, **kwargs):
@@ -78,7 +82,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
                 select_cost=cost[round(start/timestep):round(end/timestep)]
                 proba_mean=select_cost.mean(axis=0)
                 proba_means.append(proba_mean)
-
         else:
             sil='[SIL]'
             alignment_phones=[(0, len(pred_ids_audio)*self.resolution, sil)]
@@ -101,6 +104,67 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         
         df_segmented['GT_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.cmu_phones)], axis=1)
         df_segmented['pred_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.pred_phones_audio)], axis=1)
+        
+        def divide_consecutive_duplicates(p_df, phone_list):
+            grouped_phone_list=group_consecutive_duplicates(phone_list)
+            duplicate_indexes=[i for i,el in enumerate(grouped_phone_list) if el[-1]>1]
+            n_times=[el[-1] for i,el in enumerate(grouped_phone_list)]
+
+            p_df['n_times']=n_times
+            p_df_full=p_df.loc[p_df.index.repeat(p_df.n_times)]
+            p_df_full=p_df_full.reset_index()
+
+            blocks=get_blocks(p_df_full, ['cmu_phones'])
+            
+            block_starts_ends=keep_first_last(blocks.cmu_phones)
+            # keep firsts and lasts (thus only when there is two consecutive phonemes)
+            starts=block_starts_ends.loc[block_starts_ends.shift(-1) == block_starts_ends].index.tolist()
+            ends=block_starts_ends.loc[block_starts_ends.shift(+1) == block_starts_ends].index.tolist()
+
+            for start_idx,end_idx in zip(starts,ends):
+                select=p_df_full.iloc[start_idx:end_idx+1]
+                start=select.start.iloc[0]
+                end=select.end.iloc[-1]
+                interval=(end-start)/len(select)
+
+                steps=start+np.cumsum([interval]*(len(select)-1))
+
+                p_df_full.iloc[start_idx+1:end_idx+1].start=steps
+                p_df_full.iloc[start_idx:end_idx].end=steps
+            p_df_full[['start','end']]=p_df_full[['start','end']].round(2)
+            return p_df_full
+
+        def collapse_consecutive_duplicates(p_df_full):
+            blocks=get_blocks(p_df_full, ['cmu_phones'])
+            block_starts_ends=keep_first_last(blocks.cmu_phones)
+            # keep firsts and lasts (thus only when there is two consecutive phonemes)
+            starts=block_starts_ends.loc[block_starts_ends.shift(-1) == block_starts_ends].index.tolist()
+            ends=block_starts_ends.loc[block_starts_ends.shift(+1) == block_starts_ends].index.tolist()
+            # We use that info to collapse consecutive identical phonemes due to an inserted silence
+            for start_idx,end_idx in zip(starts,ends):
+                # we use the indexes to drop the consecutive identical phonemes except the first one, and put the end as the end of the last consecutive occurence
+                select=p_df_full.loc[start_idx:end_idx]
+                # start=select.start.iloc[0]
+                # print(select)
+                end=select.end.iloc[-1]
+                p_df_full.drop(select.index.tolist()[1:], inplace=True)
+                p_df_full.loc[select.index.tolist()[0]].end=end
+        
+        
+        # drop silence, collapse consecutive duplicates (some are superfluous, 
+        # e.g. phonemes interrupted by a silence), 
+        # then divide interval for consecutive duplicate phonemes in the ground truth
+        df_segmented=df_segmented[df_segmented.cmu_phones != '[SIL]']
+        collapse_consecutive_duplicates(df_segmented)
+        phone_list=sum(phones,[])
+        df_segmented=divide_consecutive_duplicates(df_segmented, phone_list)
+        
+        if df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
+            self.status="success"
+        else:
+            self.status="success: the phrase was not recognized in expected phonemes"
+
+        
         
         df=pd.DataFrame()
         df.loc[:,'pred_phones']=pred_phones
@@ -127,10 +191,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         detailed_alignment_phones.loc[:,'pred_proba_means']=pred_proba_means
         detailed_alignment_phones.loc[:,'GT_proba_means']=GT_proba_means
 
-        if df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
-            self.status="success"
-        else:
-            self.status="success: the phrase was not recognized in expected phonemes"
         
         self.phonetic_content=detailed_alignment_phones
         self.pred_phones_audio=drop_consecutive_duplicate_elements(detailed_alignment_phones[detailed_alignment_phones.pred_phones_audio!='[SIL]'].pred_phones_audio.tolist())
@@ -172,9 +232,9 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
                 if p == orig_phones[indx_in_phones]:
                     pred_phones_original_indices.append(indx_in_phones)
                 else:
-                    assert orig_phones[indx_in_phones]==orig_phones[indx_in_phones-1], "This should correspond to the case of two consecutiva identical phonemes, because they are in two consecutive words"
+                    assert orig_phones[indx_in_phones]==orig_phones[indx_in_phones-1], "This should correspond to the case of two consecutive identical phonemes, because they are in two consecutive words"
                     indx_in_phones+=1
-                    assert p == orig_phones[indx_in_phones], "This should correspond to the case of two consecutiva identical phonemes, because they are in two consecutive words"
+                    assert p == orig_phones[indx_in_phones], "This should correspond to the case of two consecutive identical phonemes, because they are in two consecutive words"
                     pred_phones_original_indices.append(indx_in_phones)
 
         # detailed_alignment_phones.loc[:,'p_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'p_idx'].tolist()
@@ -254,9 +314,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         a value by vowel representing a stress intensity
 
         Args:
-            textgridData ([type]): [description]
-            s (np array): audio signal
-            fs (int): frequency of sampling
+            phonetics (str): formatted phonetics
+            audio (np array): audio signal
         Returns:
             weighted_score [type]: stress intensity score
         """
@@ -265,39 +324,34 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         split_phonetics=sum(split_phonetics,[])
         _, textgridData, _ = self.align_phones(audio=audio,phones=split_phonetics)
-        # textgridData=self.force_and_predict(audio,split_phonetics)
-        textgridData=textgridData[textgridData.cmu_phones != '[SIL]']
 
-        # I have to collapse if several consecutive vowels are the same. it can happen when the predictions are not the same.
-        # I thus have to group the timings (first start until last end)
-
-        #  here we delete consecutives but keep first and last, so there is a possibility of only two consecutves after that, and having overall start and end
-        # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
-        keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
-
-        test=keep_first_last(textgridData.cmu_phones)
-
-        # keep firsts and lasts (thus only when there is two consecutive phonemes)
-        starts=test.loc[test.shift(-1) == test]
-        ends=test.loc[test.shift(+1) == test]
-
-        assert len(starts)==len(ends)
-
-        # drop duplicates keeping first
-        drop_duplicates=lambda a: a.loc[a.shift(+1) != a]
-        filtered_df=textgridData.loc[drop_duplicates(textgridData.cmu_phones).index]
-
+        # # TODO: remove this block: the silence and consecutive things processing, as I already do that in align_phones now
+        # # textgridData=self.force_and_predict(audio,split_phonetics)
+        # textgridData=textgridData[textgridData.cmu_phones != '[SIL]']
+        # # I have to collapse if several consecutive vowels are the same. it can happen when the predictions are not the same.
+        # # I thus have to group the timings (first start until last end)
+        # #  here we delete consecutives but keep first and last, so there is a possibility of only two consecutves after that, and having overall start and end
+        # test=keep_first_last(textgridData.cmu_phones)
+        # # keep firsts and lasts (thus only when there is two consecutive phonemes)
+        # starts=test.loc[test.shift(-1) == test]
+        # ends=test.loc[test.shift(+1) == test]
+        # assert len(starts)==len(ends)
+        # # drop duplicates keeping first
+        # drop_duplicates=lambda a: a.loc[a.shift(+1) != a]
+        # filtered_df=textgridData.loc[drop_duplicates(textgridData.cmu_phones).index]
         # here in the filtered_df containg only the first occurence for equal consecutive examples, we replace the 'end' value with the line in the "ends"
-        for rownum,(indx,val) in enumerate(starts.iteritems()): filtered_df.loc[indx,'end']=textgridData.loc[ends.index[rownum],'end']
-        filtered_df=filtered_df[filtered_df.cmu_phones.isin(cmu_vowels)]#.index.tolist()
+        # for rownum,(indx,val) in enumerate(starts.iteritems()): filtered_df.loc[indx,'end']=textgridData.loc[ends.index[rownum],'end']
+
+        # select vowels
+        filtered_df=textgridData[textgridData.cmu_phones.isin(cmu_vowels)]#.index.tolist()
 
         f0Samples=getIntonation(audio, self.sr)
         intensity=getIntensity(audio, self.sr)
 
         # extract features
         # each word start and end position expressed in samples
-        startPositions_samples = (round(self.sr*filtered_df.iloc[:,0])+1).astype(int).tolist()
-        stopPositions_samples = round(self.sr*filtered_df.iloc[:,1]).astype(int).tolist()
+        startPositions_samples = (round(self.sr*filtered_df.loc[:,'start'])+1).astype(int).tolist()
+        stopPositions_samples = round(self.sr*filtered_df.loc[:,'end']).astype(int).tolist()
 
         # to make sure we don t go beyond the end of the signal
         assert stopPositions_samples[-1]<len(audio), "The end of the last phoneme should be inside the signal"
@@ -361,16 +415,16 @@ if __name__=="__main__":
     df.loc[:,'audio_file_url']='data/scaleway-audio-files/'+df['audio_file_url']
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
-    target_phones="IH0_D"
+    target_phones="T"
     selection=df_pContrast[df_pContrast.target_phoneme==target_phones]
-    # example=selection.iloc[10]
-    example=selection.loc[1131]
+    example=selection.iloc[10]
+    # example=selection.loc[1131]
     # "ended"
     example=df.iloc[968]
     phonetics=example.cmu_phonetics
 
-    example=df.iloc[1539]
-    phonetics='AY1 K_AE1_N_T W_EY1|T_IH0_D F_AO1_R AW1_R S_AH1|M_ER0 R_OW1_D|T_R_IH2_P'
+    # example=df.iloc[1539]
+    # phonetics='AY1 K_AE1_N_T W_EY1|T_IH0_D F_AO1_R AW1_R S_AH1|M_ER0 R_OW1_D|T_R_IH2_P'
 
     path=example.audio_file_url
     s,fs=librosa.load(path, sr=16000)
@@ -379,6 +433,26 @@ if __name__=="__main__":
     _, df_segmented, phonetic_content = charsiu.align_phones(audio=s,phones=split_phonetics)
     df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.median()
     df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean()
+
+    df_word=charsiu.predict_word(s, [split_phonetics], 0) 
+    p_idx_global=-1
+    GT_proba_threshold=0.2
+    phoneme_set=cmu_consonants
+    
+    phoneme_set=[[p] for p in  remove_stress_annots(phoneme_set)]
+    proba_means=df_word.iloc[p_idx_global].proba_means
+
+    phoneme_set_ids=charsiu.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
+    # if GT_proba is beyond the threshold, we take it as prediction
+    if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
+        phonetic_detection=target_phones
+    else:
+        # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
+        filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
+        idx_mean_max=np.argmax(filtered_proba_means)
+        phonetic_detection=charsiu.charsiu_processor.mapping_id2phone(int(idx_mean_max))
+
+
 
     phonetic_content.GT_proba_means.median()
     phonetic_content.GT_proba_means.mean()

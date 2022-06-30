@@ -19,6 +19,8 @@ drop_consecutive_duplicate_elements= lambda L: [key for key, _group in groupby(L
 unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 
+group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
+
 
 def get_augmented_cmudict():
     cmudict_dict=cmudict.dict()
