@@ -9,14 +9,6 @@ from utils.charsiu_utils import charsiu_phone_forced_aligner
 import base64
 import librosa
 
-success_messages={
-"success", #--> "speech"
-"success: audio is too short compared to the expected number of syllables", # --> "nospeech"
-"success: no voiced sound detected (no pitch detected)", #--> "nospeech"
-"success: no voiced sound detected inside supposed vowels (no pitch detected)" #--> "nospeech"
-"success: the phrase was not recognized in expected phonemes"  #--> "nonsense"
-}
-
 # initialize model
 model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
@@ -28,11 +20,6 @@ target_accepted_alternatives={
     # 'IH': ['IH', 'AH', 'EH']
 }
 
-server_errors={
-    1: "audio file not found",
-    2: "mode for audio_load_and_check() must be file or base64",
-    3: "not a valid level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'."
-}
 
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
     """Load audio with 2 modes: from a "file" or from "base64" encoding
