@@ -71,23 +71,31 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
 
             print(chunks_p)
 
-            data={"phonetics":json.dumps(chunks_p), 'audio64':encode_string}
+            # data={"phonetics":json.dumps(chunks_p), 'audio64':encode_string.decode('utf-8')}
+            data={"phonetics":chunks_p, 'audio64':encode_string.decode('utf-8')}
             # post works as well with both clients
-            # res = client.post(url,  data = data)
-            if client==requests: res = client.post(url,  params = data)
-            else: res = client.post(url,  query_string = data)
+            if client==requests: res = client.post(url,  json = json.dumps(data))
+            else: res = client.post(url, 
+                       data=json.dumps(data),
+                       content_type='application/json')
+            # if client==requests: res = client.post(url,  params = data)
+            # else: res = client.post(url,  query_string = data)
         else:
-            data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string, 
+            data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string.decode('utf-8'), 
                                         'word_idx':int(ast.literal_eval(r['target_word_indexes'])[0]), 
                                         'syl_idx':int(ast.literal_eval(r['target_syllable_indexes'])[0]), 
                                         'target':r['target_phoneme']}
             # post works as well with both clients
-            # res = client.post(url,  data = data)
-            if client==requests: res = client.post(url,  params = data)
-            else: res = client.post(url,  query_string = data)
+            if client==requests: res = client.post(url,  json = json.dumps(data))
+            else: res = client.post(url, 
+                       data=json.dumps(data),
+                       content_type='application/json')
+            # if client==requests: res = client.post(url,  params = data)
+            # else: res = client.post(url,  query_string = data)
 
     if client==requests: res.data=res._content
 
+    print(res.data)
     assert res.status_code==200
     
     return res
@@ -104,7 +112,8 @@ def get_results(df, base_url = 'http://localhost:8000', endpoint='/v2/w2v/contra
     for i,r in tqdm(df.iterrows()):
         res=request_for_audio_file(r, base_url = base_url, endpoint=endpoint, client=client, mode=mode)
         if 'success' in res.data.decode('utf-8'):
-            d=ast.literal_eval(res.data.decode('utf-8'))
+            # d=ast.literal_eval(res.data.decode('utf-8'))
+            d=json.loads(res.data.decode('utf-8'))
             d['cmu_phonetics']=r.cmu_phonetics
             d['audio_file_url']=r.audio_file_url
             d['text']=r.text

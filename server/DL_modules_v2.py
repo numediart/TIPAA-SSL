@@ -15,6 +15,8 @@ bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
 
 d=default_example()
 
+
+
 # documenting params: https://github.com/jmcarp/flask-apispec/issues/137
 def params_def(example):
     params={}
@@ -38,7 +40,11 @@ example={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
 @marshal_with(sentence_stress_responseSchema_v2, code=200)  # marshalling
 @bp.route('/w2v/stress/sentence', methods=['POST'])
 def dl_sentence_stress_api_v2(**kwargs):
-    d = request.values.to_dict()
+    # d = request.values.to_dict()
+    try:
+        d=json.loads(request.get_json())
+    except TypeError:
+        d=request.get_json()
     properties=["phonetics","audio64"]
     return request_stress_v2(d, properties, "sentence", mode='base64')
 
@@ -48,7 +54,11 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"]}
 @marshal_with(word_stress_responseSchema_v2, code=200)  # marshalling
 @bp.route('/w2v/stress/word', methods=['POST'])
 def dl_word_stress_api_v2(**kwargs):
-    d = request.values.to_dict()
+    # d = request.values.to_dict()
+    try:
+        d=json.loads(request.get_json())
+    except TypeError:
+        d=request.get_json()
     properties=["phonetics","audio64"]
     return request_stress_v2(d, properties, "word", mode='base64')
 
@@ -58,7 +68,11 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["vowel
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/vowel', methods=['POST'])
 def dl_vowel_contrast_api_v2(**kwargs):
-    d = request.values.to_dict()
+    # d = request.values.to_dict()
+    try:
+        d=json.loads(request.get_json())
+    except TypeError:
+        d=request.get_json()
     properties=["phonetics","audio64","word_idx","target","syl_idx"]
     return request_phoneme_contrast(d, properties, mode='base64')
 
@@ -70,7 +84,11 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["conso
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/consonant', methods=['POST'])
 def dl_consonant_contrast_api_v2(**kwargs):
-    d = request.values.to_dict()
+    # d = request.values.to_dict()
+    try:
+        d=json.loads(request.get_json())
+    except TypeError:
+        d=request.get_json()
     properties=["phonetics","audio64","word_idx","target","syl_idx", "target_occurence_idx"]
     target_occurence_idx=int(d['target_occurence_idx'])
     return request_phoneme_contrast(d, properties, target_occurence_idx, alternatives=cmu_consonants, mode='base64')
@@ -83,7 +101,11 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"target":d["termina
 @marshal_with(contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/termination', methods=['POST'])
 def dl_termination_contrast_api_v2(**kwargs):
-    d = request.values.to_dict()
+    # d = request.values.to_dict()
+    try:
+        d=json.loads(request.get_json())
+    except TypeError:
+        d=request.get_json()
     properties=["phonetics","audio64","word_idx","target"]
     return request_phoneme_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='base64')
 
@@ -94,6 +116,10 @@ example={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termi
 @marshal_with(syl_contrast_responseSchema, code=200)  # marshalling
 @bp.route('/w2v/contrast/syllable', methods=['POST'])
 def dl_syllable_contrast_api_v2(**kwargs):
-    d = request.values.to_dict()
+    # d = request.values.to_dict()
+    try:
+        d=json.loads(request.get_json())
+    except TypeError:
+        d=request.get_json()
     properties=["phonetics","audio64","word_idx","syl_idx"]
     return request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='base64')
