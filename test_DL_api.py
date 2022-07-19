@@ -1,14 +1,14 @@
 from flask_server import app
-from dummy_client import *
 import os
 os.environ['FLOWSPEECH_KEY']="ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"
 import ast
 from tqdm import tqdm
-
+import pandas as pd
+import requests
+import json
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# from test_api import request_for_audio_file
 from utils.label_data_processing import actor_recordings
 from DL_accuracy_performance import count_values, plot_confusion_results
 
@@ -36,6 +36,17 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
     url=base_url+endpoint
     print(r['audio_file_url'])
     if mode=='v1':
+        
+        def send_audio_base64(path='data/audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
+            # based on :
+            # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
+            encode_string = base64.b64encode(open(path, "rb").read())
+            res = client.post(base_url+"/send_base64_audio", data={"audio":encode_string, "API_KEY":"ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"})
+
+            # This is for compatibility between requests module and flask's test_client
+            if client==requests: res.data=res._content
+
+            return res
         res=send_audio_base64(path=r['audio_file_url'], base_url = base_url, client=client)
         print(res)
         print(res.data)
@@ -101,8 +112,6 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
     return res
 
 
-
-
 def get_results(df, base_url = 'http://localhost:8000', endpoint='/v2/w2v/contrast/vowel', client=app.test_client(), mode='v2'):
     df.index=range(len(df))
     results_records=[]
@@ -166,9 +175,6 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
     
     return results_v, results_ed, results_ed_s
 
-# def test_actor_recordings_v2(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
-#     return test_actor_recordings(base_url = base_url, route='/v2/w2v/contrast/', client=client, n_ex_by_module=n_ex_by_module, mode='v2')
-
 def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/stress/', client=app.test_client(), n_ex_by_module=10, mode='v2'):
     df=actor_recordings()
     len_t_seg=df.apply(lambda r: len(r.syllable_parts.split(' ')), axis=1)
@@ -188,9 +194,6 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/str
     request_for_audio_file(df_test.iloc[0], base_url = base_url, endpoint=route+'word', client=client, mode=mode)
 
     return results_ss, failures_ss, results_ws, failures_ws
-
-# def test_stress_detection_v2(base_url = 'http://localhost:8000', client=app.test_client(), n_ex_by_module=10):
-#     return test_stress_detection(base_url = base_url, route='/v2/w2v/stress/', client=client, n_ex_by_module=n_ex_by_module, mode='v2')
 
 def test_audio64(base_url = 'http://localhost:8000', client=app.test_client()):
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
@@ -258,19 +261,12 @@ def vowels_confusions_user_recordings(n_user=10, n_ex_by_ex_type=10):
 if __name__ == '__main__':
     from test_DL_api import *
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
-    test_stress_detection(client=requests, n_ex_by_module=10)
-
-    # test_actor_recordings_v2(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
+    test_stress_detection(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
 
     test_actor_recordings(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
     test_stress_detection(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
-    # test_actor_recordings_v2(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
-    # test_stress_detection_v2(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
-
     r=test_actor_recordings()
-    r=test_actor_recordings_v2(n_ex_by_module=100)
     r=test_stress_detection()
-    r=test_stress_detection_v2()
 
     
     df=actor_recordings()
@@ -294,15 +290,10 @@ if __name__ == '__main__':
     # from utils.text_processing import chunk_text
     r=df_sentence_stress[l>50].iloc[0]
 
-
-    
-
     route='/v2/w2v/stress/'
     mode='v2'
     get_results(df_sentence_stress.iloc[3:4,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
     request_for_audio_file(df_sentence_stress.iloc[3,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
-
-
 
     from test_DL_api import *;print(pContrast_for_user_data())
 
