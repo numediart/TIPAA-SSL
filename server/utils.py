@@ -10,6 +10,7 @@ from flask import Response
 from utils.audio_processing import audio64_from_file
 
 
+
 success_messages={
     "success", #--> "speech"
     "success: audio is too short compared to the expected number of syllables", # --> "nospeech"
@@ -27,11 +28,47 @@ server_errors={
 
 
 request_errors={
-    1:"could not access "'+property+'" property of the request",
+    1:"could not access a property of the request",
     2:"invalid phoneme in phonetics",
     3:"the syllable corresponding to syl_idx does not contain the target.",
     4:"word_idx >= number of words"
 }
+
+
+base_response_dict={   "error":fields.Boolean(),
+        "detected": fields.Str(),
+        "status": fields.Str() }
+# stress_response_dict=base_response_dict
+# stress_response_dict["stress_intensities"]=fields.List(fields.Integer)
+# stress_response_dict["stress_binaries"]=fields.List(fields.Integer)
+
+stress_response_dict=base_response_dict
+stress_response_dict["stress_intensities"]=fields.List(fields.List(fields.Integer))
+stress_response_dict["stress_binaries"]=fields.List(fields.List(fields.Integer))
+
+contrast_response_dict=base_response_dict
+contrast_response_dict["gibberish_truth"]=fields.Str()
+contrast_response_dict["gibberish_detected"]=fields.Str()
+
+phone_contrast_response_dict=contrast_response_dict
+contrast_response_dict["phonetic_detection"]=fields.Str()
+
+word_stress_responseSchema_v2=Schema.from_dict(
+    stress_response_dict, name="word_stress_response_v2"
+)
+sentence_stress_responseSchema_v2=Schema.from_dict(
+    stress_response_dict, name="sentence_stress_response_v2"
+)
+
+contrast_responseSchema=Schema.from_dict(
+    phone_contrast_response_dict,
+    name="contrast_response"
+)
+
+syl_contrast_responseSchema=Schema.from_dict(
+    contrast_response_dict,
+    name="syllable_contrast_response"
+)
 
 
 def define_detected_flag(status):
@@ -59,7 +96,8 @@ def default_example():
         cumsum+=n
     
     d={"phonetics":p,
-        "phonetics_chunks":json.dumps(chunks_p),
+        # "phonetics_chunks":json.dumps(chunks_p),
+        "phonetics_chunks":chunks_p,
         "audio64":audio64.decode('utf-8'),
         "vowel_target":"AA1",
         "vowel_w_idx":2,
@@ -148,10 +186,12 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
     
     if res['status'].split(':')[0]=='error':
         res['error']=True
+        res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=500,mimetype="application/json")
     else:
         res['error']=False
+        res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=200,mimetype="application/json")
 
@@ -170,16 +210,19 @@ def request_syl_contrast(d, properties, tech_function=syllable_contrast_from_for
     if word_idx>=len(d['phonetics'].split(' ')):
         res={"status": "error: word_idx >= number of words"}
         res['error']=True
+        res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=400,mimetype="application/json")    
     res=tech_function(d['audio64'],phonetics=d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, mode=mode)
     
     if res['status'].split(':')[0]=='error':
         res['error']=True
+        res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=500,mimetype="application/json")
     else:
         res['error']=False
+        res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=200,mimetype="application/json")
 
@@ -209,10 +252,12 @@ def call_stress_fn(audio, p, module, n_words_by_chunk=[], mode='file', version='
     
     if res['status'].split(':')[0]=='error':
         res['error']=True
+        res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=500,mimetype="application/json")
     else:
         res['error']=False
+        res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=200,mimetype="application/json")
 
@@ -253,41 +298,3 @@ def request_stress_v2(d, properties, module, mode='file'):
     else:
         return call_stress_fn(audio, p, module, mode=mode, version='v2')
 
-
-stress_responseSchema=Schema.from_dict(
-    {
-        "status": fields.Str(), 
-        "stress_intensities":fields.List(fields.Integer), 
-        "stress_binaries":fields.List(fields.Integer)
-    }, name="stress_response"
-)
-
-word_stress_responseSchema_v2=Schema.from_dict(
-    {
-        "status": fields.Str(), 
-        "stress_intensities":fields.List(fields.List(fields.Integer)), 
-        "stress_binaries":fields.List(fields.List(fields.Integer))
-    }, name="word_stress_response_v2"
-)
-sentence_stress_responseSchema_v2=Schema.from_dict(
-    {
-        "status": fields.Str(), 
-        "stress_intensities":fields.List(fields.List(fields.Integer)), 
-        "stress_binaries":fields.List(fields.List(fields.Integer))
-    }, name="sentence_stress_response_v2"
-)
-
-contrast_responseSchema=Schema.from_dict(
-    {"status": fields.Str(), 
-    "phonetic_detection": fields.Str(),
-    "gibberish_truth": fields.Str(),
-    "gibberish_detected":fields.Str()},
-    name="contrast_response"
-)
-
-syl_contrast_responseSchema=Schema.from_dict(
-    {"status": fields.Str(), 
-    "gibberish_truth": fields.Str(),
-    "gibberish_detected":fields.Str()},
-    name="syllable_contrast_response"
-)
