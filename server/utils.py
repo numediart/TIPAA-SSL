@@ -141,7 +141,6 @@ def access_property_error(content, property):
         return response
 
 
-
 audio_property_dict={'file':'rID', 'base64':'audio64'}
 
 def check_request(d, properties):
@@ -165,7 +164,6 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
 
     word_idx=int(d['word_idx'])
     if word_idx>=len(d['phonetics'].split(' ')):
-        
         res={"status": "error: word_idx >= number of words"}
         res["error"]=True
         response=json.dumps(res)
@@ -275,19 +273,12 @@ def request_stress(d, properties, module, mode='file'):
     return call_stress_fn(audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode)
 
 def request_stress_v2(d, properties, module, mode='file'):
-
     err=check_request(d, properties)
     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
 
-    # if module=='sentence':
-    # p=ast.literal_eval(d['phonetics'])
     p=d['phonetics']
-    
     n_words_by_chunk=[len(c.split(' ')) for c in p]
     p=' '.join(p)
-    # else:
-    #     p=d['phonetics']
-
     err=check_phonetics(p)
     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
 
