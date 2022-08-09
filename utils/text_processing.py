@@ -708,6 +708,7 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     Returns:
         dict: see structure a the end of the function
     """
+    sentence=sentence.rstrip()
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
     for c in special_chars: sentence=sentence.replace(' '+c, c)
