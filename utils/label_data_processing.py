@@ -2,10 +2,7 @@ import pandas as pd
 import numpy as np
 import pdb
 from glob import glob
-from utils.text_processing import phonetics_from_sentence, remove_special_characters, remove_stress_annots
-
-# non-v2, to be removed
-# from utils.htk_utils import process_grammar
+from utils.text_processing import phonetics_from_sentence, remove_special_characters, remove_stress_annots, prefill_content
 
 import itertools
 import os
@@ -373,277 +370,27 @@ def get_errors_examples():
 
     return df_errors, exs_sort_by_n_errors
 
+def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.csv"):
+    df=pd.read_csv(path)
+    df['path']=os.path.split(path)[0]+'/audios/'+df.soundfiles_name
+    content=prefill_content(df["Text with target"].tolist())
+    df['cmu_phonetics']=content.cmu_phonetics
+    content['path']=df.path
 
-# This is non-v2, to be removed
-if False:
-
-    def make_dct_all_phones_from_phonetics(phonetics, path='test.dct'):
-        """This functions generates a dct file for the wordStress module. Phonemes are detailed
-        For vowels, the three possibilities of stressed are put as alternatives (0,1,2)
-
-        Args:
-            phonetics ([type]): [description]
-            path (str, optional): [description]. Defaults to 'test.dct'.
-        """
-        alternatives=[['AA','AE'],['EH','ER'],['IH','IY'],['AO','OW']] #, ['N','NG'], ['T','S','TH','D']]
-        # to access easier a list of alternatives corresponding to one phoneme
-        alternatives_dict={}
-        for alt in alternatives:
-            for el in alt: alternatives_dict[el]=alt
-
-        lines=[]
-        n_previous_phonemes=0
-        for w_i, word in enumerate(phonetics):
-            for p_i, p in enumerate(word):
-                if p[-1] in str([0,1,2]):
-                    # vowels of cmu end by 0,1 or 2
-                    if p[:-1] in alternatives_dict:
-                        for alt in alternatives_dict[p[:-1]]:
-                            for n in [0,1,2]: lines.append('p'+str(n_previous_phonemes+p_i)+' ['+'w'+str(w_i)+'_v'+str(n_previous_phonemes+p_i)+'_'+str(n)+'] '+alt+str(n))
-                    else:
-                        for n in [0,1,2]: lines.append('p'+str(n_previous_phonemes+p_i)+' ['+'w'+str(w_i)+'_v'+str(n_previous_phonemes+p_i)+'_'+str(n)+'] '+p[:-1]+str(n))
-                else:
-                    # consonants
-                    if p in alternatives_dict:
-                        for alt in alternatives_dict[p]:
-                            lines.append('p'+str(n_previous_phonemes+p_i)+' ['+'w'+str(w_i)+'_c'+str(n_previous_phonemes+p_i)+'_'+str(0)+'] '+alt)
-                    else:
-                        lines.append('p'+str(n_previous_phonemes+p_i)+' ['+'w'+str(w_i)+'_c'+str(n_previous_phonemes+p_i)+'_'+str(0)+'] '+p)
-            n_previous_phonemes+=len(word)
-        
-        # if the last phoneme is a consonant, add an alternative with a "AH0" at the end
-        if lines[-1][-1] not in str([0,1,2]): 
-            # lines.append('p'+str(n_previous_phonemes)+' ['+'w'+str(w_i)+'_c'+str(n_previous_phonemes)+'_'+str(1)+'] '+p+' AH0')
-            lines.append(lines[-1]+' AH0')
-
-        # adding silences and out of vocabulary possibilities
-        sil_oov=["sp sp",
-            "sil sil",
-            "o1 gs1",
-            "o2 gss2",
-            "o3 gss3",
-            "o4 gss4",
-            "o5 gss5"]
-        lines+=sil_oov
-        with open(path, "w") as text_file:
-            text_file.write("\n".join(lines)+"\n")
-
-    def make_dct_all_phones_from_text(sentence="shopping centre", path='test.dct'):
-        phonetics=phonetics_from_sentence(sentence)
-        make_dct_all_phones_from_phonetics(phonetics, path=path)
-
-    def make_generic_dct_from_phonetics(phonetics=['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'], word_idx=1, target_phones='IH0 D', 
-                    alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'], path='test.dct'):
-        """This function builds a dct file needed for htk model. It consists of a list of words and for one word a list of phoneme.
-        Each line is either a word or phoneme (or in fact several phoneme). More generally each line is just one or several phoneme. But 
-        in our case, one word of the sentence is detailed in one phoneme or group of phoneme (e.g. IH0 D for the termination -ed). And other words
-        are in one line.
-
-        For one phoneme, we put alternatives that can be confused by english learners so that htk model can choose what he recognizes. 
-        E.g. AO1, OW1, or the default set for -ed termination
-
-        Args:
-            phonetics (list, optional): [description]. Defaults to ['K AE1 L IH0 K OW0', 'HH EH1 Z IH0 T EY2 T IH0 D'].
-            word_idx (int, optional): [description]. Defaults to 1.
-            target_phones (str, optional): [description]. Defaults to 'IH0 D'.
-            alternatives (list, optional): [description]. Defaults to ['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D'].
-            path (str, optional): [description]. Defaults to 'test.dct'.
-        """
-        lines=[]
-        for i,word in enumerate(phonetics):
-            # Here we are at the level of a word of the sentence
-            if i!=word_idx:
-                # In case it is not the word we want to detail in several lines, we just put its phonetics in one line
-                lines.append('w'+str(i)+' ['+'w'+str(i)+'] '+word)
-            else:
-                # Here we want to detail this specific word
-                # split the word to detail in phonemes with the piece with several alternatives
-                # e.g., "B L A H B L A H B L A H".split('A H')   -> ['B L ', ' B L ', ' B L ', '']
-                phoneme_lists=word.split(target_phones)
-                p_idx=0
-                if word==target_phones:
-                    # a particular case fort which the word is only one phoneme and it is the one we study
-                    alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
-                    p_idx+=1
-                    lines+=alternative_phonemes
-                else:
-                    alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
-                    p_idx+=1
-                    # lines+=alternative_phonemes
-                    all_phones=alternative_phonemes
-                    for phoneme_list in phoneme_lists:
-                        if phoneme_list!='':
-                            # we detail phonemes for the target word
-                            phoneme_list=list(filter(None, phoneme_list.split(' ')))
-                            # print(phoneme_list)
-                            # we list the phonemes
-                            # print(p_idx)
-                            phonemes=['p'+str(i+p_idx)+' ['+'p'+str(i+p_idx)+']'+' '+p for i,p in enumerate(phoneme_list) if p !='']
-                            # print(phonemes)
-                            # we list alternatives
-                            p_idx+=len(phonemes)
-                            # print(p_idx)
-                            alternative_phonemes=['p'+str(p_idx)+' ['+'p'+str(p_idx)+'_'+str(i)+']'+' '+p for i,p in enumerate(alternatives)]
-                            p_idx+=1
-                            all_phones+=(phonemes+alternative_phonemes)
-                            
-                    try:
-                        # if we just want tu put Alternative phones between Sequences, we remove the last (first) time  
-                        # S A S A S -> S S S -> S A S A S A -> S A S A S
-                        # else we let it/them (first, last or both)    A S A S A S A -> S S S -> A S A S A S A 
-                        # import pdb;pdb.set_trace()
-                        if len(phoneme_lists)>0:
-                            if phoneme_lists[-1]!='':
-                                all_phones=all_phones[:-len(alternative_phonemes)]
-                            if phoneme_lists[0]!='':
-                                all_phones=all_phones[len(alternative_phonemes):]
-                    except NameError:
-                        pass
-                    lines+=all_phones
-        # adding silences and out of vocabulary possibilities
-        sil_oov=["sp sp",
-            "sil sil",
-            "o1 gs1",
-            "o2 gss2",
-            "o3 gss3",
-            "o4 gss4",
-            "o5 gss5"]
-        lines+=sil_oov
-        with open(path, "w") as text_file:
-            try:
-                text_file.write("\n".join(lines)+"\n")
-            except TypeError:
-                import pdb;pdb.set_trace()
-
-    def make_grammar_from_dct(path_dct='test.dct',
-                            path_grammar='test.txt'):
-        """Make a grammar file from a dct file. We assume that 
-        -we are studying one word in the sentence, i.e., one word is
-        segmented in phonemes 
-        -OR  zero word, i.e., no word is segmented in phonemes (this the case for sentenceStress)
-        -OR we work with a sequence of phonemes (that can in fact be one or several words, that does not matter)
-
-        Args:
-            p (dict): params from set_params function
-        """
-        print(path_dct)
-        # dct=p['inputPhoneticTranscription']
-        df=pd.read_csv(path_dct, header=None)
-        # symbols=df.apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
-        o_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='o', axis=1)
-        p_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='p', axis=1)
-        w_list=df.apply(lambda r:r.str.split(' ')[0][0][0]=='w', axis=1)
-
-        # drop consecutive duplicates to see if the are phonemes between words
-        # word_spots=w_list.loc[w_list.shift() != w_list]
-
-        symbols=df.apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
-
-        try:
-            ps=df[p_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)
-            if len(ps)>0:
-                ps=ps.unique()
-        except:
-            pdb.set_trace()
-        
-        if len(df[w_list])>0:
-            ws=df[w_list].apply(lambda r:r.str.split(' ')[0][0], axis=1)#.unique()
-        
-            # the diff evaluates if there is a jump of indices, meaning that there are phoneme between words: words -> phonemes -> words
-            listA=np.diff(ws.index)-1
-            # this locates where is the jump (we assume here there is one or zero)
-            res = [i for i, val in enumerate(listA) if val]
-            if len(res)>0:
-                # this is the case : words -> phonemes -> words
-                ws1=ws.iloc[:res[0]+1].unique()
-                ws2=ws.iloc[res[0]+1:].unique()
-            else:
-                # This is the case  phonemes -> words   OR    words -> phonemes
-
-                if symbols[0][0]=='w':
-                    # This is the case : words -> phonemes
-                    ws2=[]
-                    try:
-                        if len(ws)>0:
-                            ws1=ws.unique()
-                        else:
-                            ws1=[]
-                    except:
-                        pdb.set_trace()
-                else:
-                    # This is the case : phonemes -> words
-                    ws1=[]
-                    try:
-                        if len(ws)>0:
-                            ws2=ws.unique()
-                        else:
-                            ws2=[]
-                    except:
-                        pdb.set_trace()
-        else:
-            ws, ws1, ws2=[],[],[]
-        
-        try:
-            os=df[o_list].apply(lambda r:r.str.split(' ')[0][0], axis=1).unique()
-        except:
-            pdb.set_trace()
-
-        str1="$bla = [o4 o4 o4 o4 o4 o4];"
-        if len(ps)>0:
-            str2 ="$phrase = (("+' sp '.join(ws1)+" sp (("+' '.join(ps)+") | $bla) sp "+' sp '.join(ws2)+") | ({$bla}));"
-        else:
-            str2 ="$phrase = (("+' sp '.join(ws1)+" sp "+' sp '.join(ws2)+") | ({$bla}));"
-        str3="(({sil} | sp) $phrase ({sil} | sp))"
-        # with open(p['inputGrammar'], "w") as text_file:
-        with open(path_grammar, "w") as text_file:
-            text_file.write("\n".join([str1,str2,str3]))
-        return "\n".join([str1,str2,str3])
-
-
-
-
-    def make_all_phones_annotation_files_from_phonetics(
-        rID,
-        phonetics=[['SH', 'AA1', 'P', 'IH0', 'NG'], ['S', 'EH1', 'N', 'T', 'ER0']]):
-        make_dct_all_phones_from_phonetics(phonetics, path='inputs/'+rID+'.dct')
-        make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
-        process_grammar(rID)
-
-    def make_pContrast_annotation_files_from_phonetics(rID,
-                    phonetics=[['T', 'ER1', 'N', 'D'], ['ER0', 'AW1', 'N', 'D']], word_idx=0, target_phones='D', 
-                    alternatives=target_to_alternatives['D']):
-        phonetics=[' '.join(w) for w in phonetics]
-        make_generic_dct_from_phonetics(phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives, path='inputs/'+rID+'.dct')
-        make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
-        process_grammar(rID)
-
-
-
-    def make_all_phones_annotation_files(
-        rID,
-        text='I would love to go to ireland !'
-        ):
-        """This function generates all phones annotation files (dct and grammar) and save them in "inputs" with the rand_fileName
-        then updates the default path to point to them in parameters dictionnary
-
-        Args:
-            p ([type], optional): [description]. Defaults to set_params().
-            text (str, optional): [description]. Defaults to 'I would love to go to ireland !'.
-
-        Returns:
-            dict: parameters dictionnary
-        """
-        make_dct_all_phones_from_text(text, path='inputs/'+rID+'.dct')
-        make_grammar_from_dct(path_dct='inputs/'+rID+'.dct',path_grammar='inputs/'+rID+'.txt')
-        process_grammar(rID)
-
-
-    def make_pContrast_annotation_files(rID,
-                    text="turned around",word_idx=0, target_phones='D', 
-                    alternatives=['T', 'D', 'T AH0', 'D AH0', 'IH0 D', 'IH1 D', 'IH2 D', 'EH2 D', 'AH0 D']):
-        phonetics=phonetics_from_sentence(text)
-        make_pContrast_annotation_files_from_phonetics(rID, phonetics=phonetics, word_idx=word_idx, target_phones=target_phones, alternatives=alternatives)
-
-
-
+    content.apply(lambda r: sum(['*' in el for el in r.text.split()]), axis=1)
     
+    content['word_idx']=0
+    sents=content[content.text.str.contains('\*')].text.str.split(' ')
+    # checks in each word if there is a "*", put one if true in a list. Then I use index() to know where is the 1
+    content.loc[sents.index, 'word_idx']=sents.apply(lambda r: [int('*' in el) for i,el in enumerate(r)].index(1))
+
+    content["target"]=df["Target phoneme"]
+
+    # content["target_syllable_indexes"]=-1
+    content["target_syllable_indexes"]=[[-1]]*len(content)
+
+    to_cmu={"/z/":"Z", "/s/":"S", "/iz/": "IH_Z"}
+
+    content["target_phones"]=content["target"].apply(lambda r: to_cmu[r])
+
+    return content
