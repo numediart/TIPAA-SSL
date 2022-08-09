@@ -31,10 +31,10 @@ def check_schema(d, params):
     if errors:
         return str(errors)
 
-@bp.app_errorhandler(500)
-def internal_error(error):
-    etype, value, tb = sys.exc_info()
-    return Response(json.dumps({"status":"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.", "error":True }),status=500,mimetype="application/json")
+# @bp.app_errorhandler(500)
+# def internal_error(error):
+#     etype, value, tb = sys.exc_info()
+#     return Response(json.dumps({"status":"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.", "error":True }),status=500,mimetype="application/json")
 
 example_sentence_stress={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
 sentence_stress_params=kwargs_def(example_sentence_stress)
