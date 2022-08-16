@@ -9,6 +9,8 @@ from flask_apispec import marshal_with, doc, use_kwargs
 
 from utils.text_processing import generate_prefill_csv, prefill_for_sentence, syllables_df
 from server.utils import debug_only, access_property_error
+from server.DL_modules_v2 import check_schema, kwargs_def
+
 # from server.upload import upload_path
 upload_path="./upload_files/"
 
@@ -68,7 +70,8 @@ def prefill_from_phrases():
                 mimetype="application/json"
                 )
 
-
+example_prefill={"phrase":"I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!"}
+example_prefill_params=kwargs_def(example_prefill)
 record={'text':fields.Str(),
         'cmu_phonetics':fields.Str(),
         'pronounciation_guide':fields.Str(),
@@ -84,14 +87,18 @@ record={'text':fields.Str(),
         }
 responseSchema=Schema.from_dict(record, name="prefill response")
 @doc(description='Prefill from phrase', tags=['prefill'])
-@use_kwargs({'phrase':fields.String(required=True, description="Text sentence to be processed. It can contain special characters etc.")}, location=('form'))
+@use_kwargs(example_prefill_params, location=('json'))
 @marshal_with(responseSchema, code=200)  # marshalling
 @bp.route('/prefill_from_phrase', methods=['POST'])
-@debug_only
+# @debug_only
 def prefill_from_phrase():
-    content = request.form
-    
-    err=access_property_error(content, "phrase")
+    # content = request.form    
+    try:
+        content=json.loads(request.get_json())
+    except TypeError:
+        content=request.get_json()
+    global example_prefill_params
+    err=check_schema(content, example_prefill_params)
     if err: return Response(err,status=400,mimetype="application/json")
     
     d=prefill_for_sentence(content['phrase'], syllables_df)
