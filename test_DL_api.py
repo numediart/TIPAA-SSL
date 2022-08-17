@@ -18,6 +18,22 @@ exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_12
 from utils.audio_processing import audio64_from_file
 from utils.text_processing import get_chunks, chunk_text
 
+def call_prefill_for_sentence(sentence, base_url = 'http://localhost:8000', client=requests):
+    url=base_url+"/prefill_from_phrase"
+    data={"phrase":sentence}
+    if client==requests: res = client.post(url,  json = json.dumps(data))
+    else: res = client.post(url, 
+                data=json.dumps(data),
+                content_type='application/json')
+    if client==requests: res.data=res._content
+
+    return res
+
+def test_prefill(base_url = 'http://localhost:8000', client=app.test_client()):
+    sentence="I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!"
+    r=call_prefill_for_sentence(sentence, base_url = base_url, client=client)
+    return r.data
+
 def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests, mode='v1'):
     """makes a request with metadata contained in "r" and makes the call to the endpoint. It works locally or with a server, and with
     either requests module or flask's app.test_client()
