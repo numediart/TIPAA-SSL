@@ -3,10 +3,11 @@ import re
 import cmudict
 from tqdm import tqdm
 import pandas as pd
-
+from glob import glob
 import numpy as np
 import itertools
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char
+import json
 
 from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
@@ -20,6 +21,35 @@ unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
+
+def get_mfa_df(path='data/english_us_mfa.dict'):
+    df=pd.read_csv(path, sep='\t', header=None, encoding='utf8').dropna()
+    df.columns=['text', 'ipa']
+    df=df[~df.text.str.contains(']')]
+    df=df[~df.text.str.contains('<')]    
+
+    ipa=df.apply(lambda r: r.ipa.split(' '), axis=1)
+    df['ipa']=ipa
+
+    df.index=df.text
+    return df
+
+def get_mfa_dict(path='data/spanish_mfa.dict'):
+    df=get_mfa_df(path)
+    ipa_dict=df[['ipa']].to_dict()['ipa']
+    return ipa_dict
+
+
+def build_mfa_phone_set():
+    dict_paths=glob('data/*mfa.dict')
+    dfs=[get_mfa_df(p) for p in dict_paths]
+    df=pd.concat(dfs)
+    phones=sorted(list(set().union(*df.ipa.apply(lambda r: set(r)).tolist())))
+
+    # Writing to sample.json
+    with open("data/mfa_phones.json", "w") as outfile: outfile.write(json.dumps(phones))
+
+    return phones
 
 
 def get_augmented_cmudict():
@@ -492,6 +522,30 @@ def syllables_data(syl_sep='|'):
 
     return syllables
 
+def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=get_mfa_dict(path='data/spanish_mfa.dict')):
+    # fallbacks
+    if '-' in word:
+        w_parts=word.split('-')
+        p_parts=[]
+        for w_part in w_parts:
+            p_part=word_dict[w_part]
+            if p_part==[]:
+                p_part=[g2p(w_part)]
+            p_parts.append(p_part)
+
+        # Here I generate all alternatives of combination of word parts
+        # It corresponds to cmu alternatives for other words
+        ps=list(itertools.product(*p_parts))
+        syls_ps=[[SonoriPy(p)[0] for p in alt] for alt in ps]
+        
+        # This puts 
+        # '_' between phonemes
+        # '-' between word components (hyphenated words and acronyms, not to have more than 1 stressed syllable by word component)
+        # '|' between syllables
+        # spaces between words 
+        # to have less degrees of nested list and be compatible with the database
+        syls_ps_formatted=['-'.join(['|'.join(['_'.join(s) for s in w]) for w in alt]) for alt in syls_ps]
+
 def generate_syl_phonetics_alternatives_from_word(word="before"):
     """"Looks up in cmudict for phonetic alternatives, and apply SonoriPy on all alternatives
 
@@ -649,51 +703,6 @@ def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
             w_case=insert(w_case, syl_sep, idx)
         s_case_sep.append(w_case)
     return ' '.join(s_case_sep)
-
-
-# def add_special_char(s_orig, s_modified):
-#     """This function adds punctuation marks to modified text (here with syllable separation symbols "|") 
-#     at the end of words from an original sentence.
-#     This assumes that punctuation marks are glued to words, which is the case in english. 
-#     This assumption allows us to just check if the first and last characters are the same in original and modified text
-#     "Hello, my name is John."
-#     "hello my name is john"
-#     -> hello and john do not have the last same character.
-
-#     "*Hello*," / "hello", we extract "*" and "*,"
-
-#     Example:
-#     s_orig="I'm taking a Spanish class."
-#     s_modified="I'm tak|ing a Span|ish class"
-
-#     output="I'm tak|ing a Span|ish class."
-
-#     Args:
-#         s_orig (str): original text
-#         s_modified (str): modified text
-
-#     Returns:
-#         str: modified text with punctuation marks
-#     """
-#     s_modified_with_special_chars=[]
-#     for w_orig, w_modified in zip(s_orig.split(' '), s_modified.split(' ')):
-#         # n_spec_char=
-#         def get_n_spec_char(location='start'):
-#             # get the number of special character at the start or at the end of the word, 
-#             # by looking at every character of the orig (containing the special characters)
-#             for i in range(len(w_orig)):
-#                 if location=="end":
-#                     if w_orig[-i]==w_modified[-1]:return i
-#                 if location=="start":
-#                     if w_orig[i]==w_modified[0]:return i
-#         # glue the special characters the to the body
-#         if not get_n_spec_char(location='end'):
-#             s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified+w_orig[-get_n_spec_char(location='end'):][1:])
-#         else:
-#             s_modified_with_special_chars.append(w_orig[:get_n_spec_char()]+w_modified)
-
-
-#     return ' '.join(s_modified_with_special_chars)
 
 
 def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up!", syllables_df=pd.read_csv('data/syllables.csv'), syl_sep='|', special_chars = [',','?','.','!',';',':','"', '{', '}']):
@@ -1022,6 +1031,8 @@ if __name__ == "__main__":
     print(syls_text)
 
     syllabified_text(word, syllables_df)
+
+    syllabified_text('dépendance', pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
 
     df=generate_prefill_csv()
     df[df.n_syl_mismatch>0][['syllable_parts', 'pronounciation_guide_hr','used_method_for_syl_text']]
