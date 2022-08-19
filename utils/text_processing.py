@@ -31,12 +31,13 @@ def get_mfa_df(path='data/english_us_mfa.dict'):
     ipa=df.apply(lambda r: r.ipa.split(' '), axis=1)
     df['ipa']=ipa
 
-    df.index=df.text
+    # df.index=df.text
     return df
 
 def get_mfa_dict(path='data/spanish_mfa.dict'):
     df=get_mfa_df(path)
-    ipa_dict=df[['ipa']].to_dict()['ipa']
+    df['ipa']=df.apply(lambda r: [r.ipa], axis=1)
+    ipa_dict=df.groupby(['text']).sum().to_dict()['ipa']
     return ipa_dict
 
 
@@ -226,13 +227,13 @@ def get_cmudict_info(word='university'):
     """
     return cmudict_dict[word][0]
 
-def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\;\:\"\*\{\}]'):
+def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]'):
     """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
 
     Args:
         sentence (str, optional): [description]. Defaults to "Where's the best place to have coffee ?".
         lowercase (bool, optional): [description]. Defaults to True.
-        chars_to_ignore_regex (str, optional): [description]. Defaults to '[\,\?\.\!\;\:\"\*]'.
+        chars_to_ignore_regex (str, optional): [description]. Defaults to '[\,\?\.\!\¡\;\:\"\*]'.
 
     Returns:
         str: normalized sentence
@@ -250,14 +251,14 @@ def remove_special_characters(sentence="Where's the best place to have coffee?",
     sentence=' '.join(list(filter(None, sentence.split(' '))))
     return sentence
 
-def get_chunks(text, chunking_chars=[',',';','.','!','?', ':', '/']):
+def get_chunks(text, chunking_chars=[',',';','.','!','¡','?', ':', '/']):
     for c in chunking_chars:
         text=text.replace(c, chunking_chars[0])
     chunks=text.split(chunking_chars[0])
     chunks = list(filter(None, chunks)) # remove empty string
     return chunks
 
-def chunk_text(text, chunking_chars=[',',';','.','!','?', ':', '/']):
+def chunk_text(text, chunking_chars=[',',';','.','!','¡','?', ':', '/']):
     chunks=get_chunks(text, chunking_chars=chunking_chars)
     # split each chunk in words, remove empty strings, get length (to know the n of words in each chunk)
     n_words_by_chunk=[len(list(filter(None, el.split(' ')))) for el in chunks]
@@ -529,14 +530,14 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
         p_parts=[]
         for w_part in w_parts:
             p_part=word_dict[w_part]
-            if p_part==[]:
-                p_part=[g2p(w_part)]
+            if p_part==[]: raise "phonetics empty, not in pronunciation dictionary"
+                # p_part=[g2p(w_part)]
             p_parts.append(p_part)
 
         # Here I generate all alternatives of combination of word parts
         # It corresponds to cmu alternatives for other words
         ps=list(itertools.product(*p_parts))
-        syls_ps=[[SonoriPy(p)[0] for p in alt] for alt in ps]
+        syls_ps=[[SonoriPy(p, mode='MFA')[0] for p in alt] for alt in ps]
         
         # This puts 
         # '_' between phonemes
@@ -545,6 +546,22 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
         # spaces between words 
         # to have less degrees of nested list and be compatible with the database
         syls_ps_formatted=['-'.join(['|'.join(['_'.join(s) for s in w]) for w in alt]) for alt in syls_ps]
+    else:
+        try:
+            ps=word_dict[word]
+        except KeyError:
+            ps=[]
+        if ps==[]: raise "phonetics empty, not in pronunciation dictionary"
+            # ps=[g2p(word)]
+        
+        # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
+        # for p in ps:
+        #     if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==[ 'D', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
+        #         p[-2:]=['IH0','D']
+        
+        syls_ps=[SonoriPy(p, mode='MFA')[0] for p in ps]
+        syls_ps_formatted=['|'.join(['_'.join(s) for s in w]) for w in syls_ps]
+    return syls_ps_formatted
 
 def generate_syl_phonetics_alternatives_from_word(word="before"):
     """"Looks up in cmudict for phonetic alternatives, and apply SonoriPy on all alternatives
@@ -597,7 +614,7 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
     return syls_ps_formatted, syls_gs_formatted
 
 
-def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv')):
+def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv'), lang="en"):
     """Construct syllabified word from a word.
 
      text with syllable segmentation is done with several rules/steps:
@@ -639,21 +656,22 @@ def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv')):
         from syllabipy.sonoripy import define_categories
         _,vowels,nasals,fricatives,affricates,stops=define_categories()
 
-        if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
-            word=word[:-2]+'d'
-            modified_ed=True
-        elif word[-2:]=="es" and word[-3] not in ['s','c','g','x'] and word[-4:]!='ches' and word[-4:]!='shes' and word[-3:]!='les': #this last is treated hereafter because it dependes
-            word=word[:-2]+'s'
-            modified_es=True
-        elif word[-3:]=="les" and word[-4] not in stops: # do it for e.g. "smiles", but not gor "angles, muscles, articles, ..."
-            word=word[:-2]+'s'
-            modified_es=True
-        elif word[-1]=="e" and word[-2:]!='le': #this last one is treated hereafter because it depends
-            word=word[:-1]
-            trailing_e=True
-        elif word[-2:]=="le" and word[-3] not in stops: # do it for e.g. "smile", but not for "angle, muscle, article, ..."
-            word=word[:-1]
-            trailing_e=True
+        if lang=="en":
+            if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
+                word=word[:-2]+'d'
+                modified_ed=True
+            elif word[-2:]=="es" and word[-3] not in ['s','c','g','x'] and word[-4:]!='ches' and word[-4:]!='shes' and word[-3:]!='les': #this last is treated hereafter because it dependes
+                word=word[:-2]+'s'
+                modified_es=True
+            elif word[-3:]=="les" and word[-4] not in stops: # do it for e.g. "smiles", but not gor "angles, muscles, articles, ..."
+                word=word[:-2]+'s'
+                modified_es=True
+            elif word[-1]=="e" and word[-2:]!='le': #this last one is treated hereafter because it depends
+                word=word[:-1]
+                trailing_e=True
+            elif word[-2:]=="le" and word[-3] not in stops: # do it for e.g. "smile", but not for "angle, muscle, article, ..."
+                word=word[:-1]
+                trailing_e=True
         
         letters_by_syl=SonoriPy(str_to_list_of_char(word), mode='letters')[0]
         syls_text='|'.join([''.join(syl) for syl in letters_by_syl])
@@ -705,7 +723,59 @@ def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
     return ' '.join(s_case_sep)
 
 
-def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up!", syllables_df=pd.read_csv('data/syllables.csv'), syl_sep='|', special_chars = [',','?','.','!',';',':','"', '{', '}']):
+from num2words import num2words
+def normalize_sentence_numbers(sentence, lang="en"):
+    # this takes care of e.g. "2021", "$110"
+    # curly braces for numbers, if they are in several words
+    # also add curly braces in original sentence around numbers
+
+    def normalize(word, lang="en"):
+        if lang=="en":
+            n_word=normalize_numbers(word)
+        else:
+            try:
+                w=float(word)
+                n_word=num2words(w, lang=lang)
+            except ValueError:
+                n_word=word
+        return n_word
+
+    norm_sent_list=[]
+    sent_list=[]
+    for word in sentence.split(' '):
+        n_word=normalize(word, lang=lang)
+        if ' ' in n_word:
+            n_el="{"+n_word+"}"
+            el="{"+word+"}"
+        else: 
+            n_el=n_word
+            el=word
+        norm_sent_list.append(n_el)
+        sent_list.append(el)
+    norm_sent=" ".join(norm_sent_list)
+    sent=" ".join(sent_list)
+    return norm_sent, sent
+
+def extract_special_chars(norm_sent, special_chars):
+    # memorize special characters glued before and after words
+    special_chars_dict_end={}
+    special_chars_dict_start={}
+    for i,w in enumerate(norm_sent.split(' ')):
+        if w[-1] in special_chars:
+            special_chars_dict_end[i]=w[-1] 
+        if w[0] in special_chars:
+            special_chars_dict_start[i]=w[0] 
+    return special_chars_dict_start, special_chars_dict_end
+
+get_acronyms_idxs=lambda words: [w_idx for w_idx,w in enumerate(words) if w.isupper()]
+
+
+sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
+def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!", 
+                        syllables_df=pd.read_csv('data/syllables.csv'), 
+                        syl_sep='|', 
+                        special_chars = [',','?','.','!','¡',';',':','"', '{', '}'],
+                        leng="en"):
     """This function extract information of syllabified texts and phonetics. 
     It uses a combination of datasets (CMUdict, data from syllable_data() ) and algorithm (SonoriPy)
 
@@ -721,29 +791,9 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
     for c in special_chars: sentence=sentence.replace(' '+c, c)
-
-    # this takes care of e.g. "2021", "$110"
-    # curly braces for numbers, if they are in several words
-    norm_sent_list=[]
-    for word in sentence.split(' '):
-        n_word=normalize_numbers(word)
-        if ' ' in n_word:
-            el="{"+n_word+"}"
-        else: el=n_word
-        norm_sent_list.append(el)
-
-    norm_sent=" ".join(norm_sent_list)
-
-    # memorize special characters glued before and after words
-    special_chars_dict_end={}
-    special_chars_dict_start={}
-    for i,w in enumerate(norm_sent.split(' ')):
-        if w[-1] in special_chars:
-            special_chars_dict_end[i]=w[-1] 
-        if w[0] in special_chars:
-            special_chars_dict_start[i]=w[0] 
-
     
+    norm_sent, sentence=normalize_sentence_numbers(sentence, lang=lang)
+    special_chars_dict_start, special_chars_dict_end=extract_special_chars(norm_sent, special_chars)
     words=remove_special_characters(norm_sent, lowercase=False).split(' ')
 
     # little dictionnary mapping e.g. Mr -> Mister
@@ -752,15 +802,13 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     
     # If all letters are capital (acronym), put '-' between all letters
     # I need to do that before putting in lowercase, that is why I cannot put that in e.g. syllabified_text()
+    acronym_idxs=get_acronyms_idxs(words)
     ws=[]
-    acronym_idxs=[]
     for w_idx,w in enumerate(words):
         if w.isupper():
-            acronym_idxs.append(w_idx)
             w='-'.join(w)
             words[w_idx]=w
         ws.append(w)
-
     words=[word.lower() for word in ws]
 
     syls_texts=[]
@@ -798,7 +846,6 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
         for k in special_chars_dict_start:
             split_text[k]=special_chars_dict_start[k]+split_text[k]
         return split_text
-
     def acronyms_hyphen_to_compound(split_text, acronym_idxs):
         # remove '-' in acronyms
         # And if it was only 1 letter, then it's not a compound word.
@@ -809,17 +856,30 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
                 else:
                     split_text[i]=el.replace('{','').replace('}','')
         return split_text
-
-    case_syls_texts_special_chars=acronyms_hyphen_to_compound(case_syls_texts_special_chars, acronym_idxs)
-    case_syls_texts_special_chars=add_special_chars(case_syls_texts_special_chars, special_chars_dict_start, special_chars_dict_end)
+    def acronyms_to_compound(split_text, acronym_idxs):
+            # remove '-' in acronyms
+            # And if it was only 1 letter, then it's not a compound word.
+            for i,el in enumerate(split_text):
+                if i in acronym_idxs:
+                    if len(el)>1:
+                        split_text[i]='{'+el.replace('-',' ')+'}'
+                    else:
+                        split_text[i]=el.replace('{','').replace('}','')
+            return split_text
     
+    case_syls_texts_special_chars=acronyms_hyphen_to_compound(case_syls_texts_special_chars, acronym_idxs)
+    # this adds punctuation and the curly brackets:
+    case_syls_texts_special_chars=add_special_chars(case_syls_texts_special_chars, special_chars_dict_start, special_chars_dict_end)
 
     segmented_text=' '.join(case_syls_texts_special_chars)
 
+    # Here I want to remove only punctuation
+    segmented_text=remove_special_characters(sentence=segmented_text, lowercase=False, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*]')
+    
     # p -> phonetics
     # g -> gibberish
-
     p=[generate_syl_phonetics_alternatives_from_word(word)[0] for word in words]
+    # p=[generate_syl_phonetics_alternatives_from_word_ipa(word)[0] for word in words]
 
     # I separate the acronym in letters and lookup cmudict. I take the last, because
     # there is only one alternative except for letter 'A' which has  [['AH0'], ['EY1']]
@@ -877,7 +937,6 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     split_phonetics = lambda phonetics: [[[s.split('_') for s in sub_w.split('|')] for sub_w in w.split('-')] for w in phonetics.split(' ')]
     g_0=' '.join(['-'.join(['|'.join(['_'.join([cmu_to_gibberish[unstress(p)] for p in s]) for s in sub_w]) for sub_w in w]) for w in split_phonetics(p_0)])
     
-
     brace_dict_start=dict(filter(lambda el: el[1] in ['{','}'], special_chars_dict_start.items()))
     brace_dict_end=dict(filter(lambda el: el[1] in ['{','}'], special_chars_dict_end.items()))
 
@@ -889,7 +948,12 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     g_0_special_chars=add_special_chars(g_0_special_chars, brace_dict_start, brace_dict_end)
     g_0_special_chars=' '.join(g_0_special_chars)
 
-    record={'text':sentence,
+    # processing on the raw text to add curly brackets around compound words
+    special_chars_dict_start_raw, special_chars_dict_end_raw=extract_special_chars(sentence, special_chars)
+    sent_=acronyms_to_compound(remove_special_characters(sentence=sentence, lowercase=False, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]').split(' '), get_acronyms_idxs(remove_special_characters(sentence, lowercase=False).split(' ')))
+    sent_brackets=' '.join(add_special_chars(sent_, special_chars_dict_start_raw, special_chars_dict_end_raw))
+
+    record={'text':sent_brackets,
         'cmu_phonetics':p_0_special_chars,
         # 'pronounciation_guide':g_0_special_chars,
         'pronounciation_guide_hr':g_0_special_chars.replace('_',''),
