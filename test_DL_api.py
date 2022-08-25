@@ -39,15 +39,15 @@ def test_prefill(base_url = 'http://localhost:8000', client=app.test_client()):
     r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="es_ES", base_url = base_url, client=client)
     d=ast.literal_eval(r.data.decode('utf8'))
     sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
-    r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="en_UK", base_url = base_url, client=client)
+    r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="en_GB", base_url = base_url, client=client)
     d=ast.literal_eval(r.data.decode('utf8'))
     sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
     r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="fr_FR", base_url = base_url, client=client)
     d=ast.literal_eval(r.data.decode('utf8'))
 
-    # sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
-    # r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="es_ES", base_url = base_url, client=client)
-    # d=ast.literal_eval(r.data.decode('utf8'))
+    sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="es_ES", base_url = base_url, client=client)
+    d=ast.literal_eval(r.data.decode('utf8'))
 
     return d
 
