@@ -6,14 +6,14 @@ from __future__ import unicode_literals  # for python2 compatibility
 import sys
 from syllabipy.util import cleantext
 from datetime import datetime
-
+import json
 from ordered_set import OrderedSet
 import numpy as np
 
 import itertools
 import cmudict
 
-phones=cmudict.phones()
+cmu_phones=cmudict.phones()
 
 cmudict_dict=cmudict.dict()
 unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
@@ -31,7 +31,7 @@ def str_to_list_of_char(string):
 def define_categories(mode='CMU'):
     if mode=='CMU':
         approximates,vowels,nasals,fricatives,affricates,stops=[],[],[],[],[],[]
-        for p in phones:
+        for p in cmu_phones:
             if p[-1][0]=='vowel':
                 # I add with and without stress so that it works with both converntions
                 vowels.append(p[0].lower())
@@ -63,10 +63,48 @@ def define_categories(mode='CMU'):
         
         additional_vowels='ɝəaɔʌãeéẽɛøoõiu'
         vowels+=str_to_list_of_char(additional_vowels)
+    elif mode=="MFA_IPA":
+        with open('data/mfa_phones.json', 'r') as openfile: mfa_phones = json.load(openfile)
+        # https://mfa-models.readthedocs.io/en/refactor/mfa_phone_set.html
+        cats={}
+        cats['vowels']=str_to_list_of_char('aeiouyàáâäæãåāèéêëēėęîïíīįìôöòóœøōõûüùúūůÿ')+str_to_list_of_char('ɝəaɔʌãeéẽɛøoõiu')
+        cats['vowels']+=['ɐ', 'ɑ', 'ɑː', 'ɑ̃', 'ɒ', 'ɒː', 'ɚ', 'ɜ', 'ɜː','ʉ', 'ʉː','ʊ','ɪ','ɫ̩','m̩','n̩'] 
+        # the last two have a little AH0 before the consonant, that's why I have to put them in vowels.
+        # https://memcauliffe.com/bootstrapping-an-ipa-dictionary-for-english-using-montreal-forced-aligner-20.html
+        # maybe a better solution would be to add a vowel before it. It was with a schwa in wikipron
+
+        cats['approximates']=str_to_list_of_char('')
+        cats['nasals']=str_to_list_of_char('lmnrw')
+        cats['fricatives']=str_to_list_of_char('zvsfhʃ')
+        cats['affricates']=str_to_list_of_char('')
+        cats['stops']=str_to_list_of_char('bcdgtkpqxhj')
+
+        remaining_phones=[el for el in mfa_phones if el not in sum(cats.values(),[])]
+        for k in cats:
+            additionals=[el for el in remaining_phones if el[0] in cats[k]]
+            cats[k]+=additionals
+
+        # classifying remaining ones https://en.wikipedia.org/wiki/International_Phonetic_Alphabet
+        cats['approximates']+=['ɹ','ɥ', 'ɫ']
+        cats['fricatives']+=['ʒ','ʝ', 'β', 'θ', 'ç', 'ð','ɣ','ʁ']
+        cats['stops']+=['ʔ', 'ɡ', 'ɟ', 'ɾ', 'ɾʲ']
+        cats['nasals']+=['ɱ', 'ɲ','ŋ','ʎ']
+        cats['affricates']+=['ɟʝ']
+
+        # remaining_phones=[el for el in mfa_phones if el not in sum(cats.values(),[])]
+        # print(remaining_phones)
+
+        vowels = cats['vowels']
+        approximates = cats['approximates']
+        nasals = cats['nasals']
+        fricatives = cats['fricatives']
+        affricates = cats['affricates']
+        stops = cats['stops']
     else:
         print('This mode of categories for sonoripy does not exist')
 
-    return approximates,vowels,nasals,fricatives,affricates,stops
+    d={"approximates":approximates,"vowels":vowels,"nasals":nasals,"fricatives":fricatives,"affricates":affricates,"stops":stops}
+    return d
 
 
 
@@ -140,7 +178,8 @@ def SonoriPy(word, mode='CMU'):
                 sylset.append((letter, 0))
 
     else:
-        approximates,vowels,nasals,fricatives,affricates,stops=define_categories(mode=mode)
+        d=define_categories(mode=mode)
+        approximates,vowels,nasals,fricatives,affricates,stops=d['approximates'],d['vowels'],d['nasals'],d['fricatives'],d['affricates'],d['stops']
 
         if mode=='CMU':
         # if False:
