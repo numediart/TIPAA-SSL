@@ -23,7 +23,7 @@ split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w 
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
 from utils.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
-
+from utils.syllables_processing import n_syl_SonoriPy, syllables_data, syllabified_text
 
 syllables_df={
             'en_GB':pd.read_csv('data/syllables.csv'),
@@ -41,8 +41,6 @@ def show_alternatives_distributions():
     for k,v in cmudict_dict.items():
         lens.append(len(v))
     print(np.histogram(lens, bins=[0,1,2,3,4,5,6,7]))
-
-
 
 # expand some words as Mr or Mrs to Mister and Misses
 expand_dict={'mr':'mister',
@@ -146,10 +144,7 @@ def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
     return n
 
 
-
-
-
-from utils.syllables_processing import n_syl_SonoriPy, syllables_data, syllabified_text
+import unidecode
 
 def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=mfa_dicts['es_ES'], g2p_model="spanish_spain_mfa"):
     # fallbacks
@@ -161,8 +156,10 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
                 p_part=word_dict[w_part]
             except KeyError: p_part=[]
             if p_part==[]: #raise "phonetics empty, not in pronunciation dictionary"
-                # p_part=[g2p(w_part)]
-                p_part=mfa_g2p(w_part, model=g2p_model)[w_part]
+                # trying first if the word without accents axist in the dict, if not fallback to g2p
+                unaccented_string = unidecode.unidecode(w_part)
+                try: p_part=word_dict[unaccented_string]
+                except KeyError: p_part=mfa_g2p(w_part, model=g2p_model)[w_part]
             p_parts.append(p_part)
 
         # Here I generate all alternatives of combination of word parts
@@ -184,8 +181,10 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
             ps=[]
         if ps==[]: #raise "phonetics empty, not in pronunciation dictionary"
             # ps=[g2p(word)]
-            print(word)
-            ps=mfa_g2p(word, model=g2p_model)[word]
+            # trying first if the word without accents axist in the dict, if not fallback to g2p
+            unaccented_string = unidecode.unidecode(word)
+            try: ps=word_dict[unaccented_string]
+            except KeyError: ps=mfa_g2p(word, model=g2p_model)[word]
         
         # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
         # for p in ps:
@@ -608,8 +607,6 @@ def generate_prefill_csv(                            # path='data/phrases_speaki
     df.loc[df.apply(lambda r: bool(len(r.n_stress_inconsistencies)), axis=1)]
 
     return df
-
-
 
 # unused functions
 if False:
