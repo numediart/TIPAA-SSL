@@ -8,7 +8,7 @@ from itertools import groupby
 from io import StringIO
 import subprocess
 
-# If I use this, it should be en_GB instead of en_GB http://fbdevwiki.com/wiki/Locales
+# standard from FB http://fbdevwiki.com/wiki/Locales
 lang_to_MFA_g2p_models={'en_GB':'english_uk_mfa',
 'en_US':'english_us_mfa',
 'fr_FR':'french_mfa',
@@ -58,6 +58,88 @@ def get_mfa_dict(path='data/spanish_spain_mfa.dict'):
     ipa_dict=df.groupby(['text']).sum().to_dict()['ipa']
     return ipa_dict
 
+def generate_acronym_letter_dicts():
+    
+    def acro_dict(letters, lang):
+        acronym_dict={}
+        for l in letters[lang]:
+            try:
+                acronym_dict[l]=mfa_g2p(l, lang_to_MFA_g2p_models[lang])[l]
+            except:
+                acronym_dict[l]=[]
+        return acronym_dict
+    
+    letters={}
+
+    # spanish letters https://en.wikipedia.org/wiki/Spanish_orthography: E A O S R N I D L C T U M P B G V Y Q H F Z J Ñ X W K
+    lang="es_ES"
+    letters[lang]='E A O S R N I D L C T U M P B G V Y Q H F Z J Ñ X W K'.lower().split(' ')
+    
+    acronym_dict=acro_dict(lang)
+    acronym_dict['h']=mfa_g2p('ache', lang_to_MFA_g2p_models[lang])['ache']
+    acronym_dict['z']=mfa_g2p('zeta', lang_to_MFA_g2p_models[lang])['zeta']
+    acronym_dict['w']=mfa_g2p('uvedoble', lang_to_MFA_g2p_models[lang])['uvedoble']
+    
+    acronym_dict_long={k:[max(lst, key=len)] for k,lst in acronym_dict.items()}
+    acronym_dict_long['g']= ['g', 'e']
+
+    acronym_dict_LA=acronym_dict
+    acronym_dict_LA['z']=mfa_g2p('seta', lang_to_MFA_g2p_models[lang])['seta']
+    acronym_dict_long_LA={k:[max(lst, key=len)] for k,lst in acronym_dict_LA.items()}
+    acronym_dict_long_LA['g']= ['g', 'e']
+
+    with open('data/acronyms_es_ES_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long))
+    with open('data/acronyms_es_LA_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long_LA))
+
+    # english letters: https://en.wikipedia.org/wiki/English_alphabet
+    lang="en_GB"
+    letters[lang]="A B C D E F G H I J K L M N O P Q R S T U V W X Y Z".lower().split(' ')
+    acronym_dict=acro_dict(letters, lang)
+    acronym_dict_long={k:[max(lst, key=len)] for k,lst in acronym_dict.items()}
+    # as the first phoneme in "age"
+    acronym_dict_long['a']=[mfa_g2p('age', lang_to_MFA_g2p_models[lang])['age'][0][0]]
+    acronym_dict_long['e']=[['iː']]
+    # as the word "are", US Version //!\\
+    acronym_dict_long['r']=[mfa_g2p('are', lang_to_MFA_g2p_models['en_US'])['are'][0]]
+    acronym_dict_long['z']=mfa_g2p('zee', lang_to_MFA_g2p_models[lang])['zee']
+    
+    acronym_dict_long_US=acronym_dict_long
+    acronym_dict_long_US['o']=mfa_g2p('o', lang_to_MFA_g2p_models['en_US'])['o']
+
+    with open('data/acronyms_en_GB_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long))
+    with open('data/acronyms_en_US_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long_US))
+    
+    lang="fr_FR"
+    letters[lang]="A B C D E F G H I J K L M N O P Q R S T U V W X Y Z".lower().split(' ')
+    acronym_dict=acro_dict(letters, lang)
+    acronym_dict['h']=mfa_g2p('ache', lang_to_MFA_g2p_models[lang])['ache']
+    acronym_dict_long={k:[max(lst, key=len)] for k,lst in acronym_dict.items()}
+    acronym_dict_long['e']=[['ə']]
+    acronym_dict_long['n']=[['ɛ', 'n']]
+    acronym_dict_long['r']=[['ɛ', 'ʁ']]
+    acronym_dict_long['t']=[['t', 'e']]
+
+    acronym_dict_long['w']=[max(mfa_g2p('doublevé', lang_to_MFA_g2p_models[lang])['doublevé'], key=len)]
+    acronym_dict_long['x']=[['i', 'k', 's']]
+    acronym_dict_long['y']=[max(mfa_g2p('igrec', lang_to_MFA_g2p_models[lang])['igrec'], key=len)]
+    acronym_dict_long['z']=[['z', 'ɛ', 'd']]
+
+    with open('data/acronyms_fr_FR_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long))
+
+
+
+def get_augmented_mfa_dict(lang='es_ES'):
+    d=get_mfa_dict(path='data/'+lang_to_MFA_g2p_models[lang]+'.dict')
+    with open('data/acronyms_'+lang+'_mfa.dict','r') as f: acronyms=json.loads(f.read())
+    for k in acronyms: d[k]=acronyms[k]
+    return d
+
+
+
+mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
+
+
+
 
 def build_mfa_phone_set():
     dict_paths=glob('data/*mfa.dict')
@@ -96,7 +178,6 @@ def get_augmented_cmudict():
 
 cmudict_dict=get_augmented_cmudict()
 
-mfa_dicts={lang:get_mfa_dict(path='data/'+lang_to_MFA_g2p_models[lang]+'.dict') for lang in lang_to_MFA_g2p_models}
 
 
 
