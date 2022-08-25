@@ -26,12 +26,12 @@ from utils.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MF
 
 
 syllables_df={
-                'en_GB':pd.read_csv('data/syllables.csv'),
-                'en_US':pd.read_csv('data/syllables.csv'),
-                'fr_FR':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
-                'es_ES':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
-                'es_LA':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
-                }
+            'en_GB':pd.read_csv('data/syllables.csv'),
+            'en_US':pd.read_csv('data/syllables.csv'),
+            'fr_FR':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+            'es_ES':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+            'es_LA':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+            }
 
 
 
@@ -50,17 +50,6 @@ expand_dict={'mr':'mister',
             'Mr':'Mister',
             'Mrs':'Misses'
             }
-
-def get_cmudict_info(word='university'):
-    """get the first possible phonetisation of a word from cmudict
-
-    Args:
-        word (str, optional): input. Defaults to 'university'.
-    Returns:
-        list: phonemes and a number for each vowel indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
-    """
-    return cmudict_dict[word][0]
-
 def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]'):
     """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
 
@@ -99,22 +88,8 @@ def chunk_text(text, chunking_chars=[',',';','.','!','¡','?', ':', '/']):
     # assert sum(n_words_by_chunk)==len(list(filter(None, text.split(' ')))), "Checking number of words is the same after chunking"
     return n_words_by_chunk
     
-def phonetics_from_sentence(sentence="Where's the best place to have coffee?"):
-    sentence=remove_special_characters(sentence)
-    words=sentence.split(' ')
-    # drop empty strings
-    words = list(filter(None, words))
-    words_phones=[]
-    for w in tqdm(words):
-        phones=get_cmudict_info(w)
-        words_phones.append(phones)
-    return words_phones
-
-
 def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
     return [unstress(el) for el in transcription]
-
-
 
 
 def phonetics_indexed_df_from_formatted_phonetics(phonetics):
@@ -171,192 +146,10 @@ def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
     return n
 
 
-def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0']):
-    return len(SonoriPy(phonetics)[0])
 
 
 
-def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
-    # cmu vowels end by a number : 0, 1 or 2.   0= no stress, 1 = primary stress, 2 = secondary stress
-    # consonants do not end by a number
-    # here I return a list that is one if primary stressed and else 0
-    return [1 if p[-1]==str(1) else 0 for p in phonetics if p[-1] in str([0,1,2])]
-    
-def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
-    phonetics=phonetics_from_sentence(sentence) #return a list of phoneme list (by word)
-    result = []
-    for el in phonetics:
-        result+=el
-    binResult=word_stress_from_cmu(result)
-    return binResult
-
-
-def x_in_y(query, base):
-    """Check if a (query) is a subsequence of another list (base)
-
-    Args:
-        query (list): subsequence to find
-        base (list): main list
-
-    Returns:
-        Boolean: True if subsequence found in list, else False
-    """
-    # from https://stackoverflow.com/questions/33392219/how-to-check-subsequence-exists-in-a-list
-    try:
-        l = len(query)
-    except TypeError:
-        l = 1
-        query = type(base)((query,))
-
-    for i in range(len(base)):
-        if base[i:i+l] == query:
-            return True
-    return False
-
-def get_words_that_end_with(phones=['IH0', 'D']):
-    """Goes through cmudict items and those who end by "phones"
-
-    Args:
-        phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
-
-    Returns:
-        dict: words that end by phones
-    """
-    # cmudict_first_alternatives={}
-    selection={}
-    for k,v in cmudict_dict.items():
-        # cmudict_first_alternatives[k]=v[0]
-        if len(v[0])>=len(phones):
-            if v[0][-len(phones):]==phones:
-                selection[k]=v[0]
-    return selection
-
-def words_that_contains(phones=['IH0', 'D']):
-    """Goes through cmudict items and those who end by "phones"
-
-    Args:
-        phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
-
-    Returns:
-        dict: words that end by phones
-    """
-    selection={}
-    for k,v in cmudict_dict.items():
-        # cmudict_first_alternatives[k]=v[0]
-        if v!=[]:
-            if len(v[0])>=len(phones):
-                if x_in_y(phones, v[0]):
-                    selection[k]=v[0]
-    return selection
-
-
-def syllables_data(syl_sep='|'):
-    """This functions builds our dataset truth about text syllables. 
-    It uses an existing dataset and add our extension to it. It also get data about the number of syllables according to SonoriPy
-    When it is possible we keep only consitent solutions (in terms of n of syllables) and discard others.
-    The result is saved in a CSV that is used for syllabification. See "syllabified_text()"
-
-    Args:
-        syl_sep (str, optional): [description]. Defaults to '|'.
-
-    Returns:
-        [type]: [description]
-    """
-    # http://www.delphiforfun.org/programs/Syllables.htm
-    # syllables=pd.read_csv('Syllables.txt',sep='=', header=None)
-    syllables=pd.read_csv('data/mhyph.txt', header=None)
-    # mhyph_syl_sep=syllables[0][0][5]
-    # syllables.iloc[:,0]=syllables.iloc[:,0].str.replace(mhyph_syl_sep,syl_sep)
-
-    # This file contains additional solutions that we can change. For example, I added "tem|pera|ture"
-    # because only tem|pe|ra|ture was present. The following of the function will take care of choosing
-    # the right one so that it is consistent with SonoriPy's prediction
-    syllables_add=pd.read_csv('data/mhyph_add.txt', header=None)
-    syllables=pd.concat([syllables,syllables_add])
-
-    # http://hindson.com.au/info/free/free-english-language-hyphenation-dictionary/
-    # syllables=pd.read_csv('data/EnglishHyphDict_v108.txt', header=None, sep=' ')
-    # syllables.iloc[:,1]=syllables.iloc[:,1].str.strip(';')
-    # syllables.iloc[:,1]=syllables.iloc[:,1].str.replace('-','_')
-    # # syllables.iloc[:,0]=syllables.iloc[:,1]
-    # syllables=pd.DataFrame(syllables.iloc[:,1])
-    # syllables.columns=[0]
-
-    d=cmudict_dict
-    syllables=syllables.dropna()  # there is one row that is nan...
-
-    # syllables.columns=['word', 'syllables']
-    syllables.columns=['syllables']
-
-    n_syls=[]
-    n_vowels_cmu=[]
-    n_syls_SonoriPy=[]
-    texts=[]
-    phonetics=[]
-    for i,r in syllables.iterrows():
-        text=''.join(r[0].split(syl_sep)).lower()
-        texts.append(text)
-        try:
-            n_syls.append(int(len(r[0].split(syl_sep))))
-        except:
-            n_syls.append(None)
-        # try:
-        #     phonetics.append(' '.join(d[text][0]))
-        #     n_vowels_cmu.append(int(n_vowels(d[text][0])))
-        # except IndexError:
-        #     n_vowels_cmu.append(None)
-        #     phonetics.append(None)
-        try:
-            n_syls_SonoriPy.append(n_syl_SonoriPy(d[text][0]))
-        except IndexError:
-            n_syls_SonoriPy.append(None)
-
-    syllables.syllables=syllables.syllables.str.lower()
-    
-    syllables['normalized_text']=texts
-    # syllables['phonetics']=phonetics
-
-    syllables['n_syls']=n_syls
-    syllables['n_syls_SonoriPy']=n_syls_SonoriPy
-    # syllables['n_vowels_cmu']=n_vowels_cmu
-
-    # syllables[syllables.n_vowels_cmu.isnull()].normalized_text.tolist()
-    # len(syllables[~syllables.n_vowels_cmu.isnull()].normalized_text.tolist())
-
-    if False:
-        syllables=syllables.dropna()
-
-        # syllables[syllables.n_syls==syllables.n_vowels_cmu]
-        # syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
-        # syllables[syllables.n_vowels_cmu!=syllables.n_syls_SonoriPy]
-
-        # syllables[syllables.normalized_text=="really"]
-
-        # Some words have several possibilities of text syllable segmentation.
-        # For a given word, if there are some that for which n_syls!=n_syls_SonoriPy, and others for which n_syls==n_syls_SonoriPy
-        # then I only keep those for which n_syls==n_syls_SonoriPy
-
-        inconsistent_syls=syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
-        lens=[]
-        for i,r in inconsistent_syls.iterrows():
-            lens.append(len(syllables[syllables.normalized_text==r.normalized_text]))
-        
-        inconsistent_syls['n_syl_text_alternatives']=lens
-
-        # Select the ones who have potentially another solution with a consistent number of syls
-        candidates_for_good_alt=inconsistent_syls[inconsistent_syls['n_syl_text_alternatives']>1]
-
-        # If there are possibilities with consistent number of syllables, remove the inconsistent ones
-        idx_to_remove=[]
-        for i,r in candidates_for_good_alt.iterrows():
-            alts=syllables[syllables.normalized_text==r.normalized_text]
-            if len(alts[alts.n_syls==alts.n_syls_SonoriPy])>0:
-                idx_to_remove+=alts[alts.n_syls!=alts.n_syls_SonoriPy].index.tolist()
-        syllables=syllables.drop(idx_to_remove)
-
-    syllables.to_csv('data/syllables.csv')
-
-    return syllables
+from utils.syllables_processing import n_syl_SonoriPy, syllables_data, syllabified_text
 
 def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=mfa_dicts['es_ES'], g2p_model="spanish_spain_mfa"):
     # fallbacks
@@ -452,89 +245,6 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
         syls_ps_formatted=['|'.join(['_'.join(s) for s in w]) for w in syls_ps]
         syls_gs_formatted=['|'.join(['_'.join([cmu_to_gibberish[unstress(el)] for el in s]) for s in w]) for w in syls_ps]
     return syls_ps_formatted, syls_gs_formatted
-
-
-def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), lang="en_GB"):
-    """Construct syllabified word from a word.
-
-     text with syllable segmentation is done with several rules/steps:
-        -Use our syllables dataset
-        -If does not exist, check if only 1 vowel (trivial because 1 syllable) ==>  in that case syllable=text
-        -If not, fall back to use SonoriPy (sonority sequencing principle) with letters.
-    It is less accurate than with phonemes but we use it only on fallback.
-    I improved this part with logic in this (trailing "e", "-ed", "-es" ):
-    https://datascience.stackexchange.com/questions/23376/how-to-get-the-number-of-syllables-in-a-word
-
-    Args:
-        word ([type]): [description]
-        syllables_df ([type]): [description]
-
-    Returns:
-        [type]: [description]
-    """
-    # if phones!=[]:
-    if n==1:
-        syls_text=word
-        used_method='1 vowel = 1 syl'
-        return syls_text, used_method
-    try:
-        # If there exist choices with consistent number of syllables, let's take the first one of these.
-        a=syllables_df[syllables_df.n_syls==syllables_df.n_syls_SonoriPy].loc[syllables_df.normalized_text==word]
-        if len(a)>0:
-            syls_text=a.syllables.values[0]
-        else:
-            syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
-        used_method='dataset'
-    except IndexError:
-        # for the final -ed, remove the "e" except if "-ded" or "-ted" or "-ired"
-        # We remember if we did to insert back the "e" after syllabification
-        modified_ed=False
-        # smiles -> remove the e,   raises -> don't
-        modified_es=False
-        trailing_e=False
-
-        from syllabipy.sonoripy import define_categories
-        _,vowels,nasals,fricatives,affricates,stops=define_categories()
-
-        if lang=="en_GB" or lang=="en_US":
-            if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
-                word=word[:-2]+'d'
-                modified_ed=True
-            elif word[-2:]=="es" and word[-3] not in ['s','c','g','x'] and word[-4:]!='ches' and word[-4:]!='shes' and word[-3:]!='les': #this last is treated hereafter because it dependes
-                word=word[:-2]+'s'
-                modified_es=True
-            elif word[-3:]=="les" and word[-4] not in stops: # do it for e.g. "smiles", but not gor "angles, muscles, articles, ..."
-                word=word[:-2]+'s'
-                modified_es=True
-            elif word[-1]=="e" and word[-2:]!='le': #this last one is treated hereafter because it depends
-                word=word[:-1]
-                trailing_e=True
-            elif word[-2:]=="le" and word[-3] not in stops: # do it for e.g. "smile", but not for "angle, muscle, article, ..."
-                word=word[:-1]
-                trailing_e=True
-        
-        if lang=="fr_FR":
-            if word[-2:]=="es":
-                word=word[:-2]+'s'
-                modified_es=True
-            elif word[-1]=="e": #this last one is treated hereafter because it depends
-                word=word[:-1]
-                trailing_e=True
-        
-        letters_by_syl=SonoriPy(str_to_list_of_char(word), mode='letters')[0]
-        syls_text='|'.join([''.join(syl) for syl in letters_by_syl])
-
-        if modified_ed:
-            syls_text=syls_text[:-1]+"ed"
-        if modified_es:
-            syls_text=syls_text[:-1]+"es"
-        if trailing_e:
-            syls_text+='e'
-
-        used_method='SonoriPy'
-        return syls_text, used_method
-    return syls_text, used_method
-
 
 def find(s, ch=['|']):
     return [i for i, ltr in enumerate(s) if ltr in ch]
@@ -899,12 +609,108 @@ def generate_prefill_csv(                            # path='data/phrases_speaki
 
     return df
 
-def word_selection():
-    # words that finish in "s" with phoneme "S" that also exist without an "s" and with last phoneme then not being "S"
-    words_in_s=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='S' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='S']
-    words_in_z=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='Z' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='Z']
+
+
+# unused functions
+if False:
+    def word_selection():
+        # words that finish in "s" with phoneme "S" that also exist without an "s" and with last phoneme then not being "S"
+        words_in_s=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='S' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='S']
+        words_in_z=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='Z' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='Z']
+    def get_cmudict_info(word='university'):
+        """get the first possible phonetisation of a word from cmudict
+
+        Args:
+            word (str, optional): input. Defaults to 'university'.
+        Returns:
+            list: phonemes and a number for each vowel indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
+        """
+        return cmudict_dict[word][0]
+
+    def phonetics_from_sentence(sentence="Where's the best place to have coffee?"):
+        sentence=remove_special_characters(sentence)
+        words=sentence.split(' ')
+        # drop empty strings
+        words = list(filter(None, words))
+        words_phones=[]
+        for w in tqdm(words):
+            phones=get_cmudict_info(w)
+            words_phones.append(phones)
+        return words_phones
+
+    def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
+        # cmu vowels end by a number : 0, 1 or 2.   0= no stress, 1 = primary stress, 2 = secondary stress
+        # consonants do not end by a number
+        # here I return a list that is one if primary stressed and else 0
+        return [1 if p[-1]==str(1) else 0 for p in phonetics if p[-1] in str([0,1,2])]
     
-    
+    def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
+        phonetics=phonetics_from_sentence(sentence) #return a list of phoneme list (by word)
+        result = []
+        for el in phonetics:
+            result+=el
+        binResult=word_stress_from_cmu(result)
+        return binResult
+    def x_in_y(query, base):
+        """Check if a (query) is a subsequence of another list (base)
+
+        Args:
+            query (list): subsequence to find
+            base (list): main list
+
+        Returns:
+            Boolean: True if subsequence found in list, else False
+        """
+        # from https://stackoverflow.com/questions/33392219/how-to-check-subsequence-exists-in-a-list
+        try:
+            l = len(query)
+        except TypeError:
+            l = 1
+            query = type(base)((query,))
+
+        for i in range(len(base)):
+            if base[i:i+l] == query:
+                return True
+        return False
+
+    def get_words_that_end_with(phones=['IH0', 'D']):
+        """Goes through cmudict items and those who end by "phones"
+
+        Args:
+            phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
+
+        Returns:
+            dict: words that end by phones
+        """
+        # cmudict_first_alternatives={}
+        selection={}
+        for k,v in cmudict_dict.items():
+            # cmudict_first_alternatives[k]=v[0]
+            if len(v[0])>=len(phones):
+                if v[0][-len(phones):]==phones:
+                    selection[k]=v[0]
+        return selection
+
+    def words_that_contains(phones=['IH0', 'D']):
+        """Goes through cmudict items and those who end by "phones"
+
+        Args:
+            phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
+
+        Returns:
+            dict: words that end by phones
+        """
+        selection={}
+        for k,v in cmudict_dict.items():
+            # cmudict_first_alternatives[k]=v[0]
+            if v!=[]:
+                if len(v[0])>=len(phones):
+                    if x_in_y(phones, v[0]):
+                        selection[k]=v[0]
+        return selection
+
+
+
 if __name__ == "__main__":
     from utils.text_processing import *
     prefill_for_sentence()

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import pdb
 from glob import glob
-from utils.text_processing import phonetics_from_sentence, remove_special_characters, remove_stress_annots, prefill_content
+from utils.text_processing import remove_special_characters, remove_stress_annots, prefill_content
 
 import itertools
 import os
@@ -25,6 +25,7 @@ graphemes_to_alternatives={
     "ie":["IY1","AY1"],
     "ea":["IY1","EH1"]
 }
+
 
 def process_GE_linguistic_data(path='data/GE_linguistic_data.csv'):
     """We choosed conventions for the target:
