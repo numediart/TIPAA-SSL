@@ -26,7 +26,7 @@ from utils.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MF
 
 
 syllables_df={
-                'en_UK':pd.read_csv('data/syllables.csv'),
+                'en_GB':pd.read_csv('data/syllables.csv'),
                 'en_US':pd.read_csv('data/syllables.csv'),
                 'fr_FR':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
                 'es_ES':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
@@ -454,7 +454,7 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
     return syls_ps_formatted, syls_gs_formatted
 
 
-def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), lang="en_UK"):
+def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), lang="en_GB"):
     """Construct syllabified word from a word.
 
      text with syllable segmentation is done with several rules/steps:
@@ -496,7 +496,7 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
         from syllabipy.sonoripy import define_categories
         _,vowels,nasals,fricatives,affricates,stops=define_categories()
 
-        if lang=="en_UK" or lang=="en_US":
+        if lang=="en_GB" or lang=="en_US":
             if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
                 word=word[:-2]+'d'
                 modified_ed=True
@@ -571,7 +571,7 @@ def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
     return ' '.join(s_case_sep)
 
 
-def normalize_sentence_numbers(sentence, lang="en_UK", mode="CMU"):
+def normalize_sentence_numbers(sentence, lang="en_GB", mode="CMU"):
     # this takes care of e.g. "2021", "$110"
     # curly braces for numbers, if they are in several words
     # also add curly braces in original sentence around numbers

@@ -8,8 +8,8 @@ from itertools import groupby
 from io import StringIO
 import subprocess
 
-# If I use this, it should be en_GB instead of en_UK http://fbdevwiki.com/wiki/Locales
-lang_to_MFA_g2p_models={'en_UK':'english_uk_mfa',
+# If I use this, it should be en_GB instead of en_GB http://fbdevwiki.com/wiki/Locales
+lang_to_MFA_g2p_models={'en_GB':'english_uk_mfa',
 'en_US':'english_us_mfa',
 'fr_FR':'french_mfa',
 'es_ES':'spanish_spain_mfa',
