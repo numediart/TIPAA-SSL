@@ -5,7 +5,8 @@ from marshmallow import fields, Schema, EXCLUDE
 
 import json
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
-from utils.text_processing import check_phonemes, cmu_vowels, cmu_consonants, chunk_text, split_phonetics
+from utils.text_processing import check_phonemes, chunk_text, split_phonetics
+from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
 # from app_definition import app
 from server.utils import default_example, request_phoneme_contrast, request_syl_contrast, request_stress, request_stress_v2, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2

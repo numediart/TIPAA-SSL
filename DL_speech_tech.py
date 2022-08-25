@@ -4,7 +4,9 @@ import pandas as pd
 from utils.audio_processing import getIntonation, getIntensity, normalize
 import soundfile as sf
 import io
-from utils.text_processing import remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, chunk_text, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, cmu_consonants, unstress, split_phonetics,  cmu_to_gibberish, SonoriPy
+from utils.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, chunk_text, phonetics_indexed_df_from_formatted_phonetics
+from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_to_gibberish
+from syllabipy.sonoripy import SonoriPy
 from utils.charsiu_utils import charsiu_phone_forced_aligner
 import base64
 import librosa

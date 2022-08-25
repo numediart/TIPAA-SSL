@@ -6,12 +6,13 @@ import pandas as pd
 from glob import glob
 import numpy as np
 import itertools
-from syllabipy.sonoripy import SonoriPy, str_to_list_of_char
+from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
 import json
-
+import os
 from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
 from itertools import groupby
+from num2words import num2words
 
 g2p = G2p()
 
@@ -19,187 +20,20 @@ drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).asty
 drop_consecutive_duplicate_elements= lambda L: [key for key, _group in groupby(L)]
 unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
-
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
-def get_mfa_df(path='data/english_us_mfa.dict'):
-    df=pd.read_csv(path, sep='\t', header=None, encoding='utf8').dropna()
-    df.columns=['text', 'ipa']
-    df=df[~df.text.str.contains(']')]
-    df=df[~df.text.str.contains('<')]    
-
-    ipa=df.apply(lambda r: r.ipa.split(' '), axis=1)
-    df['ipa']=ipa
-
-    # df.index=df.text
-    return df
-
-def get_mfa_dict(path='data/spanish_mfa.dict'):
-    df=get_mfa_df(path)
-    df['ipa']=df.apply(lambda r: [r.ipa], axis=1)
-    ipa_dict=df.groupby(['text']).sum().to_dict()['ipa']
-    return ipa_dict
+from utils.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
 
 
-def build_mfa_phone_set():
-    dict_paths=glob('data/*mfa.dict')
-    dfs=[get_mfa_df(p) for p in dict_paths]
-    df=pd.concat(dfs)
-    phones=sorted(list(set().union(*df.ipa.apply(lambda r: set(r)).tolist())))
-
-    # Writing to sample.json
-    with open("data/mfa_phones.json", "w") as outfile: outfile.write(json.dumps(phones))
-
-    return phones
+syllables_df={
+                'en_UK':pd.read_csv('data/syllables.csv'),
+                'en_US':pd.read_csv('data/syllables.csv'),
+                'fr_FR':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+                'es_ES':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+                'es_LA':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+                }
 
 
-def get_augmented_cmudict():
-    cmudict_dict=cmudict.dict()
-
-    corrections={
-        'fourteen':[['F', 'AO2', 'R', 'T', 'IY1', 'N']],
-        'thirteen':[['TH', 'ER2', 'T', 'IY1', 'N']],
-        'fifteen':[['F', 'IH2', 'F', 'T', 'IY1', 'N']],
-        'sixteen':[['S', 'IH2', 'K', 'S', 'T', 'IY1', 'N']],
-        'seventeen':[['S', 'EH2', 'V', 'AH0', 'N', 'T', 'IY1', 'N']],
-        'eighteen':[['EY0', 'T', 'IY1', 'N'], ['EY2', 'T', 'IY1', 'N']],
-        'nineteen':[['N', 'AY2', 'N', 'T', 'IY1', 'N']],
-        'engineer':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R']],
-        'downstairs':[['D', 'AW0', 'N', 'S', 'T', 'EH1', 'R', 'Z']],
-        'trainee':[['T', 'R', 'EY0', 'N', 'IY1']],
-        'outside':[['AW0', 'T', 'S', 'AY1', 'D']],
-        'trespasser':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0']],
-        'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']]
-	}
-    for k in corrections:
-        cmudict_dict[k]=corrections[k]
-    return cmudict_dict
-
-
-cmudict_dict=get_augmented_cmudict()
-
-syllables_df=pd.read_csv('data/syllables.csv')
-
-cmu_to_gibberish={'AA':'o',
-                'AE':'a',
-                'AH':'uh',
-                'AO':'aw',
-                'AW':'au',
-                'AY':'ay',
-                'B':'b',
-                'CH':'ch',
-                'D':'d',
-                'DH':'th',
-                'EH':'e',
-                'ER':'uhr',
-                'EY':'ey',
-                'F':'f',
-                'G':'g',
-                'HH':'h',
-                'IH':'i',
-                'IY':'ee',
-                'JH':'dj',
-                'K':'k',
-                'L':'l',
-                'M':'m',
-                'N':'n',
-                'NG':'ng',
-                'OW':'ow',
-                'OY':'oy',
-                'P':'p',
-                'R':'r',
-                'S':'s',
-                'SH':'sh',
-                'T':'t',
-                'TH':'th',
-                'UH':'u',
-                'UW':'oo',
-                'V':'v',
-                'W':'w',
-                'Y':'y',
-                'Z':'z',
-                'ZH':'j'}
-
-# from https://github.com/kosuke-kitahara/xlsr-wav2vec2-phoneme-recognition/blob/main/Fine_tuning_XLSR_Wav2Vec2_for_Phoneme_Recognition.ipynb
-# IPA
-# ref: https://en.wikipedia.org/wiki/ARPABET
-arpabet_to_ipa = {
-    'aa': 'ɑ',
-    'ae': 'æ',
-    'ah':'ʌ',
-    'ao':'ɔ',
-    'aw':'W',
-    'ax':'ə',
-    'axr':'ɚ',
-    'ay':'Y',
-    'eh':'ɛ',
-    'er':'ɝ',
-    'ey':'e',
-    'ih':'ɪ',
-    'ix':'ɨ',
-    'iy':'i',
-    'ow':'o',
-    'oy':'O',
-    'uh':'ʊ',
-    'uw':'u',
-    'ux':'ʉ',
-    'b':'b',
-    'ch':'C',
-    'd':'d',
-    'dh':'ð',
-    'dx':'ɾ',
-    'el':'l̩',
-    'em':'m̩',
-    'en':'n̩',
-    'f':'f',
-    'g':'g',
-    'hh':'h',
-    'h':'h',
-    'jh':'J',
-    'k':'k',
-    'l':'l',    
-    'm':'m',    
-    'n':'n',    
-    'ng':'ŋ',    
-    'nx':'ɾ̃',    
-    'p':'p',    
-    'q':'ʔ',    
-    'r':'ɹ',    
-    's':'s',    
-    'sh':'ʃ',    
-    't':'t',    
-    'th':'θ',    
-    'v':'v',    
-    'w':'w',    
-    'wh':'ʍ',    
-    'y':'j',    
-    'z':'z',    
-    'zh':'ʒ',    
-    'ax-h':'ə̥',    
-    'bcl':'b̚',    
-    'dcl':'d̚',    
-    'eng':'ŋ̍',    
-    'gcl':'ɡ̚',    
-    'hv':'ɦ',    
-    'kcl':'k̚',    
-    'pcl':'p̚',    
-    'tcl':'t̚',
-    'epi':'S', 
-    'pau':'P',   
-}
-
-cmu_phones=[el[0] for el in cmudict.phones()]
-
-phones=cmudict.phones()
-cmu_vowels=[p[0] for p in phones if p[1][0]=='vowel']
-cmu_consonants=[p[0] for p in phones if p[1][0]!='vowel']
-
-# CMU is a subset of arpabet
-cmu_1_char={}
-cmu_1_char_to_gibberish={}
-for p in cmu_phones:
-    cmu_1_char[p]=arpabet_to_ipa[p.lower()]
-    cmu_1_char_to_gibberish[cmu_1_char[p]]=cmu_to_gibberish[p]
 
 def show_alternatives_distributions():
     import numpy as np
@@ -329,10 +163,11 @@ def check_phonemes(phonemes):
     for p in ps:
         if p not in cmu_phones: return p
         
-def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0']):
+def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
+    d=define_categories(mode=mode)
     n=0
     for el in phonetics:
-        if el[-1] in str([0,1,2]): n+=1
+        if el.lower() in d['vowels']: n+=1
     return n
 
 
@@ -523,21 +358,24 @@ def syllables_data(syl_sep='|'):
 
     return syllables
 
-def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=get_mfa_dict(path='data/spanish_mfa.dict')):
+def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=mfa_dicts['es_ES'], g2p_model="spanish_spain_mfa"):
     # fallbacks
     if '-' in word:
         w_parts=word.split('-')
         p_parts=[]
         for w_part in w_parts:
-            p_part=word_dict[w_part]
-            if p_part==[]: raise "phonetics empty, not in pronunciation dictionary"
+            try:
+                p_part=word_dict[w_part]
+            except KeyError: p_part=[]
+            if p_part==[]: #raise "phonetics empty, not in pronunciation dictionary"
                 # p_part=[g2p(w_part)]
+                p_part=mfa_g2p(w_part, model=g2p_model)[w_part]
             p_parts.append(p_part)
 
         # Here I generate all alternatives of combination of word parts
         # It corresponds to cmu alternatives for other words
         ps=list(itertools.product(*p_parts))
-        syls_ps=[[SonoriPy(p, mode='MFA')[0] for p in alt] for alt in ps]
+        syls_ps=[[SonoriPy(p, mode='MFA_IPA')[0] for p in alt] for alt in ps]
         
         # This puts 
         # '_' between phonemes
@@ -551,15 +389,17 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
             ps=word_dict[word]
         except KeyError:
             ps=[]
-        if ps==[]: raise "phonetics empty, not in pronunciation dictionary"
+        if ps==[]: #raise "phonetics empty, not in pronunciation dictionary"
             # ps=[g2p(word)]
+            print(word)
+            ps=mfa_g2p(word, model=g2p_model)[word]
         
         # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
         # for p in ps:
         #     if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==[ 'D', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
         #         p[-2:]=['IH0','D']
         
-        syls_ps=[SonoriPy(p, mode='MFA')[0] for p in ps]
+        syls_ps=[SonoriPy(p, mode='MFA_IPA')[0] for p in ps]
         syls_ps_formatted=['|'.join(['_'.join(s) for s in w]) for w in syls_ps]
     return syls_ps_formatted
 
@@ -605,7 +445,7 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
         
         # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
         for p in ps:
-            if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==[ 'D', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
+            if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==['D', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
                 p[-2:]=['IH0','D']
         
         syls_ps=[SonoriPy(p)[0] for p in ps]
@@ -614,7 +454,7 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
     return syls_ps_formatted, syls_gs_formatted
 
 
-def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv'), lang="en"):
+def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), lang="en_UK"):
     """Construct syllabified word from a word.
 
      text with syllable segmentation is done with several rules/steps:
@@ -632,11 +472,11 @@ def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv'), lang=
     Returns:
         [type]: [description]
     """
-    if cmudict_dict[word]!=[]:
-        if n_vowels(cmudict_dict[word][0])==1:
-            syls_text=word
-            used_method='1 syl in cmu'
-            return syls_text, used_method
+    # if phones!=[]:
+    if n==1:
+        syls_text=word
+        used_method='1 vowel = 1 syl'
+        return syls_text, used_method
     try:
         # If there exist choices with consistent number of syllables, let's take the first one of these.
         a=syllables_df[syllables_df.n_syls==syllables_df.n_syls_SonoriPy].loc[syllables_df.normalized_text==word]
@@ -656,7 +496,7 @@ def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv'), lang=
         from syllabipy.sonoripy import define_categories
         _,vowels,nasals,fricatives,affricates,stops=define_categories()
 
-        if lang=="en":
+        if lang=="en_UK" or lang=="en_US":
             if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
                 word=word[:-2]+'d'
                 modified_ed=True
@@ -670,6 +510,14 @@ def syllabified_text(word, syllables_df=pd.read_csv('data/syllables.csv'), lang=
                 word=word[:-1]
                 trailing_e=True
             elif word[-2:]=="le" and word[-3] not in stops: # do it for e.g. "smile", but not for "angle, muscle, article, ..."
+                word=word[:-1]
+                trailing_e=True
+        
+        if lang=="fr_FR":
+            if word[-2:]=="es":
+                word=word[:-2]+'s'
+                modified_es=True
+            elif word[-1]=="e": #this last one is treated hereafter because it depends
                 word=word[:-1]
                 trailing_e=True
         
@@ -723,14 +571,13 @@ def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
     return ' '.join(s_case_sep)
 
 
-from num2words import num2words
-def normalize_sentence_numbers(sentence, lang="en"):
+def normalize_sentence_numbers(sentence, lang="en_UK", mode="CMU"):
     # this takes care of e.g. "2021", "$110"
     # curly braces for numbers, if they are in several words
     # also add curly braces in original sentence around numbers
 
     def normalize(word, lang="en"):
-        if lang=="en":
+        if mode=="CMU":
             n_word=normalize_numbers(word)
         else:
             try:
@@ -770,12 +617,17 @@ def extract_special_chars(norm_sent, special_chars):
 get_acronyms_idxs=lambda words: [w_idx for w_idx,w in enumerate(words) if w.isupper()]
 
 
-sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
-def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!", 
+# sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
+# sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una start-up de 30000 dólares en etapa inicial, ¡luego con el CTO!"
+# sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+def prefill_for_sentence(
+    sentence="I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!",
+    # sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!", 
                         syllables_df=pd.read_csv('data/syllables.csv'), 
                         syl_sep='|', 
                         special_chars = [',','?','.','!','¡',';',':','"', '{', '}'],
-                        leng="en"):
+                        lang="en_US",
+                        mode='CMU'):  # "CMU" or "MFA_IPA"
     """This function extract information of syllabified texts and phonetics. 
     It uses a combination of datasets (CMUdict, data from syllable_data() ) and algorithm (SonoriPy)
 
@@ -787,12 +639,19 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     Returns:
         dict: see structure a the end of the function
     """
+    if mode=="MFA_IPA":
+        word_dict=mfa_dicts[lang]
+    else:
+        word_dict=cmudict_dict
+
     sentence=sentence.rstrip()
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
-    for c in special_chars: sentence=sentence.replace(' '+c, c)
+    for c in special_chars: 
+        if c not in ['¡']:  # this punctuation mark is at the beginning of a word
+            sentence=sentence.replace(' '+c, c)
     
-    norm_sent, sentence=normalize_sentence_numbers(sentence, lang=lang)
+    norm_sent, sentence=normalize_sentence_numbers(sentence, lang=lang, mode=mode)
     special_chars_dict_start, special_chars_dict_end=extract_special_chars(norm_sent, special_chars)
     words=remove_special_characters(norm_sent, lowercase=False).split(' ')
 
@@ -811,23 +670,38 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
         ws.append(w)
     words=[word.lower() for word in ws]
 
+    # p -> phonetics
+    # g -> gibberish
+    if mode!='MFA_IPA':
+        p=[generate_syl_phonetics_alternatives_from_word(word)[0] for word in words]
+        # I separate the acronym in letters and lookup cmudict. I take the last, because
+        # there is only one alternative except for letter 'A' which has  [['AH0'], ['EY1']]
+        for i in acronym_idxs:  p[i]=['-'.join(['_'.join(cmudict_dict[w][-1]) for w in words[i].split('-')])]
+    else:
+        p=[generate_syl_phonetics_alternatives_from_word_ipa(word, word_dict=word_dict, g2p_model=lang_to_MFA_g2p_models[lang]) for word in words]
+
+
     syls_texts=[]
     used_method_syllables=[]
-    for word in words:
+    for word, phones in zip(words,p):
         # # This split and rejoin will apply only if there is a dash and then allow to treat separately parts of a word with dash
         # if False:
         if '-' in word:
             syls_texts_parts=[]
             used_method_syllables_parts=[]
-            for w_part in word.split('-'):
-                syls_texts_parts.append(syllabified_text(w_part, syllables_df)[0])
-                used_method_syllables_parts.append(syllabified_text(w_part, syllables_df)[1])
+            for w_part, phones_part in zip(word.split('-'),phones[0].split('-')):
+                n=n_vowels(phones_part.replace('|','_').split('_'), mode=mode)
+                # print("w phones_part:",phones_part,', n_vowels:', n)
+                syls_texts_parts.append(syllabified_text(w_part, n, syllables_df, lang=lang)[0])
+                used_method_syllables_parts.append(syllabified_text(w_part, n, syllables_df, lang=lang)[1])
             # syls_texts.append('|-'.join(syls_texts_parts))
             syls_texts.append('-'.join(syls_texts_parts))
             used_method_syllables.append('-'.join(used_method_syllables_parts))
         else:
-            syls_texts.append(syllabified_text(word, syllables_df)[0])
-            used_method_syllables.append(syllabified_text(word, syllables_df)[1])
+            n=n_vowels(phones[0].replace('|','_').split('_'), mode=mode)
+            # print("w phones:",phones[0],', n_vowels:', n)
+            syls_texts.append(syllabified_text(word, n, syllables_df, lang=lang)[0])
+            used_method_syllables.append(syllabified_text(word, n, syllables_df, lang=lang)[1])
     
     # put back acronyms in syls_texts, and ignore what was there
     for i in acronym_idxs:
@@ -876,14 +750,7 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     # Here I want to remove only punctuation
     segmented_text=remove_special_characters(sentence=segmented_text, lowercase=False, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*]')
     
-    # p -> phonetics
-    # g -> gibberish
-    p=[generate_syl_phonetics_alternatives_from_word(word)[0] for word in words]
-    # p=[generate_syl_phonetics_alternatives_from_word_ipa(word)[0] for word in words]
 
-    # I separate the acronym in letters and lookup cmudict. I take the last, because
-    # there is only one alternative except for letter 'A' which has  [['AH0'], ['EY1']]
-    for i in acronym_idxs:  p[i]=['-'.join(['_'.join(cmudict_dict[w][-1]) for w in words[i].split('-')])]
 
     stress_inconsistencies=[]
     for w_i,w in enumerate(p):
@@ -935,7 +802,6 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
 
 
     split_phonetics = lambda phonetics: [[[s.split('_') for s in sub_w.split('|')] for sub_w in w.split('-')] for w in phonetics.split(' ')]
-    g_0=' '.join(['-'.join(['|'.join(['_'.join([cmu_to_gibberish[unstress(p)] for p in s]) for s in sub_w]) for sub_w in w]) for w in split_phonetics(p_0)])
     
     brace_dict_start=dict(filter(lambda el: el[1] in ['{','}'], special_chars_dict_start.items()))
     brace_dict_end=dict(filter(lambda el: el[1] in ['{','}'], special_chars_dict_end.items()))
@@ -944,29 +810,43 @@ def prefill_for_sentence(sentence="At 22 o'clock, I have a *meeting* with the CE
     p_0_special_chars=add_special_chars(p_0_special_chars, brace_dict_start, brace_dict_end)
     p_0_special_chars=' '.join(p_0_special_chars)
 
-    g_0_special_chars=acronyms_hyphen_to_compound(g_0.split(' '), acronym_idxs)
-    g_0_special_chars=add_special_chars(g_0_special_chars, brace_dict_start, brace_dict_end)
-    g_0_special_chars=' '.join(g_0_special_chars)
+    if mode!='MFA_IPA':
+        g_0=' '.join(['-'.join(['|'.join(['_'.join([cmu_to_gibberish[unstress(p)] for p in s]) for s in sub_w]) for sub_w in w]) for w in split_phonetics(p_0)])
+        g_0_special_chars=acronyms_hyphen_to_compound(g_0.split(' '), acronym_idxs)
+        g_0_special_chars=add_special_chars(g_0_special_chars, brace_dict_start, brace_dict_end)
+        g_0_special_chars=' '.join(g_0_special_chars)
 
     # processing on the raw text to add curly brackets around compound words
     special_chars_dict_start_raw, special_chars_dict_end_raw=extract_special_chars(sentence, special_chars)
     sent_=acronyms_to_compound(remove_special_characters(sentence=sentence, lowercase=False, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]').split(' '), get_acronyms_idxs(remove_special_characters(sentence, lowercase=False).split(' ')))
     sent_brackets=' '.join(add_special_chars(sent_, special_chars_dict_start_raw, special_chars_dict_end_raw))
 
-    record={'text':sent_brackets,
-        'cmu_phonetics':p_0_special_chars,
-        # 'pronounciation_guide':g_0_special_chars,
-        'pronounciation_guide_hr':g_0_special_chars.replace('_',''),
-        'segmented_text':segmented_text,
-        # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
-        'n_syl_mismatches':word_idxs_inconsitencies['n_syl'],
-        'n_stress_inconsistencies':word_idxs_inconsitencies['stress'],
-        'used_method_for_syl_text':used_method_syllables,
-        'cmu_phonetics_alt':p,
-        # 'pronounciation_guide_alt':g,
-        # 'pronounciation_guide_hr_alt':g_hr,
-        'n_alternatives':n_alternatives
-        }
+    if mode!='MFA_IPA':
+        record={'text':sent_brackets,
+            'cmu_phonetics':p_0_special_chars,
+            # 'pronounciation_guide':g_0_special_chars,
+            'pronounciation_guide_hr':g_0_special_chars.replace('_',''),
+            'segmented_text':segmented_text,
+            # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
+            'n_syl_mismatches':word_idxs_inconsitencies['n_syl'],
+            'n_stress_inconsistencies':word_idxs_inconsitencies['stress'],
+            'used_method_for_syl_text':used_method_syllables,
+            'cmu_phonetics_alt':p,
+            # 'pronounciation_guide_alt':g,
+            # 'pronounciation_guide_hr_alt':g_hr,
+            'n_alternatives':n_alternatives
+            }
+    else:
+        record={'text':sent_brackets,
+            'cmu_phonetics':p_0_special_chars,
+            'segmented_text':segmented_text,
+            # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
+            'n_syl_mismatches':word_idxs_inconsitencies['n_syl'],
+            'n_stress_inconsistencies':word_idxs_inconsitencies['stress'],
+            'used_method_for_syl_text':used_method_syllables,
+            'cmu_phonetics_alt':p,
+            'n_alternatives':n_alternatives
+            }
     return record
 
 def prefill_content(sentences, syl_sep='|'):
@@ -1028,6 +908,16 @@ def word_selection():
 if __name__ == "__main__":
     from utils.text_processing import *
     prefill_for_sentence()
+
+    
+    sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
+    sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
+    sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    r=prefill_for_sentence(
+                        sentence=sentence,
+                        # syllables_df=pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']), 
+                        lang="fr_FR",
+                        mode='MFA_IPA')  # "CMU" or "MFA_IPA"
     
     from utils.label_data_processing import actor_recordings
     df_phrases=actor_recordings()
@@ -1097,6 +987,8 @@ if __name__ == "__main__":
     syllabified_text(word, syllables_df)
 
     syllabified_text('dépendance', pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
+
+    
 
     df=generate_prefill_csv()
     df[df.n_syl_mismatch>0][['syllable_parts', 'pronounciation_guide_hr','used_method_for_syl_text']]

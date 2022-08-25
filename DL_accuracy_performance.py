@@ -16,8 +16,10 @@ exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_12
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio
 from utils.audio_processing import prepare_audio_file
 
-from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings
+from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings, final_s_artificial_data
 from utils.text_processing import *
+from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_phones
+
 from utils.libri_phonetization_data import *
 
 from tqdm import tqdm
@@ -31,6 +33,9 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 
 
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
 
 
 def stress_GE_performance_test(level='sentence'):
@@ -225,8 +230,6 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001, model = charsiu_ph
 
 
 
-from utils.text_processing import cmu_vowels
-from scipy.stats import gaussian_kde
 def distrib(l):
     x = np.linspace(0, 1, 1000)
     kde = gaussian_kde(l, bw_method = 0.5)
@@ -670,7 +673,20 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model = charsiu_ph
 
     return phonetic_detections, phonetic_detections_s, d, d_s
 
+def final_s_from_artificial_data( model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')):
+    df=final_s_artificial_data()
 
+    selections_s=df[df.target_phones=='S']
+
+    # selections_s['target_word_indexes']=selections_s['word_idx'].apply(lambda r: [r])
+    selections_s['target_word_indexes']=selections_s['word_idx']
+    selections_s['fpath']=selections_s['path']
+
+    # phonetic_detections,result_df=compute_predictions(selections_s.iloc[0:1,:], model, target_phones='S', tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='IH_Z')
+    phonetic_detections,result_df=compute_predictions(selections_s, model, target_phones='S', tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='IH_Z')
+
+    result_df[result_df.gibberish_truth==result_df.gibberish_detected]
+    result_df[result_df.gibberish_truth!=result_df.gibberish_detected]
 
 
 def pContrast_from_audiobook_data(data_set='test-other', target_phones='AO1', n=None, model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'), alternatives=cmu_vowels):
@@ -793,8 +809,6 @@ def termination_confusions_for_actor_recordings():
         results[p]=rates
     return predictions, results
 
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
     plt.clf()
