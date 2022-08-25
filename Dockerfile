@@ -37,11 +37,14 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
 # This is necessary so that librosa is able to read mp3 files (in 2 steps to avoid conda memory error...)
 # RUN conda install -c anaconda -y python=3 && conda install -c conda-forge nettle ffmpeg
 # RUN conda install -c conda-forge nettle ffmpeg && \
+# RUN conda install -c conda-forge montreal-forced-aligner
 RUN conda install ffmpeg && \
 # For using e.g. MelGAN or wav2vec2
    conda install pytorch torchaudio cpuonly -c pytorch && \
+   conda install -c conda-forge montreal-forced-aligner && \
 # clean unnecessary setup files 
    conda clean --all -y
+
 
 COPY ./requirements.txt $HOME/requirements.txt
 # COPY ./ $HOME/
@@ -64,6 +67,8 @@ RUN pip install --upgrade pip && pip install pyworld && pip install -r requireme
 
 # from https://stackoverflow.com/questions/37458287/how-to-run-a-cron-job-inside-a-docker-container
 # copy crontabs for root user
+
+# RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
 
 # COPY cronjobs/remove_old_files /etc/crontabs/root
 # RUN crontab /etc/crontabs/root

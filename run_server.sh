@@ -8,5 +8,7 @@
 
 export FLOWSPEECH_KEY="ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"
 cron
-gunicorn -b 0.0.0.0:8000 flask_server:app
-# python flask_server.py
+# gunicorn -b 0.0.0.0:8000 flask_server:app
+mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
+NEW_RELIC_CONFIG_FILE=newrelic.ini newrelic-admin run-program python flask_server.py
+# NEW_RELIC_CONFIG_FILE=newrelic.ini newrelic-admin run-program gunicorn -b 0.0.0.0:8000 flask_server:app
