@@ -9,7 +9,8 @@ import sys
 import torch
 import numpy as np
 from charsiu.src.utils import seq2duration,forced_align
-from utils.text_processing import group_consecutive_duplicates, cmu_vowels, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, cmu_vowels, cmu_consonants, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
+from utils.text_processing import group_consecutive_duplicates, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
+from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 from utils.audio_processing import getIntonation, getIntensity, normalize
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value

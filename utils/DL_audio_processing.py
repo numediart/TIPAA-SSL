@@ -6,7 +6,7 @@ import sys
 import random
 import soundfile as sf
 
-from utils.text_processing import cmu_1_char_to_gibberish
+from utils.pronunciation_dictionaries import cmu_1_char_to_gibberish
 import pandas as pd
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from scipy.io.wavfile import read
