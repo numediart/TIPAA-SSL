@@ -70,7 +70,7 @@ def prefill_from_phrases():
                 mimetype="application/json"
                 )
 
-example_prefill={"phrase":"I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!"}
+example_prefill={"phrase":"I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!", "mode":"CMU", "lang":"en_US"}
 example_prefill_params=kwargs_def(example_prefill)
 record={'text':fields.Str(),
         'cmu_phonetics':fields.Str(),
@@ -101,7 +101,14 @@ def prefill_from_phrase():
     err=check_schema(content, example_prefill_params)
     if err: return Response(err,status=400,mimetype="application/json")
     
-    d=prefill_for_sentence(content['phrase'], syllables_df)
+    # d=prefill_for_sentence(content['phrase'], syllables_df, lang=content['lang'], mode=content['mode'])
+    lang=content['lang']
+    mode=content['mode']
+    d=prefill_for_sentence(
+                        sentence=content['phrase'],
+                        syllables_df=syllables_df[lang], 
+                        lang=lang,
+                        mode=mode)  # "CMU" or "MFA_IPA"
     # print(d)
     response=json.dumps(d)
     # print(response)

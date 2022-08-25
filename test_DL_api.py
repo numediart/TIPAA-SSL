@@ -18,9 +18,9 @@ exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_12
 from utils.audio_processing import audio64_from_file
 from utils.text_processing import get_chunks, chunk_text
 
-def call_prefill_for_sentence(sentence, base_url = 'http://localhost:8000', client=requests):
+def call_prefill_for_sentence(sentence, mode="CMU", lang="en_US", base_url = 'http://localhost:8000', client=requests):
     url=base_url+"/prefill_from_phrase"
-    data={"phrase":sentence}
+    data={"phrase":sentence, "mode":mode, "lang":lang}
     if client==requests: res = client.post(url,  json = json.dumps(data))
     else: res = client.post(url, 
                 data=json.dumps(data),
@@ -32,7 +32,24 @@ def call_prefill_for_sentence(sentence, base_url = 'http://localhost:8000', clie
 def test_prefill(base_url = 'http://localhost:8000', client=app.test_client()):
     sentence="I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!"
     r=call_prefill_for_sentence(sentence, base_url = base_url, client=client)
-    return r.data
+    d=ast.literal_eval(r.data.decode('utf8'))
+    assert d['cmu_phonetics']=='AY1 P_EY1_D AH0 {TH_R_IY1 TH_AW1|Z_AH0_N_D D_AA1|L_ER0_Z} B_IH1_L W_EH1_N V_IH1|Z_IH0|T_IH0_NG {Y_UW1 S_IY1 EH1_L EY1} IH1_T_S AE1_N IH0_K_S|P_EH1_N|S_IH0_V HH_OW0|T_EH1_L F_AO1_R DH_AH0 T_W_EH1_N|T_IY0-F_ER1_S_T S_EH1_N|CH_ER0|IY0'
+
+    sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una start-up de 30000 dólares en etapa inicial, ¡luego con el CTO!"
+    r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="es_ES", base_url = base_url, client=client)
+    d=ast.literal_eval(r.data.decode('utf8'))
+    sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
+    r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="en_UK", base_url = base_url, client=client)
+    d=ast.literal_eval(r.data.decode('utf8'))
+    sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="fr_FR", base_url = base_url, client=client)
+    d=ast.literal_eval(r.data.decode('utf8'))
+
+    # sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    # r=call_prefill_for_sentence(sentence, mode="MFA_IPA", lang="es_ES", base_url = base_url, client=client)
+    # d=ast.literal_eval(r.data.decode('utf8'))
+
+    return d
 
 def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests, mode='v1'):
     """makes a request with metadata contained in "r" and makes the call to the endpoint. It works locally or with a server, and with
