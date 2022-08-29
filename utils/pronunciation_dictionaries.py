@@ -75,7 +75,7 @@ def generate_acronym_letter_dicts():
     lang="es_ES"
     letters[lang]='E A O S R N I D L C T U M P B G V Y Q H F Z J Ñ X W K'.lower().split(' ')
     
-    acronym_dict=acro_dict(lang)
+    acronym_dict=acro_dict(letters, lang)
     acronym_dict['h']=mfa_g2p('ache', lang_to_MFA_g2p_models[lang])['ache']
     acronym_dict['z']=mfa_g2p('zeta', lang_to_MFA_g2p_models[lang])['zeta']
     acronym_dict['w']=mfa_g2p('uvedoble', lang_to_MFA_g2p_models[lang])['uvedoble']
@@ -97,7 +97,8 @@ def generate_acronym_letter_dicts():
     acronym_dict=acro_dict(letters, lang)
     acronym_dict_long={k:[max(lst, key=len)] for k,lst in acronym_dict.items()}
     # as the first phoneme in "age"
-    acronym_dict_long['a']=[mfa_g2p('age', lang_to_MFA_g2p_models[lang])['age'][0][0]]
+    # acronym_dict_long['a']=[mfa_g2p('age', lang_to_MFA_g2p_models[lang])['age'][0][0]]
+    acronym_dict_long['a']=[['ej']]
     acronym_dict_long['e']=[['iː']]
     # as the word "are", US Version //!\\
     acronym_dict_long['r']=[mfa_g2p('are', lang_to_MFA_g2p_models['en_US'])['are'][0]]
@@ -138,7 +139,8 @@ def get_augmented_mfa_dict(lang='es_ES'):
 
 mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
-
+mfa_dicts['en_US']
+len(mfa_dicts['en_US'])
 
 
 def build_mfa_phone_set():
@@ -151,7 +153,6 @@ def build_mfa_phone_set():
     with open("data/mfa_phones.json", "w") as outfile: outfile.write(json.dumps(phones))
 
     return phones
-
 
 def get_augmented_cmudict():
     cmudict_dict=cmudict.dict()
@@ -178,7 +179,7 @@ def get_augmented_cmudict():
 
 cmudict_dict=get_augmented_cmudict()
 
-
+len(cmudict_dict)
 
 
 cmu_to_gibberish={'AA':'o',
