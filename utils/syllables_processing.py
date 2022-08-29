@@ -112,6 +112,7 @@ def syllables_data(syl_sep='|'):
 
     return syllables
 
+# syllables_data()
 
 def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), lang="en_GB"):
     """Construct syllabified word from a word.
@@ -153,7 +154,8 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
         trailing_e=False
 
         from syllabipy.sonoripy import define_categories
-        _,vowels,nasals,fricatives,affricates,stops=define_categories()
+        d=define_categories('letters')
+        vowels,nasals,fricatives,affricates,stops=d['vowels'],d['nasals'],d['fricatives'],d['affricates'],d['stops']
 
         if lang=="en_GB" or lang=="en_US":
             if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
@@ -189,6 +191,17 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
             syls_text=syls_text[:-1]+"es"
         if trailing_e:
             syls_text+='e'
+        
+        # yet another type of correction for some terminations. Maybe some others from above might be implemented this way and vice versa
+        if lang=="en_GB" or lang=="en_US":
+            if syls_text[-3:]=="ism":
+                syls_text=syls_text[:-3]+"i|sm"
+            if syls_text[-4:]=="isms":
+                syls_text=syls_text[:-4]+"i|sms"
+            if syls_text[-4:]=="ithm":
+                syls_text=syls_text[:-4]+"i|thm"
+            if syls_text[-5:]=="ithms":
+                syls_text=syls_text[:-5]+"i|thms"
 
         used_method='SonoriPy'
         return syls_text, used_method
