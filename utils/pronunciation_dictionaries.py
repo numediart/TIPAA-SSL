@@ -158,6 +158,12 @@ def get_augmented_cmudict():
     cmudict_dict=cmudict.dict()
 
     corrections={
+        'areas':[['EH1','R','IH0','AH0','Z']],
+        'drawing':[['D','R','AO1','W','IH0','NG']],
+        'drawings':[['D','R','AO1','W','IH0','NG','Z']],
+        'ph':[['P', 'IY1', 'EY2', 'CH']],
+        'pH':[['P', 'IY1', 'EY2', 'CH']],
+        'laboratory':[['L', 'AE1', 'B', 'AH0', 'R', 'AH0', 'T', 'AO2', 'R', 'IY0']],
         'fourteen':[['F', 'AO2', 'R', 'T', 'IY1', 'N']],
         'thirteen':[['TH', 'ER2', 'T', 'IY1', 'N']],
         'fifteen':[['F', 'IH2', 'F', 'T', 'IY1', 'N']],
@@ -166,6 +172,8 @@ def get_augmented_cmudict():
         'eighteen':[['EY0', 'T', 'IY1', 'N'], ['EY2', 'T', 'IY1', 'N']],
         'nineteen':[['N', 'AY2', 'N', 'T', 'IY1', 'N']],
         'engineer':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R']],
+        'engineers':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'Z']],
+        'engineering':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'IH0', 'NG']],
         'downstairs':[['D', 'AW0', 'N', 'S', 'T', 'EH1', 'R', 'Z']],
         'trainee':[['T', 'R', 'EY0', 'N', 'IY1']],
         'outside':[['AW0', 'T', 'S', 'AY1', 'D']],
