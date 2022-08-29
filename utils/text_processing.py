@@ -13,6 +13,7 @@ from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
 from itertools import groupby
 from num2words import num2words
+import unidecode
 
 g2p = G2p()
 
@@ -144,7 +145,7 @@ def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
     return n
 
 
-import unidecode
+
 
 def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=mfa_dicts['es_ES'], g2p_model="spanish_spain_mfa"):
     # fallbacks
@@ -353,7 +354,7 @@ def prefill_for_sentence(
     else:
         word_dict=cmudict_dict
 
-    sentence=sentence.rstrip()
+    sentence=sentence.strip()
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
     for c in special_chars: 
