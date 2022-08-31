@@ -45149,7 +45149,7 @@
 45147,draw|bridge,drawbridge,2,2.0
 45148,draw|ee,drawee,2,
 45149,draw|er,drawer,2,1.0
-45150,draw|ing,drawing,2,1.0
+45150,draw|ing,drawing,2,2.0
 45151,draw|ing ac|count,drawing account,3,
 45152,draw|ing board,drawing board,2,
 45153,draw|ing card,drawing card,2,
@@ -84603,7 +84603,7 @@
 84601,lab|o|ra|to|ri|al,laboratorial,6,
 84602,lab|o|ra|to|ri|al|ly,laboratorially,7,
 84603,lab|o|ra|to|ri|an,laboratorian,6,
-84604,lab|o|ra|to|ry,laboratory,5,4.0
+84604,lab|o|ra|to|ry,laboratory,5,5.0
 84605,lab|ra|dor,labrador,3,3.0
 84606,lab|ra|dor cur|rent,labrador current,4,
 84607,lab|ra|dor re|triev|er,labrador retriever,5,
@@ -85786,7 +85786,7 @@
 85784,la|bored,labored,2,2.0
 85785,la|bored|ly,laboredly,3,
 85786,la|bored|ness,laboredness,3,
-85787,la|bor|a|to|ry,laboratory,5,4.0
+85787,la|bor|a|to|ry,laboratory,5,5.0
 85788,la|bor|er,laborer,3,3.0
 85789,la|bor|ing|ly,laboringly,4,
 85790,la|bor|ism,laborism,3,
@@ -187193,3 +187193,18 @@
 18,ex|pe|ri|en|ces,experiences,5,5.0
 19,as|so|ci|ates,associates,4,4.0
 20,ag|gra|va|ted,aggravated,4,4.0
+21,par|ti|cles,particles,3,3.0
+22,cons|ti|tu|ents,constituents,4,4.0
+23,theo|rem,theorem,2,2.0
+24,sam|uel,samuel,2,2.0
+25,in|di|vi|du|als,individuals,5,5.0
+26,fire|wall,firewall,2,2.0
+27,re|ac|tions,reactions,3,3.0
+28,re|ac|ted,reacted,3,3.0
+29,i|deal,ideal,2,2.0
+30,im|pro|vements,improvements,3,3.0
+31,al|go|ri|thm,algorithm,4,4.0
+32,cir|cum|ference,circumference,3,3.0
+33,p|h,ph,2,2.0
+34,re|cy|cled,recycled,3,3.0
+35,tri|alled,trialled,2,
