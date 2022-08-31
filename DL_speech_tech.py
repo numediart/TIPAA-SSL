@@ -59,6 +59,7 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
     else:
         return "error: mode for audio_load_and_check() must be file or base64", None
     
+    if np.abs(s).sum()==0: return "success: no voiced sound detected (only 0's in waveform)", None
     
     f0Samples=getIntonation(s, fs)
     if sum([el!=el for el in f0Samples])==len(f0Samples):
