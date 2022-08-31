@@ -16,7 +16,8 @@ seaborn
 ordered_set
 g2p_en
 # flask-restful
-flask-apispec==0.11.0
+# flask-apispec==0.11.0
+flask-apispec
 # torch
 pyyaml
 speechbrain
@@ -26,3 +27,5 @@ newrelic
 webrtcvad
 praatio
 g2pM
+num2words
+unidecode
