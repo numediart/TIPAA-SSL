@@ -29,7 +29,8 @@ def call_prefill_for_sentence(sentence, mode="CMU", lang="en_US", base_url = 'ht
     d=ast.literal_eval(res.data.decode('utf8'))
     return d
 
-def test_prefill(base_url = 'http://localhost:8000', client=app.test_client()):
+# I removed this endpoint
+def a_test_prefill(base_url = 'http://localhost:8000', client=app.test_client()):
     sentence="I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!"
     d=call_prefill_for_sentence(sentence, base_url = base_url, client=client)
     
@@ -51,7 +52,7 @@ def test_prefill(base_url = 'http://localhost:8000', client=app.test_client()):
 
     return d
 
-def prefill_content_phrases(path="data/SE_content_all_phrases_29_08_22_8am.csv"):
+def prefill_content_phrases(path="data/SE_content_all_phrases_08_31_2022_11_56_57.csv"):
     all_sentences=pd.read_csv(path)
     # call_prefill_for_sentence()
     print('n of sentences:', len(all_sentences))
@@ -86,9 +87,10 @@ def prefill_content_phrases(path="data/SE_content_all_phrases_29_08_22_8am.csv")
 
     phonetics_data[phonetics_data.apply(lambda r: len(r.n_stress_inconsistencies)>0, axis=1)].apply(lambda r: [r.cmu_phonetics.split(' ')[i] for i in r.n_stress_inconsistencies], axis=1)
 
+    prefill_path=path.split('.')[0]+'_prefill.csv'
+    phonetics_data.to_csv(prefill_path)
+
     return phonetics_data
-
-
 
 
 def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests, mode='v1'):
@@ -268,8 +270,8 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/str
 
     return results_ss, failures_ss, results_ws, failures_ws
 
-def test_audio64(base_url = 'http://localhost:8000', client=app.test_client()):
-    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
+def test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a', base_url = 'http://localhost:8000', client=app.test_client()):
+    
     from utils.text_processing import prefill_for_sentence
 
     text="I would love to go to ireland"
@@ -278,7 +280,7 @@ def test_audio64(base_url = 'http://localhost:8000', client=app.test_client()):
     r['text']=text
     r['audio_file_url']=path
     r['target_phoneme']=float('nan')
-    res=request_for_audio_file(r, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
     print(res.data)
     assert res.status_code==200
     # res=request_for_audio_file(r, endpoint='/w2v/stress/sentence', client=client, mode='v1')
@@ -336,11 +338,12 @@ if __name__ == '__main__':
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
     test_stress_detection(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
 
-    test_actor_recordings(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
-    test_stress_detection(base_url = 'http://146.59.241.79:8000', client=requests, n_ex_by_module=10)
+    test_actor_recordings(base_url = 'http://135.125.247.39:8000', client=requests, n_ex_by_module=10)
+    test_stress_detection(base_url = 'http://135.125.247.39:8000', client=requests, n_ex_by_module=10)
     r=test_actor_recordings()
     r=test_stress_detection()
 
+    test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a', base_url = 'http://135.125.247.39:8000', client=requests)
     
     df=actor_recordings()
     len_t_seg=df.apply(lambda r: len(r.syllable_parts.split(' ')), axis=1)
