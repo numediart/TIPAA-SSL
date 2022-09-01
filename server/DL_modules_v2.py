@@ -44,7 +44,7 @@ def internal_error(error):
         'value':str(value),
         'traceback':str(traceback.format_tb(tb))
     }
-    return Response(json.dumps({"status":content, "error":True }),status=500,mimetype="application/json")
+    return Response(json.dumps({"status":str(content), "error":True }),status=500,mimetype="application/json")
 
 @bp.app_errorhandler(400)
 def internal_error(error):
@@ -54,7 +54,7 @@ def internal_error(error):
         'value':str(value),
         'traceback':str(traceback.format_tb(tb))
     }
-    return Response(json.dumps({"status":content, "error":True }),status=400,mimetype="application/json")
+    return Response(json.dumps({"status":str(content), "error":True }),status=400,mimetype="application/json")
 
 example_sentence_stress={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
 sentence_stress_params=kwargs_def(example_sentence_stress)
