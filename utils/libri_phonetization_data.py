@@ -243,11 +243,11 @@ def selection_with_and_without_s(libri_words_df, word='speak'):
     
 
 
-def select(selection, phone, column='phones', option="contains"):
+def select_libri(selection, phone, column='phones', option="contains"):
     """select from libri_words_df with criteria
     option="contains" or "startswith" or "endswith"
 
-    example: select(selection,'L D', option='endswith')
+    example: select_libri(selection,'L D', option='endswith')
     """
     # apply one selection criteria
     if option=='contains':
@@ -277,8 +277,8 @@ def frequent_selection_containing(libri_words_df, phones=['AO0','IY1'], letters=
     
     
     selection=libri_words_df
-    for phone in phones: selection=select(selection,phone, option=option)
-    for l in letters:selection=select(selection,l, 'word', option=option)
+    for phone in phones: selection=select_libri(selection,phone, option=option)
+    for l in letters:selection=select_libri(selection,l, 'word', option=option)
 
     content=learning_content(selection, n=n)
     content.index=range(len(content))

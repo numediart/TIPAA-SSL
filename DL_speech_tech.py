@@ -18,10 +18,15 @@ target_accepted_alternatives={
     'AA': ['AA', 'AO'],
     'AO': ['AA', 'AO'],
     'D': ['D', 'T'],
-    'T': ['D', 'T'],
+    'Z': ['Z', 'S'],
+    # 'T': ['D', 'T'],
     # 'IH': ['IH', 'AH', 'EH']
 }
 
+terminations_accepted_alternatives={
+    'IH_Z':['AH_Z','IH_Z'],
+    'IH_D':['AH_D','IH_D']
+    }
 
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
     """Load audio with 2 modes: from a "file" or from "base64" encoding
@@ -333,9 +338,14 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                     ter_post.append(unstress(p))
         else: ter_post=ter
 
+        
+
+
         # there might be consecutive duplicates when we concatenate root and ter_post
         # g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in root+ter_post])
-        g_d=[cmu_to_gibberish[unstress(p)] for p in ter_post]
+        
+        # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
+        g_d=[cmu_to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in ter_post]
         
         # phonetic detection needs to be the stressed version for backwards compatibility 
         # (however, here I convert to stressed version only when correct, it might work, but could cause problems?)
@@ -344,11 +354,20 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         elif contrast=="start":
             detection=ter_post[:-1]
 
+
         # detection=ter_post
         if target_phones!='': # case of final -s
             if detection==remove_stress_annots(target_phones.split('_')): detection=target_phones.split('_')
+        
+        detection='_'.join(detection)
+        
+        # post-correction for the whole termination not to differentiate between IH_D and AH_D     or    IH_Z and AH_Z
+        unstressed_target='_'.join(remove_stress_annots(target_phones.split('_')))
+        if unstressed_target in terminations_accepted_alternatives:
+            if detection in terminations_accepted_alternatives[unstressed_target]:
+                detection=unstressed_target
 
-        return {"status": "success", "phonetic_detection": '_'.join(detection), "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
+        return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 

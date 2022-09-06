@@ -1,6 +1,6 @@
 from cProfile import label
 from utils.libri_phonetization_data import build_librispeech_words_df
-from utils.libri_phonetization_data import phonetics_for_row, select
+from utils.libri_phonetization_data import phonetics_for_row, select_libri
 from tqdm import tqdm
 import pandas as pd
 import pickle
@@ -585,10 +585,10 @@ def termination_contrast_from_audiobook_data(data_set='test-other', target_phone
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
 
-    selection=select(select(libri_words_df,'D', option='endswith'), 'ed', column='word', option='endswith')
-    selection_id=select(selection, 'IH0 D', option="endswith")
+    selection=select_libri(select_libri(libri_words_df,'D', option='endswith'), 'ed', column='word', option='endswith')
+    selection_id=select_libri(selection, 'IH0 D', option="endswith")
     selection_d=selection[~selection.index.isin(selection_id.index.tolist())]
-    selection_t=select(select(libri_words_df,'T', option='endswith'), 'ed', column='word', option='endswith')
+    selection_t=select_libri(select_libri(libri_words_df,'T', option='endswith'), 'ed', column='word', option='endswith')
 
     selections={}
     selections['D']=selection_d
@@ -654,7 +654,7 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model = charsiu_ph
     selections=selections[~selections.word.isin(freq_words)]
     selections_s=selections_s[~selections_s.word.isin(freq_words_s)]
 
-    # filter our first ones like "it" or "its" tat are too frequent
+    # filter our first ones like "it" or "its" that are too frequent
 
     phonetic_detections,result_df=compute_predictions(selections, model, target_phones='', tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='S')
     phonetic_detections_s,result_df_s=compute_predictions(selections_s, model, target_phones='S', tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='S')
@@ -673,20 +673,53 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model = charsiu_ph
 
     return phonetic_detections, phonetic_detections_s, d, d_s
 
-def final_s_from_artificial_data( model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')):
-    df=final_s_artificial_data()
+def final_s_from_artificial_data(model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')):
+    df=final_s_artificial_data()    
+    # df.apply(lambda r: r.text.split(' ')[r.word_idx], axis=1)
+    df_target_word_p=df.apply(lambda r: r.cmu_phonetics.split(' ')[r.word_idx], axis=1)
 
-    selections_s=df[df.target_phones=='S']
+    df['target_word_indexes']=df['word_idx']
+    df['fpath']=df['path']
 
-    # selections_s['target_word_indexes']=selections_s['word_idx'].apply(lambda r: [r])
-    selections_s['target_word_indexes']=selections_s['word_idx']
-    selections_s['fpath']=selections_s['path']
+    df_iz=df[df_target_word_p.str.endswith('AH0_Z')|df_target_word_p.str.endswith('IH0_Z')]
+    df_s=df[df_target_word_p.str.endswith('_S')]
+    df_z=df[~(df_target_word_p.str.endswith('AH0_Z')|df_target_word_p.str.endswith('IH0_Z'))&~df_target_word_p.str.endswith('_S')]
 
-    # phonetic_detections,result_df=compute_predictions(selections_s.iloc[0:1,:], model, target_phones='S', tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='IH_Z')
-    phonetic_detections,result_df=compute_predictions(selections_s, model, target_phones='S', tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='IH_Z')
+    selections={
+        'IH_Z':df_iz,
+        'S':df_s,
+        'Z':df_z
+    }
 
-    result_df[result_df.gibberish_truth==result_df.gibberish_detected]
-    result_df[result_df.gibberish_truth!=result_df.gibberish_detected]
+    targets=['S','Z','IH_Z']
+    terminations_accepted_alternatives={'IH_Z':['AH_Z','IH_Z']}
+    result_dfs={}
+    for t in targets:
+        phonetic_detections,result_df=compute_predictions(selections[t], model, target_phones=t, tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='IH_Z')
+        result_dfs[t]=result_df
+    for t in targets:
+        # print('target ',t)
+        # if not t in accepted_aletrnative_terminations:
+            print('successes:',result_dfs[t][result_dfs[t].phonetic_detection==t])
+            print('errors:',result_dfs[t][result_dfs[t].phonetic_detection!=t])
+            success_rate=len(result_dfs[t][result_dfs[t].phonetic_detection==t])/len(result_dfs[t])
+        # else:
+            # print('successes:',result_dfs[t][result_dfs[t].phonetic_detection.isin(terminations_accepted_alternatives[t])])
+            # print('successes:',result_dfs[t][~result_dfs[t].phonetic_detection.isin(terminations_accepted_alternatives[t])])
+            # success_rate=len(result_dfs[t][result_dfs[t].phonetic_detection.isin(terminations_accepted_alternatives[t])])/len(result_dfs[t])
+            print('success_rate:',success_rate)
+
+    
+    selections['Z'].reset_index(drop=True)
+
+    selections['Z'].reset_index(drop=True)[result_dfs['Z'].status.str.contains('not')]
+    selections['S'].reset_index(drop=True)[result_dfs['S'].status.str.contains('not')]
+    selections['IH_Z'].reset_index(drop=True)[result_dfs['IH_Z'].status.str.contains('not')]
+
+    selections['IH_Z'].reset_index(drop=True)[result_dfs['IH_Z'].phonetic_detection!='IH_Z']
+    # d=count_values(phonetic_detections)
+    # d.columns=[target_phones]
+    # return phonetic_detections, d
 
 
 def pContrast_from_audiobook_data(data_set='test-other', target_phones='AO1', n=None, model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'), alternatives=cmu_vowels):
