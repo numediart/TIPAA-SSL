@@ -377,6 +377,7 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
     content=prefill_content(df["Text with target"].tolist())
     df['cmu_phonetics']=content.cmu_phonetics
     content['path']=df.path
+    content['text']=df["Text with target"]
 
     content.apply(lambda r: sum(['*' in el for el in r.text.split()]), axis=1)
     
@@ -385,13 +386,14 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
     # checks in each word if there is a "*", put one if true in a list. Then I use index() to know where is the 1
     content.loc[sents.index, 'word_idx']=sents.apply(lambda r: [int('*' in el) for i,el in enumerate(r)].index(1))
 
-    content["target"]=df["Target phoneme"]
+    # content["target"]=df["Target phoneme"]
 
     # content["target_syllable_indexes"]=-1
     content["target_syllable_indexes"]=[[-1]]*len(content)
 
-    to_cmu={"/z/":"Z", "/s/":"S", "/iz/": "IH_Z"}
+    # Don't use the annotations, they are wrong, I'll use cmudict instead
+    # to_cmu={"/z/":"Z", "/s/":"S", "/iz/": "IH_Z"}
 
-    content["target_phones"]=content["target"].apply(lambda r: to_cmu[r])
+    # content["target_phones"]=content["target"].apply(lambda r: to_cmu[r])
 
     return content
