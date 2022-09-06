@@ -686,37 +686,31 @@ def final_s_from_artificial_data(model = charsiu_phone_forced_aligner(aligner='h
     df_z=df[~(df_target_word_p.str.endswith('AH0_Z')|df_target_word_p.str.endswith('IH0_Z'))&~df_target_word_p.str.endswith('_S')]
 
     selections={
-        'IH_Z':df_iz,
+        'IH0_Z':df_iz,
         'S':df_s,
         'Z':df_z
     }
 
-    targets=['S','Z','IH_Z']
-    terminations_accepted_alternatives={'IH_Z':['AH_Z','IH_Z']}
+    targets=['S','Z','IH0_Z']
     result_dfs={}
     for t in targets:
         phonetic_detections,result_df=compute_predictions(selections[t], model, target_phones=t, tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='IH_Z')
         result_dfs[t]=result_df
     for t in targets:
-        # print('target ',t)
-        # if not t in accepted_aletrnative_terminations:
-            print('successes:',result_dfs[t][result_dfs[t].phonetic_detection==t])
-            print('errors:',result_dfs[t][result_dfs[t].phonetic_detection!=t])
-            success_rate=len(result_dfs[t][result_dfs[t].phonetic_detection==t])/len(result_dfs[t])
-        # else:
-            # print('successes:',result_dfs[t][result_dfs[t].phonetic_detection.isin(terminations_accepted_alternatives[t])])
-            # print('successes:',result_dfs[t][~result_dfs[t].phonetic_detection.isin(terminations_accepted_alternatives[t])])
-            # success_rate=len(result_dfs[t][result_dfs[t].phonetic_detection.isin(terminations_accepted_alternatives[t])])/len(result_dfs[t])
-            print('success_rate:',success_rate)
+        print('target ',t)
+        print('successes:',result_dfs[t][result_dfs[t].phonetic_detection==t])
+        print('errors:',result_dfs[t][result_dfs[t].phonetic_detection!=t])
+        success_rate=len(result_dfs[t][result_dfs[t].phonetic_detection==t])/len(result_dfs[t])
+        print('success_rate:',success_rate)
 
     
     selections['Z'].reset_index(drop=True)
 
     selections['Z'].reset_index(drop=True)[result_dfs['Z'].status.str.contains('not')]
     selections['S'].reset_index(drop=True)[result_dfs['S'].status.str.contains('not')]
-    selections['IH_Z'].reset_index(drop=True)[result_dfs['IH_Z'].status.str.contains('not')]
+    selections['IH0_Z'].reset_index(drop=True)[result_dfs['IH0_Z'].status.str.contains('not')]
 
-    selections['IH_Z'].reset_index(drop=True)[result_dfs['IH_Z'].phonetic_detection!='IH_Z']
+    selections['IH0_Z'].reset_index(drop=True)[result_dfs['IH0_Z'].phonetic_detection!='IH0_Z']
     # d=count_values(phonetic_detections)
     # d.columns=[target_phones]
     # return phonetic_detections, d
@@ -962,7 +956,7 @@ if __name__=='__main__':
     plot_confusion_results(results, name='termination_contrast_audiobook_no_D_T_dis_'+data_set+'_w2v_n_'+str(n))
 
     predictions, results=termination_confusions_for_actor_recordings()
-    plot_confusion_results(results, name='termination_confusions_for_actor_recordings_with_D_T_dis_w2v')
+    plot_confusion_results(results, name='plots/termination_confusions_for_actor_recordings_D_T_dis_w2v_AH_D_post_corr')
 
     results=vowels_confusions_actor_recordings()
     plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v_thresh_0.2')

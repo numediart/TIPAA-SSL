@@ -365,7 +365,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         unstressed_target='_'.join(remove_stress_annots(target_phones.split('_')))
         if unstressed_target in terminations_accepted_alternatives:
             if detection in terminations_accepted_alternatives[unstressed_target]:
-                detection=unstressed_target
+                detection=target_phones
 
         return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
