@@ -159,6 +159,7 @@ def get_augmented_cmudict():
 
     corrections={
         'areas':[['EH1','R','IH0','AH0','Z']],
+        'live':[['L', 'IH1', 'V']],
         'drawing':[['D','R','AO1','W','IH0','NG']],
         'drawings':[['D','R','AO1','W','IH0','NG','Z']],
         'ph':[['P', 'IY1', 'EY2', 'CH']],
