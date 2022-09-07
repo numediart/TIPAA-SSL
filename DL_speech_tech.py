@@ -75,9 +75,9 @@ def remove_downwards_trend(y):
     if len(y)>2:
         # Remove downwards trend
         x=range(len(y))
-        model = np.polyfit(x, y, 1)
-        a=model[0]
-        b=model[1]
+        linear_f = np.polyfit(x, y, 1)
+        a=linear_f[0]
+        b=linear_f[1]
         y=y-(a*x+b)
 
         # normalize between 0 and 100
@@ -86,6 +86,12 @@ def remove_downwards_trend(y):
     else:
         y=np.array(y)
     return y.astype(int).tolist()
+
+
+import math
+roundup=lambda n: math.ceil(n)
+
+# {i:roundup(i/3) for i in range(10)}
 
 def intensity_to_bin(score_by_word, n_max=2):
 
@@ -154,7 +160,7 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
 
         bins_by_chunk=[]
         for chunk in scores_grouped_by_chunk:
-            bin=intensity_to_bin(chunk)
+            bin=intensity_to_bin(chunk, n_max=roundup(len(chunk)/3))
             bins_by_chunk.append(bin)
         return {"status": "success", "stress_intensities": sum(scores_grouped_by_chunk,[]), "stress_binaries": sum(bins_by_chunk,[])}
     else:
@@ -268,7 +274,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         elif contrast=="start":
             syl_idxs=[syl_idxs[contrast_idx]]*len(basis.split('_'))+syl_idxs[n_p_target:]
 
-        df_word=model.predict_word(s, split_phonetics, target_word_idx)        
+        df_word=model.predict_word(s, split_phonetics, target_word_idx)
         # print(df_word)
         # print(phonetics_indexed_df)
 
@@ -355,17 +361,18 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             detection=ter_post[:-1]
 
 
-        # detection=ter_post
-        if target_phones!='': # case of final -s
-            if detection==remove_stress_annots(target_phones.split('_')): detection=target_phones.split('_')
-        
         detection='_'.join(detection)
+
+        # detection=ter_post
+        if target_phones!='': # don't try to split in case of case of final -s "nothing" target
+            # if dectection is the same as target_phones (without the stress marks because charsiu don't put that), change back to target phones
+            if detection.split('_')==remove_stress_annots(target_phones.split('_')): detection=target_phones
         
-        # post-correction for the whole termination not to differentiate between IH_D and AH_D     or    IH_Z and AH_Z
-        unstressed_target='_'.join(remove_stress_annots(target_phones.split('_')))
-        if unstressed_target in terminations_accepted_alternatives:
-            if detection in terminations_accepted_alternatives[unstressed_target]:
-                detection=target_phones
+            # post-correction for the whole termination not to differentiate between IH_D and AH_D     or    IH_Z and AH_Z
+            unstressed_target='_'.join(remove_stress_annots(target_phones.split('_')))
+            if unstressed_target in terminations_accepted_alternatives:
+                if detection in terminations_accepted_alternatives[unstressed_target]:
+                    detection=target_phones
 
         return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
