@@ -311,7 +311,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         return phonetic_detection, syl
 
     def compute_stress_score(self, audio, phonetics):
-        """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
+        """Use df_segmented to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
         a value by vowel representing a stress intensity
 
         Args:
@@ -324,27 +324,10 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         # phonetics=sum(phonetics,[])
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         split_phonetics=sum(split_phonetics,[])
-        _, textgridData, _ = self.align_phones(audio=audio,phones=split_phonetics)
-
-        # # TODO: remove this block: the silence and consecutive things processing, as I already do that in align_phones now
-        # # textgridData=self.force_and_predict(audio,split_phonetics)
-        # textgridData=textgridData[textgridData.cmu_phones != '[SIL]']
-        # # I have to collapse if several consecutive vowels are the same. it can happen when the predictions are not the same.
-        # # I thus have to group the timings (first start until last end)
-        # #  here we delete consecutives but keep first and last, so there is a possibility of only two consecutves after that, and having overall start and end
-        # test=keep_first_last(textgridData.cmu_phones)
-        # # keep firsts and lasts (thus only when there is two consecutive phonemes)
-        # starts=test.loc[test.shift(-1) == test]
-        # ends=test.loc[test.shift(+1) == test]
-        # assert len(starts)==len(ends)
-        # # drop duplicates keeping first
-        # drop_duplicates=lambda a: a.loc[a.shift(+1) != a]
-        # filtered_df=textgridData.loc[drop_duplicates(textgridData.cmu_phones).index]
-        # here in the filtered_df containg only the first occurence for equal consecutive examples, we replace the 'end' value with the line in the "ends"
-        # for rownum,(indx,val) in enumerate(starts.iteritems()): filtered_df.loc[indx,'end']=textgridData.loc[ends.index[rownum],'end']
+        _, df_segmented, _ = self.align_phones(audio=audio,phones=split_phonetics)
 
         # select vowels
-        filtered_df=textgridData[textgridData.cmu_phones.isin(cmu_vowels)]#.index.tolist()
+        filtered_df=df_segmented[df_segmented.cmu_phones.isin(cmu_vowels)]#.index.tolist()
 
         f0Samples=getIntonation(audio, self.sr)
         intensity=getIntensity(audio, self.sr)
@@ -371,14 +354,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             Fmean.append(np.mean(Fvowel))
 
             Dur.append(filtered_df['end'].iloc[i]-filtered_df['start'].iloc[i])
-            
-            # phone_df=pd.DataFrame([r[2].split('_') for i,r in filtered_df.iterrows()])
-            # # here we use the prediction of HMM model as an indication, as it has to classify 0, 1 or 2
-            # syltype_phone=int(phone_df[2].iloc[i])
-            # if syltype_phone == 2:  # the sylType is 0 for unstressed, 0.5 for secondary stressed syllables and 1 for primary stressed syllables
-            #     sylType[i] = 0.5
-            # else:
-            #     sylType[i]=syltype_phone
         
         # normalization of features (projection to [0 1] range)
         zImax = normalize(Imax)
@@ -388,7 +363,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         zDur = normalize(Dur)
 
         # combine the features
-        # weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur + 0.4*sylType)/3.6  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
         weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur)/3.2  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
 
         return weighted_score
