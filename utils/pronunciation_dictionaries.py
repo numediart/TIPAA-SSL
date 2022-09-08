@@ -300,9 +300,9 @@ arpabet_to_ipa = {
 }
 
 cmu_phones_info=cmudict.phones()
-cmu_phones=[el[0] for el in cmu_phones_info]
-cmu_vowels=[p[0] for p in cmu_phones_info if p[1][0]=='vowel']
-cmu_consonants=[p[0] for p in cmu_phones_info if p[1][0]!='vowel']
+cmu_phones=set([el[0] for el in cmu_phones_info])
+cmu_vowels=set([p[0] for p in cmu_phones_info if p[1][0]=='vowel'])
+cmu_consonants=set([p[0] for p in cmu_phones_info if p[1][0]!='vowel'])
 
 # CMU is a subset of arpabet
 cmu_1_char={}
