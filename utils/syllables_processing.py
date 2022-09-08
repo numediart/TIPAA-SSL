@@ -34,14 +34,6 @@ def syllables_data(syl_sep='|'):
     syllables_add=pd.read_csv('data/mhyph_add.txt', header=None)
     syllables=pd.concat([syllables,syllables_add])
 
-    # http://hindson.com.au/info/free/free-english-language-hyphenation-dictionary/
-    # syllables=pd.read_csv('data/EnglishHyphDict_v108.txt', header=None, sep=' ')
-    # syllables.iloc[:,1]=syllables.iloc[:,1].str.strip(';')
-    # syllables.iloc[:,1]=syllables.iloc[:,1].str.replace('-','_')
-    # # syllables.iloc[:,0]=syllables.iloc[:,1]
-    # syllables=pd.DataFrame(syllables.iloc[:,1])
-    # syllables.columns=[0]
-
     d=cmudict_dict
     syllables=syllables.dropna()  # there is one row that is nan...
 
@@ -72,41 +64,6 @@ def syllables_data(syl_sep='|'):
 
     syllables['n_syls']=n_syls
     syllables['n_syls_SonoriPy']=n_syls_SonoriPy
-    # syllables['n_vowels_cmu']=n_vowels_cmu
-
-    # syllables[syllables.n_vowels_cmu.isnull()].normalized_text.tolist()
-    # len(syllables[~syllables.n_vowels_cmu.isnull()].normalized_text.tolist())
-
-    if False:
-        syllables=syllables.dropna()
-
-        # syllables[syllables.n_syls==syllables.n_vowels_cmu]
-        # syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
-        # syllables[syllables.n_vowels_cmu!=syllables.n_syls_SonoriPy]
-
-        # syllables[syllables.normalized_text=="really"]
-
-        # Some words have several possibilities of text syllable segmentation.
-        # For a given word, if there are some that for which n_syls!=n_syls_SonoriPy, and others for which n_syls==n_syls_SonoriPy
-        # then I only keep those for which n_syls==n_syls_SonoriPy
-
-        inconsistent_syls=syllables[syllables.n_syls!=syllables.n_syls_SonoriPy]
-        lens=[]
-        for i,r in inconsistent_syls.iterrows():
-            lens.append(len(syllables[syllables.normalized_text==r.normalized_text]))
-        
-        inconsistent_syls['n_syl_text_alternatives']=lens
-
-        # Select the ones who have potentially another solution with a consistent number of syls
-        candidates_for_good_alt=inconsistent_syls[inconsistent_syls['n_syl_text_alternatives']>1]
-
-        # If there are possibilities with consistent number of syllables, remove the inconsistent ones
-        idx_to_remove=[]
-        for i,r in candidates_for_good_alt.iterrows():
-            alts=syllables[syllables.normalized_text==r.normalized_text]
-            if len(alts[alts.n_syls==alts.n_syls_SonoriPy])>0:
-                idx_to_remove+=alts[alts.n_syls!=alts.n_syls_SonoriPy].index.tolist()
-        syllables=syllables.drop(idx_to_remove)
 
     syllables.to_csv('data/syllables.csv')
 
