@@ -1,7 +1,0 @@
-$bla = [o4 o4 o4 o4 o4 o4];
-$inv = (d13 d12 d11 d10 d9) | (d8 d7 d6 d5) | (d4 d3 d2 d1) | (d13 d12 d11 d10 d9 d8 d7 d6 d5 d4 d3 d2 d1);
-$phrase = (d1 d2 sp d3 d4 sp d5 d6 d7 d8 d9 sp d10 d11 d12 d13) | $inv | {$bla};
-
-(
-([sil] | sp) $phrase ([sil] | sp)
-)

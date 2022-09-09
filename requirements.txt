@@ -1,9 +1,31 @@
 matplotlib
 librosa
 pandas
+textgrid
+openpyxl
 pyworld
 scipy
 pytest
 cmudict
 audiotsm
 pytsmod
+flask
+tqdm
+gunicorn
+seaborn
+ordered_set
+g2p_en
+# flask-restful
+# flask-apispec==0.11.0
+flask-apispec
+# torch
+pyyaml
+speechbrain
+transformers==4.16.2
+# s3prl
+newrelic
+webrtcvad
+praatio
+g2pM
+num2words
+unidecode
