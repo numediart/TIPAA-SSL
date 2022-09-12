@@ -12,7 +12,9 @@ import base64
 import librosa
 
 # initialize model
-model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+#model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+from utils.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
+model = pd.read_pickle('./data/models/model_librispeech.pkl')
 
 target_accepted_alternatives={
     'AA': ['AA', 'AO'],

@@ -85,7 +85,7 @@ class w2v_gmm_forced_aligner:
         return predicted_phones
 
 def get_df_segmented(alignment_with_silence, predicted_phones, fs=16000, time_per_output=0.02):
-    df_segmented = pd.DataFrame(columns=['phones', 'predicted_phones', 'start', 'end'])
+    df_segmented = pd.DataFrame(columns=['cmu_phones', 'pred_phones_audio', 'start', 'end'])
     start = []
     end = []
 
@@ -96,9 +96,9 @@ def get_df_segmented(alignment_with_silence, predicted_phones, fs=16000, time_pe
     ph_with_timings = [i for i in list(zip(alignment_with_silence, start, end)) if i[0] != '[SIL]']
     grouped = [list(v) for _,v in itertools.groupby(ph_with_timings,itemgetter(0))]
     timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
-    df_segmented['phones'] = [elem[0] for elem in timings]
+    df_segmented['cmu_phones'] = [elem[0] for elem in timings]
     df_segmented['start'] = [elem[1] for elem in timings]
     df_segmented['end'] = [elem[2] for elem in timings]
-    df_segmented['predicted_phones'] = predicted_phones
+    df_segmented['pred_phones_audio'] = predicted_phones
 
     return df_segmented

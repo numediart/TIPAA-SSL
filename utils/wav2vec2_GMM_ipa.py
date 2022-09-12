@@ -120,7 +120,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         alignment_with_silence = self.forced_aligner.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
         predicted_phones = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
         df_segmented = get_df_segmented(alignment_with_silence, predicted_phones, fs=self.fs, time_per_output=0.02)
-        self.pred_phones_audio = list(df_segmented.predicted_phones.values)
+        self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
         return df_segmented
 
     def predict_word(self, s, phonetics, target_word_idx):
@@ -157,7 +157,7 @@ class Wav2Vec2ForFrameGMMAssignment:
             len_previous_syllables=sum([len(el) for el in syllables[:target_syllable_idx]])
             p_idx_global=len_previous_syllables+p_idx_local
 
-            phonetic_detection = df_word.iloc[p_idx_global].predicted_phones
+            phonetic_detection = df_word.iloc[p_idx_global].pred_phones_audio
 
             # #phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
             # phoneme_set_ids=self.forced_aligner.labelize_phonemes([a[0] for a in phoneme_set])
@@ -274,16 +274,16 @@ class Wav2Vec2ForFrameGMMAssignment:
         # select vowels
         filtered_df=textgridData[textgridData.phones.isin(cmu_vowels)]#.index.tolist()
 
-        f0Samples=getIntonation(s, fs)
-        intensity=getIntensity(s, fs)
+        f0Samples=getIntonation(audio, self.fs)
+        intensity=getIntensity(audio, self.fs)
 
         # extract features
         # each word start and end position expressed in samples
-        startPositions_samples = (round(fs*filtered_df.loc[:,'start'])+1).astype(int).tolist()
-        stopPositions_samples = round(fs*filtered_df.loc[:,'end']).astype(int).tolist()
+        startPositions_samples = (round(self.fs*filtered_df.loc[:,'start'])+1).astype(int).tolist()
+        stopPositions_samples = round(self.fs*filtered_df.loc[:,'end']).astype(int).tolist()
 
         # to make sure we don t go beyond the end of the signal
-        assert stopPositions_samples[-1]<len(s), "The end of the last phoneme should be inside the signal"
+        assert stopPositions_samples[-1]<len(audio), "The end of the last phoneme should be inside the signal"
 
         Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
         # nVowels=len(indxVowels)
@@ -342,7 +342,7 @@ class Wav2Vec2ForFrameGMMAssignment:
 if __name__ == '__main__':
 
     if not os.path.exists('./data/'): os.makedirs('./data/')
-    pickle.dump(classe, open("./data/classe.pkl","wb"))
+    pickle.dump(classe, open("./data/models/model_librispeech.pkl","wb"))
     
     classe = pd.read_pickle('./data/classe.pkl')
 

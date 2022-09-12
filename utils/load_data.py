@@ -133,10 +133,10 @@ def load_test_dataset(df_t_test, number_of_examples=100, random=False):
     return pd.DataFrame(test_examples)
 
 def build_df_segmented(df_t, model, forced_aligner, mode, language_code): # mode = "CMU" or "MFA_IPA"
-    df_segmented = pd.DataFrame(columns=['phones', 'predicted_phones', 'start', 'end'])
+    df_segmented = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end'])
 
     for _, row in df_t.iterrows():
-        df = pd.DataFrame(columns=['phones', 'predicted_phones', 'start', 'end'])
+        df = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end'])
         if mode=='CMU':
             df.phones = remove_stress_annots(row.phone_df['cmu_phone'].values())
         else:
@@ -150,9 +150,9 @@ def build_df_segmented(df_t, model, forced_aligner, mode, language_code): # mode
         phone_prob_matrix = model.predict_phone_prob_matrix(s, fs)
         cost_nonsil, _, _ = forced_aligner.get_cost_non_sil(phone_prob_matrix)
         aligned_phones = forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
-        predicted_phones = forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
+        pred_phones_audio = forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
 
-        df.predicted_phones = predicted_phones
+        df.pred_phones_audio = pred_phones_audio
 
         df_segmented = pd.concat([df_segmented, df])
 
