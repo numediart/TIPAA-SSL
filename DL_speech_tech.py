@@ -91,8 +91,6 @@ def remove_downwards_trend(y):
 import math
 roundup=lambda n: math.ceil(n)
 
-# {i:roundup(i/3) for i in range(10)}
-
 def intensity_to_bin(score_by_word, n_max=2):
 
     bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
@@ -109,8 +107,8 @@ def intensity_to_bin(score_by_word, n_max=2):
 
 def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
                                     # text="I would love to go to Ireland!", 
-                                    n_words_by_chunk=6,
-                                    level="word", 
+                                    n_words_by_chunk=[7],
+                                    level="sentence", 
                                     # chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8, mode='file'
                                     ): #'[\,\?\.\!\;\:\"\*]'
@@ -188,7 +186,8 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
         # maybe change this to empty if we want the other feedback "are you saying the right words", 
         # or change null to "non-speech", nothing, nonsense or the pred_phones_audio
         if model.status!="success": 
-            g_d=[cmu_to_gibberish[unstress(p)] for p in model.pred_phones_audio]
+            # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
+            g_d=[cmu_to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in model.pred_phones_audio]
             if g_d==[]:
                 return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
             else:
@@ -469,16 +468,24 @@ if __name__=="__main__":
     from utils.text_processing import *
     from utils.label_data_processing import *
 
-    
+    path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
+    # encode_string = base64.b64encode(open(path, "rb").read())
+    formatted_phonetics=prefill_for_sentence('ekk')['cmu_phonetics']
+    _, rID=prepare_audio_file(path)
+    phonemeContrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+                                                        target_word_idx=0, 
+                                                        target_syllable_idx=1, 
+                                                        target_phones='EY1',
+                                                        alternatives=cmu_vowels, mode='file')
+
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
     # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
     # path='data/audio_recordings/turned_around.mp3'
     encode_string = base64.b64encode(open(path, "rb").read())
     formatted_phonetics=prefill_for_sentence('I would love to go to ireland')['cmu_phonetics']
     stress_from_formatted_phonetics(encode_string,phonetics=formatted_phonetics, 
-                                    text="I would love to go to Ireland!", 
                                     level="sentence", 
-                                    chunking_chars=[',',';','.','!','?', ':', '/'],
+                                    n_words_by_chunk=[7],
                                     max_speech_rate=8, mode='base64'
                                     )
 
