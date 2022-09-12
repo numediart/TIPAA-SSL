@@ -158,7 +158,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         df_segmented=df_segmented[df_segmented.cmu_phones != '[SIL]']
         collapse_consecutive_duplicates(df_segmented)
         phone_list=sum(phones,[])
-        df_segmented=divide_consecutive_duplicates(df_segmented, phone_list)
+        if len(df_segmented)>0:
+            df_segmented=divide_consecutive_duplicates(df_segmented, phone_list)
         
         if df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
             self.status="success"
