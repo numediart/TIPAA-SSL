@@ -148,7 +148,7 @@ def libri_phonetics(
         wav_path=os.path.join(audio_path,'/'.join(f.split('/')[-4:]).split('.')[0]+'.flac')
         phone_df=get_all_phone_with_timings(f)
         text=get_sentence(f)
-        d={'text':text, 'phones':' '.join(phone_df['ipa_phone'].tolist()), 'path':f, 'wav_path':wav_path}
+        d={'text':text, 'phones':' '.join(phone_df['phone'].tolist()), 'path':f, 'wav_path':wav_path}
         d_with_timings={'text':text, 'phone_df':phone_df, 'path':f, 'wav_path':wav_path}
         records.append(d)
         records_with_timings.append(d_with_timings)
