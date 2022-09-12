@@ -35,3 +35,32 @@ def test_particular_cases():
 
 def a_test_stress_detection():
     stress_GE_performance_test(level='word')
+
+from utils.text_processing import *
+def test_prefill():
+    prefill_for_sentence()
+
+    sentence="I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!"
+    r=prefill_for_sentence(sentence=sentence)
+
+    assert r['cmu_phonetics']=='AY1 P_EY1_D AH0 {TH_R_IY1 TH_AW1|Z_AH0_N_D D_AA1|L_ER0_Z} B_IH1_L W_EH1_N V_IH1|Z_IH0|T_IH0_NG {Y_UW1 S_IY1 EH1_L EY1} IH1_T_S AE1_N IH0_K_S|P_EH1_N|S_IH0_V HH_OW0|T_EH1_L F_AO1_R DH_AH0 T_W_EH1_N|T_IY0-F_ER1_S_T S_EH1_N|CH_ER0|IY0'
+
+    sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
+    r=prefill_for_sentence(
+                        sentence=sentence,
+                        syllables_df=pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']), 
+                        lang="es_ES",
+                        mode='MFA_IPA')  # "CMU" or "MFA_IPA"
+
+    sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
+    r=prefill_for_sentence(
+                        sentence=sentence,
+                        # syllables_df=pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']), 
+                        lang="en_GB",
+                        mode='MFA_IPA')  # "CMU" or "MFA_IPA"
+    sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    r=prefill_for_sentence(
+                        sentence=sentence,
+                        syllables_df=pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']), 
+                        lang="fr_FR",
+                        mode='MFA_IPA')  # "CMU" or "MFA_IPA"

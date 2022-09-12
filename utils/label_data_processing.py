@@ -2,10 +2,13 @@ import pandas as pd
 import numpy as np
 import pdb
 from glob import glob
-from utils.text_processing import remove_special_characters, remove_stress_annots, prefill_content
+from utils.text_processing import remove_special_characters, remove_stress_annots, prefill_content, prefill_for_sentence
+
+from utils.pronunciation_dictionaries import cmudict_dict
 
 import itertools
 import os
+import ast
 
 target_to_alternatives={
     "DH":["DH","TH"],
@@ -377,6 +380,7 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
     content=prefill_content(df["Text with target"].tolist())
     df['cmu_phonetics']=content.cmu_phonetics
     content['path']=df.path
+    content['text']=df["Text with target"]
 
     content.apply(lambda r: sum(['*' in el for el in r.text.split()]), axis=1)
     
@@ -385,13 +389,42 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
     # checks in each word if there is a "*", put one if true in a list. Then I use index() to know where is the 1
     content.loc[sents.index, 'word_idx']=sents.apply(lambda r: [int('*' in el) for i,el in enumerate(r)].index(1))
 
-    content["target"]=df["Target phoneme"]
+    # content["target"]=df["Target phoneme"]
 
     # content["target_syllable_indexes"]=-1
     content["target_syllable_indexes"]=[[-1]]*len(content)
 
-    to_cmu={"/z/":"Z", "/s/":"S", "/iz/": "IH_Z"}
+    # Don't use the annotations, they are wrong, I'll use cmudict instead
+    # to_cmu={"/z/":"Z", "/s/":"S", "/iz/": "IH_Z"}
 
-    content["target_phones"]=content["target"].apply(lambda r: to_cmu[r])
+    # content["target_phones"]=content["target"].apply(lambda r: to_cmu[r])
 
     return content
+
+def synth_words_data():
+    path="scripts/synth_audio/cmu_words/standard/prosody/"
+    if not os.path.exists(path+'linguistic_data.csv'):
+        audios_path=path+"prosody/*/*"
+        paths=glob(audios_path)
+
+        df=pd.DataFrame()
+        df['path']=paths
+        df['text']=df.apply(lambda r: os.path.split(r.path)[-1].split('.')[0].split('_')[-1] , axis=1)
+        df['cmu_phonetics']=df.apply(lambda r: cmudict_dict[r.text], axis=1)
+
+        # not sure why, it seems there are empty entries in cmudict
+        df=df[df.apply(lambda r: len(r.cmu_phonetics), axis=1)>0]
+
+        syl_p_cmu=SonoriPy(p, mode='CMU')[0]
+
+        df['syl_p_cmu']=df['cmu_phonetics'].apply(lambda r: SonoriPy(r, mode='CMU')[0])
+
+        df['cmu_phonetics']=df['syl_p_cmu'].apply(lambda p: '|'.join(['_'.join(syl) for syl in p]))
+        # df.apply(lambda r: prefill_for_sentence(r.text), axis=1)
+
+        df.to_csv(path+'linguistic_data.csv')
+    else:
+        df=pd.read_csv(path+'linguistic_data.csv')
+        # pd.read_csv()
+        df['syl_p_cmu']=df['syl_p_cmu'].apply(ast.literal_eval)
+    return df

@@ -534,23 +534,18 @@ def prefill_for_sentence(
     if mode!='MFA_IPA':
         record={'text':sent_brackets,
             'cmu_phonetics':p_0_special_chars,
-            # 'pronounciation_guide':g_0_special_chars,
             'pronounciation_guide_hr':g_0_special_chars.replace('_',''),
             'segmented_text':segmented_text,
-            # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
             'n_syl_mismatches':word_idxs_inconsitencies['n_syl'],
             'n_stress_inconsistencies':word_idxs_inconsitencies['stress'],
             'used_method_for_syl_text':used_method_syllables,
             'cmu_phonetics_alt':p,
-            # 'pronounciation_guide_alt':g,
-            # 'pronounciation_guide_hr_alt':g_hr,
             'n_alternatives':n_alternatives
             }
     else:
         record={'text':sent_brackets,
             'cmu_phonetics':p_0_special_chars,
             'segmented_text':segmented_text,
-            # 'n_syl_mismatch':len(word_idxs_inconsitencies['n_syl']),
             'n_syl_mismatches':word_idxs_inconsitencies['n_syl'],
             'n_stress_inconsistencies':word_idxs_inconsitencies['stress'],
             'used_method_for_syl_text':used_method_syllables,
@@ -574,7 +569,7 @@ def prefill_content(sentences, syl_sep='|'):
     print("n sentences", len(sentences))
     for i,s in tqdm(enumerate(sentences)):
         try:
-            record=prefill_for_sentence(s, syllables_df, syl_sep=syl_sep)
+            record=prefill_for_sentence(s, syllables_df['en_US'], syl_sep=syl_sep)
         except:
             print('Error with sentence: '+s)
             

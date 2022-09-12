@@ -18,10 +18,15 @@ target_accepted_alternatives={
     'AA': ['AA', 'AO'],
     'AO': ['AA', 'AO'],
     'D': ['D', 'T'],
-    'T': ['D', 'T'],
+    'Z': ['Z', 'S'],
+    # 'T': ['D', 'T'],
     # 'IH': ['IH', 'AH', 'EH']
 }
 
+terminations_accepted_alternatives={
+    'IH_Z':['AH_Z','IH_Z'],
+    'IH_D':['AH_D','IH_D']
+    }
 
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
     """Load audio with 2 modes: from a "file" or from "base64" encoding
@@ -70,9 +75,9 @@ def remove_downwards_trend(y):
     if len(y)>2:
         # Remove downwards trend
         x=range(len(y))
-        model = np.polyfit(x, y, 1)
-        a=model[0]
-        b=model[1]
+        linear_f = np.polyfit(x, y, 1)
+        a=linear_f[0]
+        b=linear_f[1]
         y=y-(a*x+b)
 
         # normalize between 0 and 100
@@ -81,6 +86,10 @@ def remove_downwards_trend(y):
     else:
         y=np.array(y)
     return y.astype(int).tolist()
+
+
+import math
+roundup=lambda n: math.ceil(n)
 
 def intensity_to_bin(score_by_word, n_max=2):
 
@@ -98,8 +107,8 @@ def intensity_to_bin(score_by_word, n_max=2):
 
 def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
                                     # text="I would love to go to Ireland!", 
-                                    n_words_by_chunk=6,
-                                    level="word", 
+                                    n_words_by_chunk=[7],
+                                    level="sentence", 
                                     # chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8, mode='file'
                                     ): #'[\,\?\.\!\;\:\"\*]'
@@ -149,7 +158,7 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
 
         bins_by_chunk=[]
         for chunk in scores_grouped_by_chunk:
-            bin=intensity_to_bin(chunk)
+            bin=intensity_to_bin(chunk, n_max=roundup(len(chunk)/3))
             bins_by_chunk.append(bin)
         return {"status": "success", "stress_intensities": sum(scores_grouped_by_chunk,[]), "stress_binaries": sum(bins_by_chunk,[])}
     else:
@@ -177,7 +186,8 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
         # maybe change this to empty if we want the other feedback "are you saying the right words", 
         # or change null to "non-speech", nothing, nonsense or the pred_phones_audio
         if model.status!="success": 
-            g_d=[cmu_to_gibberish[unstress(p)] for p in model.pred_phones_audio]
+            # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
+            g_d=[cmu_to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in model.pred_phones_audio]
             if g_d==[]:
                 return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
             else:
@@ -263,7 +273,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         elif contrast=="start":
             syl_idxs=[syl_idxs[contrast_idx]]*len(basis.split('_'))+syl_idxs[n_p_target:]
 
-        df_word=model.predict_word(s, split_phonetics, target_word_idx)        
+        df_word=model.predict_word(s, split_phonetics, target_word_idx)
         # print(df_word)
         # print(phonetics_indexed_df)
 
@@ -333,9 +343,14 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                     ter_post.append(unstress(p))
         else: ter_post=ter
 
+        
+
+
         # there might be consecutive duplicates when we concatenate root and ter_post
         # g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in root+ter_post])
-        g_d=[cmu_to_gibberish[unstress(p)] for p in ter_post]
+        
+        # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
+        g_d=[cmu_to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in ter_post]
         
         # phonetic detection needs to be the stressed version for backwards compatibility 
         # (however, here I convert to stressed version only when correct, it might work, but could cause problems?)
@@ -344,11 +359,21 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         elif contrast=="start":
             detection=ter_post[:-1]
 
-        # detection=ter_post
-        if target_phones!='': # case of final -s
-            if detection==remove_stress_annots(target_phones.split('_')): detection=target_phones.split('_')
 
-        return {"status": "success", "phonetic_detection": '_'.join(detection), "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
+        detection='_'.join(detection)
+
+        # detection=ter_post
+        if target_phones!='': # don't try to split in case of case of final -s "nothing" target
+            # if dectection is the same as target_phones (without the stress marks because charsiu don't put that), change back to target phones
+            if detection.split('_')==remove_stress_annots(target_phones.split('_')): detection=target_phones
+        
+            # post-correction for the whole termination not to differentiate between IH_D and AH_D     or    IH_Z and AH_Z
+            unstressed_target='_'.join(remove_stress_annots(target_phones.split('_')))
+            if unstressed_target in terminations_accepted_alternatives:
+                if detection in terminations_accepted_alternatives[unstressed_target]:
+                    detection=target_phones
+
+        return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
@@ -443,16 +468,24 @@ if __name__=="__main__":
     from utils.text_processing import *
     from utils.label_data_processing import *
 
-    
+    path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
+    # encode_string = base64.b64encode(open(path, "rb").read())
+    formatted_phonetics=prefill_for_sentence('ekk')['cmu_phonetics']
+    _, rID=prepare_audio_file(path)
+    phonemeContrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+                                                        target_word_idx=0, 
+                                                        target_syllable_idx=1, 
+                                                        target_phones='EY1',
+                                                        alternatives=cmu_vowels, mode='file')
+
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
     # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
     # path='data/audio_recordings/turned_around.mp3'
     encode_string = base64.b64encode(open(path, "rb").read())
     formatted_phonetics=prefill_for_sentence('I would love to go to ireland')['cmu_phonetics']
     stress_from_formatted_phonetics(encode_string,phonetics=formatted_phonetics, 
-                                    text="I would love to go to Ireland!", 
                                     level="sentence", 
-                                    chunking_chars=[',',';','.','!','?', ':', '/'],
+                                    n_words_by_chunk=[7],
                                     max_speech_rate=8, mode='base64'
                                     )
 
