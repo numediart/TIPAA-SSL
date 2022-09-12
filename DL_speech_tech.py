@@ -322,7 +322,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
 
             if contrast=="end":
                 # root based on GT
-                root=df_syl.cmu_phones.tolist()[:-n_ter_basis]
+                root=df_syl.phones.tolist()[:-n_ter_basis]
                 # detected termination
                 ter=syl_detected[len(root)-1:]
             elif contrast=="start":
