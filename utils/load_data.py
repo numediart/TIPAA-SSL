@@ -75,7 +75,7 @@ def load_shuffled_ipa_dataset(lang_code):
 def load_cmu_dataset():
     df_t_train, df_train=libri_phonetics_data(data_set='dev-clean')
     df_t_test, df_test=libri_phonetics_data(data_set='test-clean')
-    df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).cmu_phone.tolist(), axis=1)
+    df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
     return df_t_train, df_t_test
 
 def load_cmu_dataset_MAILABS(speaker_lang_code, others, train_size=800, test_size=200):
@@ -110,7 +110,7 @@ def load_cmu_dataset_MAILABS(speaker_lang_code, others, train_size=800, test_siz
     return df_train, df_test
 
 def load_cmu_test_dataset(df_t_test, number_of_examples=100, random=False):
-    df_cmu_phones=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).cmu_phone.tolist(), axis=1)
+    df_cmu_phones=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
     test_examples=[]
     for N in range(number_of_examples):
         example=df_t_test.iloc[N]
