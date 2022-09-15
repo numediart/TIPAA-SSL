@@ -345,8 +345,29 @@ class Wav2Vec2ForFrameGMMAssignment:
 
 if __name__ == '__main__':
 
+    from utils.load_data import *
+    from utils.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
+
+    df_t_train, df_t_test = load_cmu_dataset()
+    with open('./data/models/df_all_frames.pkl', 'rb') as f: df_all_frames=pickle.load(f)
+    df_all_frames  = pd.read_pickle('./data/models/df_all_frames.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    classe = Wav2Vec2ForFrameGMMAssignment(300,18,'cmu')
+    classe.fit(X, y)
+    classe.find_component_phoneme()
+
+    import pickle
+    path="./data/models/model_librispeech_300_18.pkl"
+    pickle.dump(classe, open(path,"wb"))
+
+    from utils.load_model import load_model
+    model = load_model(300,18)
+
+    # with open(path, 'rb') as f:             a=pickle.load(f)
+
+    # ----------------------------
+
     if not os.path.exists('./data/'): os.makedirs('./data/')
-    pickle.dump(classe, open("./data/models/model_librispeech_300_18.pkl","wb"))
     
     classe = pd.read_pickle('./data/classe.pkl')
 
