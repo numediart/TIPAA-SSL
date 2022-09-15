@@ -11,7 +11,7 @@ import librosa
 from collections import Counter
 
 from utils.label_data_processing import build_user_data_df, get_errors_examples
-exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
+# exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio
 from utils.audio_processing import prepare_audio_file
@@ -31,7 +31,8 @@ import pandas as pd
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
 
-
+from utils.load_model import load_model
+model = load_model(300,18)
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -200,6 +201,7 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
                             target_phones=target_phones,
                             basis=basis,
                             alternatives=alternatives,
+                            mode='file',
                             **kwargs
                             )
             phonetic_detections.append(res['phonetic_detection'])
@@ -857,10 +859,12 @@ def vowels_consonants_confusions_from_audiobook_data(n=100, data_set='test-other
     # cs=['T','S','TH']
     # for c in tqdm(cs):
     for c in tqdm(cmu_consonants):
-        predictions[c], results[c]=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n, alternatives=cmu_consonants, model=model)
+        # predictions[c], results[c]=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n, alternatives=cmu_consonants, model=model)
+        predictions[c], results[c]=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n, alternatives=cmu_consonants)
 
     for v in tqdm(cmu_vowels): 
-        predictions[v], results[v]=pContrast_from_audiobook_data(data_set=data_set, target_phones=v+'1', n=n, alternatives=cmu_vowels, model=model)
+        # predictions[v], results[v]=pContrast_from_audiobook_data(data_set=data_set, target_phones=v+'1', n=n, alternatives=cmu_vowels, model=model)
+        predictions[v], results[v]=pContrast_from_audiobook_data(data_set=data_set, target_phones=v+'1', n=n, alternatives=cmu_vowels)
 
     return predictions, results
 

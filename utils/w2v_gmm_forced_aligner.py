@@ -68,7 +68,7 @@ class w2v_gmm_forced_aligner:
         aligned_preds = list(zip(aligned_phones, cost_nonsil))
         grouped_aligned_preds = [list(v) for _,v in itertools.groupby(aligned_preds,itemgetter(0))]
 
-        if len(target_phonemes) != len(grouped_aligned_preds):
+        if len(target_phonemes) > len(grouped_aligned_preds):
             for i in range(len(target_phonemes)-1):
                 if target_phonemes[i] == target_phonemes[i+1]:
                     index = int(len(grouped_aligned_preds[i])/2)
@@ -77,11 +77,22 @@ class w2v_gmm_forced_aligner:
                     grouped_aligned_preds[i] = x_2
                     grouped_aligned_preds.insert(i, x_1)
 
+        # if len(target_phonemes) > len(grouped_aligned_preds):
+        #     target_phonemes = target_phonemes[:len(grouped_aligned_preds)]
+        # else if len(target_phonemes) < len(grouped_aligned_preds):
+        #     grouped_aligned_preds = grouped_aligned_preds[:len(target_phonemes)]
+
         probs_means = []
         for phon in grouped_aligned_preds:
             probs_means.append(np.median([l[1] for l in phon], axis=0))
 
         predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in probs_means]
+
+        if len(predicted_phones)>len(target_phonemes):
+            print("I'm here")
+            predicted_phones = predicted_phones[:len(target_phonemes)]
+        else:
+            print("I'm not here")
         return predicted_phones
 
 def get_df_segmented(alignment_with_silence, predicted_phones, fs=16000, time_per_output=0.02):

@@ -84,7 +84,7 @@ class Wav2Vec2ForFrameGMMAssignment:
     def reduce_lhs_dimension(self, lhs):
         return self.reducer.transform(lhs[0])
 
-    def fit(self, X, y=None, supervized_reducer=False):
+    def fit(self, X, y=None, supervized_reducer=False, save=False):
         self.X_train = X
         self.y = y
         if supervized_reducer:
@@ -94,6 +94,10 @@ class Wav2Vec2ForFrameGMMAssignment:
             self.reducer = self.reducer.fit(self.X_train)
         self.X_train_reduced = self.reducer.transform(self.X_train)
         self.gmm = self.gmm.fit(self.X_train_reduced)
+        self.find_component_phoneme()
+
+        if save:
+            pickle.dump(self, open("./data/models/model_{}_{}_{}.pkl","wb".format(save, self.nbr_clusters, self.target_dim)))
 
     def predict_sample(self, s, fs, target_phonemes):
         phone_prob_matrix = self.predict_phone_prob_matrix(s, fs)
@@ -342,7 +346,7 @@ class Wav2Vec2ForFrameGMMAssignment:
 if __name__ == '__main__':
 
     if not os.path.exists('./data/'): os.makedirs('./data/')
-    pickle.dump(classe, open("./data/models/model_librispeech.pkl","wb"))
+    pickle.dump(classe, open("./data/models/model_librispeech_300_18.pkl","wb"))
     
     classe = pd.read_pickle('./data/classe.pkl')
 
