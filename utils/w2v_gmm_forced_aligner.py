@@ -39,7 +39,7 @@ class w2v_gmm_forced_aligner:
         return cost_nonsil, silence_frames_idx, non_silence_frames_idx
 
     def get_forced_alignment(self, cost_nonsil, target_phonemes):
-        target_phonemes = [x[0] for x in groupby(target_phonemes)]
+        # target_phonemes = [x[0] for x in groupby(target_phonemes)]
         target_phonemes = remove_stress_annots(target_phonemes)
         target_labels = self.labelize_phonemes(target_phonemes)
         # Dynamic Time Warping
@@ -88,14 +88,14 @@ class w2v_gmm_forced_aligner:
 
         predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in probs_means]
 
-        if len(predicted_phones)>len(target_phonemes):
-            print("I'm here")
-            predicted_phones = predicted_phones[:len(target_phonemes)]
-        else:
-            print("I'm not here")
+        # if len(predicted_phones)>len(target_phonemes):
+        #     print("I'm here")
+        #     predicted_phones = predicted_phones[:len(target_phonemes)]
+        # else:
+        #     print("I'm not here")
         return predicted_phones
 
-def get_df_segmented(alignment_with_silence, predicted_phones, fs=16000, time_per_output=0.02):
+def get_df_segmented(alignment_with_silence, predicted_phones, phones, fs=16000, time_per_output=0.02):
     df_segmented = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end'])
     start = []
     end = []
@@ -110,6 +110,25 @@ def get_df_segmented(alignment_with_silence, predicted_phones, fs=16000, time_pe
     df_segmented['phones'] = [elem[0] for elem in timings]
     df_segmented['start'] = [elem[1] for elem in timings]
     df_segmented['end'] = [elem[2] for elem in timings]
-    df_segmented['pred_phones_audio'] = predicted_phones
+
+    if len(phones)>len(df_segmented):
+        # here make sure the index is a range. I will insert using .loc at i+0.5, then reset index every time
+        # https://stackoverflow.com/questions/15888648/is-it-possible-to-insert-a-row-at-an-arbitrary-position-in-a-dataframe-using-pan?rq=1
+        df_segmented=df_segmented.reset_index(drop=True)
+        for i in range(len(phones)-1):
+            if phones[i]==phones[i+1]:
+                df_segmented.loc[i+0.5]=df_segmented.loc[i]
+                # df_segmented.loc[i+0.5].start=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
+                # df_segmented.loc[i].end=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
+                df_segmented=df_segmented.reset_index(drop=True)
+
+    try:
+        df_segmented['pred_phones_audio'] = predicted_phones
+    except:
+        print("predictions are not the same size as ground_truth")
+        print("preds", predicted_phones)
+        print("GT", df_segmented['phones'].values)
+    finally:
+        df_segmented['pred_phones_audio'] = ["null" for i in range(len(df_segmented))]
 
     return df_segmented

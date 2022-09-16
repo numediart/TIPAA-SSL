@@ -123,7 +123,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         aligned_phones = self.forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
         alignment_with_silence = self.forced_aligner.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
         predicted_phones = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
-        df_segmented = get_df_segmented(alignment_with_silence, predicted_phones, fs=self.fs, time_per_output=0.02)
+        df_segmented = get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, fs=self.fs, time_per_output=0.02)
         self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
         return df_segmented
 
