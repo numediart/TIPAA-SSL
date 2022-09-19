@@ -111,7 +111,7 @@ def get_df_segmented(alignment_with_silence, predicted_phones, phones, fs=16000,
     df_segmented['start'] = [elem[1] for elem in timings]
     df_segmented['end'] = [elem[2] for elem in timings]
 
-    if len(phones)>len(df_segmented):
+    if len(predicted_phones)>len(df_segmented):
         # here make sure the index is a range. I will insert using .loc at i+0.5, then reset index every time
         # https://stackoverflow.com/questions/15888648/is-it-possible-to-insert-a-row-at-an-arbitrary-position-in-a-dataframe-using-pan?rq=1
         df_segmented=df_segmented.reset_index(drop=True)
@@ -121,14 +121,7 @@ def get_df_segmented(alignment_with_silence, predicted_phones, phones, fs=16000,
                 # df_segmented.loc[i+0.5].start=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
                 # df_segmented.loc[i].end=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
                 df_segmented=df_segmented.reset_index(drop=True)
-
-    try:
-        df_segmented['pred_phones_audio'] = predicted_phones
-    except:
-        print("predictions are not the same size as ground_truth")
-        print("preds", predicted_phones)
-        print("GT", df_segmented['phones'].values)
-    finally:
-        df_segmented['pred_phones_audio'] = ["null" for i in range(len(df_segmented))]
-
+                
+    df_segmented['pred_phones_audio'] = predicted_phones
+    
     return df_segmented

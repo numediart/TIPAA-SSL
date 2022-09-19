@@ -860,12 +860,17 @@ def vowels_consonants_confusions_from_audiobook_data(n=100, data_set='test-other
     # for c in tqdm(cs):
     for c in tqdm(cmu_consonants):
         # predictions[c], results[c]=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n, alternatives=cmu_consonants, model=model)
-        predictions[c], results[c]=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n, alternatives=cmu_consonants)
+        try:
+            predictions[c], results[c]=pContrast_from_audiobook_data(data_set=data_set, target_phones=c, n=n, alternatives=cmu_consonants)
+        except: 
+            print("This consonant isn't in dataset")
 
     for v in tqdm(cmu_vowels): 
         # predictions[v], results[v]=pContrast_from_audiobook_data(data_set=data_set, target_phones=v+'1', n=n, alternatives=cmu_vowels, model=model)
-        predictions[v], results[v]=pContrast_from_audiobook_data(data_set=data_set, target_phones=v+'1', n=n, alternatives=cmu_vowels)
-
+        try:
+            predictions[v], results[v]=pContrast_from_audiobook_data(data_set=data_set, target_phones=v+'1', n=n, alternatives=cmu_vowels)
+        except: 
+            print("This vowel isn't in dataset")
     return predictions, results
 
 def termination_confusions_from_audiobook_data(n=100, data_set='dev-clean'):
