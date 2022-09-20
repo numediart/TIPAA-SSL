@@ -22,10 +22,10 @@ class w2v_gmm_forced_aligner:
             self.alphabet = cmu_alphabet
         elif phone_type == 'ipa':
             self.alphabet = ipa_alphabet
-        self.label_encoder.fit([[phon] for phon in self.alphabet])
+        self.label_encoder.fit([phon for phon in self.alphabet])
 
     def labelize_phonemes(self, phonemes):
-        return np.array(self.label_encoder.transform([[phon] for phon in phonemes]))
+        return np.array(self.label_encoder.transform([phon for phon in phonemes]))
 
     def get_cost_non_sil(self, phone_prob_matrix): 
         phone_prob_matrix = [l for l in phone_prob_matrix]
@@ -93,35 +93,37 @@ class w2v_gmm_forced_aligner:
         #     predicted_phones = predicted_phones[:len(target_phonemes)]
         # else:
         #     print("I'm not here")
-        return predicted_phones
+        return predicted_phones, probs_means
 
-def get_df_segmented(alignment_with_silence, predicted_phones, phones, fs=16000, time_per_output=0.02):
-    df_segmented = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end'])
-    start = []
-    end = []
+    def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, probs_means, fs=16000, time_per_output=0.02):
+        df_segmented = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end', 'probs_means', 'GT_proba'])
+        start = []
+        end = []
 
-    for i in range(len(alignment_with_silence)):
-        start.append(i*time_per_output)
-        end.append((i+1)*time_per_output)
+        for i in range(len(alignment_with_silence)):
+            start.append(i*time_per_output)
+            end.append((i+1)*time_per_output)
 
-    ph_with_timings = [i for i in list(zip(alignment_with_silence, start, end)) if i[0] != '[SIL]']
-    grouped = [list(v) for _,v in itertools.groupby(ph_with_timings,itemgetter(0))]
-    timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
-    df_segmented['phones'] = [elem[0] for elem in timings]
-    df_segmented['start'] = [elem[1] for elem in timings]
-    df_segmented['end'] = [elem[2] for elem in timings]
+        ph_with_timings = [i for i in list(zip(alignment_with_silence, start, end)) if i[0] != '[SIL]']
+        grouped = [list(v) for _,v in itertools.groupby(ph_with_timings,itemgetter(0))]
+        timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
+        df_segmented['phones'] = [elem[0] for elem in timings]
+        df_segmented['start'] = [elem[1] for elem in timings]
+        df_segmented['end'] = [elem[2] for elem in timings]
 
-    if len(predicted_phones)>len(df_segmented):
-        # here make sure the index is a range. I will insert using .loc at i+0.5, then reset index every time
-        # https://stackoverflow.com/questions/15888648/is-it-possible-to-insert-a-row-at-an-arbitrary-position-in-a-dataframe-using-pan?rq=1
-        df_segmented=df_segmented.reset_index(drop=True)
-        for i in range(len(phones)-1):
-            if phones[i]==phones[i+1]:
-                df_segmented.loc[i+0.5]=df_segmented.loc[i]
-                # df_segmented.loc[i+0.5].start=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
-                # df_segmented.loc[i].end=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
-                df_segmented=df_segmented.reset_index(drop=True)
-                
-    df_segmented['pred_phones_audio'] = predicted_phones
-    
-    return df_segmented
+        if len(predicted_phones)>len(df_segmented):
+            # here make sure the index is a range. I will insert using .loc at i+0.5, then reset index every time
+            # https://stackoverflow.com/questions/15888648/is-it-possible-to-insert-a-row-at-an-arbitrary-position-in-a-dataframe-using-pan?rq=1
+            df_segmented=df_segmented.reset_index(drop=True)
+            for i in range(len(phones)-1):
+                if phones[i]==phones[i+1]:
+                    df_segmented.loc[i+0.5]=df_segmented.loc[i]
+                    # df_segmented.loc[i+0.5].start=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
+                    # df_segmented.loc[i].end=np.average(df_segmented.loc[i].start, df_segmented.loc[i].end)
+                    df_segmented=df_segmented.reset_index(drop=True)
+                    
+        df_segmented['pred_phones_audio'] = predicted_phones
+        df_segmented['probs_means'] = probs_means
+        df_segmented['GT_proba'] = [df_segmented.probs_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
+        
+        return df_segmented

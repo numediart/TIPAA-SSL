@@ -29,7 +29,7 @@ import umap.umap_ as umap
 
 from utils.load_data import load_cmu_dataset, load_ipa_dataset, build_df_all_frames, df_all_frames_to_X_y, load_test_dataset, load_cmu_test_dataset, load_shuffled_ipa_dataset,leave_one_speaker_out, load_cmu_dataset_MAILABS
 # from utils.metrics import compute_PER, plot_cf_matrix
-from utils.w2v_gmm_forced_aligner import w2v_gmm_forced_aligner, get_df_segmented
+from utils.w2v_gmm_forced_aligner import w2v_gmm_forced_aligner
 
 def invert_dict(d): 
     inverse = dict() 
@@ -63,6 +63,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         self.status = 'success'
         self.pred_phones_audio = []
         self.fs = 16000
+        self.GT_proba_threshold = 1
         
         if phone_type == 'cmu':
             self.alphabet = cmu_alphabet
@@ -103,7 +104,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         phone_prob_matrix = self.predict_phone_prob_matrix(s, fs)
         cost_nonsil, _, _ = self.forced_aligner.get_cost_non_sil(phone_prob_matrix)
         aligned_phones = self.forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
-        predicted_phones = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
+        predicted_phones, probs_means = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
         self.pred_phones_audio = predicted_phones
         return predicted_phones
 
@@ -113,7 +114,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         phone_prob_matrix_list = [self.predict_phone_prob_matrix(x[0], x[1]) for x in X]
         cost_nonsil_list = [self.forced_aligner.get_cost_non_sil(ppb)[0] for ppb in phone_prob_matrix_list]
         aligned_phones_list = [self.forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes) for cost_nonsil, target_phonemes in zip(cost_nonsil_list, target_phonemes_list)]
-        predicted_phones_list = [self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes) for aligned_phones,cost_nonsil,target_phonemes in zip(aligned_phones_list,cost_nonsil_list,target_phonemes_list)]
+        predicted_phones_list = [self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)[0] for aligned_phones,cost_nonsil,target_phonemes in zip(aligned_phones_list,cost_nonsil_list,target_phonemes_list)]
         self.pred_phones_audio = predicted_phones_list
         return predicted_phones_list
 
@@ -125,8 +126,8 @@ class Wav2Vec2ForFrameGMMAssignment:
             alignment_with_silence = self.forced_aligner.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
         else:
             alignment_with_silence = aligned_phones
-        predicted_phones = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
-        df_segmented = get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, fs=self.fs, time_per_output=0.02)
+        predicted_phones, probs_means = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
+        df_segmented = self.forced_aligner.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, probs_means, fs=self.fs, time_per_output=0.02)
         self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
         return df_segmented
 
@@ -144,7 +145,6 @@ class Wav2Vec2ForFrameGMMAssignment:
     def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels):
         """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
         """
-        
         phoneme_set=[[p] for p in remove_stress_annots(phoneme_set)]
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         df_word=self.predict_word(audio, split_phonetics, target_word_idx)
@@ -167,18 +167,22 @@ class Wav2Vec2ForFrameGMMAssignment:
             phonetic_detection = df_word.iloc[p_idx_global].pred_phones_audio
 
             # #phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
-            # phoneme_set_ids=self.forced_aligner.labelize_phonemes([a[0] for a in phoneme_set])
-            # proba_means=df_word.iloc[p_idx_global].proba_means
+            phoneme_set_ids=self.forced_aligner.labelize_phonemes(phoneme_set)
+            proba_means=df_word.iloc[p_idx_global].probs_means
 
-            # # if GT_proba is beyond the threshold, we take it as prediction
-            # if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
-            #     phonetic_detection=target_phones
-            # else:
-            #     # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
-            #     filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
-            #     idx_mean_max=np.argmax(filtered_proba_means)
-            #     phonetic_detection=self.charsiu_processor.mapping_id2phone(int(idx_mean_max))
-            # syl[p_idx_local]=phonetic_detection
+            # df_word['GT_proba'] = [df_word.probs_means[i][j] for i,j in zip(range(len(df_word)), self.forced_aligner.labelize_phonemes(df_word.phones))]
+
+
+            # if GT_proba is beyond the threshold, we take it as prediction
+            if df_word.iloc[p_idx_global].GT_proba>self.GT_proba_threshold:
+                phonetic_detection=target_phones
+            else:
+                # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
+                filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
+                idx_mean_max=np.argmax(filtered_proba_means)
+                phonetic_detection = self.forced_aligner.label_encoder.inverse_transform([np.argmax(filtered_proba_means)])[0]
+                # phonetic_detection=self.charsiu_processor.mapping_id2phone(int(idx_mean_max))
+            syl[p_idx_local]=phonetic_detection
             
         else:
             phonetic_detection=float('nan')
@@ -415,7 +419,7 @@ if __name__ == '__main__':
     phone_prob_matrix_list = [classe.predict_phone_prob_matrix(s, fs) for s,fs in zip(s_list, fs_list)]
     cost_nonsil_list = [forced_aligner.get_cost_non_sil(ppb)[0] for ppb in phone_prob_matrix_list]
     aligned_phones_list = [forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes) for cost_nonsil, target_phonemes in zip(cost_nonsil_list, target_phonemes_list)]
-    predicted_phones_list = [forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes) for aligned_phones,cost_nonsil,target_phonemes in zip(aligned_phones_list,cost_nonsil_list,target_phonemes_list)]
+    predicted_phones_list = [forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)[0] for aligned_phones,cost_nonsil,target_phonemes in zip(aligned_phones_list,cost_nonsil_list,target_phonemes_list)]
 
     flat_list_predictions = [item for sublist in predicted_phones_list for item in sublist]
     flat_list_target = [item for sublist in target_phonemes_list for item in sublist]

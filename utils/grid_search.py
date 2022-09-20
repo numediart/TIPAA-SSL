@@ -37,6 +37,7 @@ if __name__ == '__main__':
             model = Wav2Vec2ForFrameGMMAssignment(c,d,'cmu')
             model.fit(X, y)
 
+            print("Predictions for {} clusters and {} dimensions".format(c,d))
             preds = model.predict(x)
 
             results["({},{})".format(c,d)] = {
