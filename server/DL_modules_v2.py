@@ -4,7 +4,7 @@ from flask import Response, Blueprint
 from marshmallow import fields, Schema, EXCLUDE
 
 import json
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
 from utils.text_processing import check_phonemes, chunk_text, split_phonetics
 from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
@@ -44,17 +44,17 @@ def internal_error(error):
         'value':str(value),
         'traceback':str(traceback.format_tb(tb))
     }
-    return Response(json.dumps({"status":str(content), "error":True }),status=500,mimetype="application/json")
+    return Response(json.dumps({"status":content, "error":True }),status=500,mimetype="application/json")
 
-@bp.app_errorhandler(400)
-def internal_error(error):
-    etype, value, tb = sys.exc_info()
-    content={
-        'type':str(etype),
-        'value':str(value),
-        'traceback':str(traceback.format_tb(tb))
-    }
-    return Response(json.dumps({"status":str(content), "error":True }),status=400,mimetype="application/json")
+# @bp.app_errorhandler(400)
+# def internal_error(error):
+#     etype, value, tb = sys.exc_info()
+#     content={
+#         'type':str(etype),
+#         'value':str(value),
+#         'traceback':str(traceback.format_tb(tb))
+#     }
+#     return Response(json.dumps({"status":str(content), "error":True }),status=400,mimetype="application/json")
 
 example_sentence_stress={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
 sentence_stress_params=kwargs_def(example_sentence_stress)
