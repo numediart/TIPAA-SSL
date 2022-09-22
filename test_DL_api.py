@@ -181,6 +181,7 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
 
     if client==requests: res.data=res._content
 
+    print(res)
     print(res.data)
     assert res.status_code==200
     
@@ -286,6 +287,32 @@ def test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.
     # res=request_for_audio_file(r, endpoint='/w2v/stress/sentence', client=client, mode='v1')
     # print(res.data)
     # assert res.status_code==200
+
+def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
+    
+    from utils.text_processing import prefill_for_sentence
+    import soundfile as sf
+
+    path='data/temp.ogg'
+    sf.write(path,[],16000)
+
+    text="I would love to go to ireland"
+    r={}
+    r['cmu_phonetics']=prefill_for_sentence(text)['cmu_phonetics']
+    r['text']=text
+    r['audio_file_url']=path
+    r['target_phoneme']=float('nan')
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    print(res.data)
+    assert res.status_code==200
+
+    
+    path='data/temp.ogg'
+    sf.write(path,[],16000)
+    r['audio_file_url']=path
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    print(res.data)
+    assert res.status_code==200
 
 def pContrast_for_user_data( target_phones='AO1', n_user=10, n_ex_by_ex_type=10):
     user_data=build_user_data_df()
