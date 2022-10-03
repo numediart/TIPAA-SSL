@@ -1,14 +1,19 @@
 import cmudict
+import pandas as pd
 from jiwer import wer
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
+from utils.text_processing import remove_stress_annots
+
+global cmu_alphabet 
+cmu_alphabet = [el[0] for el in cmudict.phones()]
 
 def compute_PER(predicted_phones_list, target_phonemes_list):
     PERs = []
     for i in range(len(predicted_phones_list)):
-        flat_list = [item for sublist in predicted_phones_list[i] for item in sublist]
-        flat_list_target = [item for sublist in target_phonemes_list[i] for item in sublist]
+        flat_list = [item for item in predicted_phones_list[i]]
+        flat_list_target = remove_stress_annots([item for item in target_phonemes_list[i]])
         PERs.append(wer(" ".join(flat_list), " ".join(flat_list_target)))
     return PERs
 

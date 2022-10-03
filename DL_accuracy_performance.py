@@ -32,7 +32,7 @@ import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 
 from utils.load_model import load_model
-model = load_model(300,18)
+# model = load_model(300,18,'MAILABS')
 
 import seaborn as sns
 import matplotlib.pyplot as plt

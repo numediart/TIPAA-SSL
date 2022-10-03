@@ -15,7 +15,7 @@ import librosa
 # model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 from utils.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
 from utils.load_model import load_model
-model = load_model(300,18,train_set='MAILABS') # 'MAILABS' or 'librispeech'
+model = load_model(300,20,train_set='MAILABS') # 'MAILABS' or 'librispeech'
 
 target_accepted_alternatives={
     'AA': ['AA', 'AO'],
