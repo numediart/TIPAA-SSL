@@ -28,7 +28,7 @@ target_accepted_alternatives={
 
 terminations_accepted_alternatives={
     'IH_Z':['AH_Z','IH_Z'],
-    'IH_D':['AH_D','IH_D']
+    'IH_D':['AH_D','IH_D', 'ER_D']
     }
 
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
