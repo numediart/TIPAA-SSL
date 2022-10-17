@@ -75,13 +75,14 @@ syl_contrast_responseSchema=Schema.from_dict(
 def define_detected_flag(status):
     if status=="success": flag = "speech"
     elif "not recognized" in status: flag="nonsense"
+    elif "empty" in status: flag="empty_audio"
     else: flag = "nospeech"
     return flag
 
-def define_error_bool(status):
-    if "error:" in status: err = True
-    else: err = False
-    return err
+# def define_error_bool(status):
+#     if "error:" in status: err = True
+#     else: err = False
+#     return err
 
 
 

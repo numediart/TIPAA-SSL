@@ -181,6 +181,7 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
 
     if client==requests: res.data=res._content
 
+    print(res)
     print(res.data)
     assert res.status_code==200
     
@@ -287,6 +288,32 @@ def test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.
     # print(res.data)
     # assert res.status_code==200
 
+def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
+    
+    from utils.text_processing import prefill_for_sentence
+    import soundfile as sf
+
+    path='data/temp.ogg'
+    sf.write(path,[],16000)
+
+    text="I would love to go to ireland"
+    r={}
+    r['cmu_phonetics']=prefill_for_sentence(text)['cmu_phonetics']
+    r['text']=text
+    r['audio_file_url']=path
+    r['target_phoneme']=float('nan')
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    print(res.data)
+    assert res.status_code==200
+
+    
+    path='data/temp.ogg'
+    sf.write(path,[],16000)
+    r['audio_file_url']=path
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    print(res.data)
+    assert res.status_code==200
+
 def pContrast_for_user_data( target_phones='AO1', n_user=10, n_ex_by_ex_type=10):
     user_data=build_user_data_df()
     # user_data['module_type']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].module_type.values[0], axis=1)
@@ -333,7 +360,31 @@ def vowels_confusions_user_recordings(n_user=10, n_ex_by_ex_type=10):
         results[v]=rates
     return results
 
+
 if __name__ == '__main__':
+    
+    # TODO: try multipart form data to send files with payload data
+    # https://stackoverflow.com/questions/12385179/how-to-send-a-multipart-form-data-with-requests-in-python
+    from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+    mp_encoder = MultipartEncoder(
+        fields={
+            'phonetics': 'bar',
+            # plain file object, no filename or mime type produces a
+            # Content-Disposition header with just the part name
+            'audio': ('temp.ogg', open('data/temp.ogg', 'wb'), 'audio/ogg'),
+        }
+    )
+
+    client=requests
+    client=app.test_client()
+    r = client.post(
+        'http://localhost:8000/w2v/contrast/consonant',
+        data=mp_encoder,  # The MultipartEncoder is posted as data, don't use files=...!
+        # The MultipartEncoder provides the content-type header with the boundary:
+        # headers={'Content-Type': mp_encoder.content_type}
+    )
+
     from test_DL_api import *
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
     test_stress_detection(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)

@@ -1,12 +1,64 @@
 from DL_accuracy_performance import *
 
+from DL_speech_tech import *
+
+from utils.audio_processing import prepare_audio_file
+from utils.text_processing import *
+from utils.label_data_processing import *
+
 def test_pConstrast():
-    pContrast_for_actor_recordings(target_phones='AO1')
+    # pContrast_for_actor_recordings(target_phones='AO1', n=10)
+    # phoneme_confusions(n=10, performance_function=pContrast_on_synth_words)
+    n=10
+    p='EY1'
+    preds, rates=pContrast_on_synth_words(target_phones=p, n=n, alternatives=cmu_vowels, accent='UK')
+    
 def test_termination_contrast():
-    termination_contrast_from_audiobook_data(data_set='test-other', target_phones='D', n=50)
-    termination_contrast_for_actor_recordings()
+    termination_contrast_from_audiobook_data(data_set='test-other', target_phones='D', n=20)
+    # termination_contrast_for_actor_recordings()
+    final_s_from_audiobook_data(n=100)
+    
+
+def test_DL_speech_tech_functions():
+    path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
+    # encode_string = base64.b64encode(open(path, "rb").read())
+    formatted_phonetics=prefill_for_sentence('ekk')['cmu_phonetics']
+    _, rID=prepare_audio_file(path)
+    phonemeContrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+                                                        target_word_idx=0, 
+                                                        target_syllable_idx=1, 
+                                                        target_phones='EY1',
+                                                        alternatives=cmu_vowels, mode='file')
+
+    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
+    # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
+    # path='data/audio_recordings/turned_around.mp3'
+    encode_string = base64.b64encode(open(path, "rb").read())
+    formatted_phonetics=prefill_for_sentence('I would love to go to ireland')['cmu_phonetics']
+    stress_from_formatted_phonetics(encode_string,phonetics=formatted_phonetics, 
+                                    level="sentence", 
+                                    n_words_by_chunk=[7],
+                                    max_speech_rate=8, mode='base64'
+                                    )
 
 
+    formatted_phonetics=prefill_for_sentence('turned around')['cmu_phonetics']
+    _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
+    # _, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
+    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+                            target_word_idx=0, 
+                            target_phones='D',
+                            basis='IH0_D',
+                    )
+    
+    path='scripts/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
+    formatted_phonetics=prefill_for_sentence('hate')['cmu_phonetics']
+    _, rID=prepare_audio_file(path)
+    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+                            target_word_idx=0, 
+                            target_phones='HH',
+                            basis='HH', contrast="start"
+                    )
 
 def test_particular_cases():
     df=actor_recordings()
@@ -64,3 +116,4 @@ def test_prefill():
                         syllables_df=pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']), 
                         lang="fr_FR",
                         mode='MFA_IPA')  # "CMU" or "MFA_IPA"
+

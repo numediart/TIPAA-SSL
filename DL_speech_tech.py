@@ -46,11 +46,11 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
             f=sf.SoundFile('./inputs/'+ audio+ '.wav')
         except FileNotFoundError:
             return "error: audio file not found", None
+        if len(f.frames)==0:  return "success: audio is empty (has zero sample)", None
         duration=f.frames / f.samplerate
         speech_rate=n_syllables_tot/duration
         if speech_rate>max_speech_rate: 
             return "success: audio is too short compared to the expected number of syllables", None
-
         try:
             fs,s=read('./inputs/'+ audio+ '.wav')
             s=s/32767
@@ -58,7 +58,8 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
             return "error: audio file not found", None
     elif mode=='base64':
         decode_string = base64.b64decode(audio)
-        # s,fs=sf.read(io.BytesIO(decode_string))
+        s,_=sf.read(io.BytesIO(decode_string))
+        if len(s)==0:  return "success: audio is empty (has zero sample)", None
         s,fs=librosa.load(io.BytesIO(decode_string), sr=fs)
         duration=len(s) / fs
         speech_rate=n_syllables_tot/duration
