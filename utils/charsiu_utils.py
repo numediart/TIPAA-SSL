@@ -18,7 +18,6 @@ keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
 
 # get the blocks of consecutive identical rows in cols
 get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[cols].shift(-1) == a[cols]).any(axis=1)]
-
 class charsiu_phone_forced_aligner(charsiu_forced_aligner):
     def __init__(self, aligner, sil_threshold=4, **kwargs):
         super().__init__(aligner, sil_threshold, **kwargs)
@@ -135,31 +134,50 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             p_df_full[['start','end']]=p_df_full[['start','end']].round(2)
             return p_df_full
 
-        def collapse_consecutive_duplicates(p_df_full):
-            blocks=get_blocks(p_df_full, ['cmu_phones'])
-            block_starts_ends=keep_first_last(blocks.cmu_phones)
-            # keep firsts and lasts (thus only when there is two consecutive phonemes)
-            starts=block_starts_ends.loc[block_starts_ends.shift(-1) == block_starts_ends].index.tolist()
-            ends=block_starts_ends.loc[block_starts_ends.shift(+1) == block_starts_ends].index.tolist()
-            # We use that info to collapse consecutive identical phonemes due to an inserted silence
-            for start_idx,end_idx in zip(starts,ends):
-                # we use the indexes to drop the consecutive identical phonemes except the first one, and put the end as the end of the last consecutive occurence
-                select=p_df_full.loc[start_idx:end_idx]
-                # start=select.start.iloc[0]
-                # print(select)
-                end=select.end.iloc[-1]
-                p_df_full.drop(select.index.tolist()[1:], inplace=True)
-                p_df_full.loc[select.index.tolist()[0]].end=end
         
+        def collapse_consecutive_duplicates(df):
+            df=df.reset_index(drop=True)
+            blocks=[]
+
+            groups=df.groupby([(df.cmu_phones != df.cmu_phones.shift()).cumsum()])
+            for i, g in groups:#print('---');      print (g);         print (g.cmu_phones.tolist());r=g.iloc[0];   r.end=g.iloc[-1].end;   
+                r=g.iloc[0]
+                r.end=g.iloc[-1].end
+                blocks.append(r.to_dict())
+            return pd.DataFrame.from_records(blocks)
+
+
+        # there were some cases for which this version did not work: get_blocks could have 2 consecutive blocks of 2 different phonemes. but as we put everything in the same df, we don't make the difference.
+        # therefore, keep_first_last() would take the start of the first occurence and the end of the second occurence. This resulted sometimes in several phonemes completely skipped
+
+        # def collapse_consecutive_duplicates(p_df_full):
+        #     blocks=get_blocks(p_df_full, ['cmu_phones'])
+        #     block_starts_ends=keep_first_last(blocks.cmu_phones)
+        #     # keep firsts and lasts (thus only when there is two consecutive phonemes)
+        #     starts=block_starts_ends.loc[block_starts_ends.shift(-1) == block_starts_ends].index.tolist()
+        #     ends=block_starts_ends.loc[block_starts_ends.shift(+1) == block_starts_ends].index.tolist()
+        #     # We use that info to collapse consecutive identical phonemes due to an inserted silence
+        #     for start_idx,end_idx in zip(starts,ends):
+        #         # we use the indexes to drop the consecutive identical phonemes except the first one, and put the end as the end of the last consecutive occurence
+        #         select=p_df_full.loc[start_idx:end_idx]
+        #         # start=select.start.iloc[0]
+        #         # print(select)
+        #         end=select.end.iloc[-1]
+        #         p_df_full.drop(select.index.tolist()[1:], inplace=True)
+        #         p_df_full.loc[select.index.tolist()[0]].end=end
         
-        # drop silence, collapse consecutive duplicates (some are superfluous, 
-        # e.g. phonemes interrupted by a silence), 
-        # then divide interval for consecutive duplicate phonemes in the ground truth
-        df_segmented=df_segmented[df_segmented.cmu_phones != '[SIL]']
-        collapse_consecutive_duplicates(df_segmented)
-        phone_list=sum(phones,[])
-        if len(df_segmented)>0:
-            df_segmented=divide_consecutive_duplicates(df_segmented, phone_list)
+        try:
+            # drop silence, collapse consecutive duplicates (some are superfluous, 
+            # e.g. phonemes interrupted by a silence), 
+            # then divide interval for consecutive duplicate phonemes in the ground truth            
+            df_segmented2=df_segmented[df_segmented.cmu_phones != '[SIL]']
+            # collapse_consecutive_duplicates(df_segmented)
+            df_segmented2=collapse_consecutive_duplicates(df_segmented2)
+
+            phone_list=sum(phones,[])
+            if len(df_segmented)>0:
+                df_segmented=divide_consecutive_duplicates(df_segmented2, phone_list)
+        except: import pdb;pdb.set_trace()
         
         if df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
             self.status="success"
