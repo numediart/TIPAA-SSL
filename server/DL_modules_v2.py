@@ -167,3 +167,53 @@ def dl_syllable_contrast_api_v2(**kwargs):
     if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
     properties=["phonetics","audio64","word_idx","syl_idx"]
     return request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='base64')
+
+
+if False:
+    upload_path="./upload_files/"
+    @bp.route('/upload', methods=['POST'])
+    def upload_file():
+        import pdb;pdb.set_trace()
+        print(requests.__dict__)
+        try:
+            uploaded_file = request.files['file']
+        except:
+            return Response(
+                "error: could not access request.files['file']",
+                status=400,
+                mimetype="application/json"
+            )
+        if uploaded_file.filename != '':
+            try:
+                uploaded_file.save(upload_path+uploaded_file.filename)
+            except:
+                return Response(
+                    "error: could not save uploaded file",
+                    status=500,
+                    mimetype="application/json"
+                )
+            try:
+                # import pdb;pdb.set_trace()
+                status_conversion, rID = prepare_audio_file(upload_path+uploaded_file.filename)
+                print(rID)
+            except:
+                return Response(
+                    "error: could not convert uploaded file",
+                    status=500,
+                    mimetype="application/json"
+                )
+            try:
+                os.remove(upload_path+uploaded_file.filename)
+            except:
+                return Response(
+                    "error: could not remove uploaded file",
+                    status=500,
+                    mimetype="application/json"
+                )
+        else:
+            return Response(
+                    "error: filename is empty",
+                    status=400,
+                    mimetype="application/json"
+                )
+        return rID
