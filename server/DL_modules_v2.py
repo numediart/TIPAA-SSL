@@ -173,7 +173,7 @@ if False:
     upload_path="./upload_files/"
     @bp.route('/upload', methods=['POST'])
     def upload_file():
-        import pdb;pdb.set_trace()
+        # import pdb;pdb.set_trace()
         print(requests.__dict__)
         try:
             uploaded_file = request.files['file']
