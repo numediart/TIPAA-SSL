@@ -1,21 +1,30 @@
 from scipy.io.wavfile import  read
 import numpy as np
 import pandas as pd
-from utils.audio_processing import getIntonation, getIntensity, normalize
+from src.audio_processing import getIntonation, getIntensity, normalize
 import soundfile as sf
 import io
-from utils.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, chunk_text, phonetics_indexed_df_from_formatted_phonetics
-from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_to_gibberish
+from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, chunk_text, phonetics_indexed_df_from_formatted_phonetics
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_to_gibberish
 from syllabipy.sonoripy import SonoriPy
-from utils.charsiu_utils import charsiu_phone_forced_aligner
+from src.charsiu_utils import charsiu_phone_forced_aligner
 import base64
 import librosa
+from linetimer import CodeTimer
+import pickle
 
 # initialize model
-# model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
-from utils.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
-from utils.load_model import load_model
-model = load_model(300,20,train_set='MAILABS') # 'MAILABS' or 'librispeech'
+model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+from src.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
+from src.load_model import load_model
+
+# model = load_model(300,18,train_set='librispeech') # 'MAILABS' or 'librispeech'
+# # temporary because it didn't exist in this version:
+# model.GT_proba_threshold=1
+
+# model=pickle.load(open('model_mailabs_umap_2_bgmm_300.pkl','rb'))
+
+# model = load_model(300,20,train_set='MAILABS') # 'MAILABS' or 'librispeech'
 
 target_accepted_alternatives={
     'AA': ['AA', 'AO'],
@@ -46,7 +55,7 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
             f=sf.SoundFile('./inputs/'+ audio+ '.wav')
         except FileNotFoundError:
             return "error: audio file not found", None
-        if len(f.frames)==0:  return "success: audio is empty (has zero sample)", None
+        if f.frames==0:  return "success: audio is empty (has zero sample)", None
         duration=f.frames / f.samplerate
         speech_rate=n_syllables_tot/duration
         if speech_rate>max_speech_rate: 
@@ -118,10 +127,11 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
-    status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
+    with CodeTimer('load audio'):    status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
     if status=="success":
         # print(phonetics)
-        ws=model.compute_stress_score(s,phonetics)
+
+        with CodeTimer('inference + stress'): ws=model.compute_stress_score(s,phonetics)
         if model.status!="success": 
             return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
 
@@ -318,13 +328,13 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         else:
             df_word['syl_idx']=syl_idxs
             df_syl=df_word[df_word.syl_idx==syl_idxs[contrast_idx]]
-
+            print(df_syl)
             df_syl=df_syl[df_syl.pred_phones_audio!='[SIL]']
             syl_detected=drop_consecutive_duplicates(df_syl[['pred_phones_audio']]).pred_phones_audio.tolist()
 
             if contrast=="end":
                 # root based on GT
-                root=df_syl.phones.tolist()[:-n_ter_basis]
+                root=df_syl.cmu_phones.tolist()[:-n_ter_basis]
                 # detected termination
                 ter=syl_detected[len(root)-1:]
             elif contrast=="start":
@@ -468,9 +478,9 @@ def syllable_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D 
 if __name__=="__main__":
     from DL_speech_tech import *
 
-    from utils.audio_processing import prepare_audio_file
-    from utils.text_processing import *
-    from utils.label_data_processing import *
+    from src.audio_processing import prepare_audio_file
+    from src.text_processing import *
+    from src.label_data_processing import *
 
     path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
     # encode_string = base64.b64encode(open(path, "rb").read())

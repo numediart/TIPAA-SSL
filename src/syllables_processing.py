@@ -3,7 +3,7 @@ import pandas as pd
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
 import os
 
-from utils.pronunciation_dictionaries import cmudict_dict
+from src.pronunciation_dictionaries import cmudict_dict
 
 #### Syllables function  ####
 def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0']):

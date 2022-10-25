@@ -1,14 +1,14 @@
 import pandas as pd
 import numpy as np
 from transformers import Wav2Vec2Model, Wav2Vec2Processor, Wav2Vec2ForCTC
-from utils.text_processing import remove_stress_annots
+from src.text_processing import remove_stress_annots
 import ast
 import json
 import librosa
 from sklearn.model_selection import train_test_split
-from utils.libri_phonetization_data import libri_phonetics_data
-from utils.wav2vec2_espeak import instances_per_frame
-from utils.text_processing import prefill_for_sentence
+from src.libri_phonetization_data import libri_phonetics_data
+from src.wav2vec2_espeak import instances_per_frame
+from src.text_processing import prefill_for_sentence
 from itertools import groupby
 
 def df_all_frames_to_X_y(df_all_frames):
@@ -78,12 +78,12 @@ def load_cmu_dataset():
     df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
     return df_t_train, df_t_test
 
-def load_cmu_dataset_MAILABS(speaker_lang_code, others, train_size=800, test_size=200):
+def load_cmu_dataset_MAILABS(speaker_lang_code, others, train_size=800, test_size=200, path='./data/MAILABS'):
     df_others = pd.DataFrame()
     for lang_code in others:
-        df_temp = pd.read_csv('./data/MAILABS_shuffled_aligned-{}_CMU.csv'.format(lang_code))
+        df_temp = pd.read_csv(path+'/MAILABS_shuffled_aligned-{}_CMU.csv'.format(lang_code))
         for i, row in df_temp.iterrows():
-            df_temp.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
+            # df_temp.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
             if type(row.phone_df) == str:
                 res = ast.literal_eval(row.phone_df)
                 df_temp.at[i, "phone_df"] = res
@@ -91,9 +91,9 @@ def load_cmu_dataset_MAILABS(speaker_lang_code, others, train_size=800, test_siz
         df_others = pd.concat([df_others, df_temp])
     df_others = df_others.rename(columns={"path": "wav_path"}, errors="raise")
 
-    df_speaker = pd.read_csv('./data/MAILABS_shuffled_aligned-{}_CMU.csv'.format(speaker_lang_code))
+    df_speaker = pd.read_csv(path+'/MAILABS_shuffled_aligned-{}_CMU.csv'.format(speaker_lang_code))
     for i, row in df_speaker.iterrows():
-        df_speaker.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
+        # df_speaker.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
         if type(row.phone_df) == str:
             res = ast.literal_eval(row.phone_df)
             df_speaker.at[i, "phone_df"] = res
@@ -187,3 +187,4 @@ def build_df_segmented_all(df_t, model, forced_aligner, mode, language_code): # 
     df_segmented.predicted_phones = predictions
 
     return df_segmented
+

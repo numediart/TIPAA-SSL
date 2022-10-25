@@ -2,9 +2,9 @@ from DL_accuracy_performance import *
 
 from DL_speech_tech import *
 
-from utils.audio_processing import prepare_audio_file
-from utils.text_processing import *
-from utils.label_data_processing import *
+from src.audio_processing import prepare_audio_file
+from src.text_processing import *
+from src.label_data_processing import *
 
 def test_pConstrast():
     # pContrast_for_actor_recordings(target_phones='AO1', n=10)
@@ -88,7 +88,7 @@ def test_particular_cases():
 def a_test_stress_detection():
     stress_GE_performance_test(level='word')
 
-from utils.text_processing import *
+from src.text_processing import *
 def test_prefill():
     prefill_for_sentence()
 

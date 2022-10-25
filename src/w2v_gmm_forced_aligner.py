@@ -7,7 +7,13 @@ from itertools import groupby
 import json
 from operator import itemgetter, xor
 import cmudict
-from utils.text_processing import remove_stress_annots
+from src.text_processing import remove_stress_annots, group_consecutive_duplicates
+
+# https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
+keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
+
+# get the blocks of consecutive identical rows in cols
+get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[cols].shift(-1) == a[cols]).any(axis=1)]
 
 global cmu_alphabet
 cmu_alphabet = [el[0] for el in cmudict.phones()]
@@ -56,14 +62,12 @@ class w2v_gmm_forced_aligner:
 
     # forced alignment but with all the audio sample's frames
     def get_alignment_with_silence(self, aligned_phones, silence_frames_idx, non_silence_frames_idx):
-        last_idx = max(silence_frames_idx[-1], non_silence_frames_idx[-1])
-        alignment_with_silence = np.array(["     " for i in range(last_idx+1)])
-
+        alignment_with_silence=np.array(["     "]*(len(silence_frames_idx)+len(non_silence_frames_idx)))
         alignment_with_silence[silence_frames_idx] = "[SIL]"
         alignment_with_silence[non_silence_frames_idx] = aligned_phones
 
-        alignment_with_silence[0] = "[SIL]"
-        alignment_with_silence[-1] = "[SIL]"
+        # alignment_with_silence[0] = "[SIL]"
+        # alignment_with_silence[-1] = "[SIL]"
         return alignment_with_silence
 
     def predict(self, aligned_phones, cost_nonsil, target_phonemes):
@@ -80,22 +84,11 @@ class w2v_gmm_forced_aligner:
                     grouped_aligned_preds[i] = x_2
                     grouped_aligned_preds.insert(i, x_1)
 
-        # if len(target_phonemes) > len(grouped_aligned_preds):
-        #     target_phonemes = target_phonemes[:len(grouped_aligned_preds)]
-        # else if len(target_phonemes) < len(grouped_aligned_preds):
-        #     grouped_aligned_preds = grouped_aligned_preds[:len(target_phonemes)]
-
         probs_means = []
         for phon in grouped_aligned_preds:
             probs_means.append(np.median([l[1] for l in phon], axis=0))
 
         predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in probs_means]
-
-        # if len(predicted_phones)>len(target_phonemes):
-        #     print("I'm here")
-        #     predicted_phones = predicted_phones[:len(target_phonemes)]
-        # else:
-        #     print("I'm not here")
         return predicted_phones, probs_means
 
     def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, probs_means, fs=16000, time_per_output=0.02):
@@ -116,11 +109,61 @@ class w2v_gmm_forced_aligner:
                     grouped.insert(i, grouped[i])
 
         timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
-        # df_segmented['phones'] = [elem[0] for elem in timings]
-        df_segmented['phones'] = remove_stress_annots(phones)
+        timings_df=pd.DataFrame(timings)
+        # df_segmented['phones'] = remove_stress_annots(phones)
+        df_segmented[['phones', 'start', 'end']]=timings_df
         df_segmented['pred_phones_audio'] = predicted_phones
         df_segmented['probs_means'] = probs_means
         df_segmented['GT_proba'] = [df_segmented.probs_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
+        
+        def collapse_consecutive_duplicates(df):
+            df=df.reset_index(drop=True)
+            blocks=[]
+
+            groups=df.groupby([(df.phones != df.phones.shift()).cumsum()])
+            for i, g in groups:#print('---');      print (g);         print (g.phones.tolist());r=g.iloc[0];   r.end=g.iloc[-1].end;   
+                r=g.iloc[0]
+                r.end=g.iloc[-1].end
+                blocks.append(r.to_dict())
+            return pd.DataFrame.from_records(blocks)
+
+        def divide_consecutive_duplicates(p_df, phone_list):
+            grouped_phone_list=group_consecutive_duplicates(phone_list)
+            duplicate_indexes=[i for i,el in enumerate(grouped_phone_list) if el[-1]>1]
+            n_times=[el[-1] for i,el in enumerate(grouped_phone_list)]
+
+            p_df['n_times']=n_times
+            p_df_full=p_df.loc[p_df.index.repeat(p_df.n_times)]
+            p_df_full=p_df_full.reset_index()
+
+            blocks=get_blocks(p_df_full, ['phones'])
+            
+            block_starts_ends=keep_first_last(blocks.phones)
+            # keep firsts and lasts (thus only when there is two consecutive phonemes)
+            starts=block_starts_ends.loc[block_starts_ends.shift(-1) == block_starts_ends].index.tolist()
+            ends=block_starts_ends.loc[block_starts_ends.shift(+1) == block_starts_ends].index.tolist()
+
+            for start_idx,end_idx in zip(starts,ends):
+                select=p_df_full.iloc[start_idx:end_idx+1]
+                start=select.start.iloc[0]
+                end=select.end.iloc[-1]
+                interval=(end-start)/len(select)
+
+                steps=start+np.cumsum([interval]*(len(select)-1))
+
+                p_df_full.iloc[start_idx+1:end_idx+1].start=steps
+                p_df_full.iloc[start_idx:end_idx].end=steps
+            p_df_full[['start','end']]=p_df_full[['start','end']].round(2)
+            return p_df_full
+        
+
+        df_segmented2=df_segmented[df_segmented.phones != '[SIL]']
+        # collapse_consecutive_duplicates(df_segmented)
+        df_segmented2=collapse_consecutive_duplicates(df_segmented2)
+        if len(df_segmented)>0:
+            df_segmented=divide_consecutive_duplicates(df_segmented2, remove_stress_annots(phones))
+        
+
         # df_segmented['start'] = [elem[1] for elem in timings]
         # df_segmented['end'] = [elem[2] for elem in timings]
 
@@ -142,18 +185,18 @@ class w2v_gmm_forced_aligner:
         #             df_segmented.loc[i+0.5]=df_segmented.loc[i]
         #             df_segmented = df_segmented.sort_index()
         #             df_segmented=df_segmented.reset_index(drop=True)
-        try:
-            df_segmented['start'] = [elem[1] for elem in timings]
-            df_segmented['end'] = [elem[2] for elem in timings]
-            # df_segmented['pred_phones_audio'] = predicted_phones
-            # df_segmented['probs_means'] = probs_means
-            # df_segmented['GT_proba'] = [df_segmented.probs_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
-        except:
-            print("Problem with alignment")
-            print("GT : ", phones)
-            print("Predicted : ", predicted_phones)
-            print("df_segmented : ", df_segmented['phones'])
-            print("timings", timings)
-            print("get_alignment_with_silence", alignment_with_silence)
+
+        return df_segmented
+    
+    
+    def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, fs=16000):
+        cost_nonsil, silence_frames_idx, non_silence_frames_idx = self.get_cost_non_sil(phone_prob_matrix)
+        aligned_phones = self.get_forced_alignment(cost_nonsil, target_phonemes)
+        if silence_frames_idx:
+            alignment_with_silence = self.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
+        else:
+            alignment_with_silence = aligned_phones
+        predicted_phones, probs_means = self.predict(aligned_phones, cost_nonsil, target_phonemes)
+        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, probs_means, fs=fs, time_per_output=0.02)
 
         return df_segmented

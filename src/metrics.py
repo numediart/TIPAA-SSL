@@ -4,7 +4,7 @@ from jiwer import wer
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
-from utils.text_processing import remove_stress_annots
+from src.text_processing import remove_stress_annots
 
 global cmu_alphabet 
 cmu_alphabet = [el[0] for el in cmudict.phones()]

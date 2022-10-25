@@ -5,10 +5,10 @@ from marshmallow import Schema, fields
 import json
 import ast
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, syllable_contrast_from_formatted_phonetics_audio
-from utils.text_processing import check_phonemes, chunk_text, split_phonetics
-from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants
+from src.text_processing import check_phonemes, chunk_text, split_phonetics
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 from flask import Response
-from utils.audio_processing import audio64_from_file
+from src.audio_processing import audio64_from_file
 
 
 

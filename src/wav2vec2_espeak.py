@@ -12,7 +12,7 @@ from jiwer import wer
 # from src.phonetization import stress, unstress
 import os
 import pandas as pd
-from utils.text_processing import remove_stress_annots
+from src.text_processing import remove_stress_annots
 
 # from src.layer_extraction import get_last_hidden_state
 

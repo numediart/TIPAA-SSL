@@ -9,9 +9,9 @@ import sys
 import torch
 import numpy as np
 from charsiu.src.utils import seq2duration,forced_align
-from utils.text_processing import group_consecutive_duplicates, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
-from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants
-from utils.audio_processing import getIntonation, getIntensity, normalize
+from src.text_processing import group_consecutive_duplicates, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
+from src.audio_processing import getIntonation, getIntensity, normalize
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
 keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
@@ -177,7 +177,9 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             phone_list=sum(phones,[])
             if len(df_segmented)>0:
                 df_segmented=divide_consecutive_duplicates(df_segmented2, phone_list)
-        except: import pdb;pdb.set_trace()
+        except: 
+            # import pdb;pdb.set_trace()
+            raise "error in collapse or divide consecutive duplicates"
         
         if df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
             self.status="success"
@@ -390,9 +392,9 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
 
 if __name__=="__main__":
-    from utils.charsiu_utils import *
+    from src.charsiu_utils import *
     from transformers import Wav2Vec2Processor
-    from utils.libri_phonetization_data import libri_phonetics_data
+    from src.libri_phonetization_data import libri_phonetics_data
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 

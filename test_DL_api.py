@@ -1,6 +1,5 @@
 from flask_server import app
 import os
-os.environ['FLOWSPEECH_KEY']="ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"
 import ast
 from tqdm import tqdm
 import pandas as pd
@@ -9,14 +8,14 @@ import json
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from utils.label_data_processing import actor_recordings
+from src.label_data_processing import actor_recordings
 from DL_accuracy_performance import count_values, plot_confusion_results
 
-from utils.label_data_processing import build_user_data_df
+from src.label_data_processing import build_user_data_df
 exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from utils.audio_processing import audio64_from_file
-from utils.text_processing import get_chunks, chunk_text
+from src.audio_processing import audio64_from_file
+from src.text_processing import get_chunks, chunk_text
 
 def call_prefill_for_sentence(sentence, mode="CMU", lang="en_US", base_url = 'http://localhost:8000', client=app.test_client()):
     url=base_url+"/prefill_from_phrase"
@@ -52,8 +51,21 @@ def a_test_prefill(base_url = 'http://localhost:8000', client=app.test_client())
 
     return d
 
-def prefill_content_phrases(path="data/SE_content_all_phrases_08_31_2022_11_56_57.csv"):
+def prefill_content_phrases(path="data/SE_content_all_phrases_10_20_2022_14_51_13.csv", path_db_export="data/query_results-2022-08-31_101957.csv"):
     all_sentences=pd.read_csv(path)
+    db_export=pd.read_csv(path_db_export)
+
+    db_phrases=set(db_export.text)
+    db_phrases_lower=set(db_export.text.str.lower())
+    db_phrases.union(db_phrases_lower)
+
+    all_sentences_no_duplicates=all_sentences[~all_sentences.sentence.isin(db_phrases.union(db_phrases_lower))]
+    all_sentences_no_duplicates=all_sentences_no_duplicates.drop_duplicates(['sentence'])
+
+    no_duplicates_path=path.split('.')[0]+'_no_duplicates.csv'
+    all_sentences_no_duplicates.to_csv(no_duplicates_path)
+
+
     # call_prefill_for_sentence()
     print('n of sentences:', len(all_sentences))
     from tqdm import tqdm
@@ -70,9 +82,11 @@ def prefill_content_phrases(path="data/SE_content_all_phrases_08_31_2022_11_56_5
     idxs_errors=[i for i,el in enumerate(records) if "DOCTYPE" in el]
     # look at errors
     ids_errors=all_sentences.iloc[idxs_errors].id.tolist()
+    print('List of errors:')
     print(all_sentences.iloc[idxs_errors])
 
     phonetics_data=pd.DataFrame.from_records(records)
+    phonetics_data['text']=all_sentences['sentence']
     # look at error rows
     print(phonetics_data[phonetics_data.index.isin(ids_errors)])
     # drop error rows
@@ -85,6 +99,7 @@ def prefill_content_phrases(path="data/SE_content_all_phrases_08_31_2022_11_56_5
 
     if len(syl_errors_df)>0: pd.DataFrame([syl_errors_text, syl_errors_phonetics, syl_errors_methods]).T
 
+    print('List of inconsistencies in stress:')
     phonetics_data[phonetics_data.apply(lambda r: len(r.n_stress_inconsistencies)>0, axis=1)].apply(lambda r: [r.cmu_phonetics.split(' ')[i] for i in r.n_stress_inconsistencies], axis=1)
 
     prefill_path=path.split('.')[0]+'_prefill.csv'
@@ -224,7 +239,7 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
 
     
     results_v, failures_v=get_results(df_v.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'vowel', client=client, mode=mode)
-    results_ed_s, failures_ed_s=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'syllable', client=client, mode=mode)
+    # results_ed_s, failures_ed_s=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'syllable', client=client, mode=mode)
     results_ed, failures_ed=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'termination', client=client, mode=mode)
 
     results_v[results_v.phonetic_detection!=results_v.target_phoneme]
@@ -243,13 +258,13 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
         res=results_ed[results_ed.target_phoneme.str.contains(t)]
         print(count_values(res[res.phonetic_detection!=res.target_phoneme].phonetic_detection))
         print('success rate for '+t, success_rate(res))
-    for t in eds:
-        res=results_ed_s[results_ed_s.target_phoneme.str.contains(t)]
-        print(count_values(res[res.gibberish_detected!=res.gibberish_truth].gibberish_detected))
-        success_rate = lambda df : len(df[df.gibberish_truth==df.gibberish_detected])/len(df) if len(df)>0 else float('nan')
-        print('success rate for '+t, success_rate(res))
+    # for t in eds:
+    #     res=results_ed_s[results_ed_s.target_phoneme.str.contains(t)]
+    #     print(count_values(res[res.gibberish_detected!=res.gibberish_truth].gibberish_detected))
+    #     success_rate = lambda df : len(df[df.gibberish_truth==df.gibberish_detected])/len(df) if len(df)>0 else float('nan')
+    #     print('success rate for '+t, success_rate(res))
     
-    return results_v, results_ed, results_ed_s
+    return results_v, results_ed#, results_ed_s
 
 def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/stress/', client=app.test_client(), n_ex_by_module=10, mode='v2'):
     df=actor_recordings()
@@ -273,7 +288,7 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/str
 
 def test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a', base_url = 'http://localhost:8000', client=app.test_client()):
     
-    from utils.text_processing import prefill_for_sentence
+    from src.text_processing import prefill_for_sentence
 
     text="I would love to go to ireland"
     r={}
@@ -290,7 +305,7 @@ def test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.
 
 def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
     
-    from utils.text_processing import prefill_for_sentence
+    from src.text_processing import prefill_for_sentence
     import soundfile as sf
 
     path='data/temp.ogg'
@@ -362,6 +377,19 @@ def vowels_confusions_user_recordings(n_user=10, n_ex_by_ex_type=10):
 
 
 if __name__ == '__main__':
+
+    from test_DL_api import *
+    base_url = 'http://localhost:8000'; route='/v2/w2v/stress/'; client=app.test_client(); n_ex_by_module=10; mode='v2'
+    df=actor_recordings()
+    df_pContrast=df.loc[df.target_phoneme.dropna().index]
+    df_sentence_stress=df.loc[df.stress_category.dropna().index]
+    df_word_stress=df.drop(df_pContrast.index).drop(df_sentence_stress.index)
+    
+    results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'sentence', client=client, mode=mode)
+
+    df_test=df_word_stress[df_word_stress.text.str.contains("grandma")].iloc[-1:,:]
+    results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client, mode=mode)
+
     
     # TODO: try multipart form data to send files with payload data
     # https://stackoverflow.com/questions/12385179/how-to-send-a-multipart-form-data-with-requests-in-python
@@ -408,13 +436,13 @@ if __name__ == '__main__':
     df_sentence_stress[l>50].text.iloc[0]
     df_sentence_stress[l>50].iloc[0]
 
-    from utils.audio_processing import audio64_from_file
+    from src.audio_processing import audio64_from_file
     df_sentence_stress[l>50].iloc[0].cmu_phonetics
     audio64=audio64_from_file(df_sentence_stress[l>50].iloc[0].audio_file_url)
 
     
 
-    # from utils.text_processing import chunk_text
+    # from src.text_processing import chunk_text
     r=df_sentence_stress[l>50].iloc[0]
 
     route='/v2/w2v/stress/'

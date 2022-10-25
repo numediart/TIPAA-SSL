@@ -5,8 +5,8 @@ from marshmallow import fields, Schema, EXCLUDE
 
 import json
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
-from utils.text_processing import check_phonemes, chunk_text, split_phonetics
-from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants
+from src.text_processing import check_phonemes, chunk_text, split_phonetics
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
 # from app_definition import app
 from server.utils import default_example, request_phoneme_contrast, request_syl_contrast, request_stress, request_stress_v2, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
@@ -150,23 +150,24 @@ def dl_termination_contrast_api_v2(**kwargs):
     properties=["phonetics","audio64","word_idx","target"]
     return request_phoneme_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='base64')
 
-example_syllable_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termination_w_idx"],"syl_idx":1}
-syllable_contrast_params=kwargs_def(example_syllable_contrast)
-@doc(description='Syllable contrast', tags=['w2v_v2'])
-@use_kwargs(syllable_contrast_params, location="json")
-@marshal_with(syl_contrast_responseSchema, code=200)  # marshalling
-@bp.route('/w2v/contrast/syllable', methods=['POST'])
-def dl_syllable_contrast_api_v2(**kwargs):
-    # d = request.values.to_dict()
-    try:
-        d=json.loads(request.get_json())
-    except TypeError:
-        d=request.get_json()
-    global syllable_contrast_params
-    err=check_schema(d, syllable_contrast_params)
-    if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-    properties=["phonetics","audio64","word_idx","syl_idx"]
-    return request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='base64')
+if False:
+    example_syllable_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termination_w_idx"],"syl_idx":1}
+    syllable_contrast_params=kwargs_def(example_syllable_contrast)
+    @doc(description='Syllable contrast', tags=['w2v_v2'])
+    @use_kwargs(syllable_contrast_params, location="json")
+    @marshal_with(syl_contrast_responseSchema, code=200)  # marshalling
+    @bp.route('/w2v/contrast/syllable', methods=['POST'])
+    def dl_syllable_contrast_api_v2(**kwargs):
+        # d = request.values.to_dict()
+        try:
+            d=json.loads(request.get_json())
+        except TypeError:
+            d=request.get_json()
+        global syllable_contrast_params
+        err=check_schema(d, syllable_contrast_params)
+        if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
+        properties=["phonetics","audio64","word_idx","syl_idx"]
+        return request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='base64')
 
 
 if False:

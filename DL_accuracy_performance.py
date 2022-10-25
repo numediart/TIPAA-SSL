@@ -1,26 +1,26 @@
 from cProfile import label
-from utils.libri_phonetization_data import build_librispeech_words_df
-from utils.libri_phonetization_data import phonetics_for_row, select_libri
+from src.libri_phonetization_data import build_librispeech_words_df
+from src.libri_phonetization_data import phonetics_for_row, select_libri
 from tqdm import tqdm
 import pandas as pd
 import pickle
-from utils.charsiu_utils import charsiu_phone_forced_aligner
+from src.charsiu_utils import charsiu_phone_forced_aligner
 import ast
 
 import librosa
 from collections import Counter
 
-from utils.label_data_processing import build_user_data_df, get_errors_examples
+from src.label_data_processing import build_user_data_df, get_errors_examples
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio
-from utils.audio_processing import prepare_audio_file
+from src.audio_processing import prepare_audio_file
 
-from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings, final_s_artificial_data, synth_words_data
-from utils.text_processing import *
-from utils.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_phones
+from src.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings, final_s_artificial_data, synth_words_data
+from src.text_processing import *
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_phones
 
-from utils.libri_phonetization_data import *
+from src.libri_phonetization_data import *
 
 from tqdm import tqdm
 
@@ -31,7 +31,7 @@ import pandas as pd
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
 
-from utils.load_model import load_model
+from src.load_model import load_model
 # model = load_model(300,18,'MAILABS')
 
 import seaborn as sns
@@ -506,7 +506,7 @@ def syllable_contrast_for_actor_recordings():
     
     df[df.GT_overall_confidences<0.1][['text','audio_file_url']]
 
-    from utils.text_processing import split_phonetics, remove_stress_annots
+    from src.text_processing import split_phonetics, remove_stress_annots
     # This is to get every syllable
     all_phones_df.index=range(len(all_phones_df))
     syl_indexation_df=all_phones_df[['sentence_idx', 'word_idx',  'syl_idx' ]].drop_duplicates()
@@ -985,8 +985,6 @@ def termination_confusions_for_actor_recordings():
 
 
 def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other'):
-    
-
     _,_,d=start_end_phoneme_from_audiobook_data(phoneme='HH',basis='HH', n=n, data_set=data_set)
     r=d.T['HH']
     _,_,d=start_end_phoneme_from_audiobook_data(phoneme='EH1',basis='HH', n=1000, data_set=data_set)
@@ -1009,6 +1007,7 @@ def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other'):
 
 if __name__=='__main__':
     from DL_accuracy_performance import *
+    pContrast_for_actor_recordings(target_phones='AO1')
 
     starting_h_from_audiobook_data(data_set='dev-clean', n=100)
 
@@ -1087,7 +1086,8 @@ if __name__=='__main__':
     plot_confusion_results(results, name='plots/termination_confusions_for_actor_recordings_D_T_dis_w2v_AH_D_post_corr')
 
     results=vowels_confusions_actor_recordings()
-    plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v_thresh_0.2')
+    # plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v_mm_thresh_1_model_mailabs_umap_2_gmm_300')
+    plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v_mm_thresh_1_model_mailabs_umap_2_bgmm_300')
 
     results=vowels_confusions_user_recordings(frac=0.01)
     plot_confusion_results(results, name='vowel_contrast_proba_means_user_data_w2v_thresh_0.2')

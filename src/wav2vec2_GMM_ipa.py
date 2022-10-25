@@ -10,27 +10,60 @@ import ast
 # from src.config import DEVICE
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import LabelEncoder
-from utils.audio_processing import getIntonation, getIntensity, normalize
-from utils.text_processing import unstress, prefill_for_sentence, remove_stress_annots
+from src.audio_processing import getIntonation, getIntensity, normalize
+from src.text_processing import unstress, prefill_for_sentence, remove_stress_annots
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
 import cmudict
 from operator import itemgetter
 import itertools
-from utils.libri_phonetization_data import libri_phonetics_data
+from src.libri_phonetization_data import libri_phonetics_data
 from jiwer import wer
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from time import time
-
+from linetimer import CodeTimer
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
 import umap.umap_ as umap
 from sklearn.decomposition import PCA
 
-from utils.load_data import load_cmu_dataset, load_ipa_dataset, build_df_all_frames, df_all_frames_to_X_y, load_test_dataset, load_cmu_test_dataset, load_shuffled_ipa_dataset,leave_one_speaker_out, load_cmu_dataset_MAILABS
-# from utils.metrics import compute_PER, plot_cf_matrix
-from utils.w2v_gmm_forced_aligner import w2v_gmm_forced_aligner
+from src.load_data import load_cmu_dataset, load_ipa_dataset, build_df_all_frames, df_all_frames_to_X_y, load_test_dataset, load_cmu_test_dataset, load_shuffled_ipa_dataset,leave_one_speaker_out, load_cmu_dataset_MAILABS
+# from src.metrics import compute_PER, plot_cf_matrix
+from src.w2v_gmm_forced_aligner import w2v_gmm_forced_aligner
+
+
+from scipy import linalg
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+color_iter = itertools.cycle(["navy", "c", "cornflowerblue", "gold", "darkorange"])
+def plot_results(X, Y_, means, covariances, title):
+    plt.clf()
+    # splot = plt.subplot(2, 1, 1 + index)
+    for i, (mean, covar, color) in enumerate(zip(means, covariances, color_iter)):
+        v, w = linalg.eigh(covar)
+        v = 2.0 * np.sqrt(2.0) * np.sqrt(v)
+        u = w[0] / linalg.norm(w[0])
+        # as the DP will not use every component it has access to
+        # unless it needs it, we shouldn't plot the redundant
+        # components.
+        if not np.any(Y_ == i):
+            continue
+        plt.scatter(X[Y_ == i, 0], X[Y_ == i, 1], 0.8, color=color)
+
+        # Plot an ellipse to show the Gaussian component
+        angle = np.arctan(u[1] / u[0])
+        angle = 180.0 * angle / np.pi  # convert to degrees
+        ell = mpl.patches.Ellipse(mean, v[0], v[1], 180.0 + angle, color=color)
+        # ell.set_clip_box(splot.bbox)
+        ell.set_alpha(0.5)
+        # splot.add_artist(ell)
+
+    # plt.xlim(-9.0, 5.0)
+    # plt.ylim(-3.0, 6.0)
+    plt.xticks(())
+    plt.yticks(())
+    plt.title(title)
 
 def invert_dict(d): 
     inverse = dict() 
@@ -108,9 +141,6 @@ class Wav2Vec2ForFrameGMMAssignment:
         self.gmm = self.gmm.fit(self.X_train_reduced)
         self.find_component_phoneme()
 
-        if save:
-            pickle.dump(self, open("./data/models/model_{}_{}_{}.pkl","wb".format(save, self.nbr_clusters, self.target_dim)))
-
     # predict phonemes from an audio sample with target_phonemes
     def predict_sample(self, s, fs, target_phonemes):
         phone_prob_matrix = self.predict_phone_prob_matrix(s, fs)
@@ -133,14 +163,9 @@ class Wav2Vec2ForFrameGMMAssignment:
     # used to predict and get proba means per phoneme alignment and GT
     def predict_with_timings(self, s, target_phonemes):
         phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
-        cost_nonsil, silence_frames_idx, non_silence_frames_idx = self.forced_aligner.get_cost_non_sil(phone_prob_matrix)
-        aligned_phones = self.forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
-        if silence_frames_idx:
-            alignment_with_silence = self.forced_aligner.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
-        else:
-            alignment_with_silence = aligned_phones
-        predicted_phones, probs_means = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
-        df_segmented = self.forced_aligner.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, probs_means, fs=self.fs, time_per_output=0.02)
+
+        df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes, fs=self.fs)
+
         self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
         return df_segmented
 
@@ -272,6 +297,9 @@ class Wav2Vec2ForFrameGMMAssignment:
             for j in range(len(self.alphabet)):
                 if self.alphabet[j] in self.phoneme_to_components.keys():
                     phone_prob_matrix[i][j] = sum(probs[i][self.phoneme_to_components[self.alphabet[j]]])
+        
+        print('times of get_last_hidden_state, reduce_lhs_dimension, gmm predict_proba')
+        print(self.timestamps)
 
         return phone_prob_matrix
 
@@ -290,24 +318,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         split_phonetics=sum(split_phonetics,[])
         #_, textgridData, _ = self.align_phones(audio=audio,phones=split_phonetics)
-        textgridData = self.predict_with_timings(audio, split_phonetics)
-
-        # # TODO: remove this block: the silence and consecutive things processing, as I already do that in align_phones now
-        # # textgridData=self.force_and_predict(audio,split_phonetics)
-        # textgridData=textgridData[textgridData.cmu_phones != '[SIL]']
-        # # I have to collapse if several consecutive vowels are the same. it can happen when the predictions are not the same.
-        # # I thus have to group the timings (first start until last end)
-        # #  here we delete consecutives but keep first and last, so there is a possibility of only two consecutves after that, and having overall start and end
-        # test=keep_first_last(textgridData.cmu_phones)
-        # # keep firsts and lasts (thus only when there is two consecutive phonemes)
-        # starts=test.loc[test.shift(-1) == test]
-        # ends=test.loc[test.shift(+1) == test]
-        # assert len(starts)==len(ends)
-        # # drop duplicates keeping first
-        # drop_duplicates=lambda a: a.loc[a.shift(+1) != a]
-        # filtered_df=textgridData.loc[drop_duplicates(textgridData.cmu_phones).index]
-        # here in the filtered_df containg only the first occurence for equal consecutive examples, we replace the 'end' value with the line in the "ends"
-        # for rownum,(indx,val) in enumerate(starts.iteritems()): filtered_df.loc[indx,'end']=textgridData.loc[ends.index[rownum],'end']
+        with CodeTimer('whole phone prediction'): textgridData = self.predict_with_timings(audio, split_phonetics)
 
         # select vowels
         filtered_df=textgridData[textgridData.phones.isin(cmu_vowels)]#.index.tolist()
@@ -338,14 +349,6 @@ class Wav2Vec2ForFrameGMMAssignment:
 
             Dur.append(filtered_df['end'].iloc[i]-filtered_df['start'].iloc[i])
             
-            # phone_df=pd.DataFrame([r[2].split('_') for i,r in filtered_df.iterrows()])
-            # # here we use the prediction of HMM model as an indication, as it has to classify 0, 1 or 2
-            # syltype_phone=int(phone_df[2].iloc[i])
-            # if syltype_phone == 2:  # the sylType is 0 for unstressed, 0.5 for secondary stressed syllables and 1 for primary stressed syllables
-            #     sylType[i] = 0.5
-            # else:
-            #     sylType[i]=syltype_phone
-        
         # normalization of features (projection to [0 1] range)
         zImax = normalize(Imax)
         zImean = normalize(Imean)
@@ -379,8 +382,9 @@ class Wav2Vec2ForFrameGMMAssignment:
 
 if __name__ == '__main__':
 
-    from utils.load_data import *
-    from utils.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
+    from src.load_data import *
+    from src.wav2vec2_GMM_ipa import *
+    from src.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
 
     df_t_train, df_t_test = load_cmu_dataset()
     with open('./data/models/df_all_frames.pkl', 'rb') as f: df_all_frames=pickle.load(f)
@@ -394,7 +398,7 @@ if __name__ == '__main__':
     path="./data/models/model_librispeech_300_18.pkl"
     pickle.dump(classe, open(path,"wb"))
 
-    from utils.load_model import load_model
+    from src.load_model import load_model
     model = load_model(300,18)
 
     # with open(path, 'rb') as f:             a=pickle.load(f)
@@ -429,19 +433,42 @@ if __name__ == '__main__':
     df_all_frames = build_df_all_frames(df_t_train, 'cmu_phone')
     X, y = df_all_frames_to_X_y(df_all_frames)
 
+
+    from src.wav2vec2_GMM_ipa import *
     # leave one speaker out
     all_speakers = ['fr_FR', 'es_ES', 'en_UK', 'en_US']
     speaker_lang_code = 'en_UK'
     others = list(set(all_speakers) - set([speaker_lang_code]))
 
     # df_t_train, df_t_test = leave_one_speaker_out(speaker_lang_code, all_speakers)
-    df_t_train, df_t_test = load_cmu_dataset_MAILABS(speaker_lang_code, ['en_US', 'en_UK'])
-    df_all_frames = build_df_all_frames(df_t_train, 'ipa_phone')
+    df_t_train, df_t_test = load_cmu_dataset_MAILABS(speaker_lang_code, ['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    df_t_train=df_t_train.dropna()
+    df_all_frames = build_df_all_frames(df_t_train, 'phone')
     X, y = df_all_frames_to_X_y(df_all_frames)
 
-    classe = Wav2Vec2ForFrameGMMAssignment(300,18,'cmu')
-    classe.fit(X, y)
-    classe.find_component_phoneme()
+    model = Wav2Vec2ForFrameGMMAssignment(300,2,'cmu')
+    model.fit(X, y, save=True)
+    model.find_component_phoneme()
+    pickle.dump(model,open('model_mailabs_umap_2_gmm_300.pkl','wb'))
+
+    gmm=model.gmm
+
+    from sklearn.mixture import BayesianGaussianMixture
+
+    bgmm = BayesianGaussianMixture(n_components=model.nbr_clusters)
+    bgmm.fit(model.X_train_reduced)
+
+    plot_results(model.X_train_reduced, gmm.predict(model.X_train_reduced), gmm.means_, gmm.covariances_, "Gaussian Mixture")
+    plt.savefig('ellipses.png')
+
+    plot_results(model.X_train_reduced, bgmm.predict(model.X_train_reduced), bgmm.means_, bgmm.covariances_, "Bayesian Gaussian Mixture with DP")
+    plt.savefig('ellipses_bgmm.png')
+    model.__dict__.keys()
+    model.gmm=bgmm
+    model.find_component_phoneme()
+
+    pickle.dump(model,open('model_mailabs_umap_2_bgmm_300.pkl','wb'))
+
 
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa

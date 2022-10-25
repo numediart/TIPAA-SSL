@@ -7,7 +7,7 @@ from flask import send_from_directory, Response, request, Blueprint
 from marshmallow import Schema, fields
 from flask_apispec import marshal_with, doc, use_kwargs
 
-from utils.text_processing import generate_prefill_csv, prefill_for_sentence, syllables_df
+from src.text_processing import generate_prefill_csv, prefill_for_sentence, syllables_df
 from server.utils import debug_only, access_property_error
 from server.DL_modules_v2 import check_schema, kwargs_def
 

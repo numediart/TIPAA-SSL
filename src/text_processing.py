@@ -23,8 +23,8 @@ unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
-from utils.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
-from utils.syllables_processing import n_syl_SonoriPy, syllables_data, syllabified_text
+from src.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
+from src.syllables_processing import n_syl_SonoriPy, syllables_data, syllabified_text
 
 syllables_df={
             'en_GB':pd.read_csv('data/syllables.csv'),
@@ -705,7 +705,7 @@ if False:
 
 
 if __name__ == "__main__":
-    from utils.text_processing import *
+    from src.text_processing import *
     prefill_for_sentence()
 
     
@@ -718,7 +718,7 @@ if __name__ == "__main__":
                         lang="fr_FR",
                         mode='MFA_IPA')  # "CMU" or "MFA_IPA"
     
-    from utils.label_data_processing import actor_recordings
+    from src.label_data_processing import actor_recordings
     df_phrases=actor_recordings()
     df_phrases=df_phrases.loc[df_phrases.phrase_id.drop_duplicates().index]
     df_phrases=df_phrases.reset_index(drop=True)
