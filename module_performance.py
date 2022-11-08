@@ -1,14 +1,14 @@
 from speech_tech import *
-from utils.text_processing import *
-from utils.audio_processing import prepare_audio_file
+from src.text_processing import *
+from src.audio_processing import prepare_audio_file
 from glob import glob
 import os
 import pandas as pd
-from utils.libri_phonetization_data import *
+from src.libri_phonetization_data import *
 from tqdm import tqdm
 import pickle
 import seaborn as sns
-from utils.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, make_all_phones_annotation_files, actor_recordings
+from src.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, make_all_phones_annotation_files, actor_recordings
 import ast
 
 from collections import Counter
