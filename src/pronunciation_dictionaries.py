@@ -139,8 +139,8 @@ def get_augmented_mfa_dict(lang='es_ES'):
 
 mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
-mfa_dicts['en_US']
-len(mfa_dicts['en_US'])
+# mfa_dicts['en_US']
+# len(mfa_dicts['en_US'])
 
 
 def build_mfa_phone_set():
@@ -187,8 +187,6 @@ def get_augmented_cmudict():
 
 
 cmudict_dict=get_augmented_cmudict()
-
-len(cmudict_dict)
 
 
 cmu_to_gibberish={'AA':'o',
