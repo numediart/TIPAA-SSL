@@ -318,10 +318,14 @@ def extract_special_chars(norm_sent, special_chars):
     special_chars_dict_end={}
     special_chars_dict_start={}
     for i,w in enumerate(norm_sent.split(' ')):
-        if w[-1] in special_chars:
-            special_chars_dict_end[i]=w[-1] 
-        if w[0] in special_chars:
-            special_chars_dict_start[i]=w[0] 
+        is_special_char=[c in special_chars for c in w]
+
+        # count number of repeated values to know how much special chars is start and at end if any
+        special_char_s_in_word = [(v, sum(1 for _ in group)) for v, group in groupby(is_special_char)]
+        if special_char_s_in_word[0][0]:
+            special_chars_dict_start[i]=w[:special_char_s_in_word[0][1]]
+        if special_char_s_in_word[-1][0]:
+            special_chars_dict_end[i]=w[-special_char_s_in_word[-1][1]:]
     return special_chars_dict_start, special_chars_dict_end
 
 get_acronyms_idxs=lambda words: [w_idx for w_idx,w in enumerate(words) if w.isupper()]
@@ -335,7 +339,7 @@ def prefill_for_sentence(
     # sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!", 
                         syllables_df=pd.read_csv('data/syllables.csv'), 
                         syl_sep='|', 
-                        special_chars = [',','?','.','!','¡',';',':','"', '{', '}'],
+                        special_chars = [',','?','.','!','¡',';',':','"', '{', '}', '*'],
                         lang="en_US",
                         mode='CMU'):  # "CMU" or "MFA_IPA"
     """This function extract information of syllabified texts and phonetics. 
@@ -358,10 +362,10 @@ def prefill_for_sentence(
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
     for c in special_chars: 
-        if c not in ['¡']:  # this punctuation mark is at the beginning of a word
+        if c not in ['¡', '*']:  # these punctuation mark can be at the beginning of a word (spanish exception, and our asterisk mark for target words)
             sentence=sentence.replace(' '+c, c)
     
-    norm_sent, sentence=normalize_sentence_numbers(sentence, lang=lang, mode=mode)
+    norm_sent, c=normalize_sentence_numbers(sentence, lang=lang, mode=mode)
     special_chars_dict_start, special_chars_dict_end=extract_special_chars(norm_sent, special_chars)
     words=remove_special_characters(norm_sent, lowercase=False).split(' ')
 
