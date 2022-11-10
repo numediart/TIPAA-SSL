@@ -495,38 +495,3 @@ if __name__=="__main__":
     path_to_json='/data/audio-with-analysis-ids/data.json'
     d=pd.read_json(path_to_json)
     
-
-
-
-    
-    # model=charsiu.__dict__["aligner"]
-    # processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
-    # phone_outputs=phone_average_vectors(s, fs, df_segmented, processor, model, time_per_output=0.01, phone_type='cmu_phones', extractor_function=get_logits)
-    # phone_outputs=phone_average_vectors(s, fs, df_segmented, processor, model, time_per_output=0.01, phone_type='cmu_phones', extractor_function=inference)
-
-    # # define vectorized sigmoid
-    # sigmoid = np.vectorize(lambda x: 1 / (1 + math.exp(-x)))
-    # phone_outputs.apply(lambda r: sigmoid(r.average_vector), axis=1)
-
-    # # get_last_hidden_state(s, fs=16000, model=model)
-    # # get_hidden_states(s, fs=16000, model=model)
-    # # get_logits(s, fs=16000, model=model)
-
-    # df_all_instances=instances_per_phoneme(df_t, number_of_examples=len(df), time_per_output=0.01,  phone_type='cmu_phone', model=model)
-    # plot_reduction(df_all_instances, reduction_technique='umap', base_name='wav2vec2_frame_classification' )
-
-    # instances_per_phoneme(df_t, number_of_examples=10, time_per_output=0.01,  phone_type='cmu_phone', model=model)
-
-    # df_all_instances=instances_per_phoneme(df_t, processor, model, number_of_examples=10, time_per_output=0.02,  phone_type='cmu_phone', extractor_function=get_logits)
-
-
-    # -------------------------
-
-    # intialize model
-    # /!\  the get_hiddden_states and logits does not work with the following model. I don't know if it has something to do with attention mechanism
-    # charsiu = charsiu_attention_aligner('charsiu/en_w2v2_fs_10ms')
-    # alignment = charsiu.align(audio=audio_path,text=text)
-
-    # initialize model
-    charsiu_pred = charsiu_predictive_aligner(aligner='charsiu/en_w2v2_fc_10ms')
-    alignment = charsiu_pred.align(audio=path)
