@@ -27,7 +27,9 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
 RUN conda install ffmpeg && \
 # For using e.g. MelGAN or wav2vec2
    conda install pytorch torchaudio cpuonly -c pytorch && \
+#    conda install -c conda-forge tensorflow-cpu && \
    conda install -c conda-forge montreal-forced-aligner && \
+#    conda install tensorflow && \
 # clean unnecessary setup files 
    conda clean --all -y
 
