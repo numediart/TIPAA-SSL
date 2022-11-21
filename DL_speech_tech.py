@@ -5,7 +5,7 @@ from src.audio_processing import getIntonation, getIntensity, normalize
 import soundfile as sf
 import io
 from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, chunk_text, phonetics_indexed_df_from_formatted_phonetics
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_to_gibberish
+from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish
 from syllabipy.sonoripy import SonoriPy
 from src.charsiu_utils import charsiu_phone_forced_aligner
 import base64
@@ -14,17 +14,30 @@ from linetimer import CodeTimer
 import pickle
 
 # initialize model
-model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
-from src.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
-from src.load_model import load_model
+# default_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
-# model = load_model(300,18,train_set='librispeech') # 'MAILABS' or 'librispeech'
-# # temporary because it didn't exist in this version:
-# model.GT_proba_threshold=1
+
+phoneme_GT_proba_threshold_dict={}
+default_thresh=0.2
+for k in cmu_stressed_vowels: phoneme_GT_proba_threshold_dict[k]=default_thresh
+for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
+
+# phoneme_GT_proba_threshold_dict['AO0']=0.1
+# phoneme_GT_proba_threshold_dict['AO1']=0.1
+# phoneme_GT_proba_threshold_dict['AO2']=0.1
+
+# model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
+# model=pickle.load(open('model_mailabs_umap_2_neighbors_30_gmm_300.pkl','rb'))
+# model=pd.read_pickle('model_mailabs_umap_estimator_2_gmm_300.pkl')
 
 # model=pickle.load(open('model_mailabs_umap_2_bgmm_300.pkl','rb'))
+# model=pickle.load(open('model_mailabs_parametric_umap_2_gmm_300.pkl','rb'))
 
-# model = load_model(300,20,train_set='MAILABS') # 'MAILABS' or 'librispeech'
+# model=pd.read_pickle('model_mailabs_pca_0.95_svc.pkl')
+default_model=pd.read_pickle('model_mailabs_pca_0.95_knn_10.pkl')
+# from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+# model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl')
+
 
 target_accepted_alternatives={
     'AA': ['AA', 'AO'],
@@ -118,12 +131,18 @@ def intensity_to_bin(score_by_word, n_max=2):
                 bin_score_by_word[imax]=1
     return bin_score_by_word
 
+
+
+###################   Pronunciation aspect functions  ################
+
+
 def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
                                     # text="I would love to go to Ireland!", 
                                     n_words_by_chunk=[7],
                                     level="sentence", 
                                     # chunking_chars=[',',';','.','!','?', ':', '/'],
-                                    max_speech_rate=8, mode='file'
+                                    max_speech_rate=8, mode='file',
+                                    model=default_model
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
@@ -185,14 +204,16 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
                             target_occurence_idx=0, # will be 0  all the time for vowels, and most of the time for consonants
                             target_phones='ER1',
                             alternatives=cmu_vowels,
-                            max_speech_rate=8, mode='file', **kwargs
+                            max_speech_rate=8, mode='file', 
+                            model=default_model,
+                            **kwargs
                     ):
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
     g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
         # try:
-        phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx, phoneme_set=alternatives)
+        phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx, phoneme_set=alternatives)#, GT_proba_threshold=phoneme_GT_proba_threshold_dict[target_phones])
         # except:
         #     import pdb;pdb.set_trace()
 
@@ -241,7 +262,9 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                             target_phones='D',
                             # basis='[UNK]_D',
                             basis='IH0_D',
-                            max_speech_rate=8, mode='file', contrast="end", **kwargs
+                            max_speech_rate=8, mode='file', contrast="end", 
+                            model=default_model,
+                            **kwargs
                     ):
     
     if contrast=="end":
@@ -313,10 +336,6 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             phoneme_set=[[p] for p in  remove_stress_annots(phoneme_set)]
             phoneme_set_ids=model.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
             proba_means=df_word.iloc[p_idx_global].proba_means
-            # if GT_proba is beyond the threshold, we take it as prediction
-            # if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
-            #     phonetic_detection=target_phones
-            # else:
 
             # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
             filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
@@ -334,13 +353,11 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
 
             if contrast=="end":
                 # root based on GT
-                root=df_syl.cmu_phones.tolist()[:-n_ter_basis]
+                root=df_syl.phones.tolist()[:-n_ter_basis]
                 # detected termination
                 ter=syl_detected[len(root)-1:]
             elif contrast=="start":
-                # root based on GT
-                # root=df_syl.cmu_phones.tolist()[n_ter_basis:]
-                # detected termination
+                # detected start
                 ter=syl_detected[:n_ter_basis+1]
         
         print(ter)
@@ -356,9 +373,6 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                 else:
                     ter_post.append(unstress(p))
         else: ter_post=ter
-
-        
-
 
         # there might be consecutive duplicates when we concatenate root and ter_post
         # g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in root+ter_post])
@@ -391,7 +405,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
-def phonetic_content_analysis(s, phonetics):
+def phonetic_content_analysis(s, phonetics, model=default_model):
     phonetic_content=model.analyze_phonetic_content(s, phonetics)
     if len(phonetic_content)==0: return phonetic_content
     
@@ -454,7 +468,8 @@ def phonetic_content_analysis(s, phonetics):
 def syllable_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
                             target_syllable_idx=0,
-                            max_speech_rate=8, mode='file'
+                            max_speech_rate=8, mode='file',
+                            model=default_model
                     ):
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
