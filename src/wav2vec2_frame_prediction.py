@@ -85,10 +85,13 @@ class Wav2Vec2ForFramePrediction:
         elif reducer == "pca":
             self.reducer = PCA(n_components=target_dim, random_state=42)
 
-        self.phoneme_reducer = PCA(n_components=target_dim, random_state=42)
+        
         
         self.frame_classifier=frame_classifier
         self.phoneme_classifier=phoneme_classifier
+
+        if self.phoneme_classifier is not None:
+            self.phoneme_reducer = PCA(n_components=target_dim, random_state=42)
 
         # import Wav2Vec2 feature extractor
         self.model = Wav2Vec2Model.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True) 
@@ -122,14 +125,12 @@ class Wav2Vec2ForFramePrediction:
         if self.phoneme_classifier is not None:
             self.X_train = X
             self.y_train_labels = y
-            
             self.y_train=[self.p_to_id[el] for el in y]
 
             print('fit phoneme reducer...')
             self.phoneme_reducer.fit(self.X_train)
             print('reduce training data')
             self.X_train_reduced = self.phoneme_reducer.transform(self.X_train)
-
             print('fit phoneme classifier...')
             self.phoneme_classifier.fit(self.X_train_reduced, self.y_train)
         else:
@@ -307,16 +308,6 @@ if __name__ == '__main__':
     from src.wav2vec2_frame_prediction import *
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
-    df_all_frames  = pd.read_pickle('./data/models/df_all_frames.pkl')
-    X, y = df_all_frames_to_X_y(df_all_frames)
-    classe = Wav2Vec2ForFrameGMMAssignment(300,18,'cmu')
-    classe.fit(X, y)
-    classe.find_component_phoneme()
-
-    import pickle
-    path="./data/models/model_librispeech_300_18.pkl"
-    pickle.dump(classe, open(path,"wb"))
-
     # ----------------------------
 
 
@@ -354,7 +345,6 @@ if __name__ == '__main__':
     pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl','wb'))
 
     
-
     model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl')
 
     model2=pd.read_pickle('model_mailabs_pca_0.95_knn_10.pkl')
@@ -367,5 +357,19 @@ if __name__ == '__main__':
     # data = load_test_dataset(df_t_test)
 
     # phoneme predictions on a single audio sample with forced alignment
-    preds = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    pred = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
     prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+
+    model2.phoneme_classifier
+    
+    # phoneme predictions on a single audio sample with forced alignment
+    pred2 = model2.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    prob_matrix2 = model2.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+
+    from tqdm import tqdm
+    preds=[model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    preds2=[model2.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    preds_df=pd.concat(preds)
+    preds_df2=pd.concat(preds2)
+    sum(preds_df.pred_phones_audio==preds_df2.pred_phones_audio)/len(preds_df)
+    
