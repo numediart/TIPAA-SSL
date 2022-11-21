@@ -15,7 +15,6 @@ from src.text_processing import unstress, prefill_for_sentence, remove_stress_an
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
 import cmudict
-from operator import itemgetter
 import itertools
 from src.libri_phonetization_data import libri_phonetics_data
 from jiwer import wer
@@ -25,12 +24,13 @@ from time import time
 from linetimer import CodeTimer
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
-import umap.umap_ as umap
+from umap.umap_ import UMAP
+
 from sklearn.decomposition import PCA
 
 from src.load_data import load_cmu_dataset, load_ipa_dataset, build_df_all_frames, df_all_frames_to_X_y, load_test_dataset, load_cmu_test_dataset, load_shuffled_ipa_dataset,leave_one_speaker_out, load_cmu_dataset_MAILABS
 # from src.metrics import compute_PER, plot_cf_matrix
-from src.w2v_gmm_forced_aligner import w2v_gmm_forced_aligner
+from src.dtw_forced_aligner import dtw_forced_aligner
 
 
 from scipy import linalg
@@ -92,30 +92,35 @@ with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(ope
 class Wav2Vec2ForFrameGMMAssignment:
 
     # phone_type = 'cmu' or 'ipa'
+    # reducer= "pca" or "umap" or "parametric_umap"
     def __init__(self, nbr_clusters, target_dim, phone_type, reducer="umap"):
         self.nbr_clusters = nbr_clusters
         self.target_dim = target_dim
         self.status = 'success'
         self.pred_phones_audio = []
         self.fs = 16000
-        self.GT_proba_threshold = 1
+        # self.GT_proba_threshold = 1
         
         if phone_type == 'cmu':
             self.alphabet = cmu_alphabet
-            self.forced_aligner = w2v_gmm_forced_aligner('cmu') 
+            self.forced_aligner = dtw_forced_aligner('cmu') 
         elif phone_type == 'ipa':
             self.alphabet = ipa_alphabet
-            self.forced_aligner = w2v_gmm_forced_aligner('ipa') 
+            self.forced_aligner = dtw_forced_aligner('ipa') 
 
         if reducer == "umap":
-            self.reducer = umap.UMAP(n_components=target_dim, random_state=42)
+            # parameters advised for clustering: https://umap-learn.readthedocs.io/en/latest/clustering.html
+            self.reducer = UMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
+        elif reducer == "parametric_umap":
+            from umap.parametric_umap import ParametricUMAP
+            self.reducer = ParametricUMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
         elif reducer == "pca":
             self.reducer = PCA(n_components=target_dim, random_state=42)
 
         self.gmm = GaussianMixture(n_components=self.nbr_clusters)
         # import Wav2Vec2 feature extractor
-        self.model = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True) 
-        self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft")    
+        self.model = Wav2Vec2Model.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True) 
+        self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")    
 
     # get output from an audio sample in w2v2 feature extractor
     def get_last_hidden_state(self, s, fs):
@@ -127,11 +132,9 @@ class Wav2Vec2ForFrameGMMAssignment:
     def reduce_lhs_dimension(self, lhs):
         return self.reducer.transform(lhs[0])
 
-    def fit(self, X, y=None, supervized_reducer=False, save=False):
+    def fit(self, X, y=None, supervized_reducer=False):
         self.X_train = X
         self.y = y
-        self.gmm = GaussianMixture(n_components=self.nbr_clusters)
-        self.reducer.n_components = self.target_dim
         if supervized_reducer:
             lbl_enc = LabelEncoder()
             self.reducer = self.reducer.fit(self.X_train, y = lbl_enc.fit_transform(self.y))
@@ -160,7 +163,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         self.pred_phones_audio = predicted_phones_list
         return predicted_phones_list
 
-    # used to predict and get proba means per phoneme alignment and GT
+    # predict and get proba means per phoneme alignment and GT
     def predict_with_timings(self, s, target_phonemes):
         phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
 
@@ -182,7 +185,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         return df_word
 
     # predict a specific word in a sample through its word index in phonetics and its syllable index in word
-    def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels):
+    def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
         """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
         """
         phoneme_set=[[p] for p in remove_stress_annots(phoneme_set)]
@@ -212,9 +215,8 @@ class Wav2Vec2ForFrameGMMAssignment:
 
             # df_word['GT_proba'] = [df_word.probs_means[i][j] for i,j in zip(range(len(df_word)), self.forced_aligner.labelize_phonemes(df_word.phones))]
 
-
             # if GT_proba is beyond the threshold, we take it as prediction
-            if df_word.iloc[p_idx_global].GT_proba>self.GT_proba_threshold:
+            if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
                 phonetic_detection=target_phones
             else:
                 # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
@@ -357,7 +359,6 @@ class Wav2Vec2ForFrameGMMAssignment:
         zDur = normalize(Dur)
 
         # combine the features
-        # weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur + 0.4*sylType)/3.6  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
         weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur)/3.2  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
 
         return weighted_score
@@ -398,8 +399,8 @@ if __name__ == '__main__':
     path="./data/models/model_librispeech_300_18.pkl"
     pickle.dump(classe, open(path,"wb"))
 
-    from src.load_model import load_model
-    model = load_model(300,18)
+    # from src.load_model import load_model
+    # model = load_model(300,18)
 
     # with open(path, 'rb') as f:             a=pickle.load(f)
 
@@ -446,10 +447,32 @@ if __name__ == '__main__':
     df_all_frames = build_df_all_frames(df_t_train, 'phone')
     X, y = df_all_frames_to_X_y(df_all_frames)
 
-    model = Wav2Vec2ForFrameGMMAssignment(300,2,'cmu')
-    model.fit(X, y, save=True)
+    # model = Wav2Vec2ForFrameGMMAssignment(300,2,'cmu')
+
+    model = Wav2Vec2ForFrameGMMAssignment(300,2,'cmu', reducer="umap")
+    model.fit(X, y)
     model.find_component_phoneme()
-    pickle.dump(model,open('model_mailabs_umap_2_gmm_300.pkl','wb'))
+    # pickle.dump(model,open('model_mailabs_parametric_umap_2_gmm_300.pkl','wb'))
+    pickle.dump(model,open('model_mailabs_umap_2_neighbors_30_gmm_300.pkl','wb'))
+
+    model=pd.read_pickle('model_mailabs_umap_2_neighbors_30_gmm_300.pkl')
+
+    import hdbscan
+    # https://hdbscan.readthedocs.io/en/latest/soft_clustering.html
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=10, prediction_data=True).fit(model.X_train_reduced)
+    
+    color_palette = sns.color_palette('Paired', len(set(clusterer.labels_)))
+    cluster_colors = [color_palette[x] if x >= 0
+                    else (0.5, 0.5, 0.5)
+                    for x in clusterer.labels_]
+    cluster_member_colors = [sns.desaturate(x, p) for x, p in
+                            zip(cluster_colors, clusterer.probabilities_)]
+
+    plt.clf()
+    plt.scatter(*model.X_train_reduced.T, s=50, linewidth=0, c=cluster_member_colors, alpha=0.25)
+    plt.savefig('hdbscan_clustering.png')
+
+
 
     gmm=model.gmm
 
@@ -459,7 +482,7 @@ if __name__ == '__main__':
     bgmm.fit(model.X_train_reduced)
 
     plot_results(model.X_train_reduced, gmm.predict(model.X_train_reduced), gmm.means_, gmm.covariances_, "Gaussian Mixture")
-    plt.savefig('ellipses.png')
+    plt.savefig('ellipses_parmetric_umap.png')
 
     plot_results(model.X_train_reduced, bgmm.predict(model.X_train_reduced), bgmm.means_, bgmm.covariances_, "Bayesian Gaussian Mixture with DP")
     plt.savefig('ellipses_bgmm.png')
@@ -477,10 +500,11 @@ if __name__ == '__main__':
 
     # x = [[el.s,el.fs,el.cmu_phones] for _,el in data.iterrows()]
     x = [[el.s,el.fs,el.cmu_phones] for _,el in data.iterrows()]
-    preds = classe.predict(x)
+    preds = model.predict(x[:3])
 
     # phoneme predictions on a single audio sample with forced alignment
-    preds = classe.predict_sample(s, fs, target_phonemes)
+    preds = model.predict_sample(s, fs, target_phonemes)
+    prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa
@@ -488,7 +512,7 @@ if __name__ == '__main__':
     # data = load_test_dataset(df_t_test)
     s_list = data.s.tolist()
     fs_list = data.fs.tolist()
-    forced_aligner = w2v_gmm_forced_aligner('cmu') 
+    forced_aligner = dtw_forced_aligner('cmu') 
     target_phonemes_list = data.cmu_phones.tolist()
     # target_phonemes_list = [remove_stress_annots(i) for i in target_phonemes_list]
     phone_prob_matrix_list = [classe.predict_phone_prob_matrix(s, fs) for s,fs in zip(s_list, fs_list)]

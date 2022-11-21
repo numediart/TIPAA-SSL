@@ -196,12 +196,12 @@ if __name__=="__main__":
     # load model and processor
     # TODO: download first, do "from_pretrained(path)" instead to know easier where they are and access the vocabs, config etc.
     # in the meantime, ther are in: "~/.cache/huggingface/transformers"
-    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft")
-    processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft")
+    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
+    processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
 
     base_model=Wav2Vec2Model.from_pretrained("facebook/wav2vec2-large-xlsr-53", output_hidden_states=True)
-    base_model_ft=Wav2Vec2Model.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
-    model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
+    base_model_ft=Wav2Vec2Model.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
+    model = Wav2Vec2ForCTC.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
 
     from src.libri_phonetization_data import libri_phonetics_data
     df_t, df=libri_phonetics_data(data_set='dev-clean', data_path='/data/')
@@ -301,14 +301,14 @@ if __name__=="__main__":
     df_sample=compute_predictions_and_PER(df_sample)
     
     # -----------------------------
-    from scripts.wav2vec2_espeak import instances_per_phoneme, plot_reduction
+    from scripts.wav2vec2_utils import instances_per_phoneme, plot_reduction
     from src.libri_phonetization_data import libri_phonetics_data
     from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2FeatureExtractor, Wav2Vec2Model
     
     df_t, df=libri_phonetics_data(data_set='dev-clean')
 
-    processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft")
-    model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
+    processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
+    model = Wav2Vec2ForCTC.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
     df_all_instances=instances_per_phoneme(df_t, processor, model, number_of_examples=None, time_per_output=0.02,  phone_type='cmu_phone')
 
     df_all_instances=instances_per_phoneme(df_t, processor, model, number_of_examples=10, time_per_output=0.02,  phone_type='cmu_phone', extractor_function=get_logits)

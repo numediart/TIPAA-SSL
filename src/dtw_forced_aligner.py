@@ -21,7 +21,7 @@ cmu_alphabet = [el[0] for el in cmudict.phones()]
 global ipa_alphabet
 with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(openfile)
 
-class w2v_gmm_forced_aligner:
+class dtw_forced_aligner:
     def __init__(self, phone_type):
         self.label_encoder = LabelEncoder()
         if phone_type == 'cmu':
@@ -92,15 +92,14 @@ class w2v_gmm_forced_aligner:
         return predicted_phones, probs_means
 
     def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, probs_means, fs=16000, time_per_output=0.02):
-        df_segmented = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end', 'probs_means', 'GT_proba'])
-        start = []
-        end = []
 
+        start_idx = []
+        end_idx = []
         for i in range(len(alignment_with_silence)):
-            start.append(i*time_per_output)
-            end.append((i+1)*time_per_output)
+            start_idx.append(i)
+            end_idx.append(i+1)
 
-        ph_with_timings = [i for i in list(zip(alignment_with_silence, start, end)) if i[0] != '[SIL]']
+        ph_with_timings = [i for i in list(zip(alignment_with_silence, start_idx, end_idx)) if i[0] != '[SIL]']
         grouped = [list(v) for _,v in itertools.groupby(ph_with_timings,itemgetter(0))]
 
         if len(grouped)<len(phones):
@@ -111,17 +110,21 @@ class w2v_gmm_forced_aligner:
         timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
         timings_df=pd.DataFrame(timings)
         # df_segmented['phones'] = remove_stress_annots(phones)
-        df_segmented[['phones', 'start', 'end']]=timings_df
+
+        df_segmented = pd.DataFrame()
+        df_segmented[['phones', 'start_idx', 'end_idx']]=timings_df
         df_segmented['pred_phones_audio'] = predicted_phones
         df_segmented['probs_means'] = probs_means
         df_segmented['GT_proba'] = [df_segmented.probs_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
-        
+        df_segmented['start']=df_segmented['start_idx']*time_per_output
+        df_segmented['end']=df_segmented['end_idx']*time_per_output
+
         def collapse_consecutive_duplicates(df):
             df=df.reset_index(drop=True)
             blocks=[]
 
             groups=df.groupby([(df.phones != df.phones.shift()).cumsum()])
-            for i, g in groups:#print('---');      print (g);         print (g.phones.tolist());r=g.iloc[0];   r.end=g.iloc[-1].end;   
+            for i, g in groups:
                 r=g.iloc[0]
                 r.end=g.iloc[-1].end
                 blocks.append(r.to_dict())
@@ -162,34 +165,11 @@ class w2v_gmm_forced_aligner:
         df_segmented2=collapse_consecutive_duplicates(df_segmented2)
         if len(df_segmented)>0:
             df_segmented=divide_consecutive_duplicates(df_segmented2, remove_stress_annots(phones))
-        
-
-        # df_segmented['start'] = [elem[1] for elem in timings]
-        # df_segmented['end'] = [elem[2] for elem in timings]
-
-        # if len(predicted_phones)>len(df_segmented):
-        #     # here make sure the index is a range. I will insert using .loc at i+0.5, then reset index every time
-        #     # https://stackoverflow.com/questions/15888648/is-it-possible-to-insert-a-row-at-an-arbitrary-position-in-a-dataframe-using-pan?rq=1
-        #     df_segmented=df_segmented.reset_index(drop=True)
-        #     p_unstressed = remove_stress_annots(phones)
-        #     for i in range(len(p_unstressed)-1):
-        #         if p_unstressed[i]==p_unstressed[i+1]:
-        #             df_segmented.loc[i+0.5]=df_segmented.loc[i]
-        #             df_segmented = df_segmented.sort_index()
-        #             df_segmented=df_segmented.reset_index(drop=True)
-
-        # if len(predicted_phones)>len(df_segmented):
-        #     df_segmented=df_segmented.reset_index(drop=True)
-        #     for i in range(len(predicted_phones)-1):
-        #         if predicted_phones[i]==predicted_phones[i+1]:
-        #             df_segmented.loc[i+0.5]=df_segmented.loc[i]
-        #             df_segmented = df_segmented.sort_index()
-        #             df_segmented=df_segmented.reset_index(drop=True)
 
         return df_segmented
     
     
-    def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, fs=16000):
+    def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, fs=16000, time_per_output=0.02):
         cost_nonsil, silence_frames_idx, non_silence_frames_idx = self.get_cost_non_sil(phone_prob_matrix)
         aligned_phones = self.get_forced_alignment(cost_nonsil, target_phonemes)
         if silence_frames_idx:
@@ -197,6 +177,6 @@ class w2v_gmm_forced_aligner:
         else:
             alignment_with_silence = aligned_phones
         predicted_phones, probs_means = self.predict(aligned_phones, cost_nonsil, target_phonemes)
-        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, probs_means, fs=fs, time_per_output=0.02)
+        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, probs_means, fs=fs, time_per_output=time_per_output)
 
         return df_segmented
