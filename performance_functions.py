@@ -240,23 +240,10 @@ def stress_GE_performance_test(level='sentence'):
 
 def pContrast_for_user_data( target_phones='AO1', frac=0.001, model=predictions_default_model):
     user_data=build_user_data_df()
-    exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-    exercise_id_to_target_phoneme= dict(zip(exercise_data.exercise_id, exercise_data.target_phoneme))
-    exercise_id_to_cmu_phonetics= dict(zip(exercise_data.exercise_id, exercise_data.cmu_phonetics))
-    exercise_id_to_target_word_indexes= dict(zip(exercise_data.exercise_id, exercise_data.target_word_indexes))
-    exercise_id_to_target_syllable_indexes= dict(zip(exercise_data.exercise_id, exercise_data.target_syllable_indexes))
-
-    # user_data['module_type']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].module_type.values[0], axis=1)
-    user_data['target_phoneme']=user_data.apply(lambda r: exercise_id_to_target_phoneme[r.exercise_id], axis=1)
-    # user_data['cmu_phonetics']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].cmu_phonetics.values[0], axis=1)
-    # user_data['target_word_indexes']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_word_indexes.values[0], axis=1)
 
     selection=user_data[user_data.target_phoneme==target_phones]
-    selection['cmu_phonetics']=selection.apply(lambda r: exercise_id_to_cmu_phonetics[r.exercise_id], axis=1)
-    selection['target_word_indexes']=selection.apply(lambda r: exercise_id_to_target_word_indexes[r.exercise_id], axis=1)
-    selection['target_syllable_indexes']=selection.apply(lambda r: exercise_id_to_target_syllable_indexes[r.exercise_id], axis=1)
-    selection['uid']=selection.apply(lambda r: str(r.exercise_id)+str(r.audio_file_idx), axis=1)
+    
 
     selection['audio_file_url']=selection['fpath']
     selections=[]
@@ -525,6 +512,7 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
 if __name__=="__main__":
 
     o_list=['AA1', 'AO1', 'OW1']
+    i_list=['IH1', 'IY1']
 
     from performance_functions import *
 
@@ -534,6 +522,11 @@ if __name__=="__main__":
     for p in o_list:
         results_df, d = pContrast_on_synth_words(target_phones=p, n=100, model=prod_model)
         ds_prod.append(d)
+    
+    ds_prod_i=[]
+    for p in i_list:
+        results_df, d = pContrast_on_synth_words(target_phones=p, n=100, model=prod_model)
+        ds_prod_i.append(d)
     
     ds_actor_prod=[]
     for p in o_list:
@@ -568,6 +561,11 @@ if __name__=="__main__":
         results_df, d = pContrast_on_synth_words(target_phones=p, n=100, model=model)
         ds2.append(d)
     
+    
+    ds2_i=[]
+    for p in i_list:
+        results_df, d = pContrast_on_synth_words(target_phones=p, n=100, model=model)
+        ds2_i.append(d)
     
     ds2_actor=[]
     for p in o_list:

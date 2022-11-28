@@ -70,21 +70,11 @@ def distrib(l):
     y = kde(x)
     return x,y
 
-def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_default_model):
-    exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
+def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_default_model, basename='probas_actors'):
 
     user_data=build_user_data_df()
-    # user_data['module_type']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].module_type.values[0], axis=1)
-    user_data['target_phoneme']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_phoneme.values[0], axis=1)
-    # user_data['cmu_phonetics']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].cmu_phonetics.values[0], axis=1)
-    # user_data['target_word_indexes']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_word_indexes.values[0], axis=1)
 
     selection=user_data[user_data.target_phoneme==target_phones]
-    selection['cmu_phonetics']=selection.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].cmu_phonetics.values[0], axis=1)
-    selection['target_word_indexes']=selection.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_word_indexes.values[0], axis=1)
-    selection['target_syllable_indexes']=selection.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_syllable_indexes.values[0], axis=1)
-    selection['uid']=selection.apply(lambda r: r.exercise_id+r.audio_file_idx, axis=1)
-
     df_users=selection
 
     # from DL_accuracy_performance import *
@@ -101,24 +91,27 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
         for i,r in tqdm(df_pContrast[:n_examples].iterrows()):
             s,fs=librosa.load(r.audio_file_url, sr=16000)
             split_phonetics=sum([p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], [])
-            _, p_df, phonetic_content = model.align_phones(audio=s,phones=split_phonetics)
+            try:
+                _, p_df, phonetic_content = model.align_phones(audio=s,phones=split_phonetics)
+            except AttributeError:
+                p_df=model.predict_with_timings(s, split_phonetics)
             # p_df=charsiu.force_and_predict(s, split_phonetics)
             pred_dfs.append(p_df)
-            phonetic_contents.append(phonetic_content)
+            # phonetic_contents.append(phonetic_content)
             # phonetic_content.GT_proba_means.median()
-            means.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.mean())
-            medians.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.median())
+            means.append(p_df[p_df.phones!='[SIL]'].GT_proba.mean())
+            medians.append(p_df[p_df.phones!='[SIL]'].GT_proba.median())
         correct_proba_means=np.histogram(means)
         correct_proba_medians=np.histogram(medians)
 
-        return pred_dfs, phonetic_contents, means, medians
+        return pred_dfs, means, medians
 
     
     def plot_vowel_distributions(target, all_phones_df, basename='probas'):
         p_idx=p_to_id(target)
         plt.cla()
         for v in cmu_vowels:
-            l=all_phones_df[all_phones_df.cmu_phones==v].apply(lambda r: r.proba_means[p_idx], axis=1)
+            l=all_phones_df[all_phones_df.phones==v].apply(lambda r: r.average_vectors[p_idx], axis=1)
             if len(l)>0:
                 x,y=distrib(l)
                 if y[0]<10 or v==target:
@@ -130,9 +123,9 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
         plt.title("Proba distributions for "+target)
         plt.savefig(basename+'_'+target+'.png')
 
-    pred_dfs, phonetic_contents, means, medians=compute_predictions(df_users, model=model)
+    # pred_dfs, means, medians=compute_predictions(df_users, model=model)
 
-    pred_dfs, phonetic_contents, means, medians=compute_predictions(df, n_examples=100, model=model)
+    pred_dfs, means, medians=compute_predictions(df, n_examples=100, model=model)
 
     all_phones_df=pd.concat(pred_dfs)
 
@@ -140,12 +133,15 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
     plt.plot(x, kde1_x)
     plt.savefig('gkde.png')
 
-    p_to_id=lambda p: model.charsiu_processor.mapping_phone2id(p)
+    try:
+        p_to_id=lambda p: model.charsiu_processor.mapping_phone2id(p)
+    except:
+        p_to_id=lambda p: model.p_to_id[p]
     # target='IH'
 
     for v in cmu_vowels:
-        plot_vowel_distributions(v, all_phones_df, basename='probas_actors')
-        print(np.histogram(all_phones_df[all_phones_df.cmu_phones==v].GT_proba))
+        plot_vowel_distributions(v, all_phones_df, basename=basename)
+        print(np.histogram(all_phones_df[all_phones_df.phones==v].GT_proba))
 
 
 
@@ -219,8 +215,8 @@ def syllable_contrast_for_actor_recordings(model=predictions_default_model):
         pred_dfs.append(p_df)
         phonetic_contents.append(phonetic_content)
         # phonetic_content.GT_proba_means.median()
-        means.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.mean())
-        medians.append(p_df[p_df.cmu_phones!='[SIL]'].GT_proba.median())
+        means.append(p_df[p_df.phones!='[SIL]'].GT_proba.mean())
+        medians.append(p_df[p_df.phones!='[SIL]'].GT_proba.median())
     mismatch_proba_means=np.histogram(means)
     mismatch_proba_medians=np.histogram(medians)
 

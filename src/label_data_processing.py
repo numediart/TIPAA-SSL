@@ -359,6 +359,20 @@ def build_user_data_df(path='data/user_data_df.csv'):
     else:
         df=pd.read_csv(path)
 
+    exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
+
+    exercise_id_to_target_phoneme= dict(zip(exercise_data.exercise_id, exercise_data.target_phoneme))
+    exercise_id_to_cmu_phonetics= dict(zip(exercise_data.exercise_id, exercise_data.cmu_phonetics))
+    exercise_id_to_target_word_indexes= dict(zip(exercise_data.exercise_id, exercise_data.target_word_indexes))
+    exercise_id_to_target_syllable_indexes= dict(zip(exercise_data.exercise_id, exercise_data.target_syllable_indexes))
+
+    # user_data['module_type']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].module_type.values[0], axis=1)
+    df['target_phoneme']=df.apply(lambda r: exercise_id_to_target_phoneme[r.exercise_id], axis=1)
+    df['cmu_phonetics']=df.apply(lambda r: exercise_id_to_cmu_phonetics[r.exercise_id], axis=1)
+    df['target_word_indexes']=df.apply(lambda r: exercise_id_to_target_word_indexes[r.exercise_id], axis=1)
+    df['target_syllable_indexes']=df.apply(lambda r: exercise_id_to_target_syllable_indexes[r.exercise_id], axis=1)
+    df['uid']=df.apply(lambda r: str(r.exercise_id)+str(r.audio_file_idx), axis=1)
+
     return df
 
 def get_errors_examples():
