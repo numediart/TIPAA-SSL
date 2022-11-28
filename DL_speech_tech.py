@@ -1,17 +1,15 @@
 from scipy.io.wavfile import  read
 import numpy as np
 import pandas as pd
-from src.audio_processing import getIntonation, getIntensity, normalize
+from src.audio_processing import getIntonation
 import soundfile as sf
 import io
-from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, chunk_text, phonetics_indexed_df_from_formatted_phonetics
+from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
 from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish
 from syllabipy.sonoripy import SonoriPy
-from src.charsiu_utils import charsiu_phone_forced_aligner
 import base64
 import librosa
 from linetimer import CodeTimer
-import pickle
 
 # initialize model
 # default_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
@@ -254,8 +252,6 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
         return {"status": "success", "phonetic_detection": phonetic_detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-
-
 
 def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 

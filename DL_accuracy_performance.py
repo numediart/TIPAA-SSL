@@ -13,7 +13,7 @@ from collections import Counter
 from src.label_data_processing import build_user_data_df, get_errors_examples
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, model
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio
 from src.audio_processing import prepare_audio_file
 
 from src.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings, final_s_artificial_data, synth_words_data
@@ -69,9 +69,6 @@ def distrib(l):
     kde = gaussian_kde(l, bw_method = 0.5)
     y = kde(x)
     return x,y
-
-
-
 
 def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_default_model):
     exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
@@ -149,6 +146,8 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
     for v in cmu_vowels:
         plot_vowel_distributions(v, all_phones_df, basename='probas_actors')
         print(np.histogram(all_phones_df[all_phones_df.cmu_phones==v].GT_proba))
+
+
 
 def syllable_contrast_for_actor_recordings(model=predictions_default_model):
     # from DL_accuracy_performance import *
@@ -597,7 +596,7 @@ if __name__=='__main__':
 
     target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
     target_syllable_idx=ast.literal_eval(r.target_syllable_indexes)[0]
-    df_word=model.predict_word(s, r.split_phonetics, target_word_idx)
+    df_word=predictions_default_model.predict_word(s, r.split_phonetics, target_word_idx)
     
     word=r.cmu_phonetics.split(' ')[target_word_idx]
 
