@@ -3,11 +3,12 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 import librosa
 import itertools
-from itertools import groupby
 import json
-from operator import itemgetter, xor
+from operator import itemgetter
 import cmudict
 from src.text_processing import remove_stress_annots, group_consecutive_duplicates
+
+from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
 keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
@@ -15,11 +16,11 @@ keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
 # get the blocks of consecutive identical rows in cols
 get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[cols].shift(-1) == a[cols]).any(axis=1)]
 
-global cmu_alphabet
-cmu_alphabet = [el[0] for el in cmudict.phones()]
+# global cmu_alphabet
+# cmu_alphabet = [el[0] for el in cmudict.phones()]
 
-global ipa_alphabet
-with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(openfile)
+# global ipa_alphabet
+# with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(openfile)
 
 class dtw_forced_aligner:
     def __init__(self, phone_type):
@@ -132,7 +133,6 @@ class dtw_forced_aligner:
 
         def divide_consecutive_duplicates(p_df, phone_list):
             grouped_phone_list=group_consecutive_duplicates(phone_list)
-            duplicate_indexes=[i for i,el in enumerate(grouped_phone_list) if el[-1]>1]
             n_times=[el[-1] for i,el in enumerate(grouped_phone_list)]
 
             p_df['n_times']=n_times

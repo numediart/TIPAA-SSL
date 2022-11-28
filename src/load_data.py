@@ -7,7 +7,7 @@ import json
 import librosa
 from sklearn.model_selection import train_test_split
 from src.libri_phonetization_data import libri_phonetics_data
-from src.wav2vec2_espeak import instances_per_frame
+from src.wav2vec2_utils import instances_per_frame
 from src.text_processing import prefill_for_sentence
 from itertools import groupby
 
@@ -17,99 +17,36 @@ def df_all_frames_to_X_y(df_all_frames):
     return X, y
 
 def build_df_all_frames(df_t, phone_type):
-    processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft")
-    model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
+    processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
+    model = Wav2Vec2ForCTC.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
     df_all_frames = instances_per_frame(df_t, processor, model, phone_type=phone_type)
     return df_all_frames
 
-def load_ipa_dataset(lang_code):  
-    df_t = pd.read_csv('./data/MAILABS_aligned-{}.csv'.format(lang_code))
 
-    for i, row in df_t.iterrows():
-        df_t.at[i, "wav_path"] = './data/MAILABS/{}/{}.wav'.format(lang_code, row.filename)
-        if type(row.phone_df) == str:
-            res = ast.literal_eval(row.phone_df)
-            df_t.at[i, "phone_df"] = res
-
-    df_t_train, df_t_test = train_test_split(df_t, test_size=0.2)
-
-    return df_t_train, df_t_test
-
-def leave_one_speaker_out(speaker_lang_code, others, train_size=800, test_size=200):
-    df_others = pd.DataFrame()
-    for lang_code in others:
-        df_temp = pd.read_csv('./data/MAILABS_shuffled_aligned-{}.csv'.format(lang_code))
-        for i, row in df_temp.iterrows():
-            if type(row.phone_df) == str:
-                res = ast.literal_eval(row.phone_df)
-                df_temp.at[i, "phone_df"] = res
-            if type(row.phone_df) == float:
-                df_temp = df_temp.drop(i)
-
-        df_others = pd.concat([df_others, df_temp])
-    df_others = df_others.rename(columns={"path": "wav_path"}, errors="raise")
-
-    df_speaker = pd.read_csv('./data/MAILABS_shuffled_aligned-{}.csv'.format(speaker_lang_code))
-    for i, row in df_speaker.iterrows():
-        if type(row.phone_df) == str:
-            res = ast.literal_eval(row.phone_df)
-            df_speaker.at[i, "phone_df"] = res
-        if type(row.phone_df) == float:
-            df_speaker = df_speaker.drop(i)
-
-    df_speaker = df_speaker.rename(columns={"path": "wav_path"}, errors="raise")
-
-    df_train = df_others.sample(train_size)
-    df_train['wav_path'] = df_train['wav_path'].apply(lambda x : './data/MAILABS/'+x)
-    df_test = df_speaker.sample(test_size)
-    df_test['wav_path'] = df_test['wav_path'].apply(lambda x : './data/MAILABS/'+x)
-
-    return df_train, df_test
-
-def load_shuffled_ipa_dataset(lang_code):
-    df_t = pd.read_csv('./data/MAILABS_shuffled_aligned-{}.csv'.format(lang_code))
-    df_t.rename(columns={"path": "wav_path"}, errors="raise")
-    df_t_train, df_t_test = train_test_split(df_t, test_size=0.2)
-    return df_t_train, df_t_test
-
-def load_cmu_dataset():
-    df_t_train, df_train=libri_phonetics_data(data_set='dev-clean')
-    df_t_test, df_test=libri_phonetics_data(data_set='test-clean')
-    df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
-    return df_t_train, df_t_test
-
-def load_cmu_dataset_MAILABS(speaker_lang_code, others, train_size=800, test_size=200, path='./data/MAILABS'):
-    df_others = pd.DataFrame()
-    for lang_code in others:
-        df_temp = pd.read_csv(path+'/MAILABS_shuffled_aligned-{}_CMU.csv'.format(lang_code))
+def load_dataset_MAILABS(lang_codes, path='./data/MAILABS', phone_set='CMU'):
+    """phone_set: 'CMU' or 'MFA_IPA'
+    """
+    df_train = pd.DataFrame()
+    for lang_code in lang_codes:
+        df_temp = pd.read_csv(path+'/MAILABS_shuffled_aligned-{}_{}.csv'.format(lang_code, phone_set))
         for i, row in df_temp.iterrows():
             # df_temp.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
             if type(row.phone_df) == str:
                 res = ast.literal_eval(row.phone_df)
                 df_temp.at[i, "phone_df"] = res
 
-        df_others = pd.concat([df_others, df_temp])
-    df_others = df_others.rename(columns={"path": "wav_path"}, errors="raise")
+        df_train = pd.concat([df_train, df_temp])
+    df_train = df_train.rename(columns={"path": "wav_path"}, errors="raise")
+    return df_train
 
-    df_speaker = pd.read_csv(path+'/MAILABS_shuffled_aligned-{}_CMU.csv'.format(speaker_lang_code))
-    for i, row in df_speaker.iterrows():
-        # df_speaker.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
-        if type(row.phone_df) == str:
-            res = ast.literal_eval(row.phone_df)
-            df_speaker.at[i, "phone_df"] = res
-        if type(row.phone_df) == float:
-            df_speaker = df_speaker.drop(i)
 
-    df_speaker = df_speaker.rename(columns={"path": "wav_path"}, errors="raise")
+def load_libri_dataset():
+    df_t_train, _=libri_phonetics_data(data_set='dev-clean')
+    df_t_test, _=libri_phonetics_data(data_set='test-clean')
+    df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
+    return df_t_train, df_t_test
 
-    df_train = df_others.sample(train_size)
-    #df_train['wav_path'] = df_train['wav_path'].apply(lambda x : './data/MAILABS/'+x)
-    df_test = df_speaker.sample(test_size)
-    #df_test['wav_path'] = df_test['wav_path'].apply(lambda x : './data/MAILABS/'+x)
-
-    return df_train, df_test
-
-def load_cmu_test_dataset(df_t_test, number_of_examples=100, random=False):
+def load_cmu_test_dataset(df_t_test, number_of_examples=100):
     df_cmu_phones=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
     test_examples=[]
     for N in range(number_of_examples):
@@ -121,7 +58,7 @@ def load_cmu_test_dataset(df_t_test, number_of_examples=100, random=False):
         test_examples.append(example)
     return pd.DataFrame(test_examples)
 
-def load_test_dataset(df_t_test, number_of_examples=100, random=False):
+def load_test_dataset(df_t_test, number_of_examples=100):
     df_ipa_phones_test = pd.Series(df_t_test.phone_df.apply(lambda r: list(r['ipa_phone'].values())))
     test_examples = []
     for N in range(number_of_examples):
@@ -132,7 +69,7 @@ def load_test_dataset(df_t_test, number_of_examples=100, random=False):
         test_examples.append(example)
     return pd.DataFrame(test_examples)
 
-def build_df_segmented(df_t, model, forced_aligner, mode, language_code): # mode = "CMU" or "MFA_IPA"
+def build_df_segmented(df_t, model, forced_aligner, mode): # mode = "CMU" or "MFA_IPA"
     df_segmented = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end'])
 
     for _, row in df_t.iterrows():
@@ -188,3 +125,9 @@ def build_df_segmented_all(df_t, model, forced_aligner, mode, language_code): # 
 
     return df_segmented
 
+if __name__=="__main__":
+    
+    df_t_train = load_dataset_MAILABS('en_US', ['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    df_t_train=df_t_train.dropna()
+    df_all_frames = build_df_all_frames(df_t_train, 'phone')
+    X, y = df_all_frames_to_X_y(df_all_frames)

@@ -28,7 +28,7 @@ from umap.umap_ import UMAP
 
 from sklearn.decomposition import PCA
 
-from src.load_data import load_cmu_dataset, load_ipa_dataset, build_df_all_frames, df_all_frames_to_X_y, load_test_dataset, load_cmu_test_dataset, load_shuffled_ipa_dataset,leave_one_speaker_out, load_cmu_dataset_MAILABS
+from src.load_data import load_libri_dataset, build_df_all_frames, df_all_frames_to_X_y, load_cmu_test_dataset, load_dataset_MAILABS
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
 
@@ -387,7 +387,7 @@ if __name__ == '__main__':
     from src.wav2vec2_GMM_ipa import *
     from src.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
 
-    df_t_train, df_t_test = load_cmu_dataset()
+    df_t_train, df_t_test = load_libri_dataset()
     with open('./data/models/df_all_frames.pkl', 'rb') as f: df_all_frames=pickle.load(f)
     df_all_frames  = pd.read_pickle('./data/models/df_all_frames.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
@@ -429,7 +429,7 @@ if __name__ == '__main__':
     s,fs=librosa.load(path, sr=16000)
 
     #comment if you want cmu or ipa
-    df_t_train, df_t_test = load_cmu_dataset()
+    df_t_train, df_t_test = load_libri_dataset()
     #df_t_train, df_t_test = load_ipa_dataset(lang_code='en_US')
     df_all_frames = build_df_all_frames(df_t_train, 'cmu_phone')
     X, y = df_all_frames_to_X_y(df_all_frames)
@@ -441,8 +441,12 @@ if __name__ == '__main__':
     speaker_lang_code = 'en_UK'
     others = list(set(all_speakers) - set([speaker_lang_code]))
 
-    # df_t_train, df_t_test = leave_one_speaker_out(speaker_lang_code, all_speakers)
-    df_t_train, df_t_test = load_cmu_dataset_MAILABS(speaker_lang_code, ['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', phone_set='MFA_IPA')
+    df_t_train=df_t_train.dropna()
+    df_all_frames = build_df_all_frames(df_t_train, 'phone')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    
+    df_t_train = load_dataset_MAILABS('en_US', ['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
     df_t_train=df_t_train.dropna()
     df_all_frames = build_df_all_frames(df_t_train, 'phone')
     X, y = df_all_frames_to_X_y(df_all_frames)

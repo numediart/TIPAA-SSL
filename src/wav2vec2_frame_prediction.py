@@ -41,7 +41,7 @@ from time import time
 from linetimer import CodeTimer
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
-from src.load_data import load_cmu_dataset, load_ipa_dataset, build_df_all_frames, df_all_frames_to_X_y, load_test_dataset, load_cmu_test_dataset, load_shuffled_ipa_dataset,leave_one_speaker_out, load_cmu_dataset_MAILABS
+from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_cmu_test_dataset
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
 
@@ -316,14 +316,37 @@ if __name__ == '__main__':
     # speaker_lang_code = 'en_UK'
     # others = list(set(all_speakers) - set([speaker_lang_code]))
 
-    # df_t_train, df_t_test = leave_one_speaker_out(speaker_lang_code, all_speakers)
-    # df_t_train, df_t_test = load_cmu_dataset_MAILABS(speaker_lang_code, ['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    # df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', phone_set='MFA_IPA')
     # df_t_train=df_t_train.dropna()
     # df_all_frames = build_df_all_frames(df_t_train, 'phone')
+    # df_all_frames.to_pickle('df_all_frames_MAILABS_train_ipa.pkl')
 
+    # Basis model Wav2Vec2ForFramePrediction, in CMU phoneme set, PCA reduction at 95% variance, and a 10-NN classifier
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    # model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca")
+    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca")
+    model.fit(X, y)
+    # model.fit_phoneme(X_train, y_train)
+    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10.pkl','wb'))
+
+    # Basis model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca", frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.fit(X, y)
+    # model.fit_phoneme(X_train, y_train)
+    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_w.pkl','wb'))
+
+    # Basis model, but with IPA
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_ipa.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction(0.95,'ipa', reducer="pca")
+    model.fit(X, y)
+    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_ipa.pkl','wb'))
+
+
+
+    
     
     
     df_all_instances=pd.read_pickle('df_all_phonemes_instances_MAILABS_train.pkl')
@@ -337,10 +360,6 @@ if __name__ == '__main__':
     y_train=list(df_all_instances.phoneme.values)
 
     
-    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca")
-    model.fit(X, y)
-    # model.fit_phoneme(X_train, y_train)
-    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10.pkl','wb'))
 
     pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl','wb'))
 
@@ -352,7 +371,7 @@ if __name__ == '__main__':
     
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa
-    df_t_train, df_t_test = load_cmu_dataset()
+    df_t_train, df_t_test = load_libri_dataset()
     data = load_cmu_test_dataset(df_t_test)
     # data = load_test_dataset(df_t_test)
 
@@ -372,4 +391,26 @@ if __name__ == '__main__':
     preds_df=pd.concat(preds)
     preds_df2=pd.concat(preds2)
     sum(preds_df.pred_phones_audio==preds_df2.pred_phones_audio)/len(preds_df)
+
+
+    # https://scikit-learn.org/stable/modules/ensemble.html#weighted-average-probabilities-soft-voting
+    from sklearn.ensemble import VotingClassifier
+
+    #  with ensemble
+    estimators=[('10 Nearest Neighbors', KNeighborsClassifier(n_neighbors=10)),
+    ('Linear SVM', SVC(C=0.025, kernel='linear', probability=True)),
+    ('QDA', QuadraticDiscriminantAnalysis())]
+    eclf = VotingClassifier(estimators=estimators,
+                        voting='soft', weights=[1 for _ in estimators])
+    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca",  frame_classifier=eclf)
+    model.fit(X, y)
+    # model.fit_phoneme(X_train, y_train)
+    pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_linear_svm_qda.pkl','wb'))
+
+
+    ###
     
+    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca",  frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.fit(X, y)
+    # model.fit_phoneme(X_train, y_train)
+    pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_weighted_dist.pkl','wb'))

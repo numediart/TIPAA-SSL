@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     results = {}
 
-    df_t_train, df_t_test = load_cmu_dataset_MAILABS('en_UK', ['en_US', 'en_UK'])
+    df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'])
     # df_all_frames = build_df_all_frames(df_t_train, 'ipa_phone')
     df_all_frames = pd.read_pickle('./data/df_all_frames_MAILABS.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
