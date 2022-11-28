@@ -4,6 +4,8 @@ import pdb
 from glob import glob
 from src.text_processing import remove_special_characters, remove_stress_annots, prefill_content, prefill_for_sentence
 
+from syllabipy.sonoripy import SonoriPy
+
 from src.pronunciation_dictionaries import cmudict_dict
 
 import itertools
@@ -294,61 +296,68 @@ def actor_recordings():
 
 
 # User recordings data
-def build_user_data_df():
-    # there are files at this level (when there is no date), I ignore them for now, it's like 2% of the files
-    # all_files=glob('data/flwc-recordings/*/*')
+def build_user_data_df(path='data/user_data_df.csv'):
 
-    all_files=glob('data/flwc-recordings/*/*/*')
-    len(all_files)
+    if not os.path.exists(path):
 
-    # different possible extensions in dataset
-    extensions=set([f.split('.')[-1] for f in all_files if '.' in f])
+        # there are files at this level (when there is no date), I ignore them for now, it's like 2% of the files
+        # all_files=glob('data/flwc-recordings/*/*')
 
-    # get filenames
-    fpaths=[f for f in all_files if f.split('.')[-1] in extensions]
-    user_ids=[f.split('/')[-3] for f in fpaths]
-    # user_ids=set([f.split('/')[-2] for f in fpaths])
+        all_files=glob('data/flwc-recordings/*/*/*')
+        len(all_files)
 
-    fnames=[os.path.split(f.split('.')[0])[-1] for f in all_files if f.split('.')[-1] in extensions]
-    len(fpaths)
-    len(fnames)
+        # different possible extensions in dataset
+        extensions=set([f.split('.')[-1] for f in all_files if '.' in f])
 
-    # big number corresponding to the specific audio file
-    audio_file_idx=[f.split('.')[0].split('__')[-1] for f in fnames]
+        # get filenames
+        fpaths=[f for f in all_files if f.split('.')[-1] in extensions]
+        user_ids=[f.split('/')[-3] for f in fpaths]
+        # user_ids=set([f.split('/')[-2] for f in fpaths])
 
-    # remove user info from filename because it can contain '__' which is the separator and thus messes with parsing if not removed
-    # and I keep the information inside user_ids list
-    # metadata=[f.replace(user_ids[i]+'__', '') for i,f in enumerate(fnames)]
-    # len(metadata)
+        fnames=[os.path.split(f.split('.')[0])[-1] for f in all_files if f.split('.')[-1] in extensions]
+        len(fpaths)
+        len(fnames)
 
-    # split with '__' separator of metadata, discard last columns because user_id may contain '__' which messes the rest of the columns
-    df=pd.DataFrame([f.split('__') for f in fnames]).iloc[:,:3]
-    df.columns=['exercise_id', 'processing_status', 'answer']
-    df['user_id']=user_ids
-    df['audio_file_idx']=audio_file_idx
-    df['fpath']=fpaths
-    df['fname']=fnames
+        # big number corresponding to the specific audio file
+        audio_file_idx=[f.split('.')[0].split('__')[-1] for f in fnames]
 
-    # 0=error,    1=success
-    df.loc[df.processing_status=='P0','processing_status']=0
-    df.loc[df.processing_status=='P1','processing_status']=1
+        # remove user info from filename because it can contain '__' which is the separator and thus messes with parsing if not removed
+        # and I keep the information inside user_ids list
+        # metadata=[f.replace(user_ids[i]+'__', '') for i,f in enumerate(fnames)]
+        # len(metadata)
 
-    # 0=error,    1=  , 2=  
-    df.loc[df.answer=='A0','answer']=0
-    df.loc[df.answer=='A1','answer']=1
-    df.loc[df.answer=='A2','answer']=2
+        # split with '__' separator of metadata, discard last columns because user_id may contain '__' which messes the rest of the columns
+        df=pd.DataFrame([f.split('__') for f in fnames]).iloc[:,:3]
+        df.columns=['exercise_id', 'processing_status', 'answer']
+        df['user_id']=user_ids
+        df['audio_file_idx']=audio_file_idx
+        df['fpath']=fpaths
+        df['fname']=fnames
 
-    
+        # 0=error,    1=success
+        df.loc[df.processing_status=='P0','processing_status']=0
+        df.loc[df.processing_status=='P1','processing_status']=1
 
-    # df[df.processing_status==0]
-    # df[df.processing_status==1]
+        # 0=error,    1=  , 2=  
+        df.loc[df.answer=='A0','answer']=0
+        df.loc[df.answer=='A1','answer']=1
+        df.loc[df.answer=='A2','answer']=2
 
-    # df[df.answer==0]
-    # df[df.answer==1]
-    # df[df.answer==2]
+        
 
-    # df[df.processing_status==0][df.answer==0]
-    # df[df.processing_status==0][df.answer!=0]
+        # df[df.processing_status==0]
+        # df[df.processing_status==1]
+
+        # df[df.answer==0]
+        # df[df.answer==1]
+        # df[df.answer==2]
+
+        # df[df.processing_status==0][df.answer==0]
+        # df[df.processing_status==0][df.answer!=0]
+
+        df.to_csv(path)
+    else:
+        df=pd.read_csv(path)
 
     return df
 
@@ -404,20 +413,23 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
 def synth_words_data():
     path="scripts/synth_audio/cmu_words/standard/prosody/"
     if not os.path.exists(path+'linguistic_data.csv'):
-        audios_path=path+"prosody/*/*"
+        audios_path=path+"/*/*"
         paths=glob(audios_path)
 
         df=pd.DataFrame()
         df['path']=paths
         df['text']=df.apply(lambda r: os.path.split(r.path)[-1].split('.')[0].split('_')[-1] , axis=1)
-        df['cmu_phonetics']=df.apply(lambda r: cmudict_dict[r.text], axis=1)
+        df['cmu_phonetics']=df.progress_apply(lambda r: cmudict_dict[r.text], axis=1)
+
+        # from tqdm import tqdm
+        # tqdm.pandas()
+
+        # # df.progress_apply(lambda r: prefill_for_sentence(r.text, mode='MFA_IPA')['cmu_phonetics'], axis=1)
+        # df.progress_apply(lambda r: prefill_for_sentence(r.text, mode='CMU')['cmu_phonetics'], axis=1)
 
         # not sure why, it seems there are empty entries in cmudict
         df=df[df.apply(lambda r: len(r.cmu_phonetics), axis=1)>0]
-
-        syl_p_cmu=SonoriPy(p, mode='CMU')[0]
-
-        df['syl_p_cmu']=df['cmu_phonetics'].apply(lambda r: SonoriPy(r, mode='CMU')[0])
+        df['syl_p_cmu']=df['cmu_phonetics'].apply(lambda r: SonoriPy(r[0], mode='CMU')[0])
 
         df['cmu_phonetics']=df['syl_p_cmu'].apply(lambda p: '|'.join(['_'.join(syl) for syl in p]))
         # df.apply(lambda r: prefill_for_sentence(r.text), axis=1)
