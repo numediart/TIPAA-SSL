@@ -83,7 +83,13 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
                 target_word_idx=r.target_word_indexes
                 target_syllable_idx=r.target_syllable_indexes
 
-            status_audio, rID=prepare_audio_file(r.fpath)
+            try:
+                status_audio, rID=prepare_audio_file(r.fpath)
+            except Exception as e: 
+                print('error in prepare_audio_file in compute_predictions')
+                print('row information')
+                print(r)
+                print(e)
             try:
                 res=tech_function(rID,
                                 phonetics=r.cmu_phonetics,
@@ -100,7 +106,9 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
                 phonetic_detections.append(res['phonetic_detection'])
                 records.append(res)
             except Exception as e: 
-                print('error in compute_predictions')
+                print('error in the tech_function in compute_predictions')
+                print('row information')
+                print(r)
                 print(e)
                 
         result_df=pd.DataFrame.from_records(records)
@@ -233,16 +241,22 @@ def stress_GE_performance_test(level='sentence'):
 def pContrast_for_user_data( target_phones='AO1', frac=0.001, model=predictions_default_model):
     user_data=build_user_data_df()
     exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
+
+    exercise_id_to_target_phoneme= dict(zip(exercise_data.exercise_id, exercise_data.target_phoneme))
+    exercise_id_to_cmu_phonetics= dict(zip(exercise_data.exercise_id, exercise_data.cmu_phonetics))
+    exercise_id_to_target_word_indexes= dict(zip(exercise_data.exercise_id, exercise_data.target_word_indexes))
+    exercise_id_to_target_syllable_indexes= dict(zip(exercise_data.exercise_id, exercise_data.target_syllable_indexes))
+
     # user_data['module_type']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].module_type.values[0], axis=1)
-    user_data['target_phoneme']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_phoneme.values[0], axis=1)
+    user_data['target_phoneme']=user_data.apply(lambda r: exercise_id_to_target_phoneme[r.exercise_id], axis=1)
     # user_data['cmu_phonetics']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].cmu_phonetics.values[0], axis=1)
     # user_data['target_word_indexes']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_word_indexes.values[0], axis=1)
 
     selection=user_data[user_data.target_phoneme==target_phones]
-    selection['cmu_phonetics']=selection.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].cmu_phonetics.values[0], axis=1)
-    selection['target_word_indexes']=selection.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_word_indexes.values[0], axis=1)
-    selection['target_syllable_indexes']=selection.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_syllable_indexes.values[0], axis=1)
-    selection['uid']=selection.apply(lambda r: r.exercise_id+r.audio_file_idx, axis=1)
+    selection['cmu_phonetics']=selection.apply(lambda r: exercise_id_to_cmu_phonetics[r.exercise_id], axis=1)
+    selection['target_word_indexes']=selection.apply(lambda r: exercise_id_to_target_word_indexes[r.exercise_id], axis=1)
+    selection['target_syllable_indexes']=selection.apply(lambda r: exercise_id_to_target_syllable_indexes[r.exercise_id], axis=1)
+    selection['uid']=selection.apply(lambda r: str(r.exercise_id)+str(r.audio_file_idx), axis=1)
 
     selection['audio_file_url']=selection['fpath']
     selections=[]
@@ -256,7 +270,7 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001, model=predictions_
 
     df['split_phonetics']=df.apply(lambda r: [p.replace('|','_').split('_') for p in r.cmu_phonetics.split(' ')], axis=1)
 
-    _,result_df=compute_predictions(df, target_phones=target_phones, model=model)
+    result_df=compute_predictions(df, target_phones=target_phones, model=model)
     phonetic_detections=result_df.phonetic_detection
 
     d=count_values(phonetic_detections)
@@ -283,13 +297,13 @@ def final_ed_for_actor_recordings(target_phones='D', model=predictions_default_m
     d.columns=[target_phones]
     return result_df, d
 
-def pContrast_for_actor_recordings(target_phones='AO1', speaker=None, model=predictions_default_model):
+def pContrast_for_actor_recordings(target_phones='AO1', speakers=None, model=predictions_default_model):
     df=actor_recordings()
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     
-    if speaker is not None:
-        df_pContrast=df_pContrast[df_pContrast.audio_file_url.apply(lambda r: r.split('/')[-2])==speaker]
+    if speakers is not None:
+        df_pContrast=df_pContrast[df_pContrast.audio_file_url.apply(lambda r: r.split('/')[-2]).isin(speakers)]
     
     selection=df_pContrast[df_pContrast.target_phoneme==target_phones]
     if len(selection)>0:
@@ -496,6 +510,10 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
 
     selection=df_target.sample(frac=1, random_state=0)[:n]
 
+    # selection.progress_apply(lambda r: prefill_for_sentence(r.text, mode='MFA_IPA')['cmu_phonetics'], axis=1)
+
+    # selection.text.progress_apply(lambda r: mfa_dicts['en_US'][r][0] if r in mfa_dicts['en_US'] else float('nan')).dropna()
+
     result_df=compute_predictions(selection, target_phones=target_phones, alternatives=alternatives, model=model)
     phonetic_detections=result_df.phonetic_detection
     
@@ -505,8 +523,98 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
     return result_df, d
 
 if __name__=="__main__":
-    from performance_functions import *
-    results_df, d = pContrast_on_synth_words(n=100)
 
-    model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl')
-    results_df2, d2 = pContrast_on_synth_words(n=100, model=model)
+    o_list=['AA1', 'AO1', 'OW1']
+
+    from performance_functions import *
+
+    from src.charsiu_utils import charsiu_phone_forced_aligner
+    prod_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+    ds_prod=[]
+    for p in o_list:
+        results_df, d = pContrast_on_synth_words(target_phones=p, n=100, model=prod_model)
+        ds_prod.append(d)
+    
+    ds_actor_prod=[]
+    for p in o_list:
+        results_df, d = pContrast_for_actor_recordings(target_phones=p, model=prod_model)
+        ds_actor_prod.append(d)
+    
+    ds_actor_F1_prod=[]
+    for p in o_list:
+        results_df, d = pContrast_for_actor_recordings(target_phones=p, speakers=['F1'], model=prod_model)
+        ds_actor_F1_prod.append(d)
+    
+    ds_user_prod=[]
+    for p in o_list:
+        results_df, d = pContrast_for_user_data(target_phones=p, model=prod_model, frac=0.01)
+        ds_user_prod.append(d)
+
+        
+
+    ds=[]
+    for p in o_list:
+        results_df, d = pContrast_on_synth_words(target_phones=p, n=100)
+        ds.append(d)
+
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    # model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl')
+    # model=pd.read_pickle('model_mailabs_pca_0.95_eclf_knn_10_linear_svm_qda.pkl')
+    # model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_lucky.pkl')
+    model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_w.pkl')
+    # results_df2, d2 = pContrast_on_synth_words(n=100, model=model)
+    ds2=[]
+    for p in o_list:
+        results_df, d = pContrast_on_synth_words(target_phones=p, n=100, model=model)
+        ds2.append(d)
+    
+    
+    ds2_actor=[]
+    for p in o_list:
+        results_df, d = pContrast_for_actor_recordings(target_phones=p, model=model)
+        ds2_actor.append(d)
+    
+    ds2_actor_F1=[]
+    for p in o_list:
+        results_df, d = pContrast_for_actor_recordings(target_phones=p, speakers=['F1'], model=model)
+        ds2_actor_F1.append(d)
+    
+    ds2_actor_no_F1=[]
+    for p in o_list:
+        results_df, d = pContrast_for_actor_recordings(target_phones=p, speakers=['M1', 'F4', 'tts', 'F2', 'M4', 'flwc-phrase-audios', 'zoe'], model=model)
+        ds2_actor_no_F1.append(d)
+    
+    ds2_actor_per_speaker={}
+    speakers=['F1', 'M1', 'F4', 'tts', 'F2', 'M4', 'flwc-phrase-audios', 'zoe']
+    for s in speakers:
+        ds2_actor_per_speaker[s]=[]
+        for p in o_list:
+            results_df, d = pContrast_for_actor_recordings(target_phones=p, speakers=[s], model=model)
+            ds2_actor_per_speaker[s].append(d)
+    
+    
+    ds2_user=[]
+    for p in o_list:
+        results_df, d = pContrast_for_user_data(target_phones=p, model=model, frac=0.01)
+        ds2_user.append(d)
+
+
+    sum(results_df.phonetic_detection==results_df2.phonetic_detection)/len(results_df)
+
+
+    
+    from src.load_data import load_libri_dataset, load_cmu_test_dataset
+    # phoneme predictions on a train dataset with forced alignment
+    # comment for cmu or ipa
+    df_t_train, df_t_test = load_libri_dataset()
+    data = load_cmu_test_dataset(df_t_test)
+    # data = load_test_dataset(df_t_test)
+    
+    from tqdm import tqdm
+    preds=[model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    preds2=[predictions_default_model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    
+    preds_df=pd.concat(preds)
+    preds_df2=pd.concat(preds2)
+    sum(preds_df.pred_phones_audio==preds_df2.pred_phones_audio)/len(preds_df)
+    
