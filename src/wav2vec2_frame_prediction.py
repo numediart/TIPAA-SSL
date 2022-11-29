@@ -45,26 +45,21 @@ from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_cmu_tes
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
 
-global cmu_alphabet 
+from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer
+
 global cmu_vowels
-cmu_alphabet = [el[0] for el in cmudict.phones()]
-cmu_phones_info=cmudict.phones()
-cmu_phones=[el[0] for el in cmu_phones_info]
+# cmu_phones=[el[0] for el in cmu_phones_info]
 cmu_vowels=[p[0] for p in cmu_phones_info if p[1][0]=='vowel']
 cmu_consonants=[p[0] for p in cmu_phones_info if p[1][0]!='vowel']
 
-global ipa_alphabet
-with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(openfile)
 
 class Wav2Vec2ForFramePrediction:
 
     # phone_type = 'cmu' or 'ipa'
-    # reducer= "pca" or "umap" or "parametric_umap"
-    def __init__(self, target_dim, phone_type, reducer="pca", frame_classifier=KNeighborsClassifier(10), phoneme_classifier=None):
+    def __init__(self, phone_type, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
         self.status = 'success'
         self.pred_phones_audio = []
         self.fs = 16000
-        self.target_dim=target_dim
         
         if phone_type == 'cmu':
             self.alphabet = cmu_alphabet
@@ -76,26 +71,40 @@ class Wav2Vec2ForFramePrediction:
         self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
         
-        if reducer == "umap":
-            # parameters advised for clustering: https://umap-learn.readthedocs.io/en/latest/clustering.html
-            self.reducer = UMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
-        elif reducer == "parametric_umap":
-            from umap.parametric_umap import ParametricUMAP
-            self.reducer = ParametricUMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
-        elif reducer == "pca":
-            self.reducer = PCA(n_components=target_dim, random_state=42)
+        # if reducer == "umap":
+        #     # parameters advised for clustering: https://umap-learn.readthedocs.io/en/latest/clustering.html
+        #     self.reducer = UMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
+        # elif reducer == "parametric_umap":
+        #     from umap.parametric_umap import ParametricUMAP
+        #     self.reducer = ParametricUMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
+        # elif reducer == "pca":
+        #     self.reducer = PCA(n_components=target_dim, random_state=42)
 
-        
-        
+        self.reducer=reducer
         self.frame_classifier=frame_classifier
-        self.phoneme_classifier=phoneme_classifier
 
-        if self.phoneme_classifier is not None:
-            self.phoneme_reducer = PCA(n_components=target_dim, random_state=42)
+        # self.phoneme_classifier=phoneme_classifier
+        # if self.phoneme_classifier is not None:
+        #     self.phoneme_reducer = PCA(n_components=target_dim, random_state=42)
+
 
         # import Wav2Vec2 feature extractor
         self.model = Wav2Vec2Model.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True) 
         self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")    
+
+    def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
+        path=os.path.join(out_path,name)
+        if not os.path.exists(path): os.makedirs(path)
+        pickle.dump(self.reducer, open( path+"/reducer.p", "wb" ))
+        pickle.dump(self.frame_classifier, open( path+"/frame_classifier.p", "wb" ))
+
+    def load(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
+        path=os.path.join(out_path,name)
+        self.reducer=pd.read_pickle(path+"/reducer.p")
+        self.frame_classifier=pd.read_pickle(path+"/frame_classifier.p")
+        
+
+
 
     # get output from an audio sample in w2v2 feature extractor
     def get_last_hidden_state(self, s, fs):
@@ -121,20 +130,20 @@ class Wav2Vec2ForFramePrediction:
         print('fit frame classifier...')
         self.frame_classifier.fit(self.X_train_reduced, self.y_train)
 
-    def fit_phoneme(self, X, y):
-        if self.phoneme_classifier is not None:
-            self.X_train = X
-            self.y_train_labels = y
-            self.y_train=[self.p_to_id[el] for el in y]
+    # def fit_phoneme(self, X, y):
+    #     if self.phoneme_classifier is not None:
+    #         self.X_train = X
+    #         self.y_train_labels = y
+    #         self.y_train=[self.p_to_id[el] for el in y]
 
-            print('fit phoneme reducer...')
-            self.phoneme_reducer.fit(self.X_train)
-            print('reduce training data')
-            self.X_train_reduced = self.phoneme_reducer.transform(self.X_train)
-            print('fit phoneme classifier...')
-            self.phoneme_classifier.fit(self.X_train_reduced, self.y_train)
-        else:
-            print('phoneme_classifieris set to None, so nothing is done. Averaged frame predictions will be used to predict phonemes')
+    #         print('fit phoneme reducer...')
+    #         self.phoneme_reducer.fit(self.X_train)
+    #         print('reduce training data')
+    #         self.X_train_reduced = self.phoneme_reducer.transform(self.X_train)
+    #         print('fit phoneme classifier...')
+    #         self.phoneme_classifier.fit(self.X_train_reduced, self.y_train)
+    #     else:
+    #         print('phoneme_classifier is set to None, so nothing is done. Averaged frame predictions will be used to predict phonemes')
      
 
     # from an audio sample, computes the probability matrix of each frame corresponding to every phoneme
@@ -173,13 +182,13 @@ class Wav2Vec2ForFramePrediction:
             avg_vectors.append(avg_vector)
         df_segmented['average_vectors']=avg_vectors
 
-        if self.phoneme_classifier is not None:
-            reduced_vectors=self.phoneme_reducer.transform(avg_vectors)
-            pred_idxs=self.phoneme_classifier.predict(reduced_vectors)
-            self.pred_phones_audio=[self.id_to_p[el] for el in list(pred_idxs)]
-            df_segmented['pred_phones_audio']=self.pred_phones_audio
-        else:
-            self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
+        # if self.phoneme_classifier is not None:
+        #     reduced_vectors=self.phoneme_reducer.transform(avg_vectors)
+        #     pred_idxs=self.phoneme_classifier.predict(reduced_vectors)
+        #     self.pred_phones_audio=[self.id_to_p[el] for el in list(pred_idxs)]
+        #     df_segmented['pred_phones_audio']=self.pred_phones_audio
+        # else:
+        self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
 
         return df_segmented
 
@@ -242,7 +251,6 @@ class Wav2Vec2ForFramePrediction:
             syl=float('nan')
         return phonetic_detection, syl
 
-
     def compute_stress_score(self, audio, phonetics):
         """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
         a value by vowel representing a stress intensity
@@ -276,7 +284,7 @@ class Wav2Vec2ForFramePrediction:
 
         Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
         # nVowels=len(indxVowels)
-        sylType=np.zeros(len(filtered_df))
+        # sylType=np.zeros(len(filtered_df))
         for i in range(len(filtered_df)):
             range_vowel=range(startPositions_samples[i], stopPositions_samples[i])
             Ivowel=intensity[range_vowel]
@@ -332,10 +340,15 @@ if __name__ == '__main__':
     # Basis model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca", frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
+    model.save(name='model_mailabs_pca_0.95_knn_10_w')
+
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.load(name='model_mailabs_pca_0.95_knn_10_w')
+
     # model.fit_phoneme(X_train, y_train)
-    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_w.pkl','wb'))
+    # pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_w.pkl','wb'))
 
     # Basis model, but with IPA
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_ipa.pkl')
@@ -359,14 +372,6 @@ if __name__ == '__main__':
     # y_train=df_all_instances.phoneme.apply(lambda r: p_to_id[r]).values
     y_train=list(df_all_instances.phoneme.values)
 
-    
-
-    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl','wb'))
-
-    
-    model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl')
-
-    model2=pd.read_pickle('model_mailabs_pca_0.95_knn_10.pkl')
 
     
     # phoneme predictions on a train dataset with forced alignment
@@ -379,38 +384,37 @@ if __name__ == '__main__':
     pred = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
     prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
-    model2.phoneme_classifier
+    # model2.phoneme_classifier
     
-    # phoneme predictions on a single audio sample with forced alignment
-    pred2 = model2.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
-    prob_matrix2 = model2.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    # # phoneme predictions on a single audio sample with forced alignment
+    # pred2 = model2.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    # prob_matrix2 = model2.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
-    from tqdm import tqdm
-    preds=[model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
-    preds2=[model2.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
-    preds_df=pd.concat(preds)
-    preds_df2=pd.concat(preds2)
-    sum(preds_df.pred_phones_audio==preds_df2.pred_phones_audio)/len(preds_df)
+    # from tqdm import tqdm
+    # preds=[model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    # preds2=[model2.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    # preds_df=pd.concat(preds)
+    # preds_df2=pd.concat(preds2)
+    # sum(preds_df.pred_phones_audio==preds_df2.pred_phones_audio)/len(preds_df)
 
 
     # https://scikit-learn.org/stable/modules/ensemble.html#weighted-average-probabilities-soft-voting
     from sklearn.ensemble import VotingClassifier
 
     #  with ensemble
-    estimators=[('10 Nearest Neighbors', KNeighborsClassifier(n_neighbors=10)),
-    ('Linear SVM', SVC(C=0.025, kernel='linear', probability=True)),
+    estimators=[('10 Nearest Neighbors', KNeighborsClassifier(n_neighbors=10, weights='distance')),
     ('QDA', QuadraticDiscriminantAnalysis())]
     eclf = VotingClassifier(estimators=estimators,
                         voting='soft', weights=[1 for _ in estimators])
-    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca",  frame_classifier=eclf)
+    model = Wav2Vec2ForFramePrediction('cmu',frame_classifier=eclf)
     model.fit(X, y)
-    # model.fit_phoneme(X_train, y_train)
-    pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_linear_svm_qda.pkl','wb'))
+
+    # pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_linear_svm_qda.pkl','wb'))
 
 
     ###
     
-    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca",  frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     # model.fit_phoneme(X_train, y_train)
-    pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_weighted_dist.pkl','wb'))
+    # pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_weighted_dist.pkl','wb'))

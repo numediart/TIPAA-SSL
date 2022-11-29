@@ -12,6 +12,7 @@ import librosa
 from linetimer import CodeTimer
 
 # initialize model
+# from src.charsiu_utils import charsiu_phone_forced_aligner
 # default_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
 
@@ -25,16 +26,11 @@ for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
 # phoneme_GT_proba_threshold_dict['AO2']=0.1
 
 # model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
-# model=pickle.load(open('model_mailabs_umap_2_neighbors_30_gmm_300.pkl','rb'))
-# model=pd.read_pickle('model_mailabs_umap_estimator_2_gmm_300.pkl')
 
-# model=pickle.load(open('model_mailabs_umap_2_bgmm_300.pkl','rb'))
-# model=pickle.load(open('model_mailabs_parametric_umap_2_gmm_300.pkl','rb'))
-
-# model=pd.read_pickle('model_mailabs_pca_0.95_svc.pkl')
-default_model=pd.read_pickle('model_mailabs_pca_0.95_knn_10.pkl')
-# from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-# model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl')
+from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+from sklearn.neighbors import KNeighborsClassifier
+default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 
 
 target_accepted_alternatives={

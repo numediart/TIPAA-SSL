@@ -9,7 +9,7 @@ from collections import Counter
 from src.label_data_processing import build_user_data_df
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model
 from src.audio_processing import prepare_audio_file
 
 from src.label_data_processing import get_data_new_content, actor_recordings, synth_words_data
@@ -31,7 +31,11 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 
 
-predictions_default_model=pd.read_pickle('model_mailabs_pca_0.95_knn_10.pkl')
+# from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+# from sklearn.neighbors import KNeighborsClassifier
+# default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+# default_model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_w.pkl')
 
 
 def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
@@ -69,7 +73,7 @@ def count_values(phonetic_detections):
 
 def compute_predictions(selection, target_phones='AO1', tech_function=phonemeContrast_from_formatted_phonetics_audio, 
                         basis='IH0_D', alternatives=cmu_vowels, 
-                        model=predictions_default_model,
+                        model=default_model,
                         **kwargs):
     phonetic_detections=[]
     records=[]
@@ -238,7 +242,7 @@ def stress_GE_performance_test(level='sentence'):
             error_rate=sum(sum(np.abs(np.array(GT)-np.array(pred))))/np.prod(np.array(pred).shape)
             print('words of len '+str(l+1)+' error rate:'+str(error_rate))
 
-def pContrast_for_user_data( target_phones='AO1', frac=0.001, model=predictions_default_model):
+def pContrast_for_user_data( target_phones='AO1', frac=0.001, model=default_model):
     user_data=build_user_data_df()
 
 
@@ -267,7 +271,7 @@ def pContrast_for_user_data( target_phones='AO1', frac=0.001, model=predictions_
 
 
 
-def final_ed_for_actor_recordings(target_phones='D', model=predictions_default_model):
+def final_ed_for_actor_recordings(target_phones='D', model=default_model):
     df=actor_recordings()
 
     df['fpath']=df['audio_file_url']
@@ -284,7 +288,7 @@ def final_ed_for_actor_recordings(target_phones='D', model=predictions_default_m
     d.columns=[target_phones]
     return result_df, d
 
-def pContrast_for_actor_recordings(target_phones='AO1', speakers=None, model=predictions_default_model):
+def pContrast_for_actor_recordings(target_phones='AO1', speakers=None, model=default_model):
     df=actor_recordings()
     # those who don't have NaN in target
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
@@ -315,7 +319,7 @@ def pContrast_for_actor_recordings(target_phones='AO1', speakers=None, model=pre
 
 
 
-def pContrast_from_audiobook_data(data_set='test-other', target_phones='AO1', n=None, alternatives=cmu_vowels, model=predictions_default_model):
+def pContrast_from_audiobook_data(data_set='test-other', target_phones='AO1', n=None, alternatives=cmu_vowels, model=default_model):
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
@@ -338,7 +342,7 @@ def pContrast_from_audiobook_data(data_set='test-other', target_phones='AO1', n=
     d.columns=[target_phones]
     return result_df, d
 
-def start_end_phoneme_from_audiobook_data(phoneme='HH', basis='HH', contrast="start",data_set='dev-clean', n=100, model=predictions_default_model):
+def start_end_phoneme_from_audiobook_data(phoneme='HH', basis='HH', contrast="start",data_set='dev-clean', n=100, model=default_model):
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
@@ -379,7 +383,7 @@ def start_end_phoneme_from_audiobook_data(phoneme='HH', basis='HH', contrast="st
     d.columns=[phoneme]
     return phonetic_detections,result_df,d
 
-def final_ed_from_audiobook_data(data_set='test-other', target_phones='D', n=None, model=predictions_default_model):
+def final_ed_from_audiobook_data(data_set='test-other', target_phones='D', n=None, model=default_model):
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df=libri_words_df[~libri_words_df.file_idx.isin(libri_words_df[libri_words_df.word=='<unk>'].file_idx.unique())]
@@ -415,7 +419,7 @@ def final_ed_from_audiobook_data(data_set='test-other', target_phones='D', n=Non
     d.columns=[target_phones]
     return result_df, d
 
-def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=predictions_default_model):
+def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_model):
 
     libri_words_df=build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
@@ -476,7 +480,7 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=predictions_
 
     return phonetic_detections, phonetic_detections_s, d, d_s
 
-def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowels, accent=None, model=predictions_default_model):
+def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowels, accent=None, model=default_model):
     
     df=synth_words_data()
 
@@ -515,6 +519,11 @@ if __name__=="__main__":
     i_list=['IH1', 'IY1']
 
     from performance_functions import *
+    ds_baseline=[]
+    for p in o_list:
+        results_df, d = pContrast_on_synth_words(target_phones=p, n=100)
+        ds_baseline.append(d)
+        
 
     from src.charsiu_utils import charsiu_phone_forced_aligner
     prod_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
@@ -543,7 +552,7 @@ if __name__=="__main__":
         results_df, d = pContrast_for_user_data(target_phones=p, model=prod_model, frac=0.01)
         ds_user_prod.append(d)
 
-        
+
 
     ds=[]
     for p in o_list:
@@ -551,10 +560,9 @@ if __name__=="__main__":
         ds.append(d)
 
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    # model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_phoneme_classifier.pkl')
-    # model=pd.read_pickle('model_mailabs_pca_0.95_eclf_knn_10_linear_svm_qda.pkl')
-    # model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_lucky.pkl')
-    model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_w.pkl')
+    from sklearn.neighbors import KNeighborsClassifier
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.load(name='model_mailabs_pca_0.95_knn_10_w')
     # results_df2, d2 = pContrast_on_synth_words(n=100, model=model)
     ds2=[]
     for p in o_list:
@@ -610,7 +618,7 @@ if __name__=="__main__":
     
     from tqdm import tqdm
     preds=[model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
-    preds2=[predictions_default_model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    preds2=[default_model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
     
     preds_df=pd.concat(preds)
     preds_df2=pd.concat(preds2)
