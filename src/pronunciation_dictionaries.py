@@ -2,11 +2,21 @@ import cmudict
 import pandas as pd
 from glob import glob
 import json
-from g2p_en import G2p
-from itertools import groupby
 
 from io import StringIO
 import subprocess
+def invert_dict(d): 
+    inverse = dict() 
+    for key in d: 
+        # Go through the list that is saved in the dict:
+        item = d[key]
+        # Check if in the inverted dict the key exists
+        if item not in inverse: 
+            # If not create a new list
+            inverse[item] = [key] 
+        else: 
+            inverse[item].append(key) 
+    return inverse
 
 # standard from FB http://fbdevwiki.com/wiki/Locales
 lang_to_MFA_g2p_models={'en_GB':'english_uk_mfa',
@@ -232,7 +242,7 @@ cmu_to_gibberish={'AA':'o',
 # from https://github.com/kosuke-kitahara/xlsr-wav2vec2-phoneme-recognition/blob/main/Fine_tuning_XLSR_Wav2Vec2_for_Phoneme_Recognition.ipynb
 # IPA
 # ref: https://en.wikipedia.org/wiki/ARPABET
-arpabet_to_ipa = {
+arpabet_to_1_char_ipa = {
     'aa': 'ɑ',
     'ae': 'æ',
     'ah':'ʌ',
@@ -302,9 +312,78 @@ cmu_phones=set([el[0] for el in cmu_phones_info])
 cmu_vowels=set([p[0] for p in cmu_phones_info if p[1][0]=='vowel'])
 cmu_consonants=set([p[0] for p in cmu_phones_info if p[1][0]!='vowel'])
 
+cmu_stressed_vowels=set(cmudict.symbols())-cmu_phones
+
 # CMU is a subset of arpabet
 cmu_1_char={}
 cmu_1_char_to_gibberish={}
 for p in cmu_phones:
-    cmu_1_char[p]=arpabet_to_ipa[p.lower()]
+    cmu_1_char[p]=arpabet_to_1_char_ipa[p.lower()]
     cmu_1_char_to_gibberish[cmu_1_char[p]]=cmu_to_gibberish[p]
+
+
+cmu_alphabet = [el[0] for el in cmudict.phones()]
+with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(openfile)
+
+# csv built from tables in https://en.wikipedia.org/wiki/ARPABET  and adapted by looking at some transcriptions in cmudict of the examples in a spreadsheet
+cmu_reducer_df=pd.read_csv('data/cmu_reducer.csv')
+cmu_reducer=dict(zip(cmu_reducer_df.IPA, cmu_reducer_df.CMU))
+
+# doc on mfa phone set, an opinionated ipa phone set: https://mfa-models.readthedocs.io/en/latest/mfa_phone_set.html
+# UK US english
+# consonants
+cmu_reducer['ɲ']=cmu_reducer['n']
+cmu_reducer['c']=cmu_reducer['k']
+cmu_reducer['ʎ']=cmu_reducer['l']
+cmu_reducer['ɟ']=cmu_reducer['ɡ']
+cmu_reducer['ç']=cmu_reducer['h']
+
+cmu_reducer['pʰ']=cmu_reducer['p']
+cmu_reducer['tʰ']=cmu_reducer['t']
+cmu_reducer['cʰ']=cmu_reducer['k']
+cmu_reducer['kʰ']=cmu_reducer['k']
+
+cmu_reducer['ɫ̩']='L'
+cmu_reducer['ɫ']='L'
+
+cmu_reducer['ɱ']=cmu_reducer['m']
+cmu_reducer['t̪']=cmu_reducer['t']
+
+cmu_reducer['ʔ']='T'  # "butter", "uh-oh" sound. UK accent has instances of "T" pronounced like that
+
+
+# vowels
+cmu_reducer['aw']=cmu_reducer['aʊ']
+cmu_reducer['aj']=cmu_reducer['aɪ']
+cmu_reducer['ow']=cmu_reducer['oʊ']
+cmu_reducer['ej']=cmu_reducer['eɪ']
+cmu_reducer['ɔj']=cmu_reducer['ɔɪ']
+
+cmu_reducer['əw']=cmu_reducer['ow']
+
+cmu_reducer['ɐ']='AA'
+
+
+# nigerian
+cmu_reducer['a']='AA'
+
+# https://en.wikipedia.org/wiki/Open-mid_central_unrounded_vowel
+cmu_reducer['ɜ']=cmu_reducer['ə']
+
+
+
+
+long_vowels=[el for el in ipa_alphabet if el[-1]=='ː']
+# cmu does not have a symbol to differentiate long and short vowels with the same acoustics
+for lv in long_vowels: cmu_reducer[lv]=cmu_reducer[lv[:-1]]
+
+j_consonants=[el for el in ipa_alphabet if el[-1]=='ʲ']
+for jc in j_consonants: cmu_reducer[jc]=cmu_reducer[jc[:-1]]
+
+# print(set(ipa_alphabet)-set(cmu_reducer))
+# len(set(ipa_alphabet)-set(cmu_reducer))
+
+# invert_dict(cmu_reducer)
+
+# https://en.wiktionary.org/wiki/%C9%A3
+# cmu_reducer['ɣ']=cmu_reducer['g']
