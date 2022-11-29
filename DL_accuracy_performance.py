@@ -13,7 +13,7 @@ from collections import Counter
 from src.label_data_processing import build_user_data_df, get_errors_examples
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, default_model
 from src.audio_processing import prepare_audio_file
 
 from src.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings, final_s_artificial_data, synth_words_data
@@ -31,15 +31,12 @@ import pandas as pd
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
 
-# from src.load_model import load_model
-# model = load_model(300,18,'MAILABS')
-
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 
 
-from performance_functions import predictions_default_model, compute_predictions, count_values, pContrast_on_synth_words, \
+from performance_functions import compute_predictions, count_values, pContrast_on_synth_words, \
                                 pContrast_for_actor_recordings, start_end_phoneme_from_audiobook_data, \
                                 final_ed_for_actor_recordings, stress_GE_performance_test, final_ed_from_audiobook_data, pContrast_from_audiobook_data, pContrast_for_user_data
 
@@ -65,12 +62,18 @@ def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
 
 
 def distrib(l):
-    x = np.linspace(0, 1, 1000)
-    kde = gaussian_kde(l, bw_method = 0.5)
-    y = kde(x)
+    n_points=1000
+    x = np.linspace(0, 1, n_points)
+    if len(set(l))==1: #all the values are the same means infinite density on this value, and 0 for the rest
+        y=np.zeros(len(x))
+        idx=int(list(l)[0]*n_points)
+        y[idx]=np.inf
+    else:
+        kde = gaussian_kde(l, bw_method = 0.5)
+        y = kde(x)
     return x,y
 
-def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_default_model, basename='probas_actors'):
+def GT_proba_distribution_analysis(target_phones='AO1', model=default_model, basename='probas_actors'):
 
     user_data=build_user_data_df()
 
@@ -81,7 +84,7 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
     df=actor_recordings()
     # df_actors=df[df.target_phoneme==target_phones]
 
-    def compute_predictions(df_pContrast, n_examples=None, model=predictions_default_model):
+    def compute_predictions(df_pContrast, n_examples=None, model=default_model):
         # contrast on all phones with force_and_predict (i.e. predict based on frames allocated to a phoneme)
         pred_dfs=[]
         phonetic_contents=[]
@@ -111,7 +114,7 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
         p_idx=p_to_id(target)
         plt.cla()
         for v in cmu_vowels:
-            l=all_phones_df[all_phones_df.phones==v].apply(lambda r: r.average_vectors[p_idx], axis=1)
+            l=all_phones_df[all_phones_df.phones==v].apply(lambda r: r.probs_means[p_idx], axis=1)
             if len(l)>0:
                 x,y=distrib(l)
                 if y[0]<10 or v==target:
@@ -125,6 +128,7 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
 
     # pred_dfs, means, medians=compute_predictions(df_users, model=model)
 
+    # pred_dfs, means, medians=compute_predictions(df[:3], n_examples=100, model=model)
     pred_dfs, means, medians=compute_predictions(df, n_examples=100, model=model)
 
     all_phones_df=pd.concat(pred_dfs)
@@ -145,7 +149,7 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=predictions_defaul
 
 
 
-def syllable_contrast_for_actor_recordings(model=predictions_default_model):
+def syllable_contrast_for_actor_recordings(model=default_model):
     # from DL_accuracy_performance import *
     df=actor_recordings()
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
@@ -443,7 +447,7 @@ def final_ed_confusions_for_actor_recordings():
     return predictions, results
 
 
-def final_s_on_synth_words(n=20, model=predictions_default_model):
+def final_s_on_synth_words(n=20, model=default_model):
 
     df=synth_words_data()
 
@@ -476,7 +480,7 @@ def final_s_on_synth_words(n=20, model=predictions_default_model):
         results[t]=d
     plot_confusion_results(results, name='plots/final_s_synth_words')
 
-def final_s_from_artificial_data(model=predictions_default_model):
+def final_s_from_artificial_data(model=default_model):
     df=final_s_artificial_data()    
     # df.apply(lambda r: r.text.split(' ')[r.word_idx], axis=1)
     df_target_word_p=df.apply(lambda r: r.cmu_phonetics.split(' ')[r.word_idx], axis=1)
@@ -532,7 +536,7 @@ def final_s_from_artificial_data(model=predictions_default_model):
 
 
 
-def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other'):
+def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other', model=default_model):
     _,_,d=start_end_phoneme_from_audiobook_data(phoneme='HH',basis='HH', n=n, data_set=data_set)
     r=d.T['HH']
     _,_,d=start_end_phoneme_from_audiobook_data(phoneme='EH1',basis='HH', n=1000, data_set=data_set)
@@ -592,7 +596,7 @@ if __name__=='__main__':
 
     target_word_idx=ast.literal_eval(r.target_word_indexes)[0]
     target_syllable_idx=ast.literal_eval(r.target_syllable_indexes)[0]
-    df_word=predictions_default_model.predict_word(s, r.split_phonetics, target_word_idx)
+    df_word=default_model.predict_word(s, r.split_phonetics, target_word_idx)
     
     word=r.cmu_phonetics.split(' ')[target_word_idx]
 
