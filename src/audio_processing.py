@@ -236,6 +236,77 @@ def align_audios(
 
     return out
 
+
+
+
+from soundfile import LibsndfileError
+from pydub import AudioSegment
+import io
+import array
+from pydub import AudioSegment
+from pydub.utils import get_array_type
+def read_audio_string(encoded_string, fs=16000):
+    """
+    -decodes base64, 
+    -put into a file-like object with "io", 
+    -then read that with "soundfile" when possible, else with "pydub"
+    -resample to fs
+
+    refs:
+    https://stackoverflow.com/questions/55352789/how-can-i-convert-any-random-byte-string-to-a-playable-mp3-file-in-python3-6
+    https://stackoverflow.com/questions/32373996/pydub-raw-audio-data
+    """
+    decoded_string = base64.b64decode(encoded_string)
+    try:
+        s,orig_sr=sf.read(io.BytesIO(decoded_string))
+    except LibsndfileError:
+        audio = AudioSegment.from_file(io.BytesIO(decoded_string))#, format="m4a")
+        # audio = AudioSegment.from_file(path, format="m4a")
+
+        bit_depth = audio.sample_width * 8
+        array_type = get_array_type(bit_depth)
+        numeric_array = array.array(array_type, audio._data)
+        s=np.array(numeric_array)/2**15
+        orig_sr=audio.frame_rate
+    
+    new_s=librosa.resample(s, orig_sr=orig_sr, target_sr=fs)
+
+    return new_s, fs
+
+
+# def test_m4a(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'):
+
+#     from pydub import AudioSegment
+#     import io
+#     import array
+#     from pydub import AudioSegment
+#     from pydub.utils import get_array_type
+
+#     with open('base64_test.txt', 'r') as f: encoded_string=f.readlines()
+#     encoded_string='\n'.join(encoded_string)
+#     decode_string = base64.b64decode(encoded_string)
+
+#     audio = AudioSegment.from_file(io.BytesIO(decode_string), format="m4a")
+#     # audio = AudioSegment.from_file(path, format="m4a")
+
+#     bit_depth = audio.sample_width * 8
+#     array_type = get_array_type(bit_depth)
+#     numeric_array = array.array(array_type, audio._data)
+#     s=np.array(numeric_array)/2**15
+
+#     fs=16000
+
+#     librosa.resample(s, orig_sr=audio.frame_rate, target_sr=fs)
+
+#     import io
+#     f = io.BytesIO()
+#     f = audio.export(f, format='mp3')
+
+    
+#     test = AudioSegment.from_file(f, format="mp3")
+    
+
+
 def audio64_from_file(path, fs=16000):
     # writing bytes of an ogg file with virtual io, then encoding with base64
     s,fs=librosa.load(path, sr=fs)

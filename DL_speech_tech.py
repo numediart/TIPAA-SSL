@@ -1,7 +1,7 @@
 from scipy.io.wavfile import  read
 import numpy as np
 import pandas as pd
-from src.audio_processing import getIntonation
+from src.audio_processing import getIntonation, read_audio_string
 import soundfile as sf
 import io
 from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
@@ -12,8 +12,8 @@ import librosa
 from linetimer import CodeTimer
 
 # initialize model
-# from src.charsiu_utils import charsiu_phone_forced_aligner
-# default_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+from src.charsiu_utils import charsiu_phone_forced_aligner
+default_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
 
 phoneme_GT_proba_threshold_dict={}
@@ -27,10 +27,10 @@ for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
 
 # model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
 
-from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-from sklearn.neighbors import KNeighborsClassifier
-default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
-default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+# from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+# from sklearn.neighbors import KNeighborsClassifier
+# default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 
 
 target_accepted_alternatives={
@@ -73,10 +73,13 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
         except FileNotFoundError:
             return "error: audio file not found", None
     elif mode=='base64':
-        decode_string = base64.b64decode(audio)
-        s,_=sf.read(io.BytesIO(decode_string))
-        if len(s)==0:  return "success: audio is empty (has zero sample)", None
-        s,fs=librosa.load(io.BytesIO(decode_string), sr=fs)
+        s, fs= read_audio_string(audio, fs=fs)
+
+        # decode_string = base64.b64decode(audio)
+        # s,_=sf.read(io.BytesIO(decode_string))
+        # if len(s)==0:  return "success: audio is empty (has zero sample)", None
+        # s,fs=librosa.load(io.BytesIO(decode_string), sr=fs)
+
         duration=len(s) / fs
         speech_rate=n_syllables_tot/duration
         if speech_rate>max_speech_rate: 
