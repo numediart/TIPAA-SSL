@@ -29,3 +29,10 @@ praatio
 g2pM
 num2words
 unidecode
+umap-learn
+jiwer
+# ctc_segmentation
+requests_toolbelt
+# hdbscan
+linetimer
+pydub
