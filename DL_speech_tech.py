@@ -12,8 +12,8 @@ import librosa
 from linetimer import CodeTimer
 
 # initialize model
-from src.charsiu_utils import charsiu_phone_forced_aligner
-default_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+# from src.charsiu_utils import charsiu_phone_forced_aligner
+# default_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
 
 phoneme_GT_proba_threshold_dict={}
@@ -27,10 +27,10 @@ for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
 
 # model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
 
-# from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-# from sklearn.neighbors import KNeighborsClassifier
-# default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
-# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+from sklearn.neighbors import KNeighborsClassifier
+default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 
 
 target_accepted_alternatives={
@@ -325,15 +325,21 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                 phoneme_set=cmu_consonants
             elif unstress(basis) in cmu_vowels:
                 phoneme_set=cmu_vowels
-                
-            phoneme_set=[[p] for p in  remove_stress_annots(phoneme_set)]
-            phoneme_set_ids=model.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
+            
+            
+            phoneme_set_ids=[model.p_to_id[el] for el in remove_stress_annots(phoneme_set)]
+
+            # phoneme_set=[[p] for p in  remove_stress_annots(phoneme_set)]
+            # phoneme_set_ids=model.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
+
             proba_means=df_word.iloc[p_idx_global].proba_means
 
             # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
             filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
             idx_mean_max=np.argmax(filtered_proba_means)
-            phonetic_detection=model.charsiu_processor.mapping_id2phone(int(idx_mean_max))
+
+            # phonetic_detection=model.charsiu_processor.mapping_id2phone(int(idx_mean_max))
+            phonetic_detection=model.id_to_p[int(idx_mean_max)]
 
             ter=[phonetic_detection]
 

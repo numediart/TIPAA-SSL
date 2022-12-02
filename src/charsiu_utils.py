@@ -24,6 +24,9 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         self.status="success"
         self.phonetic_content=None
         self.pred_phones_audio=""
+
+        self.p_to_id=self.charsiu_processor.processor.tokenizer.encoder
+        self.id_to_p=self.charsiu_processor.processor.tokenizer.decoder
     def align_phones(self, audio, phones, GT_alignment_proba_threshold=0.17):
         '''
         Perform forced alignment
