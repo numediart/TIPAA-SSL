@@ -18,8 +18,8 @@ pd.options.mode.chained_assignment = None  # default='warn'
 # https://marshmallow.readthedocs.io/en/stable/quickstart.html#declaring-schemas
 
 # import routes of different parts of the server
-from server.prefill import *
-from server.prefill import bp as prefill_bp
+# from server.prefill import *
+# from server.prefill import bp as prefill_bp
 # from server.upload import *
 # from server.upload import bp as upload_bp
 
@@ -39,7 +39,7 @@ from flask_smorest import Api, Blueprint, abort
 
 api = Api(app)
 
-api.register_blueprint(prefill_bp)
+# api.register_blueprint(prefill_bp)
 api.register_blueprint(DL_modules_bp2, url_prefix='/v2')
 api.register_blueprint(DL_modules_bp2_mp, url_prefix='/v2_mp')
 
