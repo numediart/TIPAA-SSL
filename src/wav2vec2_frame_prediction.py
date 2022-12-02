@@ -29,14 +29,6 @@ from sklearn.decomposition import PCA
 from umap.umap_ import UMAP
 
 
-
-
-import cmudict
-import itertools
-from src.libri_phonetization_data import libri_phonetics_data
-from jiwer import wer
-import seaborn as sns
-from sklearn.metrics import confusion_matrix
 from time import time
 from linetimer import CodeTimer
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
@@ -56,7 +48,7 @@ cmu_consonants=[p[0] for p in cmu_phones_info if p[1][0]!='vowel']
 class Wav2Vec2ForFramePrediction:
 
     # phone_type = 'cmu' or 'ipa'
-    def __init__(self, phone_type, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
+    def __init__(self, phone_type, w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft",  reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
         self.status = 'success'
         self.pred_phones_audio = []
         self.fs = 16000
@@ -89,8 +81,8 @@ class Wav2Vec2ForFramePrediction:
 
 
         # import Wav2Vec2 feature extractor
-        self.model = Wav2Vec2Model.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True) 
-        self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")    
+        self.model = Wav2Vec2Model.from_pretrained(w2v2_model_path, output_hidden_states=True) 
+        self.processor = Wav2Vec2Processor.from_pretrained(w2v2_model_path)    
 
     def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
         path=os.path.join(out_path,name)
@@ -103,8 +95,6 @@ class Wav2Vec2ForFramePrediction:
         self.reducer=pd.read_pickle(path+"/reducer.p")
         self.frame_classifier=pd.read_pickle(path+"/frame_classifier.p")
         
-
-
 
     # get output from an audio sample in w2v2 feature extractor
     def get_last_hidden_state(self, s, fs):
@@ -313,29 +303,56 @@ class Wav2Vec2ForFramePrediction:
 if __name__ == '__main__':
 
     from src.load_data import *
-    from src.wav2vec2_frame_prediction import *
+    # from src.wav2vec2_frame_prediction import *
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     # ----------------------------
 
+    # load UK US FR ES in MFA_IPA
+    df_t_train_all = load_dataset_MAILABS(['en_US', 'en_UK', 'es_ES', 'fr_FR'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', phone_set='MFA_IPA')
+    df_t_train_all=df_t_train_all.dropna()
+    df_all_frames_all = build_df_all_frames(df_t_train_all, 'phone')
+    df_all_frames_all.to_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
 
-    # leave one speaker out
-    # all_speakers = ['fr_FR', 'es_ES', 'en_UK', 'en_US']
-    # speaker_lang_code = 'en_UK'
-    # others = list(set(all_speakers) - set([speaker_lang_code]))
-
+    # load UK US in MFA_IPA
     # df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', phone_set='MFA_IPA')
     # df_t_train=df_t_train.dropna()
     # df_all_frames = build_df_all_frames(df_t_train, 'phone')
     # df_all_frames.to_pickle('df_all_frames_MAILABS_train_ipa.pkl')
 
-    # Basis model Wav2Vec2ForFramePrediction, in CMU phoneme set, PCA reduction at 95% variance, and a 10-NN classifier
-    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
+
+    # load US english in CMU
+    df_t_train = load_dataset_MAILABS(['en_US'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    df_t_train=df_t_train.dropna()
+
+    df_all_frames = build_df_all_frames(df_t_train, 'phone')
+    df_all_frames.to_pickle('df_all_frames_MAILABS_US_train.pkl')
+
+    # load UK US english in CMU
+    df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    df_t_train=df_t_train.dropna()
+
+    df_all_frames = build_df_all_frames(df_t_train, 'phone')
+    df_all_frames.to_pickle('df_all_frames_MAILABS_train.pkl')
+    
+    df_all_frames = build_df_all_frames(df_t_train, 'phone', model_path="hf_models/facebook/wav2vec2-base-960h")
+    df_all_frames.to_pickle('df_all_frames_MAILABS_train_w2v_base.pkl')
+    
+    df_all_frames = build_df_all_frames(df_t_train, 'phone', model_path="hf_models/facebook/wav2vec2-large-xlsr-53")
+    df_all_frames.to_pickle('df_all_frames_MAILABS_train_w2v_xlsr_no_ft.pkl')
+
+    # # Basis model Wav2Vec2ForFramePrediction, in CMU phoneme set, PCA reduction at 95% variance, and a 10-NN classifier
+    # df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
+    # X, y = df_all_frames_to_X_y(df_all_frames)
+    # model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca")
+    # model.fit(X, y)
+
+    # Basis model Wav2Vec2ForFramePrediction, 10-NN classifier weighted with distances, US frames
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_US_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction(0.95,'cmu', reducer="pca")
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
-    # model.fit_phoneme(X_train, y_train)
-    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10.pkl','wb'))
+    model.save(name='model_mailabs_pca_0.95_knn_10_w_US')
 
     # Basis model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
@@ -346,9 +363,17 @@ if __name__ == '__main__':
 
     model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.load(name='model_mailabs_pca_0.95_knn_10_w')
+    
+    # Basis model Wav2Vec2ForFramePrediction with 10-NN classifier weighted with distances, with w2v2 base model instead of wlsr espeak ft
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_w2v_base.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction('cmu', w2v2_model_path="hf_models/facebook/wav2vec2-base-960h",  frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.fit(X, y)
+    model.save(name='model_w2v_base_mailabs_pca_0.95_knn_10_w')
 
-    # model.fit_phoneme(X_train, y_train)
-    # pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_w.pkl','wb'))
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.load(name='model_w2v_base_mailabs_pca_0.95_knn_10_w')
+
 
     # Basis model, but with IPA
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_ipa.pkl')
@@ -381,18 +406,18 @@ if __name__ == '__main__':
     # data = load_test_dataset(df_t_test)
 
     # phoneme predictions on a single audio sample with forced alignment
-    pred = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    pred = model.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
     prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
     # model2.phoneme_classifier
     
     # # phoneme predictions on a single audio sample with forced alignment
-    # pred2 = model2.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    # pred2 = model2.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
     # prob_matrix2 = model2.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
     # from tqdm import tqdm
-    # preds=[model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
-    # preds2=[model2.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    # preds=[model.predict_with_timings(r.s, r.phones) for i,r in tqdm(data.iterrows())]
+    # preds2=[model2.predict_with_timings(r.s, r.phones) for i,r in tqdm(data.iterrows())]
     # preds_df=pd.concat(preds)
     # preds_df2=pd.concat(preds2)
     # sum(preds_df.pred_phones_audio==preds_df2.pred_phones_audio)/len(preds_df)

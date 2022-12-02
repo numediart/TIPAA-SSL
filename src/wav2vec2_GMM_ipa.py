@@ -417,7 +417,7 @@ if __name__ == '__main__':
     example=df.iloc[N]
     path=example.wav_path
     example['cmu_phones']=df_cmu_phones.iloc[N]
-    example['cmu_phones']=remove_stress_annots(example.cmu_phones)
+    example['cmu_phones']=remove_stress_annots(example.phones)
     s,fs=librosa.load(path, sr=16000)
 
     # loading a test sample (unseen by the model)
@@ -425,7 +425,7 @@ if __name__ == '__main__':
     example=df_test.iloc[N]
     path=example.wav_path
     example['cmu_phones']=df_cmu_phones_test.iloc[N]
-    example['cmu_phones']=remove_stress_annots(example.cmu_phones)
+    example['cmu_phones']=remove_stress_annots(example.phones)
     s,fs=librosa.load(path, sr=16000)
 
     #comment if you want cmu or ipa
@@ -502,8 +502,8 @@ if __name__ == '__main__':
     data = load_cmu_test_dataset(df_t_test)
     # data = load_test_dataset(df_t_test)
 
-    # x = [[el.s,el.fs,el.cmu_phones] for _,el in data.iterrows()]
-    x = [[el.s,el.fs,el.cmu_phones] for _,el in data.iterrows()]
+    # x = [[el.s,el.fs,el.phones] for _,el in data.iterrows()]
+    x = [[el.s,el.fs,el.phones] for _,el in data.iterrows()]
     preds = model.predict(x[:3])
 
     # phoneme predictions on a single audio sample with forced alignment
@@ -517,7 +517,7 @@ if __name__ == '__main__':
     s_list = data.s.tolist()
     fs_list = data.fs.tolist()
     forced_aligner = dtw_forced_aligner('cmu') 
-    target_phonemes_list = data.cmu_phones.tolist()
+    target_phonemes_list = data.phones.tolist()
     # target_phonemes_list = [remove_stress_annots(i) for i in target_phonemes_list]
     phone_prob_matrix_list = [classe.predict_phone_prob_matrix(s, fs) for s,fs in zip(s_list, fs_list)]
     cost_nonsil_list = [forced_aligner.get_cost_non_sil(ppb)[0] for ppb in phone_prob_matrix_list]
