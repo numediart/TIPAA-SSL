@@ -97,26 +97,25 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         max_proba_mean_phones_audio=[self.charsiu_processor.mapping_id2phone(int(i)) for i in idx_mean_maxs]        
         
         df_segmented=pd.DataFrame(alignment_phones)
-        df_segmented.columns=['start','end','cmu_phones']
+        df_segmented.columns=['start','end','phones']
         df_segmented.loc[:,'pred_phones_audio']=max_proba_mean_phones_audio
         df_segmented.loc[:,'proba_means']=proba_means
         p_to_id=lambda p: self.charsiu_processor.mapping_phone2id(p)
         
-        df_segmented['GT_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.cmu_phones)], axis=1)
+        df_segmented['GT_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.phones)], axis=1)
         df_segmented['pred_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.pred_phones_audio)], axis=1)
         
         def divide_consecutive_duplicates(p_df, phone_list):
             grouped_phone_list=group_consecutive_duplicates(phone_list)
-            duplicate_indexes=[i for i,el in enumerate(grouped_phone_list) if el[-1]>1]
             n_times=[el[-1] for i,el in enumerate(grouped_phone_list)]
 
             p_df['n_times']=n_times
             p_df_full=p_df.loc[p_df.index.repeat(p_df.n_times)]
             p_df_full=p_df_full.reset_index()
 
-            blocks=get_blocks(p_df_full, ['cmu_phones'])
+            blocks=get_blocks(p_df_full, ['phones'])
             
-            block_starts_ends=keep_first_last(blocks.cmu_phones)
+            block_starts_ends=keep_first_last(blocks.phones)
             # keep firsts and lasts (thus only when there is two consecutive phonemes)
             starts=block_starts_ends.loc[block_starts_ends.shift(-1) == block_starts_ends].index.tolist()
             ends=block_starts_ends.loc[block_starts_ends.shift(+1) == block_starts_ends].index.tolist()
@@ -139,8 +138,9 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             df=df.reset_index(drop=True)
             blocks=[]
 
-            groups=df.groupby([(df.cmu_phones != df.cmu_phones.shift()).cumsum()])
-            for i, g in groups:#print('---');      print (g);         print (g.cmu_phones.tolist());r=g.iloc[0];   r.end=g.iloc[-1].end;   
+            groups=df.groupby([(df.phones != df.phones.shift()).cumsum()])
+            for i, g in groups:
+                #print('---');      print (g);         print (g.phones.tolist());r=g.iloc[0];   r.end=g.iloc[-1].end;   
                 r=g.iloc[0]
                 r.end=g.iloc[-1].end
                 blocks.append(r.to_dict())
@@ -150,7 +150,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             # drop silence, collapse consecutive duplicates (some are superfluous, 
             # e.g. phonemes interrupted by a silence), 
             # then divide interval for consecutive duplicate phonemes in the ground truth            
-            df_segmented2=df_segmented[df_segmented.cmu_phones != '[SIL]']
+            df_segmented2=df_segmented[df_segmented.phones != '[SIL]']
             # collapse_consecutive_duplicates(df_segmented)
             df_segmented2=collapse_consecutive_duplicates(df_segmented2)
 
@@ -161,7 +161,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             # import pdb;pdb.set_trace()
             raise "error in collapse or divide consecutive duplicates"
         
-        if df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
+        if df_segmented[df_segmented.phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
             self.status="success"
         else:
             self.status="success: the phrase was not recognized in expected phonemes"
@@ -253,7 +253,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         # merge lists
         phones=sum(phonetics,[])
         alignment_phones, df_segmented, phonetic_content = self.align_phones(audio=audio,phones=phones)
-        df_segmented=df_segmented[df_segmented.cmu_phones != '[SIL]']
+        df_segmented=df_segmented[df_segmented.phones != '[SIL]']
         # if phones contains twice the same phone, e.g. "PhiliP Paints well", both P will be collapsed when computing the timings from DTW.
         # this results in a df_segmented shorter than "phones" list. I thus have to duplicate the corresponding row when it happens
         if len(phones)>len(df_segmented):
@@ -328,7 +328,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         _, df_segmented, _ = self.align_phones(audio=audio,phones=split_phonetics)
 
         # select vowels
-        filtered_df=df_segmented[df_segmented.cmu_phones.isin(cmu_vowels)]#.index.tolist()
+        filtered_df=df_segmented[df_segmented.phones.isin(cmu_vowels)]#.index.tolist()
 
         f0Samples=getIntonation(audio, self.sr)
         intensity=getIntensity(audio, self.sr)
@@ -384,7 +384,7 @@ if __name__=="__main__":
     # initialize model
     charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     df_t, df=libri_phonetics_data(data_set='dev-clean')
-    df_cmu_phones=df_t.apply(lambda r: pd.DataFrame.from_records(r.phone_df).cmu_phone.tolist(), axis=1)
+    df_phones=df_t.apply(lambda r: pd.DataFrame.from_records(r.phone_df).cmu_phone.tolist(), axis=1)
 
     # actor recordings
     df=pd.read_csv('data/exercise_data_export.csv')
@@ -407,8 +407,8 @@ if __name__=="__main__":
     split_phonetics=sum([p.replace('|','_').split('_') for p in phonetics.split(' ')],[])
     # phones=[[p] for p in  remove_stress_annots(split_phonetics)]
     _, df_segmented, phonetic_content = charsiu.align_phones(audio=s,phones=split_phonetics)
-    df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.median()
-    df_segmented[df_segmented.cmu_phones!='[SIL]'].GT_proba.mean()
+    df_segmented[df_segmented.phones!='[SIL]'].GT_proba.median()
+    df_segmented[df_segmented.phones!='[SIL]'].GT_proba.mean()
 
     df_word=charsiu.predict_word(s, [split_phonetics], 0) 
     p_idx_global=-1
@@ -454,23 +454,23 @@ if __name__=="__main__":
     example=df.iloc[N]
     path=example.wav_path
     print(example.phones)
-    example['cmu_phones']=df_cmu_phones.iloc[N]
+    example['phones']=df_phones.iloc[N]
     # Loas an audio file
     s,fs=librosa.load(path, sr=16000)
 
     alignment = charsiu.align(audio=path,text=example.text)
     print(alignment)
     # _, df_segmented, _ = charsiu.align_phones(audio=s,phones=phones)
-    # df_segmented=charsiu.force_and_predict(s,example.cmu_phones)
-    df_segmented=df_segmented[df_segmented.cmu_phones != '[SIL]']
+    # df_segmented=charsiu.force_and_predict(s,example.phones)
+    df_segmented=df_segmented[df_segmented.phones != '[SIL]']
 
     # charsiu.compute_stress_score
 
-    df_segmented[df_segmented.cmu_phones!=df_segmented.pred_phones_audio]
+    df_segmented[df_segmented.phones!=df_segmented.pred_phones_audio]
 
     # ws=compute_stress_score(df_segmented, s, fs)
 
-    charsiu.compute_stress_score(s,example.cmu_phones)
+    charsiu.compute_stress_score(s,example.phones)
 
     path_to_json='/data/audio-with-analysis-ids/data.json'
     d=pd.read_json(path_to_json)
