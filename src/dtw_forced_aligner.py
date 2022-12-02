@@ -85,14 +85,14 @@ class dtw_forced_aligner:
                     grouped_aligned_preds[i] = x_2
                     grouped_aligned_preds.insert(i, x_1)
 
-        probs_means = []
+        proba_means = []
         for phon in grouped_aligned_preds:
-            probs_means.append(np.median([l[1] for l in phon], axis=0))
+            proba_means.append(np.median([l[1] for l in phon], axis=0))
 
-        predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in probs_means]
-        return predicted_phones, probs_means
+        predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in proba_means]
+        return predicted_phones, proba_means
 
-    def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, probs_means, fs=16000, time_per_output=0.02):
+    def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, proba_means, fs=16000, time_per_output=0.02):
 
         start_idx = []
         end_idx = []
@@ -115,8 +115,8 @@ class dtw_forced_aligner:
         df_segmented = pd.DataFrame()
         df_segmented[['phones', 'start_idx', 'end_idx']]=timings_df
         df_segmented['pred_phones_audio'] = predicted_phones
-        df_segmented['probs_means'] = probs_means
-        df_segmented['GT_proba'] = [df_segmented.probs_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
+        df_segmented['proba_means'] = proba_means
+        df_segmented['GT_proba'] = [df_segmented.proba_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
         df_segmented['start']=df_segmented['start_idx']*time_per_output
         df_segmented['end']=df_segmented['end_idx']*time_per_output
 
@@ -176,7 +176,7 @@ class dtw_forced_aligner:
             alignment_with_silence = self.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
         else:
             alignment_with_silence = aligned_phones
-        predicted_phones, probs_means = self.predict(aligned_phones, cost_nonsil, target_phonemes)
-        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, probs_means, fs=fs, time_per_output=time_per_output)
+        predicted_phones, proba_means = self.predict(aligned_phones, cost_nonsil, target_phonemes)
+        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, proba_means, fs=fs, time_per_output=time_per_output)
 
         return df_segmented

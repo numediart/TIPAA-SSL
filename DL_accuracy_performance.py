@@ -114,7 +114,7 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=default_model, bas
         p_idx=p_to_id(target)
         plt.cla()
         for v in cmu_vowels:
-            l=all_phones_df[all_phones_df.phones==v].apply(lambda r: r.probs_means[p_idx], axis=1)
+            l=all_phones_df[all_phones_df.phones==v].apply(lambda r: r.proba_means[p_idx], axis=1)
             if len(l)>0:
                 x,y=distrib(l)
                 if y[0]<10 or v==target:
@@ -137,10 +137,10 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=default_model, bas
     plt.plot(x, kde1_x)
     plt.savefig('gkde.png')
 
-    try:
-        p_to_id=lambda p: model.charsiu_processor.mapping_phone2id(p)
-    except:
-        p_to_id=lambda p: model.p_to_id[p]
+    # try:
+    #     p_to_id=lambda p: model.charsiu_processor.mapping_phone2id(p)
+    # except:
+    p_to_id=lambda p: model.p_to_id[p]
     # target='IH'
 
     for v in cmu_vowels:

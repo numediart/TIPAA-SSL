@@ -149,7 +149,7 @@ class Wav2Vec2ForFrameGMMAssignment:
         phone_prob_matrix = self.predict_phone_prob_matrix(s, fs)
         cost_nonsil, _, _ = self.forced_aligner.get_cost_non_sil(phone_prob_matrix)
         aligned_phones = self.forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
-        predicted_phones, probs_means = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
+        predicted_phones, proba_means = self.forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
         self.pred_phones_audio = predicted_phones
         return predicted_phones
 
@@ -211,9 +211,9 @@ class Wav2Vec2ForFrameGMMAssignment:
 
             # #phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
             phoneme_set_ids=self.forced_aligner.labelize_phonemes(phoneme_set)
-            proba_means=df_word.iloc[p_idx_global].probs_means
+            proba_means=df_word.iloc[p_idx_global].proba_means
 
-            # df_word['GT_proba'] = [df_word.probs_means[i][j] for i,j in zip(range(len(df_word)), self.forced_aligner.labelize_phonemes(df_word.phones))]
+            # df_word['GT_proba'] = [df_word.proba_means[i][j] for i,j in zip(range(len(df_word)), self.forced_aligner.labelize_phonemes(df_word.phones))]
 
             # if GT_proba is beyond the threshold, we take it as prediction
             if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:

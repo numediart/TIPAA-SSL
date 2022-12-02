@@ -221,9 +221,9 @@ class Wav2Vec2ForFramePrediction:
 
             # #phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
             phoneme_set_ids=self.forced_aligner.labelize_phonemes(phoneme_set)
-            proba_means=df_word.iloc[p_idx_global].probs_means
+            proba_means=df_word.iloc[p_idx_global].proba_means
 
-            # df_word['GT_proba'] = [df_word.probs_means[i][j] for i,j in zip(range(len(df_word)), self.forced_aligner.labelize_phonemes(df_word.phones))]
+            # df_word['GT_proba'] = [df_word.proba_means[i][j] for i,j in zip(range(len(df_word)), self.forced_aligner.labelize_phonemes(df_word.phones))]
 
             # if GT_proba is beyond the threshold, we take it as prediction
             if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
