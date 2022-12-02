@@ -10,15 +10,15 @@ import ast
 import librosa
 from collections import Counter
 
-from src.label_data_processing import build_user_data_df, get_errors_examples
+from src.label_data_processing import build_user_data_df
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, default_model
 from src.audio_processing import prepare_audio_file
 
-from src.label_data_processing import target_to_alternatives, get_sentenceStress_annotation, get_data_new_content, get_data, actor_recordings, final_s_artificial_data, synth_words_data
+from src.label_data_processing import actor_recordings, final_s_artificial_data, synth_words_data
 from src.text_processing import *
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_phones
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
 from src.libri_phonetization_data import *
 
@@ -162,25 +162,25 @@ def syllable_contrast_for_actor_recordings(model=default_model):
     df_v=df_pContrast[~df_pContrast.target_phoneme.isin(eds)]
     df_ed=df_pContrast[df_pContrast.target_phoneme.isin(eds)]
 
-    np.histogram(all_phones_df[all_phones_df.cmu_phones=="IY"].GT_proba)
+    np.histogram(all_phones_df[all_phones_df.phones=="IY"].GT_proba)
 
-    s=all_phones_df[all_phones_df.cmu_phones=="IY"]
+    s=all_phones_df[all_phones_df.phones=="IY"]
     s[(s.GT_proba>0.2)&(s.GT_proba<0.5)]
 
 
 
     
-    np.histogram(all_phones_df[all_phones_df.cmu_phones=="EH"].GT_proba)
-    np.histogram(all_phones_df[all_phones_df.cmu_phones=="IH"].GT_proba)
-    np.histogram(all_phones_df[all_phones_df.cmu_phones=="IY"].GT_proba)
+    np.histogram(all_phones_df[all_phones_df.phones=="EH"].GT_proba)
+    np.histogram(all_phones_df[all_phones_df.phones=="IH"].GT_proba)
+    np.histogram(all_phones_df[all_phones_df.phones=="IY"].GT_proba)
 
-    np.histogram(all_phones_df[all_phones_df.cmu_phones=="AA"].GT_proba)
-    np.histogram(all_phones_df[(all_phones_df.cmu_phones=="AA")&(all_phones_df.pred_phones_audio=="AO")].pred_proba)
+    np.histogram(all_phones_df[all_phones_df.phones=="AA"].GT_proba)
+    np.histogram(all_phones_df[(all_phones_df.phones=="AA")&(all_phones_df.pred_phones_audio=="AO")].pred_proba)
 
-    np.histogram(all_phones_df[all_phones_df.cmu_phones=="AO"].GT_proba)
-    np.histogram(all_phones_df[(all_phones_df.cmu_phones=="AO")&(all_phones_df.pred_phones_audio=="AA")].pred_proba)
+    np.histogram(all_phones_df[all_phones_df.phones=="AO"].GT_proba)
+    np.histogram(all_phones_df[(all_phones_df.phones=="AO")&(all_phones_df.pred_phones_audio=="AA")].pred_proba)
 
-    np.histogram(all_phones_df[all_phones_df.cmu_phones=="OW"].GT_proba)
+    np.histogram(all_phones_df[all_phones_df.phones=="OW"].GT_proba)
 
     correct_proba_means=pd.DataFrame(correct_proba_means).T
     correct_proba_means.columns=['N','target proba']
@@ -237,9 +237,9 @@ def syllable_contrast_for_actor_recordings(model=default_model):
     mismatch_proba_medians=pd.DataFrame(mismatch_proba_medians).T
     mismatch_proba_medians.columns=['N','target proba']
 
-    match_rate=1-len(pred_df[pred_df.cmu_phones!=pred_df.pred_phones_audio])/len(pred_df)
+    match_rate=1-len(pred_df[pred_df.phones!=pred_df.pred_phones_audio])/len(pred_df)
     pred_df=pred_df[pred_df.pred_phones_audio!='[SIL]']
-    match_rate=1-len(pred_df[pred_df.cmu_phones!=pred_df.pred_phones_audio])/len(pred_df)
+    match_rate=1-len(pred_df[pred_df.phones!=pred_df.pred_phones_audio])/len(pred_df)
 
     
     # an example of underlying align_phones
