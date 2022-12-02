@@ -1,7 +1,7 @@
 from scipy.io.wavfile import  read
 import numpy as np
 import pandas as pd
-from src.audio_processing import getIntonation, read_audio_string
+from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
 import soundfile as sf
 import io
 from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
@@ -50,11 +50,12 @@ terminations_accepted_alternatives={
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
     """Load audio with 2 modes: from a "file" or from "base64" encoding
     Then check duration to see if it's plausible
+    
+    I first detect if the audio is too short to have a realistic speech rate
+        https://www.science.org/doi/10.1126/sciadv.aaw2594
+    https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
+    Speech rate is always between 5 and 8 syl/second
     """
-    # I first detect if the audio is too short to have a realistic speech rate
-    #     https://www.science.org/doi/10.1126/sciadv.aaw2594
-    # https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
-    # Speech rate is always between 5 and 8 syl/second
     n_syllables_tot=sum([len(el.split('|')) for el in phonetics.split(' ')])
 
     if mode=='file':
@@ -72,14 +73,11 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
             s=s/32767
         except FileNotFoundError:
             return "error: audio file not found", None
-    elif mode=='base64':
-        s, fs= read_audio_string(audio, fs=fs)
+    elif (mode=='base64' or mode=='bytes'):
+        if mode=='base64': s, fs= read_audio_string(audio, fs=fs)
+        elif mode=='bytes': s, fs= read_audio_bytes(audio, fs=fs)
 
-        # decode_string = base64.b64decode(audio)
-        # s,_=sf.read(io.BytesIO(decode_string))
-        # if len(s)==0:  return "success: audio is empty (has zero sample)", None
-        # s,fs=librosa.load(io.BytesIO(decode_string), sr=fs)
-
+        if len(s)==0:  return "success: audio is empty (has zero sample)", None
         duration=len(s) / fs
         speech_rate=n_syllables_tot/duration
         if speech_rate>max_speech_rate: 

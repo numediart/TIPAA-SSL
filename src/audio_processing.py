@@ -4,15 +4,23 @@ import numpy as np
 import librosa
 import pytsmod as tsm
 
+from soundfile import LibsndfileError
+from pydub import AudioSegment
+import io
+import array
+from pydub import AudioSegment
+from pydub.utils import get_array_type
+
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
-from src.DL_audio_processing import melgan_analysis_synthesis, speech_enhancement
+from src.DL_audio_processing import speech_enhancement
 from scipy.interpolate import interp1d
 import uuid
 from scipy.io.wavfile import write, read
 import os
 import base64
 import io
+
 def load_audio(waveFileAddress, fs=16000):
     """Load audio, remove DC and normalize waveform
     speech_correction refers to the use of MetricGAN+. A speech enhancement system based on an adversarial loss and PESQ/STOI metrics 
@@ -59,8 +67,7 @@ def getf0Samples(s, fs):
     Returns:
         numpy array: upsampled f0 contour in semitones
     """
-    #  the /2**15  is for converting 16bit PCM to double between -1 and 1
-    f0, sp, ap = pw.wav2world(s.astype(np.float64)/2**15, fs)
+    f0, sp, ap = pw.wav2world(s.astype(np.float64), fs)
 
     f0+=10**-10 #to avoid zeros going in the log, add a tiny number
 
@@ -121,8 +128,7 @@ def getIntensity(s, fs):
     analysis_win = round((3.2/minimum_pitch)*fs)
 
     # smoothing the signal power using a moving average
-    #  the /2**15  is for converting 16bit PCM to double between -1 and 1
-    intensity=smooth((s/2**15)**2, 20, 2*analysis_win)
+    intensity=smooth((s)**2, 20, 2*analysis_win)
 
     # convert in db
     intensity /= 4.0e-10
@@ -239,15 +245,9 @@ def align_audios(
 
 
 
-from soundfile import LibsndfileError
-from pydub import AudioSegment
-import io
-import array
-from pydub import AudioSegment
-from pydub.utils import get_array_type
-def read_audio_string(encoded_string, fs=16000):
+
+def read_audio_bytes(audio_bytes, fs=16000):
     """
-    -decodes base64, 
     -put into a file-like object with "io", 
     -then read that with "soundfile" when possible, else with "pydub"
     -resample to fs
@@ -256,11 +256,10 @@ def read_audio_string(encoded_string, fs=16000):
     https://stackoverflow.com/questions/55352789/how-can-i-convert-any-random-byte-string-to-a-playable-mp3-file-in-python3-6
     https://stackoverflow.com/questions/32373996/pydub-raw-audio-data
     """
-    decoded_string = base64.b64decode(encoded_string)
     try:
-        s,orig_sr=sf.read(io.BytesIO(decoded_string))
+        s,orig_sr=sf.read(io.BytesIO(audio_bytes))
     except LibsndfileError:
-        audio = AudioSegment.from_file(io.BytesIO(decoded_string))#, format="m4a")
+        audio = AudioSegment.from_file(io.BytesIO(audio_bytes))#, format="m4a")
         # audio = AudioSegment.from_file(path, format="m4a")
 
         bit_depth = audio.sample_width * 8
@@ -268,10 +267,22 @@ def read_audio_string(encoded_string, fs=16000):
         numeric_array = array.array(array_type, audio._data)
         s=np.array(numeric_array)/2**15
         orig_sr=audio.frame_rate
-    
+
+    if len(s)==0:  return s,fs
     new_s=librosa.resample(s, orig_sr=orig_sr, target_sr=fs)
 
     return new_s, fs
+
+
+def read_audio_string(encoded_string, fs=16000):
+    """
+    -decodes base64, 
+    -call read_audio_bytes
+    """
+    audio_bytes=base64.b64decode(encoded_string)
+    s, fs=read_audio_bytes(audio_bytes, fs=fs)
+
+    return s, fs
 
 
 # def test_m4a(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'):

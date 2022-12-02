@@ -36,3 +36,4 @@ requests_toolbelt
 # hdbscan
 linetimer
 pydub
+flask-smorest

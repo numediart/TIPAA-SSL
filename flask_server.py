@@ -1,4 +1,4 @@
-from flask_apispec.extension import FlaskApiSpec
+# from flask_apispec.extension import FlaskApiSpec
 from app_definition import app
 
 # https://stackoverflow.com/questions/61444572/ignore-all-warnings-from-a-module
@@ -18,28 +18,39 @@ pd.options.mode.chained_assignment = None  # default='warn'
 # https://marshmallow.readthedocs.io/en/stable/quickstart.html#declaring-schemas
 
 # import routes of different parts of the server
-# from server.prefill import *
-# from server.prefill import bp as prefill_bp
+from server.prefill import *
+from server.prefill import bp as prefill_bp
 # from server.upload import *
 # from server.upload import bp as upload_bp
 
 from server.DL_modules_v2 import *
 from server.DL_modules_v2 import bp as DL_modules_bp2
 
+
+from server.DL_modules_v2_mp import *
+from server.DL_modules_v2_mp import bp as DL_modules_bp2_mp
+
+
+from flask_smorest import Api, Blueprint, abort
+
+
 # app.register_blueprint(upload_bp, url_prefix='/')
 # app.register_blueprint(prefill_bp, url_prefix='/')
 
-# app.register_blueprint(prefill_bp)
-app.register_blueprint(DL_modules_bp2, url_prefix='/v2')
+api = Api(app)
+
+api.register_blueprint(prefill_bp)
+api.register_blueprint(DL_modules_bp2, url_prefix='/v2')
+api.register_blueprint(DL_modules_bp2_mp, url_prefix='/v2_mp')
 
 if False:
     from server.demo import *
 
 debug=True
 def run_app():
-    app.run(debug=debug, host='0.0.0.0', port=8000)
+    app.run(debug=debug, host='0.0.0.0', port=8001)
 
-if True:
+if False:
     # https://github.com/jmcarp/flask-apispec/issues/16
     # use blueprints with flask apispec
 

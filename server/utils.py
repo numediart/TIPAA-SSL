@@ -10,6 +10,7 @@ from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 from flask import Response
 from src.audio_processing import audio64_from_file
 
+from marshmallow import fields, Schema, EXCLUDE
 
 
 success_messages={
@@ -39,9 +40,6 @@ request_errors={
 base_response_dict={   "error":fields.Boolean(),
         "detected": fields.Str(),
         "status": fields.Str() }
-# stress_response_dict=base_response_dict
-# stress_response_dict["stress_intensities"]=fields.List(fields.Integer)
-# stress_response_dict["stress_binaries"]=fields.List(fields.Integer)
 
 stress_response_dict=base_response_dict
 stress_response_dict["stress_intensities"]=fields.List(fields.List(fields.Integer))
@@ -79,15 +77,36 @@ def define_detected_flag(status):
     else: flag = "nospeech"
     return flag
 
-# def define_error_bool(status):
-#     if "error:" in status: err = True
-#     else: err = False
-#     return err
+
+
+from io import _io
+def kwargs_def(example):
+    params={}
+    for prop in example:
+        type_dict={
+                str : fields.String( example=example[prop]), 
+                int: fields.Integer( example=example[prop]), 
+                list: fields.List(fields.Str(), example=example[prop]),
+                _io.BytesIO: fields.Raw(type='file', required=True),  # https://stackoverflow.com/questions/59642902/how-to-handle-file-upload-validations-using-flask-marshmallow
+                _io.BufferedReader: fields.Raw(type='file', required=True) 
+            }
+        param_type = type_dict[type(example[prop])]
+        params[prop]=param_type
+    return params
+
+def check_schema(d, params):
+    # https://marshmallow.readthedocs.io/en/stable/api_reference.html  -> look for "from_dict"
+    input_schema=Schema.from_dict(params)
+    my_input_schema = input_schema(unknown=EXCLUDE)
+    errors = my_input_schema.validate(d)
+    if errors:
+        return str(errors)
 
 
 
 def default_example():
-    audio64=audio64_from_file("data/audio_recordings/M1_two-hundred-dollars-way-too-expensive.mp3")
+    path="data/audio_recordings/M1_two-hundred-dollars-way-too-expensive.mp3"
+    audio64=audio64_from_file(path)
     text="*Two* hundred *dollars*? That's *way* too expensive!"
     p='T_UW1 HH_AH1_N|D_R_AH0_D D_AA1|L_ER0_Z DH_AE1_T_S W_EY1 T_UW1 IH0_K_S|P_EH1_N|S_IH0_V'
     n_words_by_chunk=chunk_text(text)
@@ -101,6 +120,7 @@ def default_example():
         # "phonetics_chunks":json.dumps(chunks_p),
         "phonetics_chunks":chunks_p,
         "audio64":audio64.decode('utf-8'),
+        "audio":open(path,'rb'),
         "vowel_target":"AA1",
         "vowel_w_idx":2,
         "vowel_s_idx":0,
@@ -143,7 +163,7 @@ def access_property_error(content, property):
         return response
 
 
-audio_property_dict={'file':'rID', 'base64':'audio64'}
+audio_property_dict={'file':'rID', 'base64':'audio64', 'bytes':'audio'}
 
 def check_request(d, properties):
     for prop in properties:

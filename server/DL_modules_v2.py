@@ -1,36 +1,23 @@
 from flask import request
-from flask_apispec import marshal_with, doc, use_kwargs
-from flask import Response, Blueprint
+# from flask_apispec import marshal_with, doc, use_kwargs
+from flask import Response#, Blueprint
+from flask_smorest import Blueprint
+from flask.views import MethodView
 from marshmallow import fields, Schema, EXCLUDE
 
 import json
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
-from src.text_processing import check_phonemes, chunk_text, split_phonetics
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
 # from app_definition import app
-from server.utils import default_example, request_phoneme_contrast, request_syl_contrast, request_stress, request_stress_v2, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
+from server.utils import kwargs_def, check_schema, default_example, request_phoneme_contrast, request_syl_contrast, request_stress, request_stress_v2, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
 
-bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
+# bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
+
+bp = Blueprint("DL_modules_v2", "DL_modules_v2", url_prefix="/", description="DL_modules_v2")
+
 
 d=default_example()
-
-
-def kwargs_def(example):
-    params={}
-    for prop in example:
-        type_dict={str : fields.String(required=True, example=example[prop]), int: fields.Integer(required=True, example=example[prop]), list: fields.List(fields.Str(),required=True, example=example[prop])}
-        param_type = type_dict[type(example[prop])]
-        params[prop]=param_type
-    return params
-
-def check_schema(d, params):
-    # https://marshmallow.readthedocs.io/en/stable/api_reference.html  -> loof for "from_dict"
-    input_schema=Schema.from_dict(params)
-    my_input_schema = input_schema(unknown=EXCLUDE)
-    errors = my_input_schema.validate(d)
-    if errors:
-        return str(errors)
 
 
 import sys, traceback
@@ -58,97 +45,112 @@ def internal_error(error):
 
 example_sentence_stress={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
 sentence_stress_params=kwargs_def(example_sentence_stress)
-@doc(description='Detection of sentence stress', tags=['w2v_v2'])
-@use_kwargs(sentence_stress_params, location="json")
-@marshal_with(sentence_stress_responseSchema_v2, code=200)  # marshalling
+# @doc(description='Detection of sentence stress', tags=['w2v_v2'])
+# @use_kwargs(sentence_stress_params, location="json")
+# @marshal_with(200, sentence_stress_responseSchema_v2)  # marshalling
 @bp.route('/w2v/stress/sentence', methods=['POST'])
-def dl_sentence_stress_api_v2(**kwargs):
-    
-    # d = request.values.to_dict()
-    try:
-        d=json.loads(request.get_json())
-    except TypeError:
-        d=request.get_json()
-    global sentence_stress_params
-    err=check_schema(d, sentence_stress_params)
-    if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-    properties=["phonetics","audio64"]
-    return request_stress_v2(d, properties, "sentence", mode='base64')
+class dl_sentence_stress_api_v2(MethodView):
+    @bp.arguments(Schema.from_dict(sentence_stress_params), location="json")
+    @bp.response(200, sentence_stress_responseSchema_v2)
+    def post(self, data):
+        # d = request.values.to_dict()
+        try:
+            d=json.loads(request.get_json())
+        except TypeError:
+            d=request.get_json()
+        global sentence_stress_params
+        err=check_schema(d, sentence_stress_params)
+        if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
+        properties=["phonetics","audio64"]
+        return request_stress_v2(d, properties, "sentence", mode='base64')
+
 
 example_word_stress={"phonetics":d["phonetics_chunks"], "audio64": d["audio64"]}
 word_stress_params=kwargs_def(example_word_stress)
-@doc(description='Detection of word stress', tags=['w2v_v2'])
-@use_kwargs(word_stress_params, location="json")
-@marshal_with(word_stress_responseSchema_v2, code=200)  # marshalling
+# @doc(description='Detection of word stress', tags=['w2v_v2'])
+# @use_kwargs(word_stress_params, location="json")
+# @marshal_with(200, word_stress_responseSchema_v2)  # marshalling
 @bp.route('/w2v/stress/word', methods=['POST'])
-def dl_word_stress_api_v2(**kwargs):
-    # d = request.values.to_dict()
-    try:
-        d=json.loads(request.get_json())
-    except TypeError:
-        d=request.get_json()
-    global word_stress_params
-    err=check_schema(d, word_stress_params)
-    if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-    properties=["phonetics","audio64"]
-    return request_stress_v2(d, properties, "word", mode='base64')
+class dl_word_stress_api_v2(MethodView):
+    @bp.arguments(Schema.from_dict(word_stress_params), location="json")
+    @bp.response(200, word_stress_responseSchema_v2)
+    def post(self, data):
+        # d = request.values.to_dict()
+        try:
+            d=json.loads(request.get_json())
+        except TypeError:
+            d=request.get_json()
+        global word_stress_params
+        err=check_schema(d, word_stress_params)
+        if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
+        properties=["phonetics","audio64"]
+        return request_stress_v2(d, properties, "word", mode='base64')
 
 example_vowel_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["vowel_w_idx"],"target":d["vowel_target"],"syl_idx":d["vowel_s_idx"]}
 vowel_contrast_params=kwargs_def(example_vowel_contrast)
-@doc(description='Vowel contrast', tags=['w2v_v2'])
-@use_kwargs(vowel_contrast_params, location="json")
-@marshal_with(contrast_responseSchema, code=200)  # marshalling
+# @doc(description='Vowel contrast', tags=['w2v_v2'])
+# @use_kwargs(vowel_contrast_params, location="json")
+# @marshal_with(200, contrast_responseSchema)  # marshalling
 @bp.route('/w2v/contrast/vowel', methods=['POST'])
-def dl_vowel_contrast_api_v2(**kwargs):
-    # d = request.values.to_dict()
-    try:
-        d=json.loads(request.get_json())
-    except TypeError:
-        d=request.get_json()
-    global vowel_contrast_params
-    err=check_schema(d, vowel_contrast_params)
-    if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-    properties=["phonetics","audio64","word_idx","target","syl_idx"]
-    return request_phoneme_contrast(d, properties, mode='base64')
+class dl_vowel_contrast_api_v2(MethodView):
+    @bp.arguments(Schema.from_dict(vowel_contrast_params), location="json")
+    @bp.response(200, contrast_responseSchema)
+    def post(self, data):
+        # d = request.values.to_dict()
+        try:
+            d=json.loads(request.get_json())
+        except TypeError:
+            d=request.get_json()
+        global vowel_contrast_params
+        err=check_schema(d, vowel_contrast_params)
+        if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
+        properties=["phonetics","audio64","word_idx","target","syl_idx"]
+        return request_phoneme_contrast(d, properties, mode='base64')
 
 
 example_consonant_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["consonant_w_idx"],"target":d["consonant_target"],"syl_idx":d["consonant_s_idx"], "target_occurence_idx":d["consonant_target_occurence_idx"]}
 consonant_contrast_params=kwargs_def(example_consonant_contrast)
-@doc(description='Consonant contrast', tags=['w2v_v2'])
-@use_kwargs(consonant_contrast_params, location="json")
-@marshal_with(contrast_responseSchema, code=200)  # marshalling
+# @doc(description='Consonant contrast', tags=['w2v_v2'])
+# @use_kwargs(consonant_contrast_params, location="json")
+# @marshal_with(200, contrast_responseSchema)  # marshalling
 @bp.route('/w2v/contrast/consonant', methods=['POST'])
-def dl_consonant_contrast_api_v2(**kwargs):
-    # d = request.values.to_dict()
-    try:
-        d=json.loads(request.get_json())
-    except TypeError:
-        d=request.get_json()
-    global consonant_contrast_params
-    err=check_schema(d, consonant_contrast_params)
-    if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-    properties=["phonetics","audio64","word_idx","target","syl_idx", "target_occurence_idx"]
-    target_occurence_idx=int(d['target_occurence_idx'])
-    return request_phoneme_contrast(d, properties, target_occurence_idx, alternatives=cmu_consonants, mode='base64')
+class dl_consonant_contrast_api_v2(MethodView):
+    @bp.arguments(Schema.from_dict(consonant_contrast_params), location="json")
+    @bp.response(200, contrast_responseSchema)
+    def post(self, data):
+        # d = request.values.to_dict()
+        try:
+            d=json.loads(request.get_json())
+        except TypeError:
+            d=request.get_json()
+        global consonant_contrast_params
+        err=check_schema(d, consonant_contrast_params)
+        if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
+        properties=["phonetics","audio64","word_idx","target","syl_idx", "target_occurence_idx"]
+        target_occurence_idx=int(d['target_occurence_idx'])
+        return request_phoneme_contrast(d, properties, target_occurence_idx, alternatives=cmu_consonants, mode='base64')
 
 
 example_termination_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"target":d["termination_target"],"word_idx":d["termination_w_idx"]}
 termination_contrast_params=kwargs_def(example_termination_contrast)
-@doc(description='Termination contrast', tags=['w2v_v2'])
-@use_kwargs(termination_contrast_params, location="json")
-@marshal_with(contrast_responseSchema, code=200)  # marshalling
+# @doc(description='Termination contrast', tags=['w2v_v2'])
+# @use_kwargs(termination_contrast_params, location="json")
+# @marshal_with(200, contrast_responseSchema)  # marshalling
 @bp.route('/w2v/contrast/termination', methods=['POST'])
-def dl_termination_contrast_api_v2(**kwargs):
-    # d = request.values.to_dict()
-    try:
-        d=json.loads(request.get_json())
-    except TypeError:
-        d=request.get_json()
-    global termination_contrast_params
-    err=check_schema(d, termination_contrast_params)
-    if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-    properties=["phonetics","audio64","word_idx","target"]
-    return request_phoneme_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='base64')
+class dl_termination_contrast_api_v2(MethodView):
+    @bp.arguments(Schema.from_dict(termination_contrast_params), location="json")
+    @bp.response(200, contrast_responseSchema)
+    def post(self, data):
+        # d = request.values.to_dict()
+        try:
+            d=json.loads(request.get_json())
+        except TypeError:
+            d=request.get_json()
+        global termination_contrast_params
+        err=check_schema(d, termination_contrast_params)
+        if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
+        properties=["phonetics","audio64","word_idx","target"]
+        return request_phoneme_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='base64')
 
 if False:
     example_syllable_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termination_w_idx"],"syl_idx":1}
@@ -168,53 +170,3 @@ if False:
         if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
         properties=["phonetics","audio64","word_idx","syl_idx"]
         return request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='base64')
-
-
-if False:
-    upload_path="./upload_files/"
-    @bp.route('/upload', methods=['POST'])
-    def upload_file():
-        # import pdb;pdb.set_trace()
-        print(requests.__dict__)
-        try:
-            uploaded_file = request.files['file']
-        except:
-            return Response(
-                "error: could not access request.files['file']",
-                status=400,
-                mimetype="application/json"
-            )
-        if uploaded_file.filename != '':
-            try:
-                uploaded_file.save(upload_path+uploaded_file.filename)
-            except:
-                return Response(
-                    "error: could not save uploaded file",
-                    status=500,
-                    mimetype="application/json"
-                )
-            try:
-                # import pdb;pdb.set_trace()
-                status_conversion, rID = prepare_audio_file(upload_path+uploaded_file.filename)
-                print(rID)
-            except:
-                return Response(
-                    "error: could not convert uploaded file",
-                    status=500,
-                    mimetype="application/json"
-                )
-            try:
-                os.remove(upload_path+uploaded_file.filename)
-            except:
-                return Response(
-                    "error: could not remove uploaded file",
-                    status=500,
-                    mimetype="application/json"
-                )
-        else:
-            return Response(
-                    "error: filename is empty",
-                    status=400,
-                    mimetype="application/json"
-                )
-        return rID
