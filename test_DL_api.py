@@ -1,5 +1,4 @@
 from flask_server import app
-import os
 import ast
 from tqdm import tqdm
 import pandas as pd
@@ -15,7 +14,9 @@ from src.label_data_processing import build_user_data_df
 exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
 from src.audio_processing import audio64_from_file
-from src.text_processing import get_chunks, chunk_text
+from src.text_processing import chunk_text
+
+import base64
 
 def call_prefill_for_sentence(sentence, mode="CMU", lang="en_US", base_url = 'http://localhost:8000', client=app.test_client()):
     url=base_url+"/prefill_from_phrase"
@@ -51,7 +52,7 @@ def a_test_prefill(base_url = 'http://localhost:8000', client=app.test_client())
 
     return d
 
-def prefill_content_phrases(path="data/SE_content_all_phrases_10_20_2022_14_51_13.csv", path_db_export="data/query_results-2022-08-31_101957.csv"):
+def prefill_content_phrases(path="data/SE_content_all_phrases_10_20_2022_13_26_29.csv", path_db_export="data/query_results-2022-10-26_75652.csv"):
     all_sentences=pd.read_csv(path)
     db_export=pd.read_csv(path_db_export)
 
@@ -86,7 +87,7 @@ def prefill_content_phrases(path="data/SE_content_all_phrases_10_20_2022_14_51_1
     print(all_sentences.iloc[idxs_errors])
 
     phonetics_data=pd.DataFrame.from_records(records)
-    phonetics_data['text']=all_sentences['sentence']
+    # phonetics_data['text']=all_sentences['sentence']
     # look at error rows
     print(phonetics_data[phonetics_data.index.isin(ids_errors)])
     # drop error rows
@@ -131,7 +132,7 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
             # based on :
             # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
             encode_string = base64.b64encode(open(path, "rb").read())
-            res = client.post(base_url+"/send_base64_audio", data={"audio":encode_string, "API_KEY":"ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"})
+            res = client.post(base_url+"/send_base64_audio", data={"audio64":encode_string, "API_KEY":"ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"})
 
             # This is for compatibility between requests module and flask's test_client
             if client==requests: res.data=res._content
@@ -400,7 +401,7 @@ if __name__ == '__main__':
             'phonetics': 'bar',
             # plain file object, no filename or mime type produces a
             # Content-Disposition header with just the part name
-            'audio': ('temp.ogg', open('data/temp.ogg', 'wb'), 'audio/ogg'),
+            'audio64': ('temp.ogg', open('data/temp.ogg', 'wb'), 'audio/ogg'),
         }
     )
 
