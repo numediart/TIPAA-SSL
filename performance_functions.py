@@ -29,15 +29,6 @@ import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 
 
-
-
-# from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-# from sklearn.neighbors import KNeighborsClassifier
-# default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
-# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
-# default_model=pd.read_pickle('model_mailabs_pca_0.95_knn_10_w.pkl')
-
-
 def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
     # retrieve phonetics by word thanks to 'phonetics_fot_row'
     selection['split_phonetics']=selection.apply(lambda r: [p.split(' ') for p in phonetics_for_row(r, libri_words_df)], axis=1)
@@ -605,7 +596,7 @@ if __name__=="__main__":
         ds2_user.append(d)
 
 
-    sum(results_df.phonetic_detection==results_df2.phonetic_detection)/len(results_df)
+    # sum(results_df.phonetic_detection==results_df2.phonetic_detection)/len(results_df)
 
 
     
@@ -617,8 +608,8 @@ if __name__=="__main__":
     # data = load_test_dataset(df_t_test)
     
     from tqdm import tqdm
-    preds=[model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
-    preds2=[default_model.predict_with_timings(r.s, r.cmu_phones) for i,r in tqdm(data.iterrows())]
+    preds=[model.predict_with_timings(r.s, r.phones) for i,r in tqdm(data.iterrows())]
+    preds2=[default_model.predict_with_timings(r.s, r.phones) for i,r in tqdm(data.iterrows())]
     
     preds_df=pd.concat(preds)
     preds_df2=pd.concat(preds2)
