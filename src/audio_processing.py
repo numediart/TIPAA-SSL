@@ -268,6 +268,10 @@ def read_audio_bytes(audio_bytes, fs=16000):
         s=np.array(numeric_array)/2**15
         orig_sr=audio.frame_rate
 
+    # if the signal is a 2D array, we take the first channel only to have a 1D array
+    if len(s.shape)>1:
+        if s.shape[-1]==2: s=s[:,0]
+    # if len(s) is 0, stop here, don't try to resample it, it will throw an error
     if len(s)==0:  return s,fs
     new_s=librosa.resample(s, orig_sr=orig_sr, target_sr=fs)
 
@@ -281,7 +285,6 @@ def read_audio_string(encoded_string, fs=16000):
     """
     audio_bytes=base64.b64decode(encoded_string)
     s, fs=read_audio_bytes(audio_bytes, fs=fs)
-
     return s, fs
 
 
@@ -320,7 +323,13 @@ def read_audio_string(encoded_string, fs=16000):
 
 def audio64_from_file(path, fs=16000):
     # writing bytes of an ogg file with virtual io, then encoding with base64
-    s,fs=librosa.load(path, sr=fs)
+    try:
+        s,orig_sr=sf.read(path)
+        if len(s.shape)>1:
+            if s.shape[-1]==2: s=s[:,0]
+        s=librosa.resample(s, orig_sr=orig_sr, target_sr=fs)
+    except:
+        s,fs=librosa.load(path, sr=fs)
     with io.BytesIO() as fio:
         sf.write(fio, s, samplerate=fs, format='ogg')
         audio_string = fio.getvalue()
@@ -349,8 +358,6 @@ def test_audio_file_like():
     # url = "https://raw.githubusercontent.com/librosa/librosa/master/tests/data/test1_44100.wav"
     # url="https://filesamples.com/samples/audio/caf/sample3.caf"
     # url="https://filesamples.com/samples/audio/m4a/sample3.m4a"
-
-    
 
     import base64
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
