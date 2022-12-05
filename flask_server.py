@@ -6,13 +6,19 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
+# As my unit tests sometimes send dicts withmore info than necessary, I have to eclude unknown field, not raise en error
+# https://github.com/marshmallow-code/flask-smorest/issues/211
+from marshmallow import EXCLUDE
+from webargs.flaskparser import FlaskParser
+FlaskParser.DEFAULT_UNKNOWN_BY_LOCATION["files"] = EXCLUDE
+FlaskParser.DEFAULT_UNKNOWN_BY_LOCATION["form"] = EXCLUDE
+FlaskParser.DEFAULT_UNKNOWN_BY_LOCATION["json"] = EXCLUDE
+
 import pandas as pd
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
 
 # ===================== API with DOC =============
-
-# docs: https://flask-apispec.readthedocs.io/en/latest/usage.html#decorators
 
 # how to do a schema with a dict:
 # https://marshmallow.readthedocs.io/en/stable/quickstart.html#declaring-schemas
@@ -20,8 +26,6 @@ pd.options.mode.chained_assignment = None  # default='warn'
 # import routes of different parts of the server
 # from server.prefill import *
 # from server.prefill import bp as prefill_bp
-# from server.upload import *
-# from server.upload import bp as upload_bp
 
 from server.DL_modules_v2 import *
 from server.DL_modules_v2 import bp as DL_modules_bp2
@@ -31,20 +35,13 @@ from server.DL_modules_v2_mp import *
 from server.DL_modules_v2_mp import bp as DL_modules_bp2_mp
 
 
-from flask_smorest import Api, Blueprint, abort
-
-
-# app.register_blueprint(upload_bp, url_prefix='/')
-# app.register_blueprint(prefill_bp, url_prefix='/')
+from flask_smorest import Api
 
 api = Api(app)
 
 # api.register_blueprint(prefill_bp)
 api.register_blueprint(DL_modules_bp2, url_prefix='/v2')
 api.register_blueprint(DL_modules_bp2_mp, url_prefix='/v2_mp')
-
-if False:
-    from server.demo import *
 
 debug=True
 def run_app():
