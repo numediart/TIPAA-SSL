@@ -11,7 +11,7 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     gawk \
     curl \
     git \
-	make \
+	 make \
     cron \
     # These two are  necessary for pyworld library (f0 extraction)
     g++ \
@@ -36,7 +36,7 @@ RUN conda install ffmpeg && \
 
 COPY ./requirements.txt $HOME/requirements.txt
 # pip
-RUN pip install --upgrade pip && pip install pyworld && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install pyworld==0.3 && pip install -r requirements.txt
 
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000
