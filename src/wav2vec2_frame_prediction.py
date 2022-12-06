@@ -63,14 +63,6 @@ class Wav2Vec2ForFramePrediction:
         self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
         
-        # if reducer == "umap":
-        #     # parameters advised for clustering: https://umap-learn.readthedocs.io/en/latest/clustering.html
-        #     self.reducer = UMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
-        # elif reducer == "parametric_umap":
-        #     from umap.parametric_umap import ParametricUMAP
-        #     self.reducer = ParametricUMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
-        # elif reducer == "pca":
-        #     self.reducer = PCA(n_components=target_dim, random_state=42)
 
         self.reducer=reducer
         self.frame_classifier=frame_classifier
@@ -301,6 +293,16 @@ class Wav2Vec2ForFramePrediction:
 
 
 if __name__ == '__main__':
+
+    # backup different possible reducers
+    # if reducer == "umap":
+    #     # parameters advised for clustering: https://umap-learn.readthedocs.io/en/latest/clustering.html
+    #     self.reducer = UMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
+    # elif reducer == "parametric_umap":
+    #     from umap.parametric_umap import ParametricUMAP
+    #     self.reducer = ParametricUMAP(n_components=target_dim, n_neighbors=30, min_dist=0.0, random_state=42)
+    # elif reducer == "pca":
+    #     self.reducer = PCA(n_components=target_dim, random_state=42)
 
     from src.load_data import *
     # from src.wav2vec2_frame_prediction import *

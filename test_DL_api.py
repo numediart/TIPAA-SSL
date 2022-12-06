@@ -420,6 +420,10 @@ if __name__ == '__main__':
 
     test_actor_recordings(base_url = 'http://135.125.247.39:8000', client=requests, n_ex_by_module=10)
     test_stress_detection(base_url = 'http://135.125.247.39:8000', client=requests, n_ex_by_module=10)
+    
+    test_actor_recordings(base_url = 'http://34.77.240.102:8000', client=requests, n_ex_by_module=10)
+    test_stress_detection(base_url = 'http://34.77.240.102:8000', client=requests, n_ex_by_module=10)
+    
     r=test_actor_recordings()
     r=test_stress_detection()
 

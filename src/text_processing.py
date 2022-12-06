@@ -1,14 +1,10 @@
-
 import re
-import cmudict
 from tqdm import tqdm
 import pandas as pd
 from glob import glob
 import numpy as np
 import itertools
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
-import json
-import os
 from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
 from itertools import groupby
@@ -24,7 +20,7 @@ split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w 
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
 from src.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
-from src.syllables_processing import n_syl_SonoriPy, syllables_data, syllabified_text
+from src.syllables_processing import syllabified_text
 
 syllables_df={
             'en_GB':pd.read_csv('data/syllables.csv'),
@@ -558,7 +554,7 @@ def prefill_for_sentence(
             }
     return record
 
-def prefill_content(sentences, syl_sep='|'):
+def prefill_content(sentences, syl_sep='|', lang='en_US'):
     """This function extract information of syllabified texts and phonetics using prefill_for_sentence on a list of sentences.
     The result is saved in a DataFrame.
 
@@ -573,7 +569,7 @@ def prefill_content(sentences, syl_sep='|'):
     print("n sentences", len(sentences))
     for i,s in tqdm(enumerate(sentences)):
         try:
-            record=prefill_for_sentence(s, syllables_df['en_US'], syl_sep=syl_sep)
+            record=prefill_for_sentence(s, syllables_df[lang], syl_sep=syl_sep)
         except:
             print('Error with sentence: '+s)
             
@@ -608,6 +604,14 @@ def generate_prefill_csv(                            # path='data/phrases_speaki
 
     return df
 
+
+
+def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
+    # cmu vowels end by a number : 0, 1 or 2.   0= no stress, 1 = primary stress, 2 = secondary stress
+    # consonants do not end by a number
+    # here I return a list that is one if primary stressed and else 0
+    return [1 if p[-1]==str(1) else 0 for p in phonetics if p[-1] in str([0,1,2])]
+    
 # unused functions
 if False:
     def word_selection():
@@ -635,11 +639,6 @@ if False:
             words_phones.append(phones)
         return words_phones
 
-    def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
-        # cmu vowels end by a number : 0, 1 or 2.   0= no stress, 1 = primary stress, 2 = secondary stress
-        # consonants do not end by a number
-        # here I return a list that is one if primary stressed and else 0
-        return [1 if p[-1]==str(1) else 0 for p in phonetics if p[-1] in str([0,1,2])]
     
     def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
         phonetics=phonetics_from_sentence(sentence) #return a list of phoneme list (by word)

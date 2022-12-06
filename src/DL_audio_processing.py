@@ -41,6 +41,7 @@ def melgan_analysis_synthesis(s):
 
 
 def speech_enhancement(s):
+    from speechbrain.pretrained import SpectralMaskEnhancement
     enhance_model = SpectralMaskEnhancement.from_hparams(
         source="hf_models/speechbrain/metricgan-plus-voicebank"
         # source="speechbrain/metricgan-plus-voicebank"
@@ -132,17 +133,6 @@ def pred_to_gibberish(pred):
     gibberish=gibberish.replace('_ ',' ')[:-1]
     
     return gibberish
-
-def load_audio_with_preprocessing(audio_file):
-    from speech_tech import prepare_audio_file
-    status, rID=prepare_audio_file(audio_file, fs=16000)
-    try:
-        fs,s=read('./inputs/'+ rID+ '.wav')
-    except FileNotFoundError:
-        return "error: audio file not found", None, None, None
-    s=s/32767
-    return s,fs
-
 
 if __name__=="__main__":
 
