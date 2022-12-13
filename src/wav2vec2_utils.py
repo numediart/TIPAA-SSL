@@ -13,6 +13,7 @@ from jiwer import wer
 import os
 import pandas as pd
 from src.text_processing import remove_stress_annots
+from itertools import groupby
 
 # from src.layer_extraction import get_last_hidden_state
 
@@ -20,6 +21,26 @@ def get_last_hidden_state(s, fs, processor, model):
     input_values = processor(torch.tensor(s), sampling_rate=fs, return_tensors="pt").input_values.to('cpu')
     with torch.no_grad(): 
         return model(input_values).hidden_states[-1]
+def get_logits(s, fs, processor, model):
+    input_values = processor(torch.tensor(s), sampling_rate=fs, return_tensors="pt").input_values.to('cpu')
+    with torch.no_grad(): 
+        logits = model(input_values).logits
+    return logits
+
+def inference(s, fs, processor, model):
+    input_values = processor(torch.tensor(s), sampling_rate=fs, return_tensors="pt").input_values.to('cpu')
+    with torch.no_grad(): 
+        logits = model(input_values).logits
+
+    pred_ids = torch.argmax(logits, dim=-1)
+    # this is just a lookup operation, so no worries about computational costs
+    timed_pred=[processor.batch_decode([[id]])[0] for id in pred_ids[0]]
+
+    pred_filtered=list(filter(None, timed_pred))
+    # this removes consecutive duplicates
+    phones=[x[0] for x in groupby(pred_filtered)]
+
+    return timed_pred, phones
 
 def compute_predictions_and_PER(df_sample):
     """compute predictions phoneme error rate for the examples od a dataframe, and create a new column storing predictions and PER
@@ -131,11 +152,15 @@ def instances_per_phoneme(df_t, processor, model, number_of_examples=100, time_p
         s,fs=librosa.load(df_t.iloc[i].wav_path, sr=16000)
 
         new_df=phone_average_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
+        
+        
+        if 'language_code' in df_t.iloc[i].keys():new_df['language_code']=df_t.iloc[i]['language_code']
+        if 'genre' in df_t.iloc[i].keys():new_df['genre']=df_t.iloc[i]['genre']
+        if 'speaker' in df_t.iloc[i].keys():new_df['speaker']=df_t.iloc[i]['speaker']
         average_vectors.append(new_df)
     
     df_all_instances=pd.concat(average_vectors)
     return df_all_instances
-
 
 def instances_per_frame(df_t, processor, model, number_of_examples=100, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state):
     vectors=[]
@@ -148,13 +173,18 @@ def instances_per_frame(df_t, processor, model, number_of_examples=100, time_per
 
         #new_df=phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
         new_df=phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
+        
+        
+        if 'language_code' in df_t.iloc[i].keys():new_df['language_code']=df_t.iloc[i]['language_code']
+        if 'genre' in df_t.iloc[i].keys():new_df['genre']=df_t.iloc[i]['genre']
+        if 'speaker' in df_t.iloc[i].keys():new_df['speaker']=df_t.iloc[i]['speaker']
+        if 'filename' in df_t.iloc[i].keys():new_df['filename']=df_t.iloc[i]['filename']
         vectors.append(new_df)
     
     df_all_frames=pd.concat(vectors)
     return df_all_frames
 
-
-def plot_reduction(df_all_instances, reduction_technique='umap', base_name='wav2vec'):
+def plot_reduction(df_all_instances, reduction_technique='umap', base_name='wav2vec', legend_label='phoneme'):
     from sklearn.manifold import TSNE
     from sklearn.decomposition import PCA
     import umap.umap_ as umap
@@ -170,23 +200,26 @@ def plot_reduction(df_all_instances, reduction_technique='umap', base_name='wav2
     np_vectors=np.array(df_all_instances.average_vector.tolist())
     embedding = reducer.fit_transform(np_vectors)
 
+    plt.clf()
+
+
     df_subset=pd.DataFrame()
     df_subset['x'] = embedding[:,0]
     df_subset['y'] = embedding[:,1]
-    df_subset['phoneme']=df_all_instances['phoneme'].tolist()
+    df_subset[legend_label]=df_all_instances[legend_label].tolist()
     # plt.figure(figsize=(16,10))
     plot_result=sns.scatterplot(
         x="x", y="y",
-        hue="phoneme",
+        hue=legend_label,
         # palette=sns.color_palette("hls", 39),
         data=df_subset,
         legend="full",
         alpha=0.3
     )
     plt.legend([],[], frameon=False)
-    one_example_per_phoneme=df_subset.drop_duplicates(subset=["phoneme"])
-    for i, txt in enumerate(one_example_per_phoneme['phoneme']):
-        plt.annotate(txt, (one_example_per_phoneme['x'].iloc[i], one_example_per_phoneme['y'].iloc[i]))
+    one_example_per_label=df_subset.drop_duplicates(subset=[legend_label])
+    for i, txt in enumerate(one_example_per_label[legend_label]):
+        plt.annotate(txt, (one_example_per_label['x'].iloc[i], one_example_per_label['y'].iloc[i]))
     plt.savefig(base_name+'_phones_'+reduction_technique+'.png')
     return plot_result
 
@@ -194,8 +227,8 @@ def plot_reduction(df_all_instances, reduction_technique='umap', base_name='wav2
 
 if __name__=="__main__":
     # load model and processor
-    # TODO: download first, do "from_pretrained(path)" instead to know easier where they are and access the vocabs, config etc.
-    # in the meantime, ther are in: "~/.cache/huggingface/transformers"
+    # I download first, do "from_pretrained(path)" instead to know easier where they are and access the vocabs, config etc.
+    # Else models are in: "~/.cache/huggingface/transformers"
     feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
     processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
 
@@ -246,21 +279,6 @@ if __name__=="__main__":
     last_hidden_state=get_last_hidden_state(s, fs, processor, model=base_model)
     print(last_hidden_state)
     print(last_hidden_state.shape)
-
-    hidden_states=get_hidden_states(s, fs, processor, model=base_model)
-    # This correspond to the number of feature maps that are output of different steps of the architecture
-    print(len(hidden_states))
-
-    print("Features obtained:")
-    features = get_extract_features(s, fs, processor, model=base_model)
-    print(features.shape)
-    for i, layer in enumerate(features):
-        print(f"The shape of features layer {i} is {features.shape}")
-
-    for i, layer in enumerate(hidden_states):
-        print(f"The shape of layer {i} is {layer.shape}")
-    # TODO: find out where is the one corresponding to the output of the "feature encoder" which is context independent.
-    print(model)
     
     print(model._modules.keys())
     model._modules['wav2vec2']._modules.keys()
@@ -276,32 +294,9 @@ if __name__=="__main__":
     df_sample=df[:10]
 
     df_sample=compute_predictions_and_PER(df_sample)
-
-
-    def process_data(df):
-        # for dataset phonemized with "phonemizer" and espeak backend, the phonemes are separated by '_', I change that with spaces here
-        # parenthesis such as in (fr)  or (en) indicate language switching. I remove them
-        df_processed=df.dropna()
-        df_processed=df_processed[~df_processed.phonetics.str.contains('\(')]
-        df_processed.phonetics=df_processed.phonetics.apply(lambda r:r.replace(stress,'').replace(unstress,''))
-        df_processed.phonetics=df_processed.phonetics.apply(lambda r:r.replace('_',' ').replace('  ',' '))
-        df_processed.phonetics=df_processed.phonetics.apply(lambda r:r.replace('-',''))
-        df_processed.phonetics=df_processed.phonetics.apply(lambda r:r.replace('\n',''))
-        return df_processed
-
-    df, phoneme_set= MAILABS_data()
-    df_processed=process_data(df)
-    df_sample=df_processed[:10]
-    df_sample=compute_predictions_and_PER(df_sample)
-    
-    df, phoneme_set= MLS_data()
-    df_processed=process_data(df)
-    df_sample=df_processed[:10]
-    df_sample['path']=df_sample.apply(lambda r: os.path.join("/data/MLS/mls_polish_opus/dev/audio/",r.file_id.split("_")[0],r.file_id.split("_")[1], r.file_id)+".opus", axis=1)
-    df_sample=compute_predictions_and_PER(df_sample)
     
     # -----------------------------
-    from scripts.wav2vec2_utils import instances_per_phoneme, plot_reduction
+    from src.wav2vec2_utils import instances_per_phoneme, plot_reduction
     from src.libri_phonetization_data import libri_phonetics_data
     from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2FeatureExtractor, Wav2Vec2Model
     
