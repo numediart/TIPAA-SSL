@@ -20,12 +20,12 @@ split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w 
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
 from src.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
-from src.syllables_processing import syllabified_text
+from src.syllables_processing import syllabified_text, n_vowels
 
 syllables_df={
             'en_GB':pd.read_csv('data/syllables.csv'),
             'en_US':pd.read_csv('data/syllables.csv'),
-            'fr_FR':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+            'fr_FR':pd.read_csv('data/syllables_fr_FR.csv'),
             'es_ES':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
             'es_LA':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
             }
@@ -133,13 +133,6 @@ def check_phonemes(phonemes):
     for p in ps:
         if p not in cmu_phones: return p
         
-def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
-    d=define_categories(mode=mode)
-    n=0
-    for el in phonetics:
-        if el.lower() in d['vowels']: n+=1
-    return n
-
 
 
 
@@ -715,10 +708,12 @@ if __name__ == "__main__":
     sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
     sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
     sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+
+    lang="fr_FR"
     r=prefill_for_sentence(
                         sentence=sentence,
-                        # syllables_df=pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']), 
-                        lang="fr_FR",
+                        syllables_df=syllables_df[lang], 
+                        lang=lang,
                         mode='MFA_IPA')  # "CMU" or "MFA_IPA"
     
     from src.label_data_processing import actor_recordings
@@ -786,11 +781,6 @@ if __name__ == "__main__":
     syls_text=syllables_df[syllables_df.normalized_text==word].syllables.values[0]
     print(syls_text)
 
-    syllabified_text(word, syllables_df)
-
-    syllabified_text('dépendance', pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
-
-    
 
     df=generate_prefill_csv()
     df[df.n_syl_mismatch>0][['syllable_parts', 'pronounciation_guide_hr','used_method_for_syl_text']]
