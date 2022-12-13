@@ -11,7 +11,7 @@ from linetimer import CodeTimer
 
 # initialize model
 from src.charsiu_utils import charsiu_phone_forced_aligner
-default_model_stress = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
 
 phoneme_GT_proba_threshold_dict={}
@@ -135,7 +135,7 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
                                     level="sentence", 
                                     # chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8, mode='file',
-                                    model=default_model_stress
+                                    model=default_model_charsiu
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
