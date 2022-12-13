@@ -200,18 +200,25 @@ class Wav2Vec2ForFramePrediction:
             syllable=syllables[target_syllable_idx]
             syl=remove_stress_annots(syllable)
 
-            idxs_of_target_occurences=[i for i,p in enumerate(syl) if target_phones ==p]
+            idxs_of_target_occurences=[i for i,p in enumerate(syl) if unstress(target_phones) ==p]
 
             # find the phoneme index:
-            p_idx_local=syl.index(unstress(target_phones))
-            # p_idx_local=idxs_of_target_occurences[target_occurence_idx]
+            # p_idx_local=syl.index(unstress(target_phones))
+
+            if target_occurence_idx<len(idxs_of_target_occurences):
+                p_idx_local=idxs_of_target_occurences[target_occurence_idx]
+            else:
+                self.status="error: target_occurence_idx is out of bounds"
+                phonetic_detection=float('nan')
+                syl=float('nan')
+                return phonetic_detection, syl
 
             len_previous_syllables=sum([len(el) for el in syllables[:target_syllable_idx]])
             p_idx_global=len_previous_syllables+p_idx_local
 
             phonetic_detection = df_word.iloc[p_idx_global].pred_phones_audio
 
-            # #phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
+            # phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
             phoneme_set_ids=self.forced_aligner.labelize_phonemes(phoneme_set)
             proba_means=df_word.iloc[p_idx_global].proba_means
 
@@ -292,6 +299,15 @@ class Wav2Vec2ForFramePrediction:
         return weighted_score
 
 
+def train_Wav2Vec2ForFramePrediction_model():
+
+    # model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances, UK US FR ES, IPA
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction('ipa', frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
+    model.fit(X, y)
+    model.save(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
+
 if __name__ == '__main__':
 
     # backup different possible reducers
@@ -315,6 +331,17 @@ if __name__ == '__main__':
     df_t_train_all=df_t_train_all.dropna()
     df_all_frames_all = build_df_all_frames(df_t_train_all, 'phone')
     df_all_frames_all.to_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
+
+    
+    from src.wav2vec2_utils import plot_reduction
+    df_all_frames_all['average_vector']=df_all_frames_all['vector']
+    df_all_frames_all.sample(frac=1, random_state=1)
+    plot_reduction(df_all_frames_all.sample(frac=1, random_state=1), reduction_technique='umap', base_name='plots/w2v_xlsr_ft_space_phoneme', legend_label='phoneme')
+    plot_reduction(df_all_frames_all.sample(frac=1, random_state=1), reduction_technique='umap', base_name='plots/w2v_xlsr_ft_space_genre', legend_label='genre')
+    plot_reduction(df_all_frames_all.sample(frac=1, random_state=1), reduction_technique='umap', base_name='plots/w2v_xlsr_ft_space_speaker', legend_label='speaker')
+    plot_reduction(df_all_frames_all.sample(frac=1, random_state=1), reduction_technique='umap', base_name='plots/w2v_xlsr_ft_space_language_code', legend_label='language_code')
+
+
 
     # load UK US in MFA_IPA
     # df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', phone_set='MFA_IPA')
@@ -342,6 +369,39 @@ if __name__ == '__main__':
     
     df_all_frames = build_df_all_frames(df_t_train, 'phone', model_path="hf_models/facebook/wav2vec2-large-xlsr-53")
     df_all_frames.to_pickle('df_all_frames_MAILABS_train_w2v_xlsr_no_ft.pkl')
+
+    df_t_train_all = load_dataset_MAILABS(['en_US', 'en_UK', 'es_ES', 'fr_FR'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', phone_set='MFA_IPA')
+    df_all_frames = build_df_all_frames(df_t_train_all, 'phone', model_path="hf_models/facebook/wav2vec2-large-xlsr-53")
+    df_all_frames.to_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa_w2v_xlsr_no_ft.pkl')
+
+    from src.wav2vec2_utils import plot_reduction
+
+    df_all_frames['average_vector']=df_all_frames['vector']
+    plot_reduction(df_all_frames, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_space_phoneme', legend_label='phoneme')
+    plot_reduction(df_all_frames, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_space_genre', legend_label='genre')
+    plot_reduction(df_all_frames, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_space_speaker', legend_label='speaker')
+    plot_reduction(df_all_frames, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_space_language_code', legend_label='language_code')
+
+
+    records=[]
+    for fn in df_all_frames.filename.unique():
+        df_all_frames_fn=df_all_frames[df_all_frames.filename==fn]
+
+        keys=['language_code', 'genre', 'speaker', 'filename']
+        d={}
+        for k in keys:
+            d[k]=df_all_frames_fn.iloc[0][k]
+
+        d['average_vector']=df_all_frames_fn.vector.mean()
+        records.append(d)
+    df_all_sentences=pd.DataFrame.from_records(records)
+    
+    # plot_reduction(df_all_sentences, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_sentence_space_phoneme', legend_label='phoneme')
+    plot_reduction(df_all_sentences, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_sentence_space_genre', legend_label='genre')
+    plot_reduction(df_all_sentences, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_sentence_space_speaker', legend_label='speaker')
+    plot_reduction(df_all_sentences, reduction_technique='umap', base_name='plots/w2v_xlsr_no_ft_sentence_space_language_code', legend_label='language_code')
+
+
 
     # # Basis model Wav2Vec2ForFramePrediction, in CMU phoneme set, PCA reduction at 95% variance, and a 10-NN classifier
     # df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
