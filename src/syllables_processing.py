@@ -2,12 +2,118 @@
 import pandas as pd
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
 import os
-
-from src.pronunciation_dictionaries import cmudict_dict
+from tqdm import tqdm
+from src.pronunciation_dictionaries import cmudict_dict, mfa_dicts
 
 #### Syllables function  ####
-def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0']):
-    return len(SonoriPy(phonetics)[0])
+def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0'], mode='CMU'):
+    return len(SonoriPy(phonetics, mode=mode)[0])
+
+def syllables_data_fr(syl_sep='|'):
+    # from http://www.lexique.org/  
+    df=pd.read_csv('data/Lexique383.tsv', sep='\t')
+
+    columns=['ortho','syll','nbsyll','orthosyll']
+    df=df[columns]
+    df=df.dropna()
+
+    # filter out words containing a space, and dash (it's the sep, and there is conflict in their file)
+    df=df[~df['ortho'].str.contains(' ')]
+    df=df[~df['ortho'].str.contains('-')]
+
+    # a weird systematic mistake in the data making me wondering if it was done by spanish native speakers. Starting s- considered as a syllable. I remove the first dash when that happens
+    df.loc[(df.orthosyll.str[:2]=='s-'),'orthosyll']=df[(df.orthosyll.str[:2]=='s-')].orthosyll.apply(lambda my_str: my_str[:my_str.index('-')] + my_str[my_str.index('-')+1:])
+    df.loc[(df.orthosyll.str[:3]=='ch-'),'orthosyll']=df[(df.orthosyll.str[:3]=='ch-')].orthosyll.apply(lambda my_str: my_str[:my_str.index('-')] + my_str[my_str.index('-')+1:])
+
+    # alone -s- (or -ch-) is also wrong inside a word  (could be generalized for -[consonant_letters]-  . I tried single consonant and applied to those impactes)
+    df.loc[df.orthosyll.str.contains('-s-'),'orthosyll']=df.loc[df.orthosyll.str.contains('-s-'),'orthosyll'].str.replace('-s-', '-s')
+    df.loc[df.orthosyll.str.contains('-ch-'),'orthosyll']=df.loc[df.orthosyll.str.contains('-ch-'),'orthosyll'].str.replace('-ch-', '-ch')
+    df.loc[df.orthosyll.str.contains('-th-'),'orthosyll']=df.loc[df.orthosyll.str.contains('-th-'),'orthosyll'].str.replace('-th-', '-th')
+    df.loc[df.orthosyll.str.contains('-n-'),'orthosyll']=df.loc[df.orthosyll.str.contains('-n-'),'orthosyll'].str.replace('-n-', '-n')
+    df.loc[df.orthosyll.str.contains('-j-'),'orthosyll']=df.loc[df.orthosyll.str.contains('-j-'),'orthosyll'].str.replace('-j-', '-j')
+    df.loc[df.orthosyll.str.contains('-r-'),'orthosyll']=df.loc[df.orthosyll.str.contains('-r-'),'orthosyll'].str.replace('-r-', '-r')
+
+    
+    # from tqdm import tqdm
+    # tqdm.pandas()
+    # n_syl_in_text=df.progress_apply(lambda r: n_syl_SonoriPy(mfa_dicts['fr_FR'][r.ortho][0], mode='MFA_IPA') if r.ortho in mfa_dicts['fr_FR'] else len(r.orthosyll.split('-')), axis=1)
+
+    # check number of syls in text == number of syls in phonetics
+    n_syl_in_text=df.orthosyll.str.split('-').apply(lambda r: len(r))
+
+    df_good_n_syl=df[df.nbsyll==n_syl_in_text]
+    df_bad_n_syl=df[df.nbsyll!=n_syl_in_text]
+
+    # extract words for which the mistake of number of syllables comes from trailing -e, -es, -ent. They are annotated with n+1 syllables
+    wrong_n_syl_in_text=df_bad_n_syl.orthosyll.str.split('-').apply(lambda r: len(r))
+    
+    df_e=df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll+1)&(df_bad_n_syl.orthosyll.str[-1]=='e')]
+    df_es=df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll+1)&(df_bad_n_syl.orthosyll.str[-2:]=='es')]
+    df_ent=df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll+1)&(df_bad_n_syl.orthosyll.str[-3:]=='ent')]
+
+    # words in -ement  . According to mfa, mfa_dicts['fr_FR']['lentement'] = [['l', 'ɑ̃', 't', 'm', 'ɑ̃']]
+    # other sources like https://fr.wiktionary.org/wiki/lentement let the 2 possibilities  \lɑ̃t.mɑ̃\ ou \lɑ̃.tə.mɑ̃\  
+    df_ement=df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll+1)&(df_bad_n_syl.orthosyll.str[-6:]=='e-ment')]
+
+    # a weird systematic mistake in the dataset that looks like plural were not corrently processed
+    df_s=df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll+1)&(df_bad_n_syl.orthosyll.str[-2:]=='-s')]
+
+    
+    def remove_last_syl_sep(df_n_plus_1):
+        # in each syllabified word: 
+        # -take all characters before and after the last "-"
+        df_n_plus_1['orthosyll']=df_n_plus_1.orthosyll.apply(lambda my_str: my_str[:my_str.rfind('-')] + my_str[my_str.rfind('-')+1:])
+        return df_n_plus_1
+    df_e=remove_last_syl_sep(df_e)
+    df_es=remove_last_syl_sep(df_es)
+    df_ent=remove_last_syl_sep(df_ent)
+    df_s=remove_last_syl_sep(df_s)
+    df_ement=remove_last_syl_sep(df_ement)
+
+    df_new_good_n_syl=pd.concat([df_good_n_syl, df_e, df_es, df_ent, df_s, df_ement])
+    
+    # not n+1 inconsistencies
+    df_bad_n_syl[(wrong_n_syl_in_text!=df_bad_n_syl.nbsyll+1)]
+
+    # mostly hiatus words
+    df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll-1)]
+    n_syl_SonoriPy(mfa_dicts['fr_FR']['exagérément'][0], mode='MFA_IPA')
+
+    # SonoriPy(mfa_dicts['fr_FR']['exagérément'][0], mode='MFA_IPA')[0]
+    # SonoriPy('exagérément', mode='letters')[0]
+
+    # df_rest_bad_n_syl=df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll+1)&(df_bad_n_syl.orthosyll.str[-1]!='e')&(df_bad_n_syl.orthosyll.str[-2:]!='es')&(df_bad_n_syl.orthosyll.str[-3:]!='ent')&(df_bad_n_syl.orthosyll.str[-2:]!='-s')]
+
+
+    syllables=df_new_good_n_syl[['orthosyll','ortho','nbsyll']]
+
+    syllables.columns=['syllables','normalized_text','n_syls']  #,'n_syls_SonoriPy']
+
+    syllables.loc[:,'syllables']=syllables.loc[:,'syllables'].str.replace('-',syl_sep)
+
+    syllables['n_syls_SonoriPy']=None
+
+    # d=mfa_dicts['fr_FR']
+    # n_syls=[]
+    # n_syls_SonoriPy=[]
+    # texts=[]
+    # for i,r in tqdm(syllables.iterrows()):
+    #     text=''.join(r[0].split(syl_sep)).lower()
+    #     texts.append(text)
+    #     try:
+    #         n_syls.append(int(len(r[0].split(syl_sep))))
+    #     except:
+    #         n_syls.append(None)
+    #     try:
+    #         n_syls_SonoriPy.append(n_syl_SonoriPy(d[text][0], mode='MFA_IPA'))
+    #     except:
+    #         n_syls_SonoriPy.append(None)
+
+    syllables.to_csv('data/syllables_fr_FR.csv')
+
+    return syllables
+
+    
 
 
 def syllables_data(syl_sep='|'):
@@ -41,10 +147,8 @@ def syllables_data(syl_sep='|'):
     syllables.columns=['syllables']
 
     n_syls=[]
-    n_vowels_cmu=[]
     n_syls_SonoriPy=[]
     texts=[]
-    phonetics=[]
     for i,r in syllables.iterrows():
         text=''.join(r[0].split(syl_sep)).lower()
         texts.append(text)
@@ -163,3 +267,21 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
         used_method='SonoriPy'
         return syls_text, used_method
     return syls_text, used_method
+
+
+def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
+    d=define_categories(mode=mode)
+    n=0
+    for el in phonetics:
+        if el.lower() in d['vowels']: n+=1
+    return n
+
+
+if __name__=="__main__":
+
+    word='dépendance'
+    phonetic_dict=mfa_dicts['fr_FR']
+    nv=n_vowels(phonetic_dict[word][0], mode="MFA_IPA")
+    syllabified_text(word, nv, syllables_df=pd.read_csv('data/syllables_fr_FR.csv'), lang="fr_FR")
+
+    syllabified_text('dépendance', pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
