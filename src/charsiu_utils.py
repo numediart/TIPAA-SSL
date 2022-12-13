@@ -287,11 +287,18 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             syllable=syllables[target_syllable_idx]
             syl=remove_stress_annots(syllable)
 
-            idxs_of_target_occurences=[i for i,p in enumerate(syl) if target_phones ==p]
+            idxs_of_target_occurences=[i for i,p in enumerate(syl) if unstress(target_phones) ==p]
 
             # find the phoneme index:
-            p_idx_local=syl.index(unstress(target_phones))
-            # p_idx_local=idxs_of_target_occurences[target_occurence_idx]
+            # p_idx_local=syl.index(unstress(target_phones))
+
+            if target_occurence_idx<len(idxs_of_target_occurences):
+                p_idx_local=idxs_of_target_occurences[target_occurence_idx]
+            else:
+                self.status="error: target_occurence_idx is out of bounds"
+                phonetic_detection=float('nan')
+                syl=float('nan')
+                return phonetic_detection, syl
 
             len_previous_syllables=sum([len(el) for el in syllables[:target_syllable_idx]])
             p_idx_global=len_previous_syllables+p_idx_local
