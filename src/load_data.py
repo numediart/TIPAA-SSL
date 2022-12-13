@@ -1,26 +1,36 @@
 import pandas as pd
-import numpy as np
-from transformers import Wav2Vec2Model, Wav2Vec2Processor, Wav2Vec2ForCTC
+from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from src.text_processing import remove_stress_annots
 import ast
-import json
 import librosa
-from sklearn.model_selection import train_test_split
 from src.libri_phonetization_data import libri_phonetics_data
-from src.wav2vec2_utils import instances_per_frame
+from src.wav2vec2_utils import instances_per_frame, instances_per_phoneme
 from src.text_processing import prefill_for_sentence
-from itertools import groupby
 
 def df_all_frames_to_X_y(df_all_frames):
     X = df_all_frames['vector'].tolist()
     y = df_all_frames['phoneme'].tolist()
     return X, y
 
-def build_df_all_frames(df_t, phone_type):
-    processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
-    model = Wav2Vec2ForCTC.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
-    df_all_frames = instances_per_frame(df_t, processor, model, phone_type=phone_type)
+def build_df_all_frames(df_t, phone_type, number_of_examples=100, model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
+    try:
+        processor = Wav2Vec2Processor.from_pretrained(model_path)
+    except OSError:
+        # some don't have one, take a default from facebook/wav2vec2-base-960h
+        processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+    model = Wav2Vec2ForCTC.from_pretrained(model_path, output_hidden_states=True)
+
+    # Here I have to shuffle. Because if there are several languages sorted and I select only some examples, it might take only examples from one language
+    df_t=df_t.sample(frac=1, random_state=1)
+    df_all_frames = instances_per_frame(df_t, processor, model, number_of_examples=number_of_examples, phone_type=phone_type)
     return df_all_frames
+
+def build_df_all_phoneme_instances(df_t_train, phone_type='phone', model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
+    processor = Wav2Vec2Processor.from_pretrained(model_path)
+    model = Wav2Vec2ForCTC.from_pretrained(model_path, output_hidden_states=True)
+    df_t_train['phone_df']=df_t_train.phone_df.apply(lambda r: pd.DataFrame(r))
+    df_all_instances=instances_per_phoneme(df_t_train, processor, model, number_of_examples=None, time_per_output=0.02,  phone_type=phone_type)
+    return df_all_instances
 
 
 def load_dataset_MAILABS(lang_codes, path='./data/MAILABS', phone_set='CMU'):
@@ -36,7 +46,11 @@ def load_dataset_MAILABS(lang_codes, path='./data/MAILABS', phone_set='CMU'):
                 df_temp.at[i, "phone_df"] = res
 
         df_train = pd.concat([df_train, df_temp])
+        
     df_train = df_train.rename(columns={"path": "wav_path"}, errors="raise")
+    df_train['genre']=df_train.wav_path.str.split('/').apply(lambda r: r[-5])
+    df_train['speaker']=df_train.wav_path.str.split('/').apply(lambda r: r[-4])
+
     return df_train
 
 
