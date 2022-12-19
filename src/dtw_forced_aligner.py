@@ -5,7 +5,6 @@ import librosa
 import itertools
 import json
 from operator import itemgetter
-import cmudict
 from src.text_processing import remove_stress_annots, group_consecutive_duplicates
 
 from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet
@@ -16,28 +15,27 @@ keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
 # get the blocks of consecutive identical rows in cols
 get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[cols].shift(-1) == a[cols]).any(axis=1)]
 
-# global cmu_alphabet
-# cmu_alphabet = [el[0] for el in cmudict.phones()]
-
-# global ipa_alphabet
-# with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(openfile)
 
 class dtw_forced_aligner:
     def __init__(self, phone_type):
-        self.label_encoder = LabelEncoder()
+        # self.label_encoder = LabelEncoder()
         if phone_type == 'cmu':
             self.alphabet = cmu_alphabet
         elif phone_type == 'ipa':
             self.alphabet = ipa_alphabet
-        self.label_encoder.fit([phon for phon in self.alphabet])
+        # self.label_encoder.fit([phon for phon in self.alphabet])
+        self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
+        self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
 
     def labelize_phonemes(self, phonemes):
-        return np.array(self.label_encoder.transform([phon for phon in phonemes]))
+        # return np.array(self.label_encoder.transform([phon for phon in phonemes]))
+        return np.array([self.p_to_id[el] for el in phonemes])
 
     # get the columns from the probability matrix which correspond to non-silent frames
     def get_cost_non_sil(self, phone_prob_matrix):
         phone_prob_matrix = [l for l in phone_prob_matrix]
 
+        # the sum is 1, except if it's a silence, because the column corresponding to that token was removed
         def condition(vect): return sum(vect)<0.2
         a = np.array(phone_prob_matrix)
 
@@ -58,7 +56,9 @@ class dtw_forced_aligner:
         for index in [i[1] for i in wp]:
             aligned_phones_labels.insert(0, target_labels[index])
         # using the label encoder to find the phoneme
-        aligned_phones = list(self.label_encoder.inverse_transform(aligned_phones_labels))
+        # aligned_phones = list(self.label_encoder.inverse_transform(aligned_phones_labels))
+        aligned_phones = [self.id_to_p[el] for el in aligned_phones_labels]
+        
         return aligned_phones
 
     # forced alignment but with all the audio sample's frames
@@ -66,9 +66,6 @@ class dtw_forced_aligner:
         alignment_with_silence=np.array(["     "]*(len(silence_frames_idx)+len(non_silence_frames_idx)))
         alignment_with_silence[silence_frames_idx] = "[SIL]"
         alignment_with_silence[non_silence_frames_idx] = aligned_phones
-
-        # alignment_with_silence[0] = "[SIL]"
-        # alignment_with_silence[-1] = "[SIL]"
         return alignment_with_silence
 
     def predict(self, aligned_phones, cost_nonsil, target_phonemes):
@@ -89,7 +86,9 @@ class dtw_forced_aligner:
         for phon in grouped_aligned_preds:
             proba_means.append(np.median([l[1] for l in phon], axis=0))
 
-        predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in proba_means]
+        # predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in proba_means]
+        predicted_phones = [self.id_to_p[np.argmax(i)] for i in proba_means]
+        
         return predicted_phones, proba_means
 
     def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, proba_means, fs=16000, time_per_output=0.02):
@@ -167,7 +166,6 @@ class dtw_forced_aligner:
             df_segmented=divide_consecutive_duplicates(df_segmented2, remove_stress_annots(phones))
 
         return df_segmented
-    
     
     def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, fs=16000, time_per_output=0.02):
         cost_nonsil, silence_frames_idx, non_silence_frames_idx = self.get_cost_non_sil(phone_prob_matrix)

@@ -19,6 +19,7 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.linear_model import LogisticRegression
 
 from sklearn.preprocessing import LabelEncoder
 from src.audio_processing import getIntonation, getIntensity, normalize
@@ -142,6 +143,15 @@ class Wav2Vec2ForFramePrediction:
         start = time()
         phone_prob_matrix = self.frame_classifier.predict_proba(reduced_lhs)
         self.timestamps.append(time()-start)
+
+        # if during the classifier has not seen some of the labels, it won't be in the possible labels, and the proba matrix will have a reduced shape
+        # thus here I extract indices that don't have a column in the matrix to then add rows of zeros and have a correct shape
+        ids_to_add=[el for el in range(len(self.id_to_p)) if el not in self.frame_classifier.classes_]
+
+        for i in ids_to_add:
+            phone_prob_matrix=np.concatenate([phone_prob_matrix[:,:i] , np.zeros((phone_prob_matrix.shape[0],1)), phone_prob_matrix[:,i:]], axis=1)
+            # print(phone_prob_matrix.shape)
+
         
         # we defined the silence as the last token, we remove it here. 
         # Silence will be deteted in the forced aligner by checking that the sum of the remaining probablities are not close to 1 (<0.2)
@@ -190,7 +200,7 @@ class Wav2Vec2ForFramePrediction:
     def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
         """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
         """
-        phoneme_set=[[p] for p in remove_stress_annots(phoneme_set)]
+        phoneme_set=[p for p in remove_stress_annots(phoneme_set)]
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         df_word=self.predict_word(audio, split_phonetics, target_word_idx)
 
@@ -231,7 +241,9 @@ class Wav2Vec2ForFramePrediction:
                 # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
                 filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
                 idx_mean_max=np.argmax(filtered_proba_means)
-                phonetic_detection = self.forced_aligner.label_encoder.inverse_transform([np.argmax(filtered_proba_means)])[0]
+
+                phonetic_detection=self.id_to_p[np.argmax(filtered_proba_means)]
+                # phonetic_detection = self.forced_aligner.label_encoder.inverse_transform([np.argmax(filtered_proba_means)])[0]
                 # phonetic_detection=self.charsiu_processor.mapping_id2phone(int(idx_mean_max))
             syl[p_idx_local]=phonetic_detection
             
@@ -300,13 +312,61 @@ class Wav2Vec2ForFramePrediction:
 
 
 def train_Wav2Vec2ForFramePrediction_model():
+    # Basis model Wav2Vec2ForFramePrediction, a 10-NN classifier weighted with distances
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.fit(X, y)
+    model.save(name='model_mailabs_pca_0.95_knn_10_w')
 
+    
+    # Basis model Wav2Vec2ForFramePrediction, a 10-NN classifier weighted with distances
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_ipa.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction('ipa', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.fit(X, y)
+    model.save(name='model_mailabs_pca_95_knn_10_w_ipa')
+
+    
+    # Basis model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(5, weights='distance', metric='cosine'))
+    model.fit(X, y)
+    model.save(name='model_mailabs_pca_99_knn_5_cos_w')
+
+    
     # model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances, UK US FR ES, IPA
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
     model = Wav2Vec2ForFramePrediction('ipa', frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
+
+    
+    # Basis model Wav2Vec2ForFramePrediction, PCA 99% variance, logistic regression
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LogisticRegression(max_iter=1000))
+    model.fit(X, y)
+    model.save(name='model_mailabs_pca_99_logistic_regression')
+
+    
+    # model Wav2Vec2ForFramePrediction, PCA 99% variance, logistic regression, UK US FR ES, IPA
+    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
+    X, y = df_all_frames_to_X_y(df_all_frames)
+    model = Wav2Vec2ForFramePrediction('ipa', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LogisticRegression(max_iter=1000))
+    model.fit(X, y)
+    model.save(name='model_mailabs_pca_99_logistic_regression_UK_US_FR_ES')
+
+
+    
+
+    # estimators=[('5-NN cosine metric weighted', KNeighborsClassifier(5, weights='distance', metric='cosine')), ('LogisticRegression', LogisticRegression(max_iter=1000))]
+    # eclf = VotingClassifier(estimators=estimators, voting='soft', weights=[1,5])
+    # reducer=PCA(n_components=0.99, random_state=42)
+
+
 
 if __name__ == '__main__':
 
@@ -437,15 +497,6 @@ if __name__ == '__main__':
     model.load(name='model_w2v_base_mailabs_pca_0.95_knn_10_w')
 
 
-    # Basis model, but with IPA
-    df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_ipa.pkl')
-    X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction(0.95,'ipa', reducer="pca")
-    model.fit(X, y)
-    pickle.dump(model,open('model_mailabs_pca_0.95_knn_10_ipa.pkl','wb'))
-
-
-
     
     
     
@@ -460,6 +511,9 @@ if __name__ == '__main__':
     y_train=list(df_all_instances.phoneme.values)
 
 
+
+
+    # --------------- Inference demo --------------------
     
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa
@@ -468,10 +522,25 @@ if __name__ == '__main__':
     # data = load_test_dataset(df_t_test)
 
     # phoneme predictions on a single audio sample with forced alignment
-    pred = model.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
+    pred = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
     prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
-    # model2.phoneme_classifier
+    
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    default_model_cmu = Wav2Vec2ForFramePrediction('cmu')
+    default_model_cmu.load(name='model_mailabs_pca_0.95_knn_10_w')
+
+    # phoneme predictions on a single audio sample with forced alignment
+    pred = default_model_cmu.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    prob_matrix = default_model_cmu.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    
+    # default_model_ipa = Wav2Vec2ForFramePrediction('ipa')
+    # default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
+
+    # # phoneme predictions on a single audio sample with forced alignment
+    # pred = default_model_ipa.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
+    # prob_matrix = default_model_ipa.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+
     
     # # phoneme predictions on a single audio sample with forced alignment
     # pred2 = model2.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
