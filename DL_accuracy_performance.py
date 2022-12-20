@@ -1,20 +1,10 @@
-from cProfile import label
-from src.libri_phonetization_data import build_librispeech_words_df
-from src.libri_phonetization_data import phonetics_for_row, select_libri
 from tqdm import tqdm
 import pandas as pd
 import pickle
-from src.charsiu_utils import charsiu_phone_forced_aligner
 import ast
-
 import librosa
-from collections import Counter
 
-from src.label_data_processing import build_user_data_df
-# exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
-
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, default_model
-from src.audio_processing import prepare_audio_file
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, default_model, default_model_charsiu
 
 from src.label_data_processing import actor_recordings, final_s_artificial_data, synth_words_data
 from src.text_processing import *
@@ -73,12 +63,11 @@ def distrib(l):
         y = kde(x)
     return x,y
 
-def GT_proba_distribution_analysis(target_phones='AO1', model=default_model, basename='probas_actors'):
+def GT_proba_distribution_analysis(model=default_model, basename='probas_actors_logistic'):
 
-    user_data=build_user_data_df()
-
-    selection=user_data[user_data.target_phoneme==target_phones]
-    df_users=selection
+    # user_data=build_user_data_df()
+    # selection=user_data[user_data.target_phoneme==target_phones]
+    # df_users=selection
 
     # from DL_accuracy_performance import *
     df=actor_recordings()
@@ -87,7 +76,7 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=default_model, bas
     def compute_predictions(df_pContrast, n_examples=None, model=default_model):
         # contrast on all phones with force_and_predict (i.e. predict based on frames allocated to a phoneme)
         pred_dfs=[]
-        phonetic_contents=[]
+        # phonetic_contents=[]
         print(len(df_pContrast))
         means=[]
         medians=[]
@@ -104,8 +93,8 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=default_model, bas
             # phonetic_content.GT_proba_means.median()
             means.append(p_df[p_df.phones!='[SIL]'].GT_proba.mean())
             medians.append(p_df[p_df.phones!='[SIL]'].GT_proba.median())
-        correct_proba_means=np.histogram(means)
-        correct_proba_medians=np.histogram(medians)
+        # correct_proba_means=np.histogram(means)
+        # correct_proba_medians=np.histogram(medians)
 
         return pred_dfs, means, medians
 
@@ -126,16 +115,13 @@ def GT_proba_distribution_analysis(target_phones='AO1', model=default_model, bas
         plt.title("Proba distributions for "+target)
         plt.savefig(basename+'_'+target+'.png')
 
-    # pred_dfs, means, medians=compute_predictions(df_users, model=model)
-
-    # pred_dfs, means, medians=compute_predictions(df[:3], n_examples=100, model=model)
     pred_dfs, means, medians=compute_predictions(df, n_examples=100, model=model)
 
     all_phones_df=pd.concat(pred_dfs)
 
     x,kde1_x=distrib(means)
     plt.plot(x, kde1_x)
-    plt.savefig('gkde.png')
+    plt.savefig('gkde_logistic.png')
 
     # try:
     #     p_to_id=lambda p: model.charsiu_processor.mapping_phone2id(p)
@@ -360,7 +346,6 @@ def syllable_contrast_for_actor_recordings(model=default_model):
     all_phones_df[all_phones_df.sentence_idx==r.sentence_idx]
 
 
-
 def phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=None, accent=None, name='plots/consonants_confusions_on_synth_words'):
     results={}
     predictions={}
@@ -370,17 +355,20 @@ def phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_sy
         # _, predictions[v].to_csv('performance_results/vowel_accuracies_'+v+'.csv')
         results[p]=rates
         predictions[p]=preds
+        print('phoneme')
+        print(results[p])
     
     plot_confusion_results(results, name=name+'_'+accent)
 
     return results
 
-def phoneme_confusion_experiments(label='w2v'):
-    phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100, accent='US', name='plots/vowels_confusions_on_synth_words_'+label)
+def phoneme_confusion_experiments(label='w2v_pca_99_knn_5_cos_w'):
+    # from DL_accuracy_performance import *
     phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100, accent='UK', name='plots/vowels_confusions_on_synth_words_'+label)
+    phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100, accent='US', name='plots/vowels_confusions_on_synth_words_'+label)
 
-    phoneme_confusions(phonemes=cmu_consonants, performance_function=pContrast_on_synth_words, n=100, accent='US', name='plots/consonants_confusions_on_synth_words_'+label)
     phoneme_confusions(phonemes=cmu_consonants, performance_function=pContrast_on_synth_words, n=100, accent='UK', name='plots/consonants_confusions_on_synth_words_'+label)
+    phoneme_confusions(phonemes=cmu_consonants, performance_function=pContrast_on_synth_words, n=100, accent='US', name='plots/consonants_confusions_on_synth_words_'+label)
 
 
 def vowels_confusions_actor_recordings(vowels=['IY1','IH1','AO1','AA1','OW1']):
@@ -447,30 +435,24 @@ def final_ed_confusions_for_actor_recordings():
     return predictions, results
 
 
-def final_s_on_synth_words(n=20, model=default_model):
+target_to_basis={
+    'D':'IH0_D',
+    'IH0_D':'IH0_D',
+    '':'IH0_Z',
+    'S':'IH0_Z',
+    'Z':'IH0_Z',
+}
 
-    df=synth_words_data()
 
-    df['target_word_indexes']=0
-    df['target_syllable_indexes']=-1
-    df['fpath']=df['path']
-    
-    df_iz=df[(df.cmu_phonetics.str.endswith('AH0_Z')|df.cmu_phonetics.str.endswith('IH0_Z'))&df.text.str.endswith('es')]
-    df_s=df[(df.cmu_phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
-    df_z=df[(~(df.cmu_phonetics.str.endswith('AH0_Z')|df.cmu_phonetics.str.endswith('IH0_Z'))&~df.cmu_phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
-    
-    selections={
-        'IH0_Z':df_iz.sample(frac=1, random_state=0)[:n],
-        'S':df_s.sample(frac=1, random_state=0)[:n],
-        'Z':df_z.sample(frac=1, random_state=0)[:n]
-    }
-
-    targets=['S','Z','IH0_Z']
+def compute_start_end_confusions_from_selections(selections, model=default_model):
+    targets=selections.keys()
     result_dfs={}
     results={}
-
     for t in targets:
-        result_df=compute_predictions(selections[t], target_phones=t, tech_function=start_end_contrast_from_formatted_phonetics_audio, basis='IH_Z', model=model)
+        selection=selections[t]
+        selection['cmu_phonetics']=selection['phonetics']
+        basis=target_to_basis[t] if t in target_to_basis else t
+        result_df=compute_predictions(selection, target_phones=t, tech_function=start_end_contrast_from_formatted_phonetics_audio, basis=basis, model=model)
         result_dfs[t]=result_df
     
     for t in targets:
@@ -478,6 +460,71 @@ def final_s_on_synth_words(n=20, model=default_model):
         d=count_values(phonetic_detections)
         d.columns=[t]
         results[t]=d
+
+    return results, result_dfs
+
+# pronunciation aspect: Initial consonant clusters (e.g.: thr-, pr-, spl-, scr-…)
+def start_end_consonant_clusters_on_synth_words(clusters=['P_TH', 'M_P_T', 'N_TH_S'], contrast='end', n=100, model=default_model):
+    # clusters=["TH_R", "P_R", "S_P_L", "S_K_R"]
+    # 
+    df=synth_words_data()
+
+    df['target_word_indexes']=0
+    df['target_syllable_indexes']=0
+    df['contrast']=contrast
+    df['fpath']=df['path']
+
+    df=df.dropna()
+
+    selections={}
+    for cluster in clusters:
+        if contrast=="start":
+            df.phonetics.str.startswith(cluster)
+            df_c=df[df.phonetics.str.startswith(cluster)]
+        if contrast=="end":
+            df.phonetics.str.endswith(cluster)
+            df_c=df[df.phonetics.str.endswith(cluster)]
+        selections[cluster]=df_c.sample(frac=1, random_state=0)[:n]
+
+    results, result_dfs=compute_start_end_confusions_from_selections(selections, model=model)
+
+    plot_confusion_results(results, name='plots/'+contrast+'_clusters')
+
+# start_end_consonant_clusters_on_synth_words(clusters=['P_TH', 'M_P_T', 'N_TH_S'], n=100, model=default_model_charsiu, contrast='end')
+# start_end_consonant_clusters_on_synth_words(clusters=["TH_R", "P_R", "S_P_L", "S_K_R"], n=100, model=default_model_charsiu, contrast='start')
+    
+
+
+
+def final_s_on_synth_words(n=100, model=default_model):
+
+    df=synth_words_data()
+
+    df['target_word_indexes']=0
+    df['target_syllable_indexes']=-1
+    df['fpath']=df['path']
+    
+    df_iz=df[(df.phonetics.str.endswith('AH0_Z')|df.phonetics.str.endswith('IH0_Z'))&df.text.str.endswith('es')]
+    df_s=df[(df.phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
+    df_z=df[(~(df.phonetics.str.endswith('AH0_Z')|df.phonetics.str.endswith('IH0_Z'))&~df.phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
+
+
+    words_no_s_candidates=set(list(df_iz.text.str[:-2])+list(df_s.text.str[:-1])+list(df_z.text.str[:-1]))
+    df_no_s=df[df.text.isin(words_no_s_candidates)]
+
+    
+    selections={
+        '':df_no_s.sample(frac=1, random_state=0)[:n],
+        'IH0_Z':df_iz.sample(frac=1, random_state=0)[:n],
+        'S':df_s.sample(frac=1, random_state=0)[:n],
+        'Z':df_z.sample(frac=1, random_state=0)[:n],
+    }
+
+    # targets=['S','Z','IH0_Z']
+
+    
+    results, result_dfs=compute_start_end_confusions_from_selections(selections, model=model)
+
     plot_confusion_results(results, name='plots/final_s_synth_words')
 
 def final_s_from_artificial_data(model=default_model):
