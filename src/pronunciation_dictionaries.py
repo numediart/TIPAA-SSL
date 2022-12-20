@@ -167,6 +167,18 @@ def build_mfa_phone_set():
 def get_augmented_cmudict():
     cmudict_dict=cmudict.dict()
 
+    inconsistent_word_stresses={}
+    for k in cmudict_dict:
+        for alt in cmudict_dict[k]:
+            if '-' not in k:
+                if sum(['1' in p for p in alt])>1:
+                    inconsistent_word_stresses[k]=alt
+    # len(inconsistent_word_stresses)
+    # There are too much to be corrected, and too few to really care, it's less than 1% nd most probalably unfrequend words...
+
+    # len([k for k in inconsistent_word_stresses if k[:2]=='re'])
+    # {k:inconsistent_word_stresses[k] for k in inconsistent_word_stresses if k[:2]!='re'}
+
     corrections={
         'areas':[['EH1','R','IH0','AH0','Z']],
         'live':[['L', 'IH1', 'V']],
@@ -189,11 +201,13 @@ def get_augmented_cmudict():
         'trainee':[['T', 'R', 'EY0', 'N', 'IY1']],
         'outside':[['AW0', 'T', 'S', 'AY1', 'D']],
         'trespasser':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0']],
-        'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']]
+        'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']],
+        'outdoors':[['AW1', 'T', 'D', 'AO2', 'R', 'Z']]
 	}
     for k in corrections:
         cmudict_dict[k]=corrections[k]
     return cmudict_dict
+
 
 
 cmudict_dict=get_augmented_cmudict()
@@ -387,3 +401,28 @@ for jc in j_consonants: cmu_reducer[jc]=cmu_reducer[jc[:-1]]
 
 # https://en.wiktionary.org/wiki/%C9%A3
 # cmu_reducer['ɣ']=cmu_reducer['g']
+
+# categorize ipa phonemes in vowels and consonants, first thanks to the associations done towards CMU, and then filling the missing ones
+
+ipa_vowels=set()
+ipa_consonants=set()
+for p in ipa_alphabet:
+    if p in cmu_reducer:
+        if cmu_reducer[p] in cmu_vowels:
+            ipa_vowels.add(p)
+        elif cmu_reducer[p] in cmu_consonants:
+            ipa_consonants.add(p)
+
+# print(set(ipa_alphabet)-set(cmu_reducer))
+
+ipa_remainings=set(ipa_alphabet)-set(cmu_reducer)
+
+# information on the remainings from https://mfa-models.readthedocs.io/en/latest/mfa_phone_set.html
+ipa_vowels_add={'œ', 'ø', 'ɛ̃', 'y', 'o', 'e', 'ɔ̃', 'ɑ̃'}
+
+ipa_consonants_add=ipa_remainings-ipa_vowels_add
+
+ipa_vowels=ipa_vowels.union(ipa_vowels_add)
+ipa_consonants=ipa_consonants.union(ipa_consonants_add)
+
+ipa_to_gibberish={k:cmu_to_gibberish[cmu_reducer[k]] for k in cmu_reducer}
