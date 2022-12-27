@@ -5,6 +5,7 @@ from src.audio_processing import getIntonation, read_audio_string, read_audio_by
 import soundfile as sf
 from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
 from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish
+from src.pronunciation_dictionaries import ipa_vowels, ipa_consonants, ipa_to_gibberish
 from syllabipy.sonoripy import SonoriPy
 import base64
 from linetimer import CodeTimer
@@ -26,27 +27,45 @@ for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
 # model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
 
 from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-from sklearn.neighbors import KNeighborsClassifier
-default_model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
-default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+default_model = Wav2Vec2ForFramePrediction('cmu')
+# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+# default_model.load(name='model_mailabs_pca_99_logistic_regression')
+default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
 
 
 target_accepted_alternatives={
-    'AA': ['AA', 'AO'],
+    # 'AA': ['AA', 'AO'],
     'AO': ['AA', 'AO'],
+    # 'OW': ['AA', 'OW'],
     'D': ['D', 'T'],
     'Z': ['Z', 'S'],
+    'S': ['Z', 'S'],
     # 'T': ['D', 'T'],
     # 'IH': ['IH', 'AH', 'EH']
 }
 
 terminations_accepted_alternatives={
-    'IH_Z':['AH_Z','IH_Z'],
-    'IH_D':['AH_D','IH_D', 'ER_D']
+    'IH_Z':['AH_Z','IH_Z', 'ER_Z', 'IY_Z'],
+    'IH_D':['AH_D','IH_D', 'ER_D', 'IY_D'],
     }
 
+# for "Z", I want to accept anything finishing with "Z" except those corresponding to "IH_Z"
+
+# all_Z=[p+"_Z" for p in (list(cmu_vowels) + list(cmu_consonants))]
+# all_S=[p+"_S" for p in (list(cmu_vowels) + list(cmu_consonants))]
+all_Z=[p+"_Z" for p in list(cmu_consonants)]
+all_S=[p+"_S" for p in list(cmu_consonants)]
+terminations_accepted_alternatives["Z"]=[el for el in all_Z if el not in terminations_accepted_alternatives['IH_Z']]
+terminations_accepted_alternatives["S"]=[el for el in all_S if el not in terminations_accepted_alternatives['IH_Z']]+['S_Z', 'S_SH']
+
+
+all_D=[p+"_D" for p in list(cmu_consonants)]
+all_T=[p+"_T" for p in list(cmu_consonants)]
+terminations_accepted_alternatives["D"]=[el for el in all_D if el not in terminations_accepted_alternatives['IH_D']]
+terminations_accepted_alternatives["T"]=[el for el in all_T if el not in terminations_accepted_alternatives['IH_D']]#+['S_Z', 'S_SH']
+
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
-    """Load audio with 2 modes: from a "file" or from "base64" encoding
+    """Load audio with 2 modes: from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array
     Then check duration to see if it's plausible
     
     I first detect if the audio is too short to have a realistic speech rate
@@ -71,9 +90,10 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
             s=s/32767
         except FileNotFoundError:
             return "error: audio file not found", None
-    elif (mode=='base64' or mode=='bytes'):
+    elif (mode=='base64' or mode=='bytes' or mode=="numpy"):
         if mode=='base64': s, fs= read_audio_string(audio, fs=fs)
         elif mode=='bytes': s, fs= read_audio_bytes(audio, fs=fs)
+        elif mode=="numpy": s=audio
 
         if len(s)==0:  return "success: audio is empty (has zero sample)", None
         duration=len(s) / fs
@@ -135,7 +155,8 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
                                     level="sentence", 
                                     # chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8, mode='file',
-                                    model=default_model_charsiu
+                                    model=default_model_charsiu,
+                                    vowels=cmu_vowels
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
@@ -153,7 +174,7 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
             return {"status": status, "stress_intensities": [], "stress_binaries": []}
 
         phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
-        is_vowel=phonetics_indexed_df.apply(lambda r: unstress(r.phones) in cmu_vowels, axis=1)
+        is_vowel=phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
         vowels_indexed_df=phonetics_indexed_df[is_vowel]
         # print(vowels_indexed_df)
         vowels_indexed_df.loc[:,'stress_scores']=(100*ws).astype(int)
@@ -199,11 +220,12 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
                             alternatives=cmu_vowels,
                             max_speech_rate=8, mode='file', 
                             model=default_model,
+                            to_gibberish=cmu_to_gibberish,
                             **kwargs
                     ):
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
-    g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+    g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     if status=="success":
         # try:
         phonetic_detection, detected_syllable=model.predict_phone(s, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx, phoneme_set=alternatives)#, GT_proba_threshold=phoneme_GT_proba_threshold_dict[target_phones])
@@ -215,7 +237,7 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
         # or change null to "non-speech", nothing, nonsense or the pred_phones_audio
         if model.status!="success": 
             # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
-            g_d=[cmu_to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in model.pred_phones_audio]
+            g_d=[to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in model.pred_phones_audio]
             if g_d==[]:
                 return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
             else:
@@ -228,7 +250,7 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
         if detected_syllable!=detected_syllable: 
             return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
-        g_d=[cmu_to_gibberish[unstress(p)] for p in detected_syllable]
+        g_d=[to_gibberish[unstress(p)] for p in detected_syllable]
         
         # post-correction: for the target, when we are in a case of accepted alternative in prediction, we replace it with the GT
         if unstress(target_phones) in target_accepted_alternatives:
@@ -255,6 +277,9 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                             basis='IH0_D',
                             max_speech_rate=8, mode='file', contrast="end", 
                             model=default_model,
+                            vowels=cmu_vowels,
+                            consonants=cmu_consonants,
+                            to_gibberish=cmu_to_gibberish,
                             **kwargs
                     ):
     
@@ -281,10 +306,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
     elif contrast=="start":
         GT=syl_GT[:n_p_target+1]
 
-    g_t=[cmu_to_gibberish[unstress(p)] for p in GT]
-    # g_t=[cmu_to_gibberish[unstress(p)] for p in syl_GT]
-    # g_t=[cmu_to_gibberish[unstress(p)] for p in target_phones.split('_')]
-    # g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+    g_t=[to_gibberish[unstress(p)] for p in GT]
     if status=="success":
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         target_word=split_phonetics[target_word_idx]
@@ -302,11 +324,10 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             syl_idxs=[syl_idxs[contrast_idx]]*len(basis.split('_'))+syl_idxs[n_p_target:]
 
         df_word=model.predict_word(s, split_phonetics, target_word_idx)
-        # print(df_word)
-        # print(phonetics_indexed_df)
 
         if model.status!="success": 
-            g_d=[cmu_to_gibberish[unstress(p)] for p in model.pred_phones_audio]
+            # g_d=[to_gibberish[unstress(p)] for p in model.pred_phones_audio]
+            g_d=[to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in model.pred_phones_audio]
             if g_d==[]:
                 return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
             else:
@@ -315,21 +336,16 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                 else:
                     return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  '_'.join(g_d)}
 
+
+        #  In this case (e.g. starting -h) we want to use the fact that it is possible to reduce the set of possibilities to vowels or consonants as there is only 1 phoneme. It's the same method as in vowel/consonant contrast
         if n_ter_basis==1 and basis!='':
-        # if False:
-            #  In this case we want to use the fact that it is possible to reduce the set of possibilities to vowels or consonants as there is only 1 phoneme. It's the same method as in vowel/consonant contrast
             p_idx_global=contrast_idx
-            if unstress(basis) in cmu_consonants:
-                phoneme_set=cmu_consonants
-            elif unstress(basis) in cmu_vowels:
-                phoneme_set=cmu_vowels
-            
+            if unstress(basis) in consonants:
+                phoneme_set=consonants
+            elif unstress(basis) in vowels:
+                phoneme_set=vowels
             
             phoneme_set_ids=[model.p_to_id[el] for el in remove_stress_annots(phoneme_set)]
-
-            # phoneme_set=[[p] for p in  remove_stress_annots(phoneme_set)]
-            # phoneme_set_ids=model.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
-
             proba_means=df_word.iloc[p_idx_global].proba_means
 
             # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
@@ -342,6 +358,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             ter=[phonetic_detection]
 
         else:
+            # selection of the syllable, then divide it into a root and a termination (or start and root)
             df_word['syl_idx']=syl_idxs
             df_syl=df_word[df_word.syl_idx==syl_idxs[contrast_idx]]
             print(df_syl)
@@ -356,6 +373,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             elif contrast=="start":
                 # detected start
                 ter=syl_detected[:n_ter_basis+1]
+                # root=df_syl.phones.tolist()[:-n_ter_basis]
         
         print(ter)
         if len(ter)==len(GT):
@@ -372,22 +390,22 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         else: ter_post=ter
 
         # there might be consecutive duplicates when we concatenate root and ter_post
-        # g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in root+ter_post])
+        # g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in root+ter_post])
         
         # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
-        g_d=[cmu_to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in ter_post]
+        g_d=[to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in ter_post]
         
-        # phonetic detection needs to be the stressed version for backwards compatibility 
-        # (however, here I convert to stressed version only when correct, it might work, but could cause problems?)
         if contrast=="end":
             detection=ter_post[1:]
         elif contrast=="start":
             detection=ter_post[:-1]
 
-
         detection='_'.join(detection)
 
         # detection=ter_post
+        
+        # phonetic detection needs to be the stressed version for backwards compatibility 
+        # (however, here I convert to stressed version only when correct, it might work, but could cause problems?)
         if target_phones!='': # don't try to split in case of case of final -s "nothing" target
             # if dectection is the same as target_phones (without the stress marks because charsiu don't put that), change back to target phones
             if detection.split('_')==remove_stress_annots(target_phones.split('_')): detection=target_phones
@@ -397,15 +415,30 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             if unstressed_target in terminations_accepted_alternatives:
                 if detection in terminations_accepted_alternatives[unstressed_target]:
                     detection=target_phones
+        
+        # WARNING: that logic would accept IH_Z as Z which is not wished
+        # if the end (or start) of detection is the same as target_phones, I want to consider it correct if the phoneme corresponds to what's in the root
+        # e.g. the words id "cops", target in "S" and detection is "P_S" --> should be correct
 
+        # # I want to do this on the stress version with post-correction from accepted alternatives
+        # if len(detection.split('_'))>n_p_target:
+        #     if contrast=="end":
+        #         if '_'.join(detection.split('_')[-n_p_target:])==target_phones:
+        #             detection=target_phones
+        #     if contrast=="start":
+        #         if '_'.join(detection.split('_')[:n_p_target])==target_phones:
+        #             detection=target_phones
+
+        print('detection', detection)
         return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
-def phonetic_content_analysis(s, phonetics, model=default_model):
+def phonetic_content_analysis(s, phonetics, model=default_model,
+                            vowels=cmu_vowels,
+                            consonants=cmu_consonants):
     phonetic_content=model.analyze_phonetic_content(s, phonetics)
     if len(phonetic_content)==0: return phonetic_content
-    
     
     def syl_analysis(syl_df):
         # inside a syllable or word, there cannot be several times the same phoneme consecutively
@@ -416,7 +449,6 @@ def phonetic_content_analysis(s, phonetics, model=default_model):
         pred_syls=SonoriPy(collapsed_syl.pred_phones_audio.tolist())[0]
         if pred_syls==[]: pred_syls=[collapsed_syl.pred_phones_audio.tolist()]
 
-        
         # extract syllable indices for predicted syls
         pred_syls_indxs=sum([[i]*n for i,n in enumerate([len(syl) for syl in pred_syls])], [])
 
@@ -427,13 +459,13 @@ def phonetic_content_analysis(s, phonetics, model=default_model):
         syl_df=syl_df.fillna(method="ffill")
 
         # in each syllable in prediction, I only keep one vowel, by majority vote, i.e. I drop all vowels except max frames in each syl
-        for i in syl_df.pred_syls_indxs_inside_GT_syl.unique():
-            s=syl_df.loc[syl_df.pred_syls_indxs_inside_GT_syl==i]
-            v=s[s.pred_phones_audio.isin(cmu_vowels)]
-            if len(v)>0:
-                m=v.n_frames.idxmax()
-                l=[el for el in v.index.tolist() if el != m]
-                syl_df=syl_df.drop(l)
+        # for i in syl_df.pred_syls_indxs_inside_GT_syl.unique():
+        #     s=syl_df.loc[syl_df.pred_syls_indxs_inside_GT_syl==i]
+        #     v=s[s.pred_phones_audio.isin(vowels)]
+        #     if len(v)>0:
+        #         m=v.n_frames.idxmax()
+        #         l=[el for el in v.index.tolist() if el != m]
+        #         syl_df=syl_df.drop(l)
         
         return syl_df
 
@@ -449,28 +481,26 @@ def phonetic_content_analysis(s, phonetics, model=default_model):
 
     # post-correction : for each row when we are in a case of accepted alternative in prediction, we replace it with the GT
     for i,r in phonetic_content.iterrows():
-        if r.pred_phones in target_accepted_alternatives:
-            if r.pred_phones_audio in target_accepted_alternatives[r.pred_phones]:
-                phonetic_content.loc[i, 'pred_phones_audio']=r.pred_phones
+        if r.phones in target_accepted_alternatives:
+            if r.pred_phones_audio in target_accepted_alternatives[r.phones]:
+                phonetic_content.loc[i, 'pred_phones_audio']=r.phones
 
-    
     # phonetic_content=phonetic_content[phonetic_content.n_frames>1]
     phonetic_content=phonetic_content[phonetic_content.pred_phones_audio!='[SIL]']
-
-    # phonetic_content.loc[phonetic_content.pred_phones_audio=='[SIL]','pred_phones_audio']=''
-
-    phonetic_content=phonetic_content.loc[drop_consecutive_duplicates(phonetic_content[['pred_phones','pred_phones_audio']]).index,:]
+    phonetic_content=phonetic_content.loc[drop_consecutive_duplicates(phonetic_content[['phones','pred_phones_audio']]).index,:]
     return phonetic_content
 
 def syllable_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
                             target_syllable_idx=0,
                             max_speech_rate=8, mode='file',
-                            model=default_model
+                            to_gibberish=cmu_to_gibberish,
+                            model=default_model,
+                            **kwargs
                     ):
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
-    g_t=[cmu_to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+    g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
 
     if status=="success":
         phonetic_content=phonetic_content_analysis(s, phonetics)
@@ -480,9 +510,10 @@ def syllable_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D 
 
         syllable_content=phonetic_content[phonetic_content.word_idx==target_word_idx][phonetic_content.syl_idx==target_syllable_idx]
         detected_syllable=syllable_content.pred_phones_audio.tolist()
-        g_d=drop_consecutive_duplicate_elements([cmu_to_gibberish[unstress(p)] for p in detected_syllable])
+        g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in detected_syllable])
 
-        return {"status": "success", "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
+        g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in detected_syllable])
+        return {"status": "success", "phonetic_detection":detected_syllable,  "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
         return {"status": status,  "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
     
@@ -493,16 +524,16 @@ if __name__=="__main__":
     from src.audio_processing import prepare_audio_file
     from src.text_processing import *
     from src.label_data_processing import *
+    import librosa
 
     path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
-    # encode_string = base64.b64encode(open(path, "rb").read())
     formatted_phonetics=prefill_for_sentence('ekk')['cmu_phonetics']
-    _, rID=prepare_audio_file(path)
-    phonemeContrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+    s,fs=librosa.load(path, sr=16000)
+    phonemeContrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
                                                         target_word_idx=0, 
                                                         target_syllable_idx=1, 
                                                         target_phones='EY1',
-                                                        alternatives=cmu_vowels, mode='file')
+                                                        alternatives=cmu_vowels, mode='numpy')
 
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
     # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
@@ -515,7 +546,91 @@ if __name__=="__main__":
                                     max_speech_rate=8, mode='base64'
                                     )
 
+    
+    df=synth_words_data()
+    df['target_word_indexes']=0
+    df['target_syllable_indexes']=0
+    df['contrast']='start'
+    df['fpath']=df['path']
+    clusters=["TH_R", "P_R", "S_P_L", "S_K_R"]
+    cluster=clusters[-1]
+    
+    df.phonetics.str.startswith(cluster)
+    df_c=df[df.phonetics.str.startswith(cluster)]
 
+    row=df_c.iloc[0]
+    s,fs=librosa.load(row.path, sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=row.phonetics, target_word_idx=0, target_phones=cluster,basis=cluster,
+                            contrast='start',
+                            mode='numpy')
+    
+
+    cmu_phonetics="T_AO1_S_T"
+    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_tossed.mp3"
+    s,fs=librosa.load(path, sr=16000)
+    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=cmu_phonetics,target_word_idx=0,target_syllable_idx=0,target_occurence_idx=0,target_phones='T',basis='IH0_D',contrast='end',mode='numpy',model=default_model_charsiu)
+
+    
+
+
+    
+
+    
+    formatted_phonetics=prefill_for_sentence('turned around', mode='CMU')['cmu_phonetics']
+    import librosa
+    # s,fs=librosa.load('data/audio_recordings/turnEED_around.mp3', sr=16000)
+    s,fs=librosa.load('data/audio_recordings/turned_around.mp3', sr=16000)
+    default_model.predict_phone_prob_matrix(s,fs).shape
+    default_model.predict_with_timings(s, sum(sum(split_phonetics(formatted_phonetics),[]),[]))
+    default_model.analyze_phonetic_content(s, formatted_phonetics)
+    phonetic_content=phonetic_content_analysis(s, formatted_phonetics)
+    phonetic_content[['phones', 'start_idx', 'end_idx', 'pred_phones_audio','proba_means', 'GT_proba', 'start', 'end', 'n_times']]
+    
+    syllable_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
+                            target_word_idx=1, 
+                            target_syllable_idx=0,
+                            max_speech_rate=8, mode='numpy',
+                            to_gibberish=cmu_to_gibberish,
+                            model=default_model
+                    )
+    
+
+    prefill_for_sentence('expected', mode='MFA_IPA')['cmu_phonetics']
+
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    model_ipa = Wav2Vec2ForFramePrediction('ipa')
+    model_ipa.load(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
+
+    formatted_phonetics=prefill_for_sentence('turned around', mode='MFA_IPA')['cmu_phonetics']
+    
+    # s,fs=librosa.load('data/audio_recordings/turnEED_around.mp3', sr=16000)
+    s,fs=librosa.load('data/audio_recordings/turned_around.mp3', sr=16000)
+    model_ipa.predict_phone_prob_matrix(s,fs).shape
+    model_ipa.predict_with_timings(s, sum(sum(split_phonetics(formatted_phonetics),[]),[]))
+
+
+
+    # _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
+    # _, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
+    s,fs=librosa.load('data/audio_recordings/turned_around.mp3', sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, target_word_idx=0, target_phones='d',basis='ɪ_d',
+                            model=model_ipa,
+                            vowels=ipa_vowels,
+                            consonants=ipa_consonants,
+                            to_gibberish=ipa_to_gibberish,
+                            mode='numpy')
+    
+    
+    
+    
+    # phonemeContrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+    #                         target_word_idx=0, 
+    #                         target_syllable_idx=0, 
+    #                         target_phones='ɝ',
+    #                         alternatives=ipa_vowels,
+    #                         model=model_ipa,
+    #                         to_gibberish=ipa_to_gibberish)
+    
     formatted_phonetics=prefill_for_sentence('turned around')['cmu_phonetics']
     _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
     # _, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
