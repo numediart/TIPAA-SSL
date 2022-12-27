@@ -1,11 +1,8 @@
-import os
 import librosa
 import pandas as pd
 import numpy as np
 
-from charsiu.src.Charsiu import charsiu_forced_aligner, charsiu_attention_aligner, charsiu_predictive_aligner
-
-import sys
+from charsiu.src.Charsiu import charsiu_forced_aligner
 import torch
 import numpy as np
 from charsiu.src.utils import seq2duration,forced_align
@@ -15,6 +12,31 @@ from src.audio_processing import getIntonation, getIntensity, normalize
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
 keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
+
+# processing functions of df_segmented, which is the output of prediction and forced alignment
+
+def extract_word(df_segmented, phonetics, target_word_idx):
+    """phonetics must be a list of list of phonemes, e.g.: phonetics=[['AY1'],['EH1', 'N', 'D', 'IH0', 'D']]
+    """
+    # merge lists
+    phones=sum(phonetics,[])
+
+    df_segmented=df_segmented[df_segmented.phones != '[SIL]']
+    # if phones contains twice the same phone, e.g. "PhiliP Paints well", both P will be collapsed when computing the timings from DTW.
+    # this results in a df_segmented shorter than "phones" list. I thus have to duplicate the corresponding row when it happens
+    if len(phones)>len(df_segmented):
+        # here make sure the index is a range. I will insert using .loc at i+0.5, then reset index every time
+        # https://stackoverflow.com/questions/15888648/is-it-possible-to-insert-a-row-at-an-arbitrary-position-in-a-dataframe-using-pan?rq=1
+        df_segmented=df_segmented.reset_index(drop=True)
+        for i in range(len(phones)-1):
+            if phones[i]==phones[i+1]:
+                df_segmented.loc[i+0.5]=df_segmented.loc[i]
+                df_segmented=df_segmented.reset_index(drop=True)
+    
+    start_idx=sum([len(p) for p in phonetics][:target_word_idx])
+    end_idx=sum([len(p) for p in phonetics][:target_word_idx+1])
+    df_word=df_segmented[start_idx:end_idx]
+    return df_word
 
 # get the blocks of consecutive identical rows in cols
 get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[cols].shift(-1) == a[cols]).any(axis=1)]
@@ -27,6 +49,22 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
         self.p_to_id=self.charsiu_processor.processor.tokenizer.encoder
         self.id_to_p=self.charsiu_processor.processor.tokenizer.decoder
+    
+    def predict_prob_matrix_and_phones(self, audio):
+        
+        audio = self.charsiu_processor.audio_preprocess(audio,sr=self.sr)
+        audio = torch.Tensor(audio).unsqueeze(0).to(self.device)
+
+        with torch.no_grad():  out = self.aligner(audio)
+        cost = torch.softmax(out.logits,dim=-1).detach().cpu().numpy().squeeze()
+
+        
+        pred_ids_audio = torch.argmax(out.logits.squeeze(),dim=-1)
+        pred_ids_audio = pred_ids_audio.detach().cpu().numpy()
+        pred_phones_audio = [self.charsiu_processor.mapping_id2phone(int(i)) for i in pred_ids_audio]
+
+        return cost, pred_phones_audio
+
     def align_phones(self, audio, phones, GT_alignment_proba_threshold=0.17):
         '''
         Perform forced alignment
@@ -43,27 +81,13 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
         '''
         phones=[[p] for p in  remove_stress_annots(phones)]
-
-        audio = self.charsiu_processor.audio_preprocess(audio,sr=self.sr)
-        audio = torch.Tensor(audio).unsqueeze(0).to(self.device)
-        # phones, words = self.charsiu_processor.get_phones_and_words(text)
         phone_ids = self.charsiu_processor.get_phone_ids(phones)
 
-        with torch.no_grad():  out = self.aligner(audio)
-        
-        # hidden_states= out.hidden_states
-        # last_hidden_state=hidden_states[-1]
-        # logits=out.logits
+        cost, pred_phones_audio=self.predict_prob_matrix_and_phones(audio)
 
-        cost = torch.softmax(out.logits,dim=-1).detach().cpu().numpy().squeeze()
 
         pred_probas=np.max(cost, axis=1)
 
-        pred_ids_audio = torch.argmax(out.logits.squeeze(),dim=-1)
-        pred_ids_audio = pred_ids_audio.detach().cpu().numpy()
-        pred_phones_audio = [self.charsiu_processor.mapping_id2phone(int(i)) for i in pred_ids_audio]
-        # pred_phones = seq2duration(pred_phones,resolution=self.resolution)
-        
         sil_mask = self._get_sil_mask(cost)
         nonsil_idx = np.argwhere(sil_mask!=self.charsiu_processor.sil_idx).squeeze()
 
@@ -87,13 +111,13 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
                 proba_means.append(proba_mean)
         else:
             sil='[SIL]'
-            alignment_phones=[(0, len(pred_ids_audio)*self.resolution, sil)]
+            alignment_phones=[(0, len(pred_phones_audio)*self.resolution, sil)]
             # most_pred_phones_audio=[sil]
             # max_proba_mean_phones_audio=[sil]
             sil_vec=np.zeros(cost.shape[-1])
             sil_vec[0]=1
             proba_means=[sil_vec]
-            pred_phones=[sil]*len(pred_ids_audio)
+            pred_phones=[sil]*len(pred_phones_audio)
 
         proba_means_matrix=np.array(proba_means)
         idx_mean_maxs=np.argmax(proba_means_matrix, axis=1)
@@ -256,21 +280,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         # merge lists
         phones=sum(phonetics,[])
         alignment_phones, df_segmented, phonetic_content = self.align_phones(audio=audio,phones=phones)
-        df_segmented=df_segmented[df_segmented.phones != '[SIL]']
-        # if phones contains twice the same phone, e.g. "PhiliP Paints well", both P will be collapsed when computing the timings from DTW.
-        # this results in a df_segmented shorter than "phones" list. I thus have to duplicate the corresponding row when it happens
-        if len(phones)>len(df_segmented):
-            # here make sure the index is a range. I will insert using .loc at i+0.5, then reset index every time
-            # https://stackoverflow.com/questions/15888648/is-it-possible-to-insert-a-row-at-an-arbitrary-position-in-a-dataframe-using-pan?rq=1
-            df_segmented=df_segmented.reset_index(drop=True)
-            for i in range(len(phones)-1):
-                if phones[i]==phones[i+1]:
-                    df_segmented.loc[i+0.5]=df_segmented.loc[i]
-                    df_segmented=df_segmented.reset_index(drop=True)
-        
-        start_idx=sum([len(p) for p in phonetics][:target_word_idx])
-        end_idx=sum([len(p) for p in phonetics][:target_word_idx+1])
-        df_word=df_segmented[start_idx:end_idx]
+
+        df_word=extract_word(df_segmented, phonetics, target_word_idx)
         return df_word
     
     def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
@@ -353,7 +364,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
         Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
         # nVowels=len(indxVowels)
-        sylType=np.zeros(len(filtered_df))
+        # sylType=np.zeros(len(filtered_df))
         for i in range(len(filtered_df)):
             range_vowel=range(startPositions_samples[i], stopPositions_samples[i])
             Ivowel=intensity[range_vowel]
