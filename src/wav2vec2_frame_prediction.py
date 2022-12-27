@@ -40,11 +40,22 @@ from src.dtw_forced_aligner import dtw_forced_aligner
 
 from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer
 
+from src.text_processing import remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
+
+
 global cmu_vowels
 # cmu_phones=[el[0] for el in cmu_phones_info]
 cmu_vowels=[p[0] for p in cmu_phones_info if p[1][0]=='vowel']
 cmu_consonants=[p[0] for p in cmu_phones_info if p[1][0]!='vowel']
 
+
+# processing functions of df_segmented, which is the output of prediction and forced alignment
+
+def extract_word(df_segmented, phonetics, target_word_idx):
+    start_idx=sum([len(p) for p in phonetics][:target_word_idx])
+    end_idx=sum([len(p) for p in phonetics][:target_word_idx+1])
+    df_word=df_segmented[start_idx:end_idx]
+    return df_word
 
 class Wav2Vec2ForFramePrediction:
 
@@ -113,22 +124,6 @@ class Wav2Vec2ForFramePrediction:
         print('fit frame classifier...')
         self.frame_classifier.fit(self.X_train_reduced, self.y_train)
 
-    # def fit_phoneme(self, X, y):
-    #     if self.phoneme_classifier is not None:
-    #         self.X_train = X
-    #         self.y_train_labels = y
-    #         self.y_train=[self.p_to_id[el] for el in y]
-
-    #         print('fit phoneme reducer...')
-    #         self.phoneme_reducer.fit(self.X_train)
-    #         print('reduce training data')
-    #         self.X_train_reduced = self.phoneme_reducer.transform(self.X_train)
-    #         print('fit phoneme classifier...')
-    #         self.phoneme_classifier.fit(self.X_train_reduced, self.y_train)
-    #     else:
-    #         print('phoneme_classifier is set to None, so nothing is done. Averaged frame predictions will be used to predict phonemes')
-     
-
     # from an audio sample, computes the probability matrix of each frame corresponding to every phoneme
     def predict_phone_prob_matrix(self, s, fs):
         self.timestamps = []
@@ -174,15 +169,51 @@ class Wav2Vec2ForFramePrediction:
             avg_vectors.append(avg_vector)
         df_segmented['average_vectors']=avg_vectors
 
-        # if self.phoneme_classifier is not None:
-        #     reduced_vectors=self.phoneme_reducer.transform(avg_vectors)
-        #     pred_idxs=self.phoneme_classifier.predict(reduced_vectors)
-        #     self.pred_phones_audio=[self.id_to_p[el] for el in list(pred_idxs)]
-        #     df_segmented['pred_phones_audio']=self.pred_phones_audio
-        # else:
         self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
 
         return df_segmented
+
+    # call predict_with_timings and reindex words and syllables on top of it
+    def analyze_phonetic_content(self, audio, phonetics):
+        """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
+        """
+        split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
+        phones=sum(split_phonetics,[])
+        # seq_p=[[p] for p in  remove_stress_annots(phones)]
+        df_segmented = self.predict_with_timings(audio,phones)
+
+        detailed_alignment_phones=df_segmented[df_segmented.phones != '[SIL]']
+
+        if len(detailed_alignment_phones)==0: return detailed_alignment_phones
+
+        phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
+
+        # here we align phonetics_indexed_df to the detailed_alignment_phones to be able to get an indexation on the "really pronounced phonetics"
+        # from part of audio that corresponded to specific phones in ground truth (according to forced-alignment)
+        orig_phones=remove_stress_annots(phones)
+        pred_phones=detailed_alignment_phones.phones.tolist()
+        assert orig_phones[0] == pred_phones[0], "The first phone of alignment pred and ground truth should be the same"
+        indx_in_phones=0
+        pred_phones_original_indices=[]
+        for i,p in enumerate(pred_phones):
+            if p == orig_phones[indx_in_phones]:
+                pred_phones_original_indices.append(indx_in_phones)
+            else:
+                indx_in_phones+=1
+                # Given it was not equal to the previous element, after going to the next element of ground truth, it should be the same"
+                # except if there was twice the same phoneme (because it was the end of last word and start of current word)
+                if p == orig_phones[indx_in_phones]:
+                    pred_phones_original_indices.append(indx_in_phones)
+                else:
+                    assert orig_phones[indx_in_phones]==orig_phones[indx_in_phones-1], "This should correspond to the case of two consecutive identical phonemes, because they are in two consecutive words"
+                    indx_in_phones+=1
+                    assert p == orig_phones[indx_in_phones], "This should correspond to the case of two consecutive identical phonemes, because they are in two consecutive words"
+                    pred_phones_original_indices.append(indx_in_phones)
+
+        # detailed_alignment_phones.loc[:,'p_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'p_idx'].tolist()
+        detailed_alignment_phones.loc[:,'word_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'word_idx'].tolist()
+        detailed_alignment_phones.loc[:,'syl_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'syl_idx'].tolist()
+        return detailed_alignment_phones
 
     # predict a specific word in a sample through its index in phonetics
     def predict_word(self, s, phonetics, target_word_idx):
@@ -191,9 +222,8 @@ class Wav2Vec2ForFramePrediction:
         phones=sum(phonetics,[])
         df_segmented = self.predict_with_timings(s, phones)
         
-        start_idx=sum([len(p) for p in phonetics][:target_word_idx])
-        end_idx=sum([len(p) for p in phonetics][:target_word_idx+1])
-        df_word=df_segmented[start_idx:end_idx]
+
+        df_word=extract_word(df_segmented, phonetics, target_word_idx)
         return df_word
 
     # predict a specific word in a sample through its word index in phonetics and its syllable index in word
@@ -521,9 +551,9 @@ if __name__ == '__main__':
     data = load_cmu_test_dataset(df_t_test)
     # data = load_test_dataset(df_t_test)
 
-    # phoneme predictions on a single audio sample with forced alignment
-    pred = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
-    prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    # # phoneme predictions on a single audio sample with forced alignment
+    # pred = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    # prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
     
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
@@ -533,6 +563,8 @@ if __name__ == '__main__':
     # phoneme predictions on a single audio sample with forced alignment
     pred = default_model_cmu.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
     prob_matrix = default_model_cmu.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+
+    phonetic_content = default_model_cmu.analyze_phonetic_content(data.s.iloc[0], data.cmu_phones.iloc[0])
     
     # default_model_ipa = Wav2Vec2ForFramePrediction('ipa')
     # default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
