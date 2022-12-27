@@ -424,33 +424,36 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
 
     return content
 
-def synth_words_data():
-    path="scripts/synth_audio/cmu_words/standard/prosody/"
-    if not os.path.exists(path+'linguistic_data.csv'):
+
+
+
+def synth_words_data(path="scripts/synth_audio/cmu_words/standard/prosody/", phonetic_dict=cmudict_dict, mode='CMU'):
+    # path="scripts/synth_audio/mfa_words/standard/prosody/fr_FR"
+    if not os.path.exists(path+'/linguistic_data.csv'):
         audios_path=path+"/*/*"
         paths=glob(audios_path)
 
         df=pd.DataFrame()
         df['path']=paths
         df['text']=df.apply(lambda r: os.path.split(r.path)[-1].split('.')[0].split('_')[-1] , axis=1)
-        df['cmu_phonetics']=df.progress_apply(lambda r: cmudict_dict[r.text], axis=1)
 
-        # from tqdm import tqdm
-        # tqdm.pandas()
+        
+        from tqdm import tqdm
+        tqdm.pandas()
+        df['phonetics']=df.progress_apply(lambda r: phonetic_dict[r.text] if r.text in phonetic_dict else float('nan'), axis=1)
 
-        # # df.progress_apply(lambda r: prefill_for_sentence(r.text, mode='MFA_IPA')['cmu_phonetics'], axis=1)
-        # df.progress_apply(lambda r: prefill_for_sentence(r.text, mode='CMU')['cmu_phonetics'], axis=1)
+        df=df.dropna()
 
         # not sure why, it seems there are empty entries in cmudict
-        df=df[df.apply(lambda r: len(r.cmu_phonetics), axis=1)>0]
-        df['syl_p_cmu']=df['cmu_phonetics'].apply(lambda r: SonoriPy(r[0], mode='CMU')[0])
-
-        df['cmu_phonetics']=df['syl_p_cmu'].apply(lambda p: '|'.join(['_'.join(syl) for syl in p]))
+        df=df[df.apply(lambda r: len(r.phonetics), axis=1)>0]
+        
+        df['syl_p']=df['phonetics'].progress_apply(lambda r: SonoriPy(r[0], mode=mode)[0])
+        df['phonetics']=df['syl_p'].apply(lambda p: '|'.join(['_'.join(syl) for syl in p]))
         # df.apply(lambda r: prefill_for_sentence(r.text), axis=1)
 
-        df.to_csv(path+'linguistic_data.csv')
+        df.to_csv(path+'/linguistic_data.csv')
     else:
-        df=pd.read_csv(path+'linguistic_data.csv')
+        df=pd.read_csv(path+'/linguistic_data.csv')
         # pd.read_csv()
-        df['syl_p_cmu']=df['syl_p_cmu'].apply(ast.literal_eval)
+        df['syl_p']=df['syl_p'].apply(ast.literal_eval)
     return df
