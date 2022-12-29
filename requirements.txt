@@ -3,7 +3,7 @@ librosa
 pandas
 textgrid
 openpyxl
-pyworld
+# pyworld
 scipy
 pytest
 cmudict
@@ -24,16 +24,20 @@ speechbrain
 transformers==4.16.2
 # s3prl
 newrelic
-webrtcvad
+# webrtcvad
 praatio
 g2pM
 num2words
 unidecode
 umap-learn
 jiwer
-# ctc_segmentation
+ctc_segmentation
 requests_toolbelt
 # hdbscan
 linetimer
 pydub
 flask-smorest
+# flask_jwt_extended
+streamlit
+biopython
+datasets
