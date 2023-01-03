@@ -1,3 +1,4 @@
+# The speech tech
 
 Download code:
 ```
@@ -60,8 +61,13 @@ Rebuild and launch right away:
 docker-compose up -d --no-deps --build flaskapp
 ```
 
+# For content-tools
 
-Additional notes: 
+Same for downloading code and models. 
+
+But `docker compose -f docker-compose_streamlit.yml build` then up
+
+# Additional notes: 
 
 To kill all containers, e.g. to restart afterwards:
 ```
