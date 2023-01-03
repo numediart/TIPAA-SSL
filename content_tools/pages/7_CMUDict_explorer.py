@@ -35,7 +35,7 @@ def main(filters_df):
     Example: if you wand to select words that finish in "-ed" and for which the phonetics ends in "D" like in "cleaned" or "moved", but not like in "guided" or "started", you will need three filters:
     - text | does | endswith | ed
     - formatted_phonetics | does | endswith | D
-    - formatted_phonetics | does | endswith | IH0_D
+    - formatted_phonetics | does not | endswith | IH0_D
     """)
     
     # Get the number of rows to add from the user
