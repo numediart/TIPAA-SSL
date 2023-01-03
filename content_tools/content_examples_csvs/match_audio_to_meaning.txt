@@ -1,0 +1,14 @@
+1. {'text_to_display': 'Our meeting is not at 4PM.', 'target_content': 'Our meeting is at *three*.', 'incorrect': '*Our* meeting is at three.'}
+2. {'text_to_display': "I didn't see Alex.", 'target_content': 'I saw *Selma* in the printing room.', 'incorrect': 'I saw Selma in the *printing* room.'}
+3. {'text_to_display': "I didn't send her an old report.", 'target_content': 'I sent her the *latest* report.', 'incorrect': '*I* sent her the latest report.'}
+4. {'text_to_display': "I'm innocent!", 'target_content': "*I* didn't steal your lunch from the fridge!", 'incorrect': "I didn't steal *your* lunch from the fridge!"}
+5. {'text_to_display': 'I speak both languages.', 'target_content': 'I speak English *and* Dutch.', 'incorrect': 'I speak English and *Dutch*.'}
+6. {'text_to_display': "I didn't go.", 'target_content': '*James* went to the office yesterday.', 'incorrect': 'James went to the office *yesterday*.'}
+7. {'text_to_display': "James didn't go there today.", 'target_content': 'James went to the office *yesterday*.', 'incorrect': '*James* went to the office yesterday.'}
+8. {'text_to_display': 'I think we should spend more money.', 'target_content': 'In my opinion, we should not spend *less*.', 'incorrect': 'In *my* opinion, we should not spend less.'}
+9. {'text_to_display': "Mohammed didn't do the budget.", 'target_content': '*Sarah* did the budget for this project.', 'incorrect': 'Sarah did the budget for *this* project.'}
+10. {'text_to_display': "Jamila didn't write Sarah an email.", 'target_content': 'Jamila *called* Sarah to tell her she was promoted.', 'incorrect': 'Jamila called *Sarah* to tell her she was promoted.'}
+11. {'text_to_display': "I put the right date in my boss's calendar.", 'target_content': 'I put the wrong date in *my* calendar.', 'incorrect': '*I* put the wrong date in my calendar.'}
+12. {'text_to_display': 'I got my parcel on time.', 'target_content': "*Lee* didn't get his parcel on time.", 'incorrect': "Lee didn't get *his* parcel on time."}
+13. {'text_to_display': "I thought she wasn't doing it.", 'target_content': 'Laura *is* doing a market study about avocados.', 'incorrect': '*Laura* is doing a market study about avocados.'}
+14. {'text_to_display': "We aren't exporting to Italy.", 'target_content': 'We are exporting our business to *Spain*.', 'incorrect': 'We are exporting *our* business to Spain.'}
