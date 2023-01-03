@@ -18,6 +18,13 @@ import textwrap
 
 from transformers import Wav2Vec2ForCTC
 
+
+import sys
+sys.path.append('./')
+from src.label_data_processing import get_formatted_cmudict
+
+formatted_cmudict_df=get_formatted_cmudict()
+
 @st.experimental_singleton
 def get_model(model_type):
     # Create a model of the specified type

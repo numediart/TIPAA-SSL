@@ -438,9 +438,11 @@ def final_ed_confusions_for_actor_recordings():
 target_to_basis={
     'D':'IH0_D',
     'IH0_D':'IH0_D',
+    'T':'IH0_D',
     '':'IH0_Z',
     'S':'IH0_Z',
     'Z':'IH0_Z',
+    'IH0_Z':'IH0_Z',
 }
 
 
@@ -492,17 +494,61 @@ def start_end_consonant_clusters_on_synth_words(clusters=['P_TH', 'M_P_T', 'N_TH
 
 # start_end_consonant_clusters_on_synth_words(clusters=['P_TH', 'M_P_T', 'N_TH_S'], n=100, model=default_model_charsiu, contrast='end')
 # start_end_consonant_clusters_on_synth_words(clusters=["TH_R", "P_R", "S_P_L", "S_K_R"], n=100, model=default_model_charsiu, contrast='start')
+
+
+from src.text_processing import unstress
+def syl_confusions_on_synth_words():
     
+    df=synth_words_data()
+    syls=df.syl_p.apply(lambda r: set(['_'.join(el) for el in r])).tolist()
+    syls=df.syl_p.apply(lambda r: set(['_'.join([unstress(p) for p in el]) for el in r])).tolist()
+
+    syls_set=set().union(*syls)
+    len(syls_set)
 
 
 
-def final_s_on_synth_words(n=100, model=default_model):
+
+# final_ed_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu')
+# final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline')
+def final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words'):
 
     df=synth_words_data()
 
     df['target_word_indexes']=0
     df['target_syllable_indexes']=-1
     df['fpath']=df['path']
+
+    df=df.dropna()
+    
+    df_id=df[(df.phonetics.str.endswith('AH0_D')|df.phonetics.str.endswith('IH0_D'))&df.text.str.endswith('ed')]
+    df_t=df[(df.phonetics.str.endswith('_T'))&df.text.str.endswith('ed')]
+    df_d=df[(~(df.phonetics.str.endswith('AH0_D')|df.phonetics.str.endswith('IH0_D'))&~df.phonetics.str.endswith('_T'))&df.text.str.endswith('ed')]
+
+    selections={
+        # '':df_no_s.sample(frac=1, random_state=0)[:n],
+        'IH0_D':df_id.sample(frac=1, random_state=0)[:n],
+        'T':df_t.sample(frac=1, random_state=0)[:n],
+        'D':df_d.sample(frac=1, random_state=0)[:n],
+    }
+
+    
+    results, result_dfs=compute_start_end_confusions_from_selections(selections, model=model)
+
+    plot_confusion_results(results, name=name)
+
+
+# final_s_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu')
+# final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline')
+def final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words'):
+
+    df=synth_words_data()
+
+    df['target_word_indexes']=0
+    df['target_syllable_indexes']=-1
+    df['fpath']=df['path']
+
+    df=df.dropna()
     
     df_iz=df[(df.phonetics.str.endswith('AH0_Z')|df.phonetics.str.endswith('IH0_Z'))&df.text.str.endswith('es')]
     df_s=df[(df.phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
@@ -514,7 +560,7 @@ def final_s_on_synth_words(n=100, model=default_model):
 
     
     selections={
-        '':df_no_s.sample(frac=1, random_state=0)[:n],
+        # '':df_no_s.sample(frac=1, random_state=0)[:n],
         'IH0_Z':df_iz.sample(frac=1, random_state=0)[:n],
         'S':df_s.sample(frac=1, random_state=0)[:n],
         'Z':df_z.sample(frac=1, random_state=0)[:n],
@@ -525,7 +571,13 @@ def final_s_on_synth_words(n=100, model=default_model):
     
     results, result_dfs=compute_start_end_confusions_from_selections(selections, model=model)
 
-    plot_confusion_results(results, name='plots/final_s_synth_words')
+    plot_confusion_results(results, name=name)
+
+def final_ed_s_confusions_on_synth_words():
+    final_ed_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu')
+    final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline')
+    final_s_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu')
+    final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline')
 
 def final_s_from_artificial_data(model=default_model):
     df=final_s_artificial_data()    
