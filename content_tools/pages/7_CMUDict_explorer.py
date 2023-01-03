@@ -24,7 +24,8 @@ def main(filters_df):
     st.title('CMU Dict explorer')
 
     st.markdown("""
-    This tool allows you to filter English words contained in (CMUDict)[http://www.speech.cs.cmu.edu/cgi-bin/cmudict] based on criterea in text and in phonetics.
+    This tool allows you to filter English words contained in [CMUDict](http://www.speech.cs.cmu.edu/cgi-bin/cmudict) based on criterea in text and in phonetics.
+    You can find [here a spreadsheet](https://docs.google.com/spreadsheets/d/1aOEJyXFjbERq8vZ2qYMGsWnqpkIvzmL3Q4khBLMZ0Zc/edit?usp=sharing) that list the different CMU phonemes and their link to IPA and ARPABET and an example of word containing them.
     - First choose the number of filters (criterea) you want
     - Then build your filters
         - choose on what to apply a filter (text or formatted_phonetics)
