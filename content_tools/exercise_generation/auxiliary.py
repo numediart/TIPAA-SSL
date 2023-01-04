@@ -62,8 +62,7 @@ def syllable_count(word):
   pre: word is a string that can be found in the keys of the CMU dictionary
   post: returns the number of syllables contained in 'word'
   """
-  cmu=cmudict.dict()
-  phword = cmu[word]
+  phword = cmudict_dict[word]
   i = 0
   for el in phword[0]:
     for symbol in el:
@@ -93,8 +92,7 @@ def stressed_syllable(word):
   post: returns which syllable is stressed in 'word'. 
   """
   word = word.lower() #needs to be lowercase
-  cmu=cmudict.dict()
-  phword = cmu[word]
+  phword = cmudict_dict[word]
   i = 0
   for el in phword[0]:
     if len(el) == 3: #vowels are always written with 3 symbols
@@ -149,7 +147,7 @@ def sort_ed(list_of_words):
                     d['D'].append(word) # the final -ed is pronounced /d/
     return d
 
-def filter_data(string):
+def filter_index_nans(string):
     """
     pre: string is a string that comes from an Panda Dataframe extraction and that needs to be cleaned from all superfluous info
     post returns a string that is clean data that can be used as such in prompts
@@ -168,13 +166,13 @@ def create_title(d, pronunciation_aspect = 'WS'):
     # creating a dictionary with the related prompt complement depending on the pronunciation aspect
     fillers = {'FW':'focus words.','WS':'word stress.','-ED':'words ending in -ed.','VC1':'the vowel contrast between /ɪ/ and /i:/','VC2':'the vowel contrast between /ɔː/ vs. /əʊ/'}
     if list(d.keys())[0] == 'Module title':
-        data_module = filter_data(df['Module'].to_string())
+        data_module = filter_index_nans(df['Module'].to_string())
         prompt = """Here are example of titles for exercise modules from a learning program for English\n""" + data_module + "\nGenerate 5 exercise module titles inspired by this list, for exercises related to " + fillers[pronunciation_aspect]
     elif list(d.keys())[0] == 'Activity set':
-        data_activity_set = filter_data(df['Activity Set'].to_string())
+        data_activity_set = filter_index_nans(df['Activity Set'].to_string())
         prompt = """Here are example of titles for exercise modules from a learning program for English\n""" + data_activity_set + "\nGenerate 5 exercise module titles inspired by this list, for exercises related to " + fillers[pronunciation_aspect]
     elif list(d.keys())[0] == 'Activity title':
-        data_activity = filter_data(df['Activity'].to_string())
+        data_activity = filter_index_nans(df['Activity'].to_string())
         prompt = """Here are example of titles for exercise modules from a learning program for English\n""" + data_activity + "\nGenerate 5 exercise module titles inspired by this list, for exercises related to " + fillers[pronunciation_aspect]
     response=generate_response(prompt, frequency_penalty=0.4,presence_penalty = 0.4)
     text = response.choices[0]['text']
