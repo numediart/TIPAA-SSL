@@ -107,7 +107,8 @@ def match_word_to_audio_vc1(n_exercises = 10):
     df= pd.read_csv("content_tools/content_examples_csvs/match_word_to_audio.csv")
     
     # VC /i:/ and /ɪ/
-    match_word_to_audio_vc1 = aux.filter_index_nans(df['VC1'].to_string())    
+    
+    match_word_to_audio_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
     prompt = "Here is a list of pairs of words easily confused containing IPA phonemes /i:/ and /ɪ/\n" + match_word_to_audio_vc1 +  "Give me " + str(n_exercises*3)+" more pairs of words like this."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -158,7 +159,7 @@ def match_word_to_audio_vc2(n_exercises = 10):
     df= pd.read_csv("content_tools/content_examples_csvs/match_word_to_audio.csv")
     
     # VC /ɔː/ and /əʊ/
-    match_word_to_audio_vc2 = aux.filter_index_nans(df['VC2'].to_string())
+    match_word_to_audio_vc2 = '\n'.join(df['VC2'].dropna().tolist())+'\n'
     prompt = "Here is a list of pairs of words easily confused containing IPA phonemes /ɔː/ and /əʊ/\n" + match_word_to_audio_vc2 + "\nGive me "+ str(n_exercises*3)+" more pairs of words like this"
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -208,7 +209,9 @@ def match_word_to_audio_vc3(n_exercises = 10):
     df= pd.read_csv("content_tools/content_examples_csvs/match_word_to_audio.csv")
     
     # VC /ʊ/ vs. /u:/
-    match_word_to_audio_vc2 = aux.filter_index_nans(df['VC2'].to_string())
+    
+    
+    match_word_to_audio_vc2 = '\n'.join(df['VC2'].dropna().tolist())+'\n'
     prompt = "Here is a list of pairs of words easily confused containing IPA phonemes /ɔː/ and /əʊ/\n" + match_word_to_audio_vc2 + "\nGive me " + str(n_exercises*3) + " pairs of words like this, but with the phonemes /ʊ/ (like in 'good') and /u:/ (like in 'use')."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -258,7 +261,7 @@ def match_word_to_audio_vc4(n_exercises = 10):
     df= pd.read_csv("content_tools/content_examples_csvs/match_word_to_audio.csv")
     
     # VC /ʊ/ vs. /u:/
-    match_word_to_audio_vc2 = aux.filter_index_nans(df['VC2'].to_string())
+    match_word_to_audio_vc2 = '\n'.join(df['VC2'].dropna().tolist())+'\n'
     prompt = "Here is a list of pairs of words easily confused containing IPA phonemes /ɔː/ and /əʊ/\n" + match_word_to_audio_vc2 + "\nGive me " + str(n_exercises*3) + " pairs of words like this, but with the phonemes /æ/ (like in 'had') and /ɑ:/ (like in 'hard')."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -307,7 +310,8 @@ def match_word_to_audio_ed(n_exercises = 10):
     # Creating a Panda Dataframe to retrieve data in CSV file
     df= pd.read_csv("content_tools/content_examples_csvs/match_word_to_audio.csv")
     
-    match_word_to_audio_ed = aux.filter_index_nans(df['-ED'].to_string())
+    
+    match_word_to_audio_ed = '\n'.join(df['-ED'].dropna().tolist())+'\n'
     prompt = "Here is a list of pairs of verbs that sound very similar, ending in -ed\n" + match_word_to_audio_ed + "Give me "+ str(n_exercises*3)+" more pairs of verbs like this"
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -458,8 +462,10 @@ def pick_phonetics_vc1(n_exercises = 10, topic = 'Business', target_regexes= ['I
     Example: [{"target_content": "testimony"}, {"target_content": "litigation"}, {"target_content": "agreement"}, {"target_content": "jury"}, {"target_content": "negotiations"}]
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
+
     
-    pick_phonetics_vc1 = aux.filter_index_nans(df['VC1'].to_string())
+    
+    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
     prompt = "Here is a list of  of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " more words that also have either the /i:/ or the /ɪ/ phoneme and that could be found in a " + topic + " English vocabulary list."
     
     response=aux.generate_response(prompt)
@@ -477,7 +483,7 @@ def pick_phonetics_vc2(n_exercises = 10, topic = 'Business', target_regexes= ['O
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_vc2 = aux.filter_index_nans(df['VC2'].to_string())
+    pick_phonetics_vc2 = '\n'.join(df['VC2'].dropna().tolist())+'\n'
     prompt = "Here is a list of  of words containing either the IPA phonemes /ɔː/ and /əʊ/ from a Business English vocabulary list.\n" + pick_phonetics_vc2 + "\nGenerate " + str(n_exercises*3) + " more words that also have either the /ɔː/ and /əʊ/ phoneme and that could be found in a " + topic + " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -494,7 +500,7 @@ def pick_phonetics_vc3(n_exercises = 10, topic = 'Business', target_regexes= ['U
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_vc1 = aux.filter_index_nans(df['VC1'].to_string())
+    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
     prompt = "Here is a list of  of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phonemes /ʊ/ (like in 'good') and /u:/ (like in 'pool'), that could be found in a " + topic+ " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -511,7 +517,7 @@ def pick_phonetics_vc4(n_exercises = 10, topic = 'Business', target_regexes= ['A
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_vc1 = aux.filter_index_nans(df['VC1'].to_string())
+    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
     prompt = "Here is a list of  of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phonemes /æ/ (like in 'have') and /ɑ:/ (like in 'part'), that could be found in a " + topic+ " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -528,7 +534,7 @@ def pick_phonetics_th(n_exercises = 10, topic = 'Business', target_regexes= ['TH
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_vc1 = aux.filter_index_nans(df['VC1'].to_string())
+    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
     prompt = "Here is a list of  of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phoneme /θ/ (like in 'method') or /ð/ (like in 'mother'), that could be found in a " + topic+ " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -545,7 +551,7 @@ def pick_phonetics_h(n_exercises = 10, topic = 'Business', target_regexes= ['HH'
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_vc1 = aux.filter_index_nans(df['VC1'].to_string())
+    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
     prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phoneme /h/ (like in 'forehead') , that could be found in a " + topic+ " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -562,7 +568,7 @@ def pick_phonetics_ed(n_exercises = 10, topic = 'Business'):
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_ed = aux.filter_index_nans(df['-ED'].to_string())
+    pick_phonetics_ed = '\n'.join(df['-ED'].dropna().tolist())+'\n'
     prompt = "Here is a list of  of words ending in -ed, from a Business English vocabulary list.\n" + pick_phonetics_ed + "\nGenerate " + str(n_exercises*3) + " more words that also end in -ed and that could be found in a " + topic + " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -580,7 +586,7 @@ def pick_phonetics_final_s(n_exercises = 10, topic = 'Business'):
     """
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_ed = aux.filter_index_nans(df['-ED'].to_string())
+    pick_phonetics_ed = '\n'.join(df['-ED'].dropna().tolist())+'\n'
     prompt = "Here is a list of words ending in -ed from a Business English vocabulary list.\n" + pick_phonetics_ed + "\nGenerate " + str(n_exercises*3) + " words like this, but that end in -s (like 'products' or 'services', that also exist without the final -s, and that could be found in a " + topic+ " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -783,8 +789,9 @@ def spokencard_one_type(exercise_type,n_exercises = 10, topic = 'Business'):
     vc2_complement = ", which contains either the phoneme /ɔː/ or /əʊ/,"
     ed_complement = ", which ends in '-ed',"
     if exercise_type in ['WS-SW','VC1-SW']:
-        ws_sw = aux.filter_index_nans(df['WS single word'].to_string())
-        vc1_sw = aux.filter_index_nans(df['VC1 single word'].to_string())
+        
+        ws_sw = '\n'.join(df['WS single word'].dropna().tolist())+'\n'
+        vc1_sw = '\n'.join(df['VC1 single word'].dropna().tolist())+'\n'
         prompt_type = {'WS-SW': [ws_sw,""],'VC1-SW': [vc1_sw,vc1_complement]}
         prompt = "Here is a list of words" + prompt_type[exercise_type][1] + " from a Business English vocabulary list.\n" + prompt_type[exercise_type][0] + "\nGenerate " + str(n_exercises) + " more words that could be found in a " + topic + " English vocabulary list."
         response=aux.generate_response(prompt)
@@ -802,14 +809,14 @@ def spokencard_one_type(exercise_type,n_exercises = 10, topic = 'Business'):
                             break # if we don't break, the same word could be twice in the list if you have two phonemes that fit the requirements
             l = filtered_list
     elif exercise_type in ['WS-WG','WS-S','VC1-WG','VC1-S','VC2-WG','VC2-S','-ED-WG','-ED-S']:
-        ws_wg = aux.filter_index_nans(df['WS word group'].to_string())
-        ws_s = aux.filter_index_nans(df['WS sentence'].to_string())
-        vc1_wg = aux.filter_index_nans(df['VC1 word group'].to_string())
-        vc1_s = aux.filter_index_nans(df['VC1 sentence'].to_string())
-        vc2_wg = aux.filter_index_nans(df['VC2 word group'].to_string())
-        vc2_s = aux.filter_index_nans(df['VC2 sentence'].to_string())
-        ed_wg = aux.filter_index_nans(df['-ED word group'].to_string())
-        ed_s = aux.filter_index_nans(df['-ED sentence'].to_string())
+        ws_wg = '\n'.join(df['WS word group'].dropna().tolist())+'\n'
+        ws_s = '\n'.join(df['WS sentence'].dropna().tolist())+'\n'
+        vc1_wg = '\n'.join(df['VC1 word group'].dropna().tolist())+'\n'
+        vc1_s = '\n'.join(df['VC1 sentence'].dropna().tolist())+'\n'
+        vc2_wg = '\n'.join(df['VC2 word group'].dropna().tolist())+'\n'
+        vc2_s = '\n'.join(df['VC2 sentence'].dropna().tolist())+'\n'
+        ed_wg = '\n'.join(df['-ED word group'].dropna().tolist())+'\n'
+        ed_s = '\n'.join(df['-ED sentence'].dropna().tolist())+'\n'
         # dictionary to adapt the prompt depending on type of exercise (WS-WG, WS-S, VC1-WG, VC1-S, VC2-WG, VC2-S). 
         prompt_type = {'WS-WG':['word groups',ws_wg,""],'WS-S':['sentences',ws_s,""],'VC1-WG':['word groups',vc1_wg,vc1_complement],'VC1-S':['sentences',vc1_s,vc1_complement],'VC2-WG':['word groups',vc2_wg,vc2_complement],'VC2-S':['sentences',vc2_s,vc2_complement],'-ED-WG':['word groups',ed_wg,ed_complement],'-ED-S':['sentences',ed_s,ed_complement]}
         prompt = "Here is a list of " + prompt_type[exercise_type][0] + " where emphasis on one word in particular" + prompt_type[exercise_type][2] + " is indicated using asterisks (*), from a Business English vocabulary list.\n" + prompt_type[exercise_type][1] + "\nGenerate " + str(n_exercises) + " more " + prompt_type[exercise_type][0] + " where emphasis on one word in particular"  + prompt_type[exercise_type][2] + " is indicated using asterisks (*) and that could be found in a " + topic + " English vocabulary list."
@@ -1027,15 +1034,15 @@ def spokensentence_fw(n_exercises = 5, topic = 'Business'):
     """
     # Creating a panda Dataframe to retrieve all of the example data
     df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
-    
+
     # doesn't work very well, most of the time the output does not have the required format. I think the prompt is a bit too complicated for OpenAI to understand.
-    fw_correction_examples = aux.filter_index_nans(df['FW correction'].to_string())
+    fw_correction_examples = '\n'.join(df['FW correction'].dropna().tolist())+'\n'
     fw_correction = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word is indicated using asterisks (*)
     in "question", and a correction occurs in "answer", using asterisks (*). The stress category 'Correction' is also indicated in "stress_category".\n""" + fw_correction_examples
-    fw_highlight_examples = aux.filter_index_nans(df['FW highlight'].to_string())
+    fw_highlight_examples = '\n'.join(df['FW highlight'].dropna().tolist())+'\n'
     fw_highlight = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, or none, is indicated using asterisks (*)
     in "question" , and another word is emphasized in "answer", using asterisks (*). The stress category 'Highlight' is also indicated in "stress_category".\n""" + fw_highlight_examples    
-    fw_emotion_examples = aux.filter_index_nans(df['FW emotion'].to_string())
+    fw_emotion_examples = '\n'.join(df['FW emotion'].dropna().tolist())+'\n'
     fw_emotion = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, or none, is indicated using asterisks (*) in "question" ,
     and emotion is expressed in "answer" by emphasizing a word in particular using asterisks (*). The stress category 'Emotion' is also indicated in "stress_category".\n""" + fw_emotion_examples
     prompt1 = fw_correction + "/nGenerate " + str(n_exercises*2) + " more exercise outputs that could be found in a " + topic + " English vocabulary list, alternating between the stress categories 'Correction', 'Highlight' and 'Emotion'."
@@ -1079,7 +1086,9 @@ def spokensentence_vc1(n_exercises = 20, topic = 'Business'):
     #first step: creating a word list  
     df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
     
-    pick_phonetics_vc1 = aux.filter_index_nans(df['VC1'].to_string())
+    # '\n'.join(df['VC1'].dropna().tolist())+'\n'
+
+    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
     prompt = "Here is a list of  of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate 30 more words that also have either the /i:/ or the /ɪ/ phoneme and that could be found in a " + topic + " English vocabulary list."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -1154,7 +1163,7 @@ def spokensentence_vc2(n_exercises = 5, topic = 'Business'):
     # Creating a panda Dataframe to retrieve all of the example data
     df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
     
-    examples = aux.filter_index_nans(df['VC2'].to_string())
+    examples = '\n'.join(df['VC2'].dropna().tolist())+'\n'
     prompt = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word containing either the phoneme /ɔː/ or /əʊ/ is indicated using asterisks (*)
     in "answer".""" + examples + "/nGenerate " + str(n_exercises*2) + " more exercise outputs that could be found in a " + topic + " English vocabulary list."  
     response=aux.generate_response(prompt)
@@ -1196,7 +1205,8 @@ def spokensentence_ed(n_exercises = 5, topic = 'Business'):
     # Creating a panda Dataframe to retrieve all of the example data
     df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
     
-    examples = aux.filter_index_nans(df['-ED'].to_string())
+    
+    examples = '\n'.join(df['-ED'].dropna().tolist())+'\n'
     prompt = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, ending in -ed, is indicated using asterisks (*)
     in "answer".""" + examples + "/nGenerate " + str(n_exercises*2) + " more exercise outputs that could be found in a " + topic + " English vocabulary list."
     response=aux.generate_response(prompt)
