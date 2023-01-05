@@ -25,7 +25,7 @@ def generate_response(prompt,
     presence_penalty=0.4):
   
   response = openai.Completion.create(
-    model="text-davinci-002",
+    model="text-davinci-003",
     prompt=prompt,
     temperature=temperature,
     max_tokens=max_tokens,
