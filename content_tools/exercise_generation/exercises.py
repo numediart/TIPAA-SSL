@@ -419,11 +419,14 @@ def pick_stressed_syllable(n_exercises = 10, topic = 'Business'): count_syllable
 
 has_a_target_phone=lambda phones,  target_phoneme_regexes: sum([sum([re.search(reg,phon)!=None for phon in phones]) for reg in target_phoneme_regexes])
 
-has_target_text_pattern=lambda text,  target_word_regex:  (re.search(target_word_regex,text)!=None)
+has_target_text_pattern=lambda text,  target_word_regexes:  sum([re.search(target_word_regex,text)!=None for target_word_regex in target_word_regexes])
 
 def word_has_a_target_phone(word, target_phoneme_regexes):
     if word in cmudict_dict:
-        return has_a_target_phone(cmudict_dict[word][0], target_phoneme_regexes)
+        if len(cmudict_dict[word])>0:
+            return has_a_target_phone(cmudict_dict[word][0], target_phoneme_regexes)
+        else:
+            return False
     else:
         return False
 
@@ -452,8 +455,7 @@ def text_response_to_words_with_target_word_regex(text, target_word_regex, n_exe
     l = []
     for element in liste:
         if len(l) <= n_exercises:
-            has_target= (re.search(target_word_regex,element)!=None)
-            if has_target:
+            if has_target_text_pattern(element, [target_word_regex]):
                 l.append(element)
     return l
 
@@ -1097,17 +1099,11 @@ def spokensentence_fw(n_exercises = 5, topic = 'Business'):
             
 
 
-def change_asterisks(element, target_phoneme_regexes):
+def change_asterisks(element, checking_function=word_has_a_target_phone, target_regexes=['IH[012]','IY[012]']):
     # n_syl*has_target
     n_char_has_target=[]
     for el in element['answer'].replace('*','').split(' '):
-        if el in cmudict_dict:
-            if len(cmudict_dict[el])>0:
-                n_char_has_target.append(has_a_target_phone(cmudict_dict[el][0], target_phoneme_regexes)*len(el))
-            else:
-                n_char_has_target.append(0)
-        else:
-            n_char_has_target.append(0)
+        n_char_has_target.append(checking_function(el, target_regexes)*len(el))
     if sum(n_char_has_target):
         idx_w=np.argmax(n_char_has_target)
         element['answer']=element['answer'].replace('*','')
@@ -1115,7 +1111,6 @@ def change_asterisks(element, target_phoneme_regexes):
         # put asterisks o nit
         element['answer']=' '.join(l[:idx_w]+['*'+l[idx_w]+'*']+l[idx_w+1:])
     return element
-
 
 def check_correct_target_word_and_filter(records, checking_function=word_has_a_target_phone, target_regexes=['IH[012]','IY[012]']):
     word_in_asterisks_regex='(\*[A-Za-z]+\*)'
@@ -1129,15 +1124,21 @@ def check_correct_target_word_and_filter(records, checking_function=word_has_a_t
             if checking_function(y, target_regexes):
                 filtered_list.append(element)
             else: # else we look for the another world with a target and take the longest
-                element=change_asterisks(element, target_regexes)
+                element=change_asterisks(element, checking_function=checking_function, target_regexes=target_regexes)
                 x = re.search(word_in_asterisks_regex,element['answer'])
                 if x: 
-                    filtered_list.append(element)
+                    y = x.group(1)
+                    y = re.sub("\*", "", y) # asterisks need to be removed to check if entry is in cmudictresponse=aux.generate_response(prompt)
+                    if checking_function(y, target_regexes):
+                        filtered_list.append(element)
         else: # else we look for the another world with a target and take the longest
-            element=change_asterisks(element, target_regexes)
+            element=change_asterisks(element, checking_function=checking_function, target_regexes=target_regexes)
             x = re.search(word_in_asterisks_regex,element['answer'])
             if x: 
-                filtered_list.append(element)
+                y = x.group(1)
+                y = re.sub("\*", "", y) # asterisks need to be removed to check if entry is in cmudictresponse=aux.generate_response(prompt)
+                if checking_function(y, target_regexes):
+                    filtered_list.append(element)
     return filtered_list
 
 def spokensentence_vc1(n_exercises = 20, topic = 'Business'):
@@ -1259,9 +1260,6 @@ def spokensentence_ed(n_exercises = 5, topic = 'Business'):
     Each dialogue must contain a word ending in "ed", inbetween asterisks (*), in the second part after the "|". 
     """ + examples_string + "\n\nGenerate a numbered list of " + str(n_exercises*2) + """ more dialogues with a word ending in "ed", inbetween asterisks (*), in the second part after the "|", relating to the topic of """ + topic +""".
     Each phrase should contain maximum 20 words."""
-    # examples = '\n'.join(df['-ED'].dropna().tolist()[:10])+'\n'
-    # prompt = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, ending in -ed, is indicated using asterisks (*) in "answer".
-    # \n""" + examples + "\nGenerate " + str(n_exercises*2) + """ more exercise outputs with a word ending in -ed in "answer" that could be found in a """ + topic + " English vocabulary list."
 
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
@@ -1270,30 +1268,13 @@ def spokensentence_ed(n_exercises = 5, topic = 'Business'):
     l=list(set(l))
 
     records=[{"question":el.split(" | ")[0], "answer":el.split(" | ")[1]} for el in l]
-
-    filtered_list = []
-    for element in l:
-        x = re.search('\*.+\*',element) # the word inbetween asterisks has to be isolated
-        if x: # only proceeds if asterisks were found
-            y = x.group()
-            y = re.sub("\*", "", y) # asterisks need to be removed to check if entry is in cmudict
-            if re.search('ed$',y):
-                filtered_list.append(element)
     
-    liste = []
-    for i in range(len(filtered_list)):
-        filtered_output = re.search('{.+}',random.choice(filtered_list)) # making sure the string looks something like a dictionary
-        if filtered_output:
-            try:
-                d = ast.literal_eval(filtered_output.group())
-                if type(d) == dict: # making sure d was actually transformed into a dictionary
-                    liste.append(d)
-            except:
-                pass
-    if len(liste) > n_exercises: # we have to limit the number of outputs in case there are more than asked for
-        liste = liste[:n_exercises]
-    aux.jsonfile(liste)
-    return liste
+    filtered_list=check_correct_target_word_and_filter(records, checking_function=has_target_text_pattern, target_regexes=['ed$'])
+
+    if len(filtered_list) > n_exercises: # we have to limit the number of outputs in case there are more than asked for
+        filtered_list = filtered_list[:n_exercises]
+    aux.jsonfile(filtered_list)
+    return filtered_list
     
 """
 Putting everything together
