@@ -33,6 +33,18 @@ def process(json_str):
     return df, all_sentences_df, linguistic_data
 
 if check_password():
+
+    st.markdown("""
+    This tool allows you to extract necessary information from a learning program created with the Content Entry Interface from this [list of content tools](https://docs.google.com/spreadsheets/d/1McYu6sPxRJsOcYFdWp-3k9u6GkzgbHedcX2MbIb7F_o/edit?usp=sharing)
+    You just have to paste the output JSON of the whole learning program, and then click on process. The tool will process the content and provide you:
+    - The list of all phrases from all the exercise
+    - a master spreadsheet (as a CSV) that is a picture of the whole content, and is currently used for importing the syllabus tree in the app database (although that might be replace by the JSON itself)
+    - the linguistic content containing 
+        - the phonetization of the phrases, cut in syllables,
+        - the text also cut into syllables
+        - note if there are inconsistencies in the number of syllables in phonetics and in texts (noting that in a list of word index), you can filter that in google sheet for manually fixing them if there are some
+    """)
+
     json_str = st.text_area('Paste your JSON variable here:')
 
     if st.button('Process'):
