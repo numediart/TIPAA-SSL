@@ -11,8 +11,9 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer
 import soundfile as sf
 
 from tqdm import tqdm
-
-from Bio import pairwise2
+import json
+# from Bio import pairwise2
+from Bio import Align
 from time import time
 
 SAMPLERATE = 16000
@@ -21,12 +22,67 @@ WRITING_SAMPLERATE=44100
 from transformers import Wav2Vec2ProcessorWithLM
 
 
+import zipfile
+import io
+def extract_zip_to_dict(zip_file):
+    """
+    Extracts a zip file-like object to a dictionary of file-like objects.
+    The keys of the dictionary are the paths to the corresponding files.
+
+    Parameters:
+    - zip_file: A file-like object representing the zip file to extract.
+
+    Returns:
+    - A dictionary of file-like objects, where the keys are the paths to the corresponding files.
+    """
+    # Create an empty dictionary to store the extracted files
+    extracted_files = {}
+
+    # Open the zip file
+    with zipfile.ZipFile(zip_file, 'r') as zf:
+        # Iterate over the files in the zip file
+        for info in zf.infolist():
+            # Extract the file to a BytesIO object
+            extracted_file = io.BytesIO(zf.read(info))
+            # Add the file to the dictionary, using the path as the key
+            extracted_files[info.filename] = extracted_file
+
+    return extracted_files
+
+
+def reconstruct_zip_from_dict(files):
+    """
+    Reconstructs a zip file-like object from a dictionary of file-like objects.
+    The keys of the dictionary should be the paths to the corresponding files.
+
+    Parameters:
+    - files: A dictionary of file-like objects, where the keys are the paths to the corresponding files.
+
+    Returns:
+    - A file-like object representing the reconstructed zip file.
+    """
+    # Create a BytesIO object to store the zip file
+    zip_file = io.BytesIO()
+
+    # Create a ZipFile object
+    with zipfile.ZipFile(zip_file, 'w') as zf:
+        # Iterate over the files in the dictionary
+        for path, file in files.items():
+            # Write the file to the zip file
+            zf.writestr(path, file.read())
+
+    # Seek to the beginning of the zip file
+    zip_file.seek(0)
+
+    return zip_file
+
+
 
 
 # load model, processor and tokenizer
 # model_name = "jonatasgrosman/wav2vec2-large-xlsr-53-english"
 # model_name="facebook/wav2vec2-large-960h-lv60-self"
-model_name="facebook/wav2vec2-base-960h"
+model_name="hf_models/facebook/wav2vec2-base-960h"
 
 processor = Wav2Vec2Processor.from_pretrained(model_name)
 # processor = Wav2Vec2ProcessorWithLM.from_pretrained("patrickvonplaten/wav2vec2-base-100h-with-lm")
@@ -240,9 +296,6 @@ def extract_timings(df, audio_path, model, report_callback=None):
     # to release some memory for now
     del audio
 
-
-
-    # the ASR works in uppper case
     chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]'
     # from https://huggingface.co/blog/fine-tune-wav2vec2-english
 
@@ -252,30 +305,50 @@ def extract_timings(df, audio_path, model, report_callback=None):
     # A = predicted
     # B = transcript
 
+    # the ASR works in uppper case
     LISTA=all_df_words.text.str.lower().tolist()
     LISTB=' '.join(transcripts).split(' ')
 
-    print('Alignment on all characters...')
+    print(LISTA)
+    print(LISTB)
+
+    print('Creating all characters strings...')
+    
     joined_LISTA=' '.join(LISTA).replace('-','_')
     joined_LISTB=' '.join(LISTB).replace('-','_')
+
+    print('Alignment on all characters...')
     t=time()
-    alignments_chars=pairwise2.align.globalxx(joined_LISTA,joined_LISTB)
+    
+    aligner = Align.PairwiseAligner()
+    aligner.mode = 'global'
+    alignments_chars = aligner.align(joined_LISTA,joined_LISTB)
+    alignment=alignments_chars[0]
+
+    # https://github.com/biopython/biopython/blob/master/Bio/Align/__init__.py#L1725
+    seqA=alignment[0, :]
+    seqB=alignment[1, :]
+
+    
     print('finished, took ',time()-t,' seconds')
 
     print('retieving word parts in transcripts from predicted words')
     t=time()
     start_char=0
     retrieve_B=[]
-    for el in alignments_chars[0].seqA.split(' '):
+    for el in seqA.split(' '):
         len(el+' ')
-        retrieve_B.append(alignments_chars[0].seqB[start_char:start_char+len(el+' ')])
+        retrieve_B.append(seqB[start_char:start_char+len(el+' ')])
         start_char+=len(el+' ')
     print('finished, took ',time()-t,' seconds')
 
-    all_df_words['text_predicted_dashed']=alignments_chars[0].seqA.split(' ')
+    all_df_words['text_predicted_dashed']=seqA.split(' ')
+
     all_df_words['text_transcript_dashed']=retrieve_B
+
     all_df_words['text_transcript_undashed']=all_df_words.text_transcript_dashed.str.replace('-','').replace('_','-')
 
+    print(all_df_words)
     assert ''.join(all_df_words.text_transcript_dashed.tolist()).replace('-','').replace('_','-')==' '.join(transcripts)
 
     # build list of original IDs thanks to number of words in each sentence
@@ -318,7 +391,14 @@ def cutting(df, audio_path, phrases_dfs, out_folder):
                 text=df[df.id==k].norm_text.iloc[0].replace(' ','_')
             except:import pdb;pdb.set_trace()
 
-            sf.write(out_folder+'/'+k+'-'+text+'.wav',audio[int((start+audio_offset_start)*WRITING_SAMPLERATE):int((end+audio_offset_end)*WRITING_SAMPLERATE)], WRITING_SAMPLERATE)
+            y=audio[int((start+audio_offset_start)*WRITING_SAMPLERATE):int((end+audio_offset_end)*WRITING_SAMPLERATE)]
+
+            # 0.2 is from the order of magnitude in actor recordings, I normalize so that threshold is more stable 
+            y = 0.2*y/max(abs(y))
+            
+            y,_= librosa.effects.trim(y, top_db=40, frame_length=256, hop_length=64)
+            # sf.write(out_folder+'/'+k.replace('/','_')+'-'+text+'.wav',audio[int((start+audio_offset_start)*WRITING_SAMPLERATE):int((end+audio_offset_end)*WRITING_SAMPLERATE)], WRITING_SAMPLERATE)
+            sf.write(out_folder+'/'+k.replace('/','_')+'.wav',y, WRITING_SAMPLERATE)
 
             dashed_text=''.join(phrase_df.text_transcript_dashed.tolist())
             text_predicted_dashed=' '.join(phrase_df.text_predicted_dashed.tolist())
@@ -399,10 +479,13 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
         print('There should be exactly 1 xlsx file, but there is/are '+str(len(xlsx_files)))
     else:
         xlsx_file=xlsx_files[0]
-        
+    
+    print(file_dict)
+
     dir,_=os.path.split(xlsx_file)
     sheet_df_map = pd.read_excel(file_dict[xlsx_file], sheet_name=None)
 
+    not_detecteds={}
     first_pass_dfs={}
     for k in sheet_df_map:
         if report_callback:
@@ -410,7 +493,7 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
             report_callback(0, 'Loading '+k)
         df=sheet_df_map[k]
 
-        audio_path=dir+'/'+k+'.wav'
+        audio_path=os.path.join(dir, k+'.wav')
 
         timings = extract_timings(df, file_dict[audio_path], model=model, report_callback=report_callback)
         # report_callback(100, 'Loading '+k)
@@ -418,6 +501,11 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
         # Reset the position of the file pointer to the beginning of the file
         file_dict[audio_path].seek(0)
         phrase_cutting_data_df, not_detected= cutting(df, file_dict[audio_path], timings, results_dir)
+
+        not_detecteds[k]=not_detected
+
+        print("not detected", not_detected)
+
         if report_callback: report_callback(100, 'Cutting '+k)
         first_pass_dfs[k]=phrase_cutting_data_df
         srt_path=results_dir+'/'+k+'.srt'
@@ -440,6 +528,10 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
     all_first_pass_df.round(2).to_csv(results_dir+'/timed_transcriptions.csv',index=False)
     all_first_pass_df.round(2).to_excel(results_dir+'/timed_transcriptions.xlsx',index=False)
 
+    json_str = json.dumps(not_detecteds)
+    with open("not_detected.txt", "w") as f:
+            f.write(json_str)
+
     # all_second_pass_df.round(2).to_csv('data/andrew_second_pass.csv',index=False)
     # all_second_pass_df.round(2).to_excel('data/andrew_second_pass.xlsx',index=False)
     # all_third_pass_df.round(2).to_csv('data/andrew_third_pass.csv',index=False)
@@ -455,6 +547,13 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
 
 if __name__=="__main__":
     model=Wav2Vec2ForCTC.from_pretrained(model_name)
+
+    with open('content_tools/task1-GEA2.zip', 'rb') as file:  file_dict=extract_zip_to_dict(file)
+    analyze_files_and_build_transcripts(model, file_dict, report_callback=None, results_dir='./results_task1_v2/')
+
+    with open('content_tools/task2-GEA2.zip', 'rb') as file:  file_dict=extract_zip_to_dict(file)
+    analyze_files_and_build_transcripts(model, file_dict, report_callback=None, results_dir='./results_task2_v2/')
+
     # ------------- without trancscript
     filename="Y2Mate.is - C2W - Prof. Philippe Dubois, RectorPresident of UMONS-_1_dGs28JMQ-720p-1659731395421.mp4"
     audio_path="data/"+filename

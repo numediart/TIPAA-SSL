@@ -1,7 +1,7 @@
 import streamlit as st
 st.set_page_config(page_icon="✂️", page_title="Audio Segmentation")
 import pandas as pd
-from audio_segmentation import analyze_files_and_build_transcripts
+from audio_segmentation import analyze_files_and_build_transcripts, extract_zip_to_dict, reconstruct_zip_from_dict
 from glob import glob
 import zipfile, os
 
@@ -12,63 +12,6 @@ import shutil
 from utils import check_password, get_model
 
 model_name="hf_models/facebook/wav2vec2-base-960h"
-
-
-import zipfile
-import io
-
-
-def extract_zip_to_dict(zip_file):
-    """
-    Extracts a zip file-like object to a dictionary of file-like objects.
-    The keys of the dictionary are the paths to the corresponding files.
-
-    Parameters:
-    - zip_file: A file-like object representing the zip file to extract.
-
-    Returns:
-    - A dictionary of file-like objects, where the keys are the paths to the corresponding files.
-    """
-    # Create an empty dictionary to store the extracted files
-    extracted_files = {}
-
-    # Open the zip file
-    with zipfile.ZipFile(zip_file, 'r') as zf:
-        # Iterate over the files in the zip file
-        for info in zf.infolist():
-            # Extract the file to a BytesIO object
-            extracted_file = io.BytesIO(zf.read(info))
-            # Add the file to the dictionary, using the path as the key
-            extracted_files[info.filename] = extracted_file
-
-    return extracted_files
-
-
-def reconstruct_zip_from_dict(files):
-    """
-    Reconstructs a zip file-like object from a dictionary of file-like objects.
-    The keys of the dictionary should be the paths to the corresponding files.
-
-    Parameters:
-    - files: A dictionary of file-like objects, where the keys are the paths to the corresponding files.
-
-    Returns:
-    - A file-like object representing the reconstructed zip file.
-    """
-    # Create a BytesIO object to store the zip file
-    zip_file = io.BytesIO()
-
-    # Create a ZipFile object
-    with zipfile.ZipFile(zip_file, 'w') as zf:
-        # Iterate over the files in the dictionary
-        for path, file in files.items():
-            # Write the file to the zip file
-            zf.writestr(path, file.read())
-
-    # Seek to the beginning of the zip file
-    zip_file.seek(0)
-
-    return zip_file
 
 
 def unzip_file(file, outdir='streamlit_apps'):
