@@ -40,3 +40,13 @@ non_v2/**
 Documents/**
 .streamlit/**
 *.pkl
+*.bash
+models/**
+content_tools/uploaded/**
+content_tools/exercise_generation/__pycache__/**
+content_tools/*.json
+content_tools/*.zip
+content_tools/6_extract_subtitles.py
+cronjobs/**
+.gitconfig
+.bash_history
