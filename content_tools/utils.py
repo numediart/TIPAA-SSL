@@ -22,6 +22,7 @@ from transformers import Wav2Vec2ForCTC
 import sys
 sys.path.append('./')
 from src.label_data_processing import get_formatted_cmudict
+from src.pronunciation_dictionaries import cmu_reducer
 
 formatted_cmudict_df=get_formatted_cmudict()
 
