@@ -52,7 +52,8 @@ def a_test_prefill(base_url = 'http://localhost:8000', client=app.test_client())
 
     return d
 
-def prefill_content_phrases(path="data/SE_content_all_phrases_10_20_2022_13_26_29.csv", path_db_export="data/query_results-2022-10-26_75652.csv"):
+# 'data/marie_program_all_phrases.csv'
+def prefill_content_phrases(path="data/marie_program_all_phrases.csv", path_db_export="data/query_results-2022-10-26_75652.csv"):
     all_sentences=pd.read_csv(path)
     db_export=pd.read_csv(path_db_export)
 
@@ -418,10 +419,10 @@ if __name__ == '__main__':
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
     test_stress_detection(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
 
-    test_actor_recordings(base_url = 'http://135.125.247.39:8000', client=requests, n_ex_by_module=10)
-    test_stress_detection(base_url = 'http://135.125.247.39:8000', client=requests, n_ex_by_module=10)
+    test_actor_recordings(base_url = 'http://35.187.176.184/', client=requests, n_ex_by_module=10)
+    test_stress_detection(base_url = 'http://35.187.176.184/', client=requests, n_ex_by_module=10)
     
-    test_actor_recordings(base_url = 'http://34.77.240.102:8000', client=requests, n_ex_by_module=10)
+    test_actor_recordings(base_url = 'https://spdev.flowchase.app/', client=requests, n_ex_by_module=10)
     test_stress_detection(base_url = 'http://34.77.240.102:8000', client=requests, n_ex_by_module=10)
     
     r=test_actor_recordings()
