@@ -17,18 +17,6 @@ def invert_dict(d):
         else: 
             inverse[item].append(key) 
     return inverse
-def invert_dict(d): 
-    inverse = dict() 
-    for key in d: 
-        # Go through the list that is saved in the dict:
-        item = d[key]
-        # Check if in the inverted dict the key exists
-        if item not in inverse: 
-            # If not create a new list
-            inverse[item] = [key] 
-        else: 
-            inverse[item].append(key) 
-    return inverse
 
 # standard from FB http://fbdevwiki.com/wiki/Locales
 lang_to_MFA_g2p_models={'en_GB':'english_uk_mfa',

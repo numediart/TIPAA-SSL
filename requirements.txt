@@ -4,7 +4,6 @@ pandas
 textgrid
 openpyxl
 # pyworld
-# pyworld
 scipy
 pytest
 cmudict
@@ -25,7 +24,6 @@ speechbrain
 transformers==4.16.2
 # s3prl
 newrelic
-# webrtcvad
 # webrtcvad
 praatio
 g2pM
