@@ -303,8 +303,62 @@ def frequent_word_selections_for_phones(libri_words_df,
     return df
 
 
+
+
+def get_phone_termination_dict():
+    """Get rules of terminations for -ed module (maybe to be generalized)
+
+    Returns:
+        dicts: associates phoneme to the correct termination and accepted alternatives
+    """
+    consonants=[p for p in cmudict.phones() if p[-1][0]!='vowel']
+    consonants_not_D_T=[p for p in consonants if p[0] not in ['D','T']]
+    liquid=[p for p in consonants if p[-1][0]=='liquid']
+    semivowel=[p for p in consonants if p[-1][0]=='semivowel']
+    nasal=[p for p in consonants if p[-1][0]=='nasal']
+
+    others=[p for p in consonants if (p[-1][0]!='nasal' and  p[-1][0]!='liquid' and  p[-1][0]!='semivowel')]
+
+    vuv_dict={'B':'v',
+            'CH':'uv',
+            'D':'v',
+            'DH':'v',
+            'F':'uv',
+            'G':'v',
+            'HH':'uv',
+            'JH':'v',
+            'K':'uv',
+            'P':'uv',
+            'S':'uv',
+            'SH':'uv',
+            'T':'uv',
+            'TH':'uv',
+            'V':'v',
+            'Z':'v',
+            'ZH':'v'}
+    
+    for el in liquid: vuv_dict[el[0]]='v'
+    for el in nasal: vuv_dict[el[0]]='v'
+    for el in semivowel: vuv_dict[el[0]]='v'
+
+    vuv_termination_dict={'v':'D', 'uv':'T'}
+
+    phone_termination_dict={}
+    for p,vuv in vuv_dict.items(): phone_termination_dict[p]=vuv_termination_dict[vuv]
+    phone_termination_dict['T']= 'IH0 D'
+    phone_termination_dict['D']= 'IH0 D'
+    
+    correct_alternatives={}
+    correct_alternatives['IH0 D']=['IH0 D', 'IH1 D', 'IH2 D']
+    correct_alternatives['D']=['D', 'D AH0']
+    correct_alternatives['T']=['T', 'T AH0']
+
+    return phone_termination_dict, correct_alternatives
+
+
+
+
 def frequent_ed_word_selections_by_termation(libri_words_df, n=200):
-    from module_performance import get_phone_termination_dict
     phone_termination_dict, correct_alternatives=get_phone_termination_dict()
     import pickle
     res=pickle.load(open('performance_results/ed_performance_dev-clean.p','rb'))
