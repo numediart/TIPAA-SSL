@@ -1,0 +1,382 @@
+{
+    "title": "Tutorials",
+    "type": "array",
+    "format": "grid",
+    "lib":{
+      "_audioEntries":{
+          "$schema": "http://json-schema.org/draft-06/schema",
+          "$id": "flowchase-audioEntries",
+          "additionalProperties": false,
+          "line_endings": "unix",
+          "type": "array",
+          "minLength": 1,
+          "items": {
+              "type": "object",
+              "properties": {
+                  "audio": {
+                      "type": "string"
+                  },
+                  "label": {
+                      "type": "string"
+                  }
+              },
+              "required": [
+                  "audio",
+                  "label"
+              ],
+              "additionalProperties": false
+          }
+      },
+      "_chat":{
+          "$schema": "http://json-schema.org/draft-06/schema",
+          "$id": "flowchase-chatMessage",
+          "additionalProperties": false,
+          "line_endings": "unix",
+          "type": "array",
+          "items": {
+              "type": "object",
+              "properties": {
+                  "direction": {
+                      "type": "string",
+                      "enum": ["left", "right"]
+                  },
+                  "audio": {
+                      "type": "string"
+                  },
+                  "message": {
+                      "type": "array",
+                      "items": {
+                          "type": "object",
+                          "properties": {
+                              "text": {
+                                  "type": "string"
+                              },
+                              "color": {
+                                  "type": "string"
+                              },
+                              "underline": {
+                                  "type": "boolean"
+                              },
+                              "uppercase": {
+                                  "type": "boolean"
+                              }
+                          },
+                          "required": [
+                              "text"
+                          ],
+                          "additionalProperties": false
+                      }
+                  }
+              },
+              "required": [
+                  "direction", "audio", "message"
+              ],
+              "additionalProperties": false
+          }
+      },
+      "_answers":{
+          "$schema": "http://json-schema.org/draft-06/schema",
+          "$id": "flowchase-answers",
+          "additionalProperties": false,
+          "line_endings": "unix",
+          "type": "array",
+          "items": {
+              "type": "object",
+              "properties": {
+                  "label": {
+                      "type": "string"
+                  },
+                  "correct": {
+                      "type": "boolean"
+                  }
+              },
+              "required": [
+                  "label",
+                  "correct"
+              ],
+              "additionalProperties": false
+          }
+      }
+    },
+    
+    "_textAudioQuestion":{
+        "title":"TEXT_AUDIO_QUESTION",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-textAudioQuestion",
+        "line_endings": "unix",
+        "type": "object",
+        "properties": {
+            "type": {
+                "type": "string",
+                "const": "TEXT_AUDIO_QUESTION",
+                "enum": [
+                    "TEXT_AUDIO_QUESTION"
+                ]
+            },
+            "introduction": {
+                "type": "string"
+            },
+            "audioEntries": {
+                "$ref": "#/lib/_audioEntries"
+            },
+            "question": {
+                "type": "string"
+            },
+            "buttons": {
+                "type": "array",
+                "minLength": 1,
+                "maxLength": 2,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string"
+                        }
+                    },
+                    "additionalProperties": false,
+                    "required": ["label"]
+                }
+            }
+        },
+        "required": ["type", "introduction", "audioEntries", "question", "buttons"],
+        "additionalProperties": false
+    },
+    "_textAudioImage":{
+      "title":"TEXT_AUDIO_IMAGE",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-textAudioImage",
+        "line_endings": "unix",
+        "type": "object",
+        "properties": {
+            "type": {
+                "const": "TEXT_AUDIO_IMAGE",
+                "type": "string",
+                "enum": [
+                    "TEXT_AUDIO_IMAGE"
+                ]
+            },
+            "introduction": {
+                "type": "string"
+            },
+            "audioEntries": {
+                "$ref": "#/lib/_audioEntries"
+            },
+            "image": {
+                "type": "string"
+            }
+        },
+        "required": ["type", "introduction", "audioEntries", "image"],
+        "additionalProperties": false
+    },
+    "_textAudioQcm":{
+        "title":"TEXT_QUESTION_AUDIO_QCM",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-textAudioQcm",
+        "line_endings": "unix",
+        "type": "object",
+        "properties": {
+            "type": {
+                "const": "TEXT_QUESTION_AUDIO_QCM",
+                "type": "string",
+                "enum": [
+                    "TEXT_QUESTION_AUDIO_QCM"
+                ]
+            },
+            "title": {
+                "type": "string"
+            },
+            "question": {
+                "type": "string"
+            },
+            "audioEntries": {
+                "$ref": "#/lib/_audioEntries"
+            },
+            "answers": {
+                "$ref": "#/lib/_answers"
+            }
+        },
+        "required": ["type", "question", "title", "audioEntries", "answers"],
+        "additionalProperties": false
+    },
+    "_textQcm":{
+        "title":"TEXT_QCM",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-textQcm",
+        "line_endings": "unix",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "type": {
+                "const": "TEXT_QCM",
+                "type": "string",
+                "enum": [
+                    "TEXT_QCM"
+                ]
+            },
+            "title": {
+                "type": "string"
+            },
+            "question": {
+                "type": "string"
+            },
+            "answers": {
+                "$ref": "#/lib/_answers"
+            }
+        },
+        "required": ["type", "title", "question", "answers"]
+    },
+    "_titleTextAudio":{
+        "title":"TITLE_TEXT_AUDIO",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-titleTextAudio",
+        "line_endings": "unix",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "type": {
+                "const": "TITLE_TEXT_AUDIO",
+                "type": "string",
+                "enum": [
+                    "TITLE_TEXT_AUDIO"
+                ]
+            },
+            "title": {
+                "type": "string"
+            },
+            "audioEntries": {
+                "$ref": "#/lib/_audioEntries"
+            }
+        },
+        "required": ["type", "title", "audioEntries"]
+    },
+    "_textChat":{
+        "title":"TEXT_CHAT",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-textChat",
+        "line_endings": "unix",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "type": {
+                "const": "TEXT_CHAT",
+                "type": "string",
+                "enum": [
+                    "TEXT_CHAT"
+                ]
+            },
+            "title": {
+                "type": "string"
+            },
+            "chatMessage": {
+                "$ref": "#/lib/_chat"
+            }
+        },
+        "required": ["type", "title", "chatMessage"]
+    },
+    "_audioImageText":{
+        "title":"AUDIO_IMAGE_TEXT",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-audioImageText",
+        "line_endings": "unix",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "type": {
+                "const": "AUDIO_IMAGE_TEXT",
+                "type": "string",
+                "enum": [
+                    "AUDIO_IMAGE_TEXT"
+                ]
+            },
+            "body": {
+                "type": "string"
+            },
+            "image": {
+                "type": "string"
+            },
+            "audioEntries": {
+                "$ref": "#/lib/_audioEntries"
+            }
+        },
+        "required": ["type", "body", "image", "audioEntries"]
+    },
+    "_textAndImage":{
+        "title":"TEXT_AND_IMAGE",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-textAndImage",
+        "line_endings": "unix",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "type": {
+                "const": "TEXT_AND_IMAGE",
+                "type": "string",
+                "enum": [
+                    "TEXT_AND_IMAGE"
+                ]
+            },
+            "body": {
+                "type": "string"
+            },
+            "image": {
+                "type": "string"
+            }
+        },
+        "required": ["type", "body", "image"]
+    },
+    "_text":{
+        "title":"TEXT",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-text",
+        "line_endings": "unix",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "type": {
+                "const": "TEXT",
+                "type": "string",
+                "enum": [
+                    "TEXT"
+                ]
+            },
+            "body": {
+                "type": "string"
+            }
+        },
+        "required": ["type", "body"]
+    },
+    "items":{
+      "title":"tuto",
+        "$schema": "http://json-schema.org/draft-06/schema",
+        "$id": "flowchase-tutorials",
+        "additionalProperties": false,
+        "line_endings": "unix",
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "description": "A unique ID that identifies this tutorial in the database. For now it can be anything you want."
+            },
+            "pages": {
+                "type": "array",
+                "minLength": 1,
+                "items": {
+                    "oneOf": [
+                        {"$ref": "#/_textAudioQuestion"},
+                        {"$ref": "#/_textAudioImage"},
+                        {"$ref": "#/_textAudioQcm"},
+                        {"$ref": "#/_textQcm"},
+                        {"$ref": "#/_titleTextAudio"},
+                        {"$ref": "#/_textChat"},
+                        {"$ref": "#/_audioImageText"},
+                        {"$ref": "#/_textAndImage"},
+                        {"$ref": "#/_text"}
+                    ]
+                }
+            }
+        },
+        "required": [
+            "id", "pages"
+        ]
+    }
+  }
