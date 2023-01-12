@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import sys
 sys.path.append('./')
-from src.text_processing import group_consecutive_duplicates, prefill_content
+from src.text_processing import group_consecutive_duplicates, prefill_content, remove_special_characters
 
 
 param_to_name={
@@ -89,7 +89,7 @@ def process_content(df):
     all_sentences=df.phrase_data.apply(lambda r: [r[k] for k in r if k not in not_content_keys]).sum()
 
     # make a string containing infos of all columns except phrase data for making ids
-    L=df.apply(lambda r: ['__'.join([el.replace(' ','_') for el in r[:-1]]) for k in r.phrase_data if k not in not_content_keys], axis=1).sum()
+    L=df.apply(lambda r: ['__'.join([remove_special_characters(el).replace(' ','_') for el in r[:-1]]) for k in r.phrase_data if k not in not_content_keys], axis=1).sum()
     # group them, this extract the consecutive duplicates and get a the number of occurences
     L_c=group_consecutive_duplicates(L)
     # make a dataframe with the two columns
