@@ -41,3 +41,4 @@ flask-smorest
 streamlit
 biopython
 datasets
+openai
