@@ -9,7 +9,7 @@ from collections import Counter
 from src.label_data_processing import build_user_data_df
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model
+from DL_speech_tech import syllable_contrast_from_formatted_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model, default_model_charsiu
 from src.audio_processing import prepare_audio_file
 
 from src.label_data_processing import get_data_new_content, actor_recordings, synth_words_data
@@ -27,7 +27,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 import pandas as pd
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
-
+import librosa
 
 def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
     # retrieve phonetics by word thanks to 'phonetics_fot_row'
@@ -77,27 +77,18 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
             else:
                 target_word_idx=r.target_word_indexes
                 target_syllable_idx=r.target_syllable_indexes
-
             try:
-                status_audio, rID=prepare_audio_file(r.fpath)
+                # status_audio, rID=prepare_audio_file(r.fpath)
+                s,fs=librosa.load(r.fpath, sr=16000)
             except Exception as e: 
-                print('error in prepare_audio_file in compute_predictions')
+                print('error in reading audio in compute_predictions')
                 print('row information')
                 print(r)
                 print(e)
             try:
-                res=tech_function(rID,
-                                phonetics=r.cmu_phonetics,
-                                target_word_idx=target_word_idx,
-                                target_syllable_idx=target_syllable_idx,
-                                target_occurence_idx=0,
-                                target_phones=target_phones,
-                                basis=basis,
-                                alternatives=alternatives,
-                                mode='file',
-                                model=model,
-                                **kwargs
-                                )
+                # this is only for start_end_contrasts, I am putting a default if does not exist
+                contrast = r.contrast if 'contrast' in r else 'end'
+                res=tech_function(s,phonetics=r.cmu_phonetics,target_word_idx=target_word_idx,target_syllable_idx=target_syllable_idx,target_occurence_idx=0,target_phones=target_phones,basis=basis,contrast=contrast,alternatives=alternatives,mode='numpy',model=model,**kwargs)
                 phonetic_detections.append(res['phonetic_detection'])
                 records.append(res)
             except Exception as e: 
@@ -105,6 +96,7 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
                 print('row information')
                 print(r)
                 print(e)
+                # import pdb;pdb.set_trace()
                 
         result_df=pd.DataFrame.from_records(records)
     else:
@@ -119,13 +111,18 @@ def stress_GE_performance_test(level='sentence'):
     df=get_data_new_content()
     stress_intensities=[]
     stress_binaries=[]
+
+    df['cmu_phonetics']=df.text.apply(lambda r: prefill_for_sentence(r)['cmu_phonetics'])
+    df=df[~df['cmu_phonetics'].str.contains('{')]
+
     print('n rows:',len(df))
     for i,row in tqdm(df.iterrows()):
-        formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
-        _, rID=prepare_audio_file(row.audio_path)
+        # formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
+        # _, rID=prepare_audio_file(row.audio_path)
+        s,fs=librosa.load(row.audio_path, sr=16000)
         
         n_words_by_chunk=chunk_text(text=row.text)
-        res=stress_from_formatted_phonetics(rID,phonetics=formatted_phonetics, n_words_by_chunk=n_words_by_chunk, level=level)
+        res=stress_from_formatted_phonetics(s,phonetics=row.cmu_phonetics, n_words_by_chunk=n_words_by_chunk, level=level, mode="numpy")
         print(res)
         stress_intensities.append(res['stress_intensities'])
         stress_binaries.append(res['stress_binaries'])
@@ -188,7 +185,8 @@ def stress_GE_performance_test(level='sentence'):
 
 
         df.index=range(len(df))
-        word_stress_binaries=df.text.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(prefill_for_sentence(r)['cmu_phonetics'])])
+        # word_stress_binaries=df.text.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(prefill_for_sentence(r)['cmu_phonetics'])])
+        word_stress_binaries=df.cmu_phonetics.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(r)])
 
         # I realized some words have all "syllables" stressed (even though they are > 1 syl). In fact, it corresponds to acronyms
         # here I remove them
@@ -221,6 +219,11 @@ def stress_GE_performance_test(level='sentence'):
         df=df.loc[word_stress_binaries.index]
 
         assert len(sum(word_stress_binaries.tolist(),[])) == len(sum(df['stress_binaries'].tolist(),[]))
+
+        # # When I don't exclude compound words (containing "{" and "}"), this will show the problematic of empty and non-consistent number of words
+        # word_stress_binaries[word_stress_binaries.apply(lambda r: [] in  r)]
+        # df.text[word_stress_binaries.apply(lambda r: [] in  r)]
+        # df.cmu_phonetics[word_stress_binaries.apply(lambda r: [] in  r)]
 
         GT_by_len=select_by_len(word_stress_binaries)
         preds_by_len=select_by_len(df['stress_binaries'])
@@ -472,6 +475,13 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_mode
     return phonetic_detections, phonetic_detections_s, d, d_s
 
 def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowels, accent=None, model=default_model):
+
+    # ex for fr_FR, as in "rue" or "lu":
+
+    # df=synth_words_data(path="scripts/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
+    # target_phones='y'
+    # from src.pronunciation_dictionaries import ipa_vowels
+    # alternatives=ipa_vowels
     
     df=synth_words_data()
 
@@ -485,10 +495,10 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
 
     df['target_word_indexes']=0
     df['fpath']=df['path']
-    df_target=df[(df.cmu_phonetics.str.endswith('_'+target_phones)|df.cmu_phonetics.str.startswith(target_phones+'_')|df.cmu_phonetics.str.contains('_'+target_phones+'_'))]
+    df_target=df[(df.phonetics.str.endswith('_'+target_phones)|df.phonetics.str.startswith(target_phones+'_')|df.phonetics.str.contains('_'+target_phones+'_'))]
 
-    print(target_phones)
-    df_target['target_syllable_indexes']=df_target['syl_p_cmu'].apply(lambda r: [1 if target_phones in el else 0 for el in r].index(1))
+    # just get the index of the first occurence of the target
+    df_target['target_syllable_indexes']=df_target['syl_p'].apply(lambda r: [1 if target_phones in el else 0 for el in r].index(1))
 
     selection=df_target.sample(frac=1, random_state=0)[:n]
 
@@ -496,6 +506,7 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
 
     # selection.text.progress_apply(lambda r: mfa_dicts['en_US'][r][0] if r in mfa_dicts['en_US'] else float('nan')).dropna()
 
+    selection['cmu_phonetics']=selection['phonetics']
     result_df=compute_predictions(selection, target_phones=target_phones, alternatives=alternatives, model=model)
     phonetic_detections=result_df.phonetic_detection
     
@@ -504,7 +515,49 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
 
     return result_df, d
 
+
+def syl_contrast_on_synth_words(syl_target='P_EH1', n=None, accent=None, model=default_model):
+
+    # ex for fr_FR, as in "rue" or "lu":
+
+    # df=synth_words_data(path="scripts/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
+    # target_phones='y'
+    # from src.pronunciation_dictionaries import ipa_vowels
+    # alternatives=ipa_vowels
+    
+    df=synth_words_data()
+
+    df=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)]
+
+    if accent!=None:
+        if accent=='UK':
+            df=df[df.path.apply(lambda r: '_UK_' in r.split('/')[-1])]
+        elif accent=="US":
+            df=df[df.path.apply(lambda r: '_US_' in r.split('/')[-1])]
+        else:
+            raise "accent must be US or UK or None"
+
+    df['target_word_indexes']=0
+    df['fpath']=df['path']
+
+    selection=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)].sample(frac=1, random_state=0)[:n]
+
+    selection['target_syllable_indexes']=selection.syl_p.apply(lambda r: r.index(syl_target.split('_')))
+    selection['cmu_phonetics']=selection['phonetics']
+    result_df=compute_predictions(selection, model=model, tech_function=syllable_contrast_from_formatted_phonetics_audio)
+    phonetic_detections=result_df.phonetic_detection.str.join('_')
+    
+    d=count_values(phonetic_detections)
+    d.columns=[syl_target]
+
+    return result_df, d
+
 if __name__=="__main__":
+    
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    default_model_ipa = Wav2Vec2ForFramePrediction('ipa')
+    default_model_ipa.load(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
+
 
     o_list=['AA1', 'AO1', 'OW1']
     i_list=['IH1', 'IY1']
