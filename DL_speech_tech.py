@@ -49,20 +49,29 @@ terminations_accepted_alternatives={
     'IH_D':['AH_D','IH_D', 'ER_D', 'IY_D'],
     }
 
-# for "Z", I want to accept anything finishing with "Z" except those corresponding to "IH_Z"
+
+# For final -ed and final -s, we use a termination contrast with a basis that can accept enough phonemes, I take the longest target "IH_D" or "IH_Z"
+# because of this, if the target is D/T or S/Z, it is frequent to have a border effect and that the real phoneme before or after is included in the result
+# I want to accept these as correct
+
+# for "D", I want to accept anything finishing with "D" except those corresponding to "IH_D"
+# but if I accept all vowels, it mens I wouldn't give feedback for a mistake like "S_T_AA_R_T_EY_D" for "started"
+# therefore, I accept only consonants. It's also more likely to have this border effect with consonant because the target is a consonant (verified experimentally looking at confusions)
 
 # all_Z=[p+"_Z" for p in (list(cmu_vowels) + list(cmu_consonants))]
 # all_S=[p+"_S" for p in (list(cmu_vowels) + list(cmu_consonants))]
-all_Z=[p+"_Z" for p in list(cmu_consonants)]
-all_S=[p+"_S" for p in list(cmu_consonants)]
+all_Z=[p+"_Z" for p in list(cmu_consonants)]+["Z_"+p for p in list(cmu_consonants)]
+all_S=[p+"_S" for p in list(cmu_consonants)]+["S_"+p for p in list(cmu_consonants)]
 terminations_accepted_alternatives["Z"]=[el for el in all_Z if el not in terminations_accepted_alternatives['IH_Z']]
-terminations_accepted_alternatives["S"]=[el for el in all_S if el not in terminations_accepted_alternatives['IH_Z']]+['S_Z', 'S_SH']
+terminations_accepted_alternatives["S"]=[el for el in all_S if el not in terminations_accepted_alternatives['IH_Z']]
 
 
-all_D=[p+"_D" for p in list(cmu_consonants)]
-all_T=[p+"_T" for p in list(cmu_consonants)]
+# all_Z=[p+"_Z" for p in (list(cmu_vowels) + list(cmu_consonants))]
+# all_S=[p+"_S" for p in (list(cmu_vowels) + list(cmu_consonants))]
+all_D=[p+"_D" for p in list(cmu_consonants)]+["D_"+p for p in list(cmu_consonants)]
+all_T=[p+"_T" for p in list(cmu_consonants)]+["T_"+p for p in list(cmu_consonants)]
 terminations_accepted_alternatives["D"]=[el for el in all_D if el not in terminations_accepted_alternatives['IH_D']]
-terminations_accepted_alternatives["T"]=[el for el in all_T if el not in terminations_accepted_alternatives['IH_D']]#+['S_Z', 'S_SH']
+terminations_accepted_alternatives["T"]=[el for el in all_T if el not in terminations_accepted_alternatives['IH_D']]
 
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
     """Load audio with 2 modes: from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array
