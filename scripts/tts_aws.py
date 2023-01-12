@@ -41,7 +41,8 @@ def replace_with_tag(sentence, tag='emphasis', options='level="strong"'):
     sentence="<speak>"+sentence+"</speak>"
     return sentence
 
-def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',path="synth_audio",synth_technique='standard',voice_id="Joanna", name="sample"):
+def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',
+                path="synth_audio",synth_technique='standard',voice_id="Joanna", name="sample", verbose=False):
     # sentence=sentence.replace("'","&apos;").replace('"','&quot;')
     text=replace_with_tag(sentence.replace("'","&apos;").replace('"','&quot;'), tag=tag, options=options)
     # reserved characters : https://docs.aws.amazon.com/polly/latest/dg/escapees.html
@@ -54,8 +55,11 @@ def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',path
     --voice-id "+voice_id+" \
     --engine "+synth_technique+" \
     --profile iam_user \
-    "+path+'/'+name+".mp3  >/dev/null 2>&1"
+    "+path+'/'+name+".mp3"
 
+    if not verbose: cmd+="  >/dev/null 2>&1"
+    
+    if not os.path.exists(path): os.makedirs(path)
     # print(path+'/'+name+".mp3")
     if not os.path.exists(path+'/'+name+".mp3"):    
         os.system(cmd)
@@ -82,26 +86,47 @@ def synthesize_list(df, voices, root_folder="synth_audio/user_texts"):
     results.to_csv(root_folder+'/data.csv')
     
 
-def synthesize_cmu(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk_id="F_US"):
-    import cmudict
-    from tqdm import tqdm
-    words=list(cmudict.dict().keys())
 
+import cmudict
+from tqdm import tqdm
+def synthesize_words(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk_id="F_US", words=list(cmudict.dict().keys())):
     synth_technique='standard'
     tag='prosody'
-    root_folder='/'.join([root_folder, synth_technique, tag, voice_id])
+    audio_path='/'.join([root_folder, synth_technique, tag, voice_id])
+
 
     executor = ProcessPoolExecutor(max_workers=25)    
     futures = []
     for w in tqdm(words):
         name=spk_id+'_'+remove_special_characters(w, chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"\']')
+        # synthesize(w, tag=tag, options='rate="70%" volume="+20dB"',path=audio_path,synth_technique=synth_technique,voice_id=voice_id, name=name)
+
         futures.append(executor.submit(
-            synthesize, w, tag=tag, options='rate="70%" volume="+20dB"',path=root_folder,synth_technique=synth_technique,voice_id=voice_id, name=name))
-        # synthesize(w, tag='prosody', options='rate="70%" volume="+20dB"',path=root_folder,synth_technique='standard',voice_id=voice_id, name=name)
+            synthesize, w, tag=tag, options='rate="70%" volume="+20dB"',path=audio_path,synth_technique=synth_technique,voice_id=voice_id, name=name))
 
     proc_list = [future.result() for future in tqdm(futures)]
 
+
+def synthesize_voices():
+
+    from src.pronunciation_dictionaries import mfa_dicts
+
+    root_folder="scripts/synth_audio/mfa_words"
+
+    words=list(mfa_dicts['fr_FR'])
+    voices={"Lea":"F_FR", "Mathieu":"M_FR", "Celine":"F_FR"} # FR
+    # voices={"Ivy":"F_US", "Kevin":"M_US"} # US children
+    # words=list(mfa_dicts['en_US'])
+
+    # ------------- synthesize cmu words
+    for k in voices:
+        voice_id=k
+        spk_id=voices[k]
+        print(k)
+        synthesize_words(root_folder=root_folder, voice_id=voice_id, spk_id=spk_id, words=words)
+
 if __name__ == "__main__":
+    from scripts.tts_aws import *
     # df=pd.read_csv('data/BE_PickStressedWord_1.csv')
     # col=df.iloc[:,1]
     # df=pd.read_csv('data/Business English-Vocabulary_all.csv')
@@ -117,7 +142,8 @@ if __name__ == "__main__":
     df=df[['text']]
 
     # col=df.text
-    root_folder="scripts/synth_audio/speechocean762"
+    # root_folder="scripts/synth_audio/speechocean762"
+    root_folder="scripts/synth_audio/cmu_words"
     synth_technique='neural' # "standard" or "neural"
     # tag=''
     # options=''
@@ -128,7 +154,12 @@ if __name__ == "__main__":
     # tag='emphasis'
     # options='level="strong"'
     # voices={'Joanna':'F_US', 'Kendra':'F_US', "Amy":"F_UK", "Emma":"F_UK", "Matthew":"M_US",  "Joey":"M_US", "Brian":"M_UK", "Arthur":"M_UK"}
-    voices={'Joanna':'F_US', "Amy":"F_UK", "Matthew":"M_US",  "Brian":"M_UK"}
+    # voices={'Joanna':'F_US', "Amy":"F_UK", "Matthew":"M_US",  "Brian":"M_UK"}
+
+    # voices={"Ivy":"F_US", "Justin":"M_US", "Kevin":"M_US"} # children
+
+    voices={"Lea":"F_FR"} # FR
+
     # voices={"Brian":"M_UK",  "Matthew":"M_US"}
 
     # lang_dict={'US':'en-US', 'UK':'en-GB'}
