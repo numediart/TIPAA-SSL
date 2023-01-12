@@ -54,7 +54,7 @@ def make_exercise():
                     elif exercise_type == 'SpokenCard':
                         pronunciation_aspect = st.selectbox('What pronunciation aspect would you like your exercises to be based on?',('Options...','VC1','VC2','-ED','WS'))
                     elif exercise_type == 'SpokenSentence':
-                        pronunciation_aspect = st.selectbox('What pronunciation aspect would you like your exercises to be based on?',('Options...','VC1','VC2','-ED','FW'))
+                        pronunciation_aspect = st.selectbox('What pronunciation aspect would you like your exercises to be based on?',('Options...','VC1','VC2','-ED','FW', 'WS'))
                 # some exercise types have 'FW' as default pronunciation aspect (cf. Gianie's structure)
                 elif exercise_type in ['Pick Stressed Word','Pick Meaning of Audio']:
                     pronunciation_aspect = 'FW'
@@ -62,7 +62,7 @@ def make_exercise():
                 else:
                     pronunciation_aspect = 'WS'
                 if pronunciation_aspect != 'Options...':
-                    n_exercises = st.slider('How many exercises would you like to generate?', 0, 50)
+                    n_exercises = st.number_input('How many exercises would you like to generate?', min_value=1, max_value=30, value=10)
                     if n_exercises != 0:
                         # Match Word to Audio is the only exercise that is not topic-specific, since it focuses on minimal pairs
                         if exercise_type != 'Match Word to Audio':
@@ -100,7 +100,7 @@ def make_exercise():
                                     aux.jsonfile([d_exercise])
                                 else:
                                     d_activity_title = {'Activity title' : "Unfortunately, no title was generated..."} # creating a dictionary to follow the same structure as JSON Editor (cf. Gianie's work)
-                                    d_activity_title['Activity title'] = aux.create_title(d_activity_title,pronunciation_aspect,topic)
+                                    d_activity_title['Activity title'] = aux.create_title(d_activity_title,topic=topic)
                                     if exercise_type in ['SpokenCard','SpokenSentence']:
                                         d_activity_title['Activity type'] = "Speaking"
                                         d_activity_title['Speaking activity'] = [d_exercise]
@@ -112,14 +112,14 @@ def make_exercise():
                                         aux.jsonfile([d_activity_title])
                                     else:
                                         d_activity_set = {'Activity set' : "Unfortunately, no title was generated..."} # creating a dictionary to follow the same structure as JSON Editor (cf. Gianie's work)
-                                        d_activity_set['Activity set'] = aux.create_title(d_activity_set,pronunciation_aspect,topic)
+                                        d_activity_set['Activity set'] = aux.create_title(d_activity_set,topic=topic)
                                         d_activity_set['Activity'] = [d_activity_title]
                                         if format == 'Activity Set': #level 3 (activity set)
                                             st.write(d_activity_set)
                                             aux.jsonfile([d_activity_set])
                                         else: # level 4 (module)
                                             d_module = {'Module title' : "Unfortunately, no title was generated..."} # creating a dictionary to follow the same structure as JSON Editor (cf. Gianie's work)
-                                            d_module['Module title'] = aux.create_title(d_module,pronunciation_aspect,topic)
+                                            d_module['Module title'] = aux.create_title(d_module,topic=topic)
                                             d_module['Activity sets'] = [d_activity_set]
                                             st.write(d_module)
                                             aux.jsonfile([d_module])

@@ -6,10 +6,17 @@ import ast
 import json # everything needs to be accessible in a JSON file import json
 import cmudict
 cmudict_dict=cmudict.dict() # initializes an access to the CMU dictionary
-import exercise_generation.auxiliary as aux
+
 import csv
 import pandas as pd
 import numpy as np
+
+
+# import sys
+# sys.path.append('../')
+from exercise_generation.auxiliary import has_a_target_phone, has_target_text_pattern, word_has_a_target_phone, has_at_least_2_syls
+from exercise_generation.exercise_words import generate_words, pick_phonetics_phones
+import exercise_generation.auxiliary as aux
 
 # Generate a response based on a prompt using OpenAI
 # https://wandb.ai/ivangoncharov/GPT-3%20in%20Python/reports/Use-GPT-3-in-Python-with-the-OpenAI-API-and-W-B-Tables--VmlldzoxOTg4NTMz
@@ -86,6 +93,73 @@ def count_syllables(n_exercises = 10, topic = "Business"):
 def input_stress_pattern(n_exercises = 10, topic = "Business"):  count_syllables(n_exercises = n_exercises, topic = topic)
 
 """
+6) Exercise type: Pick Stress Pattern
+"""
+def pick_stress_pattern(n_exercises = 10, topic = 'Business'): count_syllables(n_exercises = n_exercises, topic = topic)
+    
+"""
+7) Exercise type: Pick Stressed Syllable
+"""
+
+def pick_stressed_syllable(n_exercises = 10, topic = 'Business'): count_syllables(n_exercises = n_exercises, topic = topic)
+
+
+"""
+5) Exercise type: Match Word to Stress Pattern
+Comment: does not work very well with 5 or 6 syllable words, but in the end very few existing exercises have such long words (only 2 out of 32 exercises)
+"""
+def match_word_to_stress_pattern(n_exercises = 10, topic = 'Business'):
+    """
+    pre: n_syllables is the number of syllables you want your exercise items to have (from 2 to 6, works best from 2 to 4) and topic is the topic you want your generated exercises to be based on
+    post: returns a dictionary where the 3 keys are 'target_content','incorrect1' and 'incorrect2'
+    and the values are the vocabulary items related to these keys. Number of syllables for each dictionary value must be the same but
+    the stress pattern of the 'target_content' key must be different to those of the 'incorrect' keys.
+    Example : {"target_content": "appoint", "incorrect1": "budget", "incorrect2": "censure"}
+    """
+    # To improve OpenAI results, I grouped the existing examples per syllable count in a single CSV file
+    df= pd.read_csv("content_tools/content_examples_csvs/match_word_to_stress_pattern.csv")
+    # create a dataframe object
+    
+    l = []
+    for i in range(2,5):
+        examples_filtered = df[str(i)].to_string() # pandas creates a Series object that does not function well in a prompt, so it needs to be adapted
+        examples_filtered = re.sub('\d+\s+|NaN\n*','',examples_filtered) # and filtered
+        prompt = "Here is a list of " + str(i) + "-syllable words from a Business English vocabulary list.\n" + examples_filtered + "\nGenerate "+ str(n_exercises*3) + " more words that are also " + str(i) + " syllables long and that could be found in a " + topic + " English vocabulary list."
+        response=aux.generate_response(prompt)
+        text = response.choices[0]['text']
+        liste = aux.filter(text)
+        l = l + liste # making a big list in hopes of having a lot of words with different stress patterns and number of syllables.
+    
+    d = aux.syllable_sort(l)
+
+    stress_pattern_dic={key:aux.stress_pattern_sort(d[key]) for key in d} # we make a dictionary where the keys are different amount of syllables and the values are dictionaries where all the stress patterns with this amount of syllables is represented. The values for these dictionaries in a dictionary are lists of words that follow the stress pattern given in key.
+    
+    final_list = []
+    for exercise_number in range(n_exercises):
+        n_syllables = random.choices([2,3,4], weights=(3, 4, 3), k=1) # we choose a number of syllables at random, but with weighed probabilities
+        syllable_dic = stress_pattern_dic[n_syllables[0]]
+        if n_syllables[0] in list(stress_pattern_dic.keys()): # we have to make sure not to have a KeyError
+            try:
+                stress_pattern = random.choice(list(syllable_dic.keys())) # we choose a stress pattern at random that has n_syllables number of syllables in it.
+                correct = random.choice(syllable_dic[stress_pattern]) # we choose a word at random that has the stress pattern that was selected at random just before
+                exercise = {}
+                exercise['target_content'] = correct
+                del syllable_dic[stress_pattern]
+                if len(syllable_dic) != 0: # There needs to be at least 2 different stress patterns with this amount of syllables
+                    stress_pattern = random.choice(list(syllable_dic.keys())) # we choose another stress pattern at random
+                    if len(syllable_dic[stress_pattern]) >= 2: # There needs to be at least two entries, because we need an 'incorrect1' and an 'incorrect2'
+                        incorrect1 = random.choice(syllable_dic[stress_pattern])
+                        exercise['incorrect1'] = incorrect1
+                        syllable_dic[stress_pattern] = list(filter((incorrect1).__ne__, (syllable_dic[stress_pattern]))) # remove all instances of this particular word so that it cannot be selected twice
+                        incorrect2 = random.choice(syllable_dic[stress_pattern])
+                        exercise['incorrect2'] = incorrect2
+                        final_list.append(exercise)
+            except:
+                pass
+    aux.jsonfile(final_list)
+    return final_list
+    
+"""
 3) Exercise type : Match Audio to Stress Pattern
 Comment: It is important to ask OpenAI to generate long lists of vocabulary, or else the end result will generate almost no exercices because it won't have
 enough content to work with. Also, the program currently takes a lot of time to run. Function match_word_to_stress_pattern works much better and reliably in my opinion
@@ -93,11 +167,15 @@ enough content to work with. Also, the program currently takes a lot of time to 
 """
 def match_audio_to_stress_pattern(n_exercises = 10, topic = "Business"): match_word_to_stress_pattern(n_exercises = n_exercises, topic = topic)
 
+
+
+
+
 """
 4) Exercise type: Match Word to Audio
 Comment: Different types of exercises inside the type itself; Vowel contrast (VC) and words ending in -ed with minimal pairs(ED)
 """
-def match_word_to_audio_vc1(n_exercises = 10):
+def match_word_to_audio_vc1(ipa_targets=["i:", "ɪ"], n_exercises = 10):
     """
     pre: n_exercises is the number of vocabulary items generated by OpenAI.
     post: creates a JSON file with a list of dictionaries, where the 2 keys are 'target_content' and 'incorrect1' and the values are
@@ -110,7 +188,9 @@ def match_word_to_audio_vc1(n_exercises = 10):
     # VC /i:/ and /ɪ/
     
     match_word_to_audio_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of pairs of words easily confused containing IPA phonemes /i:/ and /ɪ/\n" + match_word_to_audio_vc1 +  "Give me " + str(n_exercises*3)+" more pairs of words like this."
+    prompt = """Here is a list of pairs of words easily confused containing IPA phonemes /i:/ and /ɪ/
+    """ + match_word_to_audio_vc1 +  "Give me " + str(n_exercises*3)+" more pairs of words like this, containing IPA phonemes /"+ipa_targets[0]+"/ and /"+ipa_targets[1]+"/."
+
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
     
@@ -118,6 +198,9 @@ def match_word_to_audio_vc1(n_exercises = 10):
     del list[0:2] # the first 2 elements are "\n"
     list = aux.remove_numbering(list)
     list = [el.lower() for el in list]
+
+    # has_a_target_phone=lambda phones,  target_phoneme_regexes
+
     final_list = []
     for element in list:
         splitted_list = element.split('/')
@@ -133,6 +216,7 @@ def match_word_to_audio_vc1(n_exercises = 10):
                         if re.search('IH[012]',phon2):
                             final_list.append(splitted_list[0])
                             final_list.append(splitted_list[1])
+        
     l = []
     for element in range(len(final_list)):
         if element%2 == 0: # only evaluates one item out of two, because they all work in pair
@@ -342,93 +426,11 @@ def match_word_to_audio_ed(n_exercises = 10):
     aux.jsonfile(l)
     return l
 
-
-"""
-5) Exercise type: Match Word to Stress Pattern
-Comment: does not work very well with 5 or 6 syllable words, but in the end very few existing exercises have such long words (only 2 out of 32 exercises)
-"""
-# 2nd iteration of the function match_audio_to_stress_pattern
-
-def match_word_to_stress_pattern(n_exercises = 10, topic = 'Business'):
-    """
-    pre: n_syllables is the number of syllables you want your exercise items to have (from 2 to 6, works best from 2 to 4) and topic is the topic you want your generated exercises to be based on
-    post: returns a dictionary where the 3 keys are 'target_content','incorrect1' and 'incorrect2'
-    and the values are the vocabulary items related to these keys. Number of syllables for each dictionary value must be the same but
-    the stress pattern of the 'target_content' key must be different to those of the 'incorrect' keys.
-    Example : {"target_content": "appoint", "incorrect1": "budget", "incorrect2": "censure"}
-    """
-    # To improve OpenAI results, I grouped the existing examples per syllable count in a single CSV file
-    df= pd.read_csv("content_tools/content_examples_csvs/match_word_to_stress_pattern.csv")
-    # create a dataframe object
-    
-    l = []
-    for i in range(2,5):
-        examples_filtered = df[str(i)].to_string() # pandas creates a Series object that does not function well in a prompt, so it needs to be adapted
-        examples_filtered = re.sub('\d+\s+|NaN\n*','',examples_filtered) # and filtered
-        prompt = "Here is a list of " + str(i) + "-syllable words from a Business English vocabulary list.\n" + examples_filtered + "\nGenerate "+ str(n_exercises*3) + " more words that are also " + str(i) + " syllables long and that could be found in a " + topic + " English vocabulary list."
-        response=aux.generate_response(prompt)
-        text = response.choices[0]['text']
-        liste = aux.filter(text)
-        l = l + liste # making a big list in hopes of having a lot of words with different stress patterns and number of syllables.
-    
-    d = aux.syllable_sort(l)
-
-    stress_pattern_dic={key:aux.stress_pattern_sort(d[key]) for key in d} # we make a dictionary where the keys are different amount of syllables and the values are dictionaries where all the stress patterns with this amount of syllables is represented. The values for these dictionaries in a dictionary are lists of words that follow the stress pattern given in key.
-    
-    final_list = []
-    for exercise_number in range(n_exercises):
-        n_syllables = random.choices([2,3,4], weights=(3, 4, 3), k=1) # we choose a number of syllables at random, but with weighed probabilities
-        syllable_dic = stress_pattern_dic[n_syllables[0]]
-        if n_syllables[0] in list(stress_pattern_dic.keys()): # we have to make sure not to have a KeyError
-            try:
-                stress_pattern = random.choice(list(syllable_dic.keys())) # we choose a stress pattern at random that has n_syllables number of syllables in it.
-                correct = random.choice(syllable_dic[stress_pattern]) # we choose a word at random that has the stress pattern that was selected at random just before
-                exercise = {}
-                exercise['target_content'] = correct
-                del syllable_dic[stress_pattern]
-                if len(syllable_dic) != 0: # There needs to be at least 2 different stress patterns with this amount of syllables
-                    stress_pattern = random.choice(list(syllable_dic.keys())) # we choose another stress pattern at random
-                    if len(syllable_dic[stress_pattern]) >= 2: # There needs to be at least two entries, because we need an 'incorrect1' and an 'incorrect2'
-                        incorrect1 = random.choice(syllable_dic[stress_pattern])
-                        exercise['incorrect1'] = incorrect1
-                        syllable_dic[stress_pattern] = list(filter((incorrect1).__ne__, (syllable_dic[stress_pattern]))) # remove all instances of this particular word so that it cannot be selected twice
-                        incorrect2 = random.choice(syllable_dic[stress_pattern])
-                        exercise['incorrect2'] = incorrect2
-                        final_list.append(exercise)
-            except:
-                pass
-    aux.jsonfile(final_list)
-    return final_list
-    
-"""
-6) Exercise type: Pick Stress Pattern
-"""
-# 2nd iteration of the function input_stress_pattern 
-def pick_stress_pattern(n_exercises = 10, topic = 'Business'): count_syllables(n_exercises = n_exercises, topic = topic)
-    
-"""
-7) Exercise type: Pick Stressed Syllable
-"""
-
-def pick_stressed_syllable(n_exercises = 10, topic = 'Business'): count_syllables(n_exercises = n_exercises, topic = topic)
-
 """
 8) Exercise type: Pick Phonetics
 """
 
 
-has_a_target_phone=lambda phones,  target_phoneme_regexes: sum([sum([re.search(reg,phon)!=None for phon in phones]) for reg in target_phoneme_regexes])
-
-has_target_text_pattern=lambda text,  target_word_regexes:  sum([re.search(target_word_regex,text)!=None for target_word_regex in target_word_regexes])
-
-def word_has_a_target_phone(word, target_phoneme_regexes):
-    if word in cmudict_dict:
-        if len(cmudict_dict[word])>0:
-            return has_a_target_phone(cmudict_dict[word][0], target_phoneme_regexes)
-        else:
-            return False
-    else:
-        return False
 
 
 def text_response_to_words_with_target_phonemes(text, target_phoneme_regexes, n_exercises):
@@ -457,125 +459,6 @@ def text_response_to_words_with_target_word_regex(text, target_word_regex, n_exe
         if len(l) <= n_exercises:
             if has_target_text_pattern(element, [target_word_regex]):
                 l.append(element)
-    return l
-
-
-def pick_phonetics_vc1(n_exercises = 10, topic = 'Business', target_regexes= ['IH[012]', 'IY[012]']):
-    """
-    pre: n_exercises is the number of vocabulary items generated by OpenAI.
-    post: creates a JSON file with a list of dictionaries where the keys are 'target_content' and the keys are words that fit into the required category
-    Example: [{"target_content": "testimony"}, {"target_content": "litigation"}, {"target_content": "agreement"}, {"target_content": "jury"}, {"target_content": "negotiations"}]
-    """
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-
-    
-    
-    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " more words that also have either the /i:/ or the /ɪ/ phoneme and that could be found in a " + topic + " English vocabulary list."
-    
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    
-    l=text_response_to_words_with_target_phonemes(text, target_regexes, n_exercises)
-    l=[{'target_content':el} for el in l]
-
-    aux.jsonfile(l)
-    return l
-
-def pick_phonetics_vc2(n_exercises = 10, topic = 'Business', target_regexes= ['OW[012]', 'AO[012]']):
-    """
-    pre: n_exercises is the number of vocabulary items generated by OpenAI.
-    post: creates a JSON file with a list of dictionaries where the keys are 'target_content' and the keys are words that fit into the required category
-    Example: [{"target_content": "goal"}, {"target_content": "road"}, {"target_content": "low"}, {"target_content": "tall"}, {"target_content": "blow"},
-    """
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-    
-    pick_phonetics_vc2 = '\n'.join(df['VC2'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /ɔː/ and /əʊ/ from a Business English vocabulary list.\n" + pick_phonetics_vc2 + "\nGenerate " + str(n_exercises*3) + " more words that also have either the /ɔː/ and /əʊ/ phoneme and that could be found in a " + topic + " English vocabulary list."
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    
-    l=text_response_to_words_with_target_phonemes(text, target_regexes, n_exercises)
-    l=[{'target_content':el} for el in l]
-
-    aux.jsonfile(l)
-    return l
-
-def pick_phonetics_vc3(n_exercises = 10, topic = 'Business', target_regexes= ['UH[012]', 'UW[012]']):
-    """
-    pre: n_exercises is the number of vocabulary items generated by OpenAI.
-    post: creates a JSON file with a list of dictionaries where the keys are 'target_content' and the keys are words that fit into the required category
-    Example: [{"target_content": "full"}, {"target_content": "pull"}, {"target_content": "wood"}, {"target_content": "took"}, {"target_content": "good"}]
-    """
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-    
-    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phonemes /ʊ/ (like in 'good') and /u:/ (like in 'pool'), that could be found in a " + topic+ " English vocabulary list."
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    
-    l=text_response_to_words_with_target_phonemes(text, target_regexes, n_exercises)
-    l=[{'target_content':el} for el in l]
-    
-
-    aux.jsonfile(l)
-    return l
-    
-def pick_phonetics_vc4(n_exercises = 10, topic = 'Business', target_regexes= ['AE[012]', 'AA[012]']):
-    """
-    pre: n_exercises is the number of vocabulary items generated by OpenAI.
-    post: creates a JSON file with a list of dictionaries where the keys are 'target_content' and the keys are words that fit into the required category
-    Example: [{"target_content": "large"}, {"target_content": "park"}, {"target_content": "smart"}, {"target_content": "dark"}, {"target_content": "start"}]
-    """
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-    
-    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phonemes /æ/ (like in 'have') and /ɑ:/ (like in 'part'), that could be found in a " + topic+ " English vocabulary list."
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    
-    l=text_response_to_words_with_target_phonemes(text, target_regexes, n_exercises)
-    l=[{'target_content':el} for el in l]
-
-    aux.jsonfile(l)
-    return l
-    
-def pick_phonetics_th(n_exercises = 10, topic = 'Business', target_regexes= ['TH', 'DH']):
-    """
-    pre: n_exercises is the number of vocabulary items generated by OpenAI.
-    post: creates a JSON file with a list of dictionaries where the keys are 'target_content' and the keys are words that fit into the required category
-    Example: [{"target_content": "mother"}, {"target_content": "thesis"}, {"target_content": "clothing"}, {"target_content": "method"}, {"target_content": "father"}]
-    """
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-    
-    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phoneme /θ/ (like in 'method') or /ð/ (like in 'mother'), that could be found in a " + topic+ " English vocabulary list."
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    
-    l=text_response_to_words_with_target_phonemes(text, target_regexes, n_exercises)
-    l=[{'target_content':el} for el in l]
-
-    aux.jsonfile(l)
-    return l
-    
-def pick_phonetics_h(n_exercises = 10, topic = 'Business', target_regexes= ['HH']):
-    """
-    pre: n_exercises is the number of vocabulary items generated by OpenAI.
-    post: creates a JSON file with a list of dictionaries where the keys are 'target_content' and the keys are words that fit into the required category
-    Example: [{"target_content": "mother"}, {"target_content": "thesis"}, {"target_content": "clothing"}, {"target_content": "method"}, {"target_content": "father"}]
-    """
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-    
-    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate " + str(n_exercises*3) + " words like this, but with the phoneme /h/ (like in 'forehead') , that could be found in a " + topic+ " English vocabulary list."
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    
-    l=text_response_to_words_with_target_phonemes(text, target_regexes, n_exercises)
-    l=[{'target_content':el} for el in l]
-
-    aux.jsonfile(l)
     return l
 
 def pick_phonetics_ed(n_exercises = 10, topic = 'Business'):
@@ -994,7 +877,7 @@ def pick_meaning_of_audio(n_exercises = 5, topic = 'Business'):
     """
     with open('content_tools/content_examples_csvs/pick_meaning_of_audio.txt') as f:
         pick_meaning_of_audio = f.read()
-    prompt = "Here is a list of exercise outputs where emphasis on words is indicated using asterisks (*), from a Business English vocabulary list. Only the word between asterisks should be changed, not another part of the sentence.\n" + pick_meaning_of_audio + "\nGenerate " + str(n_exercises*2) + " exercise outputs that could be found in a " + topic + " English vocabulary list and where at least 4 words are inbetween asterisks (*)."
+    prompt = "Here is a list of exercise outputs where emphasis on words is indicated using asterisks (*), from a Business English vocabulary list. Only the word between asterisks should be changed, not another part of the sentence.\n" + pick_meaning_of_audio + "\nGenerate " + str(n_exercises*2) + " exercise relating to the topic of " + topic + " and where at least 4 words are inbetween asterisks (*)."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
     l = text.split('\n')
@@ -1024,7 +907,7 @@ def match_audio_to_meaning(n_exercises = 5, topic = 'Business'):
     """
     with open('content_tools/content_examples_csvs/match_audio_to_meaning.txt') as f:
         match_audio_to_meaning = f.read()
-    prompt = "Here is a list of exercise outputs where emphasis on words is indicated using asterisks (*), from a Business English vocabulary list. Only the word between asterisks should be changed, not another part of the sentence.\n" + match_audio_to_meaning + "\nGenerate " + str(n_exercises*2) + " more exercise outputs that could be found in a " + topic + " English vocabulary list. There should be one word inbetween asterisks (*) after 'target_content' and one word inbetween asterisks (*) after 'incorrect'."
+    prompt = "Here is a list of exercise outputs where emphasis on words is indicated using asterisks (*), from a Business English vocabulary list. Only the word between asterisks should be changed, not another part of the sentence.\n" + match_audio_to_meaning + "\nGenerate " + str(n_exercises*2) + " more exercise relating to the topic of " + topic + ". There should be one word inbetween asterisks (*) after 'target_content' and one word inbetween asterisks (*) after 'incorrect'."
     response=aux.generate_response(prompt)
     text = response.choices[0]['text']
     l = text.split('\n')
@@ -1046,69 +929,20 @@ def match_audio_to_meaning(n_exercises = 5, topic = 'Business'):
 """
 14) Exercise type : SpokenSentence
 """
-    
-def spokensentence_fw(n_exercises = 5, topic = 'Business'):
-    """
-    pre: You are asked to fill in the type of exercise you want to create and n_exercises is the number of vocabulary items generated by OpenAI 
-    post: 
-    Example
-    """
-    # Creating a panda Dataframe to retrieve all of the example data
-    df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
 
-    # doesn't work very well, most of the time the output does not have the required format. I think the prompt is a bit too complicated for OpenAI to understand.
-    fw_correction_examples = '\n'.join(df['FW correction'].dropna().tolist())+'\n'
-    fw_correction = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word is indicated using asterisks (*)
-    in "question", and a correction occurs in "answer", using asterisks (*). The stress category 'Correction' is also indicated in "stress_category".\n""" + fw_correction_examples
-    fw_highlight_examples = '\n'.join(df['FW highlight'].dropna().tolist())+'\n'
-    fw_highlight = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, or none, is indicated using asterisks (*)
-    in "question" , and another word is emphasized in "answer", using asterisks (*). The stress category 'Highlight' is also indicated in "stress_category".\n""" + fw_highlight_examples    
-    fw_emotion_examples = '\n'.join(df['FW emotion'].dropna().tolist())+'\n'
-    fw_emotion = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, or none, is indicated using asterisks (*) in "question" ,
-    and emotion is expressed in "answer" by emphasizing a word in particular using asterisks (*). The stress category 'Emotion' is also indicated in "stress_category".\n""" + fw_emotion_examples
-    prompt1 = fw_correction + "/nGenerate " + str(n_exercises*2) + " more exercise outputs that could be found in a " + topic + " English vocabulary list, alternating between the stress categories 'Correction', 'Highlight' and 'Emotion'."
-    response1=aux.generate_response(prompt1)
-    text1 = response1.choices[0]['text']
-    l1 = text1.split('\n')
-    l1 = aux.remove_numbering(l1)
-    prompt2 = fw_highlight + "/nGenerate " + str(n_exercises) + " more exercise outputs that could be found in a " + topic + " English vocabulary list."
-    response2=aux.generate_response(prompt2)
-    text2 = response2.choices[0]['text']
-    l2 = text2.split('\n')
-    l2 = aux.remove_numbering(l2)
-    prompt3 = fw_emotion + "/nGenerate " + str(n_exercises) + " more exercise outputs that could be found in a " + topic + " English vocabulary list."
-    response3=aux.generate_response(prompt3)
-    text3 = response3.choices[0]['text']
-    l3 = text3.split('\n')
-    l3 = aux.remove_numbering(l3)
-    l = l1 + l2 + l3
-    liste = []
-    for i in range(len(l)):
-        filtered_output = re.search('{.+}',random.choice(l)) # making sure the string looks something like a dictionary
-        if filtered_output:
-            try:
-                d = ast.literal_eval(filtered_output.group())
-                if type(d) == dict: # making sure d was actually transformed into a dictionary
-                    liste.append(d)
-            except:
-                pass
-    if len(liste) > n_exercises: # we have to limit the number of outputs in case there are more than asked for
-        liste = liste[:n_exercises]
-    aux.jsonfile(liste)
-    return liste
-            
-
-
+from src.text_processing import remove_special_characters 
 def change_asterisks(element, checking_function=word_has_a_target_phone, target_regexes=['IH[012]','IY[012]']):
     # n_syl*has_target
     n_char_has_target=[]
-    for el in element['answer'].replace('*','').split(' '):
+    # remove_special_characters(element['answer'], lowercase=False).split(' ')
+    for el in remove_special_characters(element['answer'], lowercase=True).split(' '):
+        print(el)
         n_char_has_target.append(checking_function(el, target_regexes)*len(el))
     if sum(n_char_has_target):
         idx_w=np.argmax(n_char_has_target)
         element['answer']=element['answer'].replace('*','')
         l=element['answer'].split(' ')
-        # put asterisks o nit
+        # put asterisks on it
         element['answer']=' '.join(l[:idx_w]+['*'+l[idx_w]+'*']+l[idx_w+1:])
     return element
 
@@ -1141,48 +975,122 @@ def check_correct_target_word_and_filter(records, checking_function=word_has_a_t
                     filtered_list.append(element)
     return filtered_list
 
-def spokensentence_vc1(n_exercises = 20, topic = 'Business'):
+
+from src.pronunciation_dictionaries import cmu_reducer
+def spokensentence_vc(ipa_targets=["i:", "ɪ"], phone_type="vowel", n_exercises = 20, topic = 'biology'):
     """
     pre: You are asked to fill in the type of exercise you want to create and n_exercises is the number of vocabulary items generated by OpenAI 
     post: 
     Example
-    
     """
-    #first step: creating a word list  
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
+    exercise_words=[]
+    for ipa_target in ipa_targets:
+        ws=generate_words(ipa_target=ipa_target, phone_type=phone_type, n=n_exercises, topic=topic)
+        exercise_words+=ws[:int(n_exercises*1.1/2)+1]
+    random.Random(0).shuffle(exercise_words)
+    string='\n'.join(exercise_words)+'\n'
 
-    target_phoneme_regexes=['IH[012]','IY[012]']
-    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ from a Business English vocabulary list.\n" + pick_phonetics_vc1 + "\nGenerate 30 more words that also have either the /i:/ or the /ɪ/ phoneme and that could be found in a " + topic + " English vocabulary list."
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    l=text_response_to_words_with_target_phonemes(text, target_phoneme_regexes, n_exercises)
-    string='\n'.join(l)+'\n'
-
-    prompt = "Here is a list of words that contain either the phoneme /i:/ (like in 'leave') or /ɪ/ (like in 'stick'), from a " + topic + " English vocabulary list.\n" + string + """
-    Generate a numbered list of dialogues with only one interaction (each of the 2 persons talks once) like the example below.
-    Each dialogue must contain a word from the list inbetween asterisks (*) in the second part after the "|". The topic needs to be about """+ topic + """. Each phrase should contain maximum 20 words.
+    prompt = "Here is a list of words that contain either the phoneme /"+ipa_targets[0]+"/ or /"+ipa_targets[1]+"/, relating to the topic of " + topic + ":\n" + string + """
+    Generate a numbered list of """+str(len(exercise_words))+""" dialogues with only one interaction (each of the 2 persons talks once) like the example above.
+    Each dialogue must contain a word from the list inbetween asterisks (*) in the second part after the "|". The topic needs to be about """+ topic + """. 
+    The 2 parts of every dialogue must each contain maximum 15 words.
     Example with the word "finished": 
     So, how did the first round of interviews go? | I just *finished*, I think it went pretty well actually.
     """ 
     
-    response=aux.generate_response(prompt, max_tokens=2000)
+    response=aux.generate_response(prompt, max_tokens=3000)
     text = response.choices[0]['text']
     l = filter(None,text.split('\n'))
     l = aux.remove_numbering(l)
     l=list(set(l))
 
-    records=[{"question":el.split(" | ")[0], "answer":el.split(" | ")[1]} for el in l]
+    records=[{"question":el.split("|")[0].strip(), "answer":el.split("|")[1].strip()} for el in l]
+
+    target_phoneme_regexes = [cmu_reducer[ipa_target]+'[012]'] if phone_type=="vowel" else [cmu_reducer[ipa_target]]
     
-    filtered_list=check_correct_target_word_and_filter(records, checking_function=word_has_a_target_phone, target_regexes=['IH[012]','IY[012]'])
+    filtered_list=check_correct_target_word_and_filter(records, checking_function=word_has_a_target_phone, target_regexes=target_phoneme_regexes)
 
     if len(filtered_list) > n_exercises: # we have to limit the number of outputs in case there are more than asked for
         filtered_list = filtered_list[:n_exercises]
     aux.jsonfile(filtered_list)
     return filtered_list
 
-                        
-def spokensentence_vc2(n_exercises = 5, topic = 'Business'):
+
+def spokensentence_ed(n_exercises = 5, topic = 'Business'):
+    """
+    pre: You are asked to fill in the type of exercise you want to create and n_exercises is the number of vocabulary items generated by OpenAI 
+    post: 
+    Example:
+    """
+    
+    # Creating a panda Dataframe to retrieve all of the example data
+    df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
+
+    examples_dicts=[ast.literal_eval(el) for el in aux.remove_numbering(df['-ED'].dropna().tolist())][:10]
+    examples_string='\n'.join([str(i+1)+'. '+el['question']+" | "+el['answer'] for i,el in enumerate(examples_dicts)])
+    # Each dialogue must contain a word from the list inbetween asterisks (*) in the second part after the "|". 
+    
+
+    prompt = """Here is a list of dialogues relating to the topic of "business".
+    """ + examples_string + "\n\nGenerate a numbered list of " + str(n_exercises*2) + """ dialogues with only one interaction (each of the 2 persons talks once) like the example above.
+    Each dialogue must contain a word ending in "ed", inbetween asterisks (*), in the second part after the "|". The topic needs to be about """+ topic + """. 
+    The 2 parts of every dialogue must each contain maximum 15 words."""
+
+    response=aux.generate_response(prompt)
+    text = response.choices[0]['text']
+    l = filter(None,text.split('\n'))
+    l = aux.remove_numbering(l)
+    l=list(set(l))
+
+    records=[{"question":el.split("|")[0].strip(), "answer":el.split("|")[1].strip()} for el in l]
+    
+    filtered_list=check_correct_target_word_and_filter(records, checking_function=has_target_text_pattern, target_regexes=['ed$'])
+
+    if len(filtered_list) > n_exercises: # we have to limit the number of outputs in case there are more than asked for
+        filtered_list = filtered_list[:n_exercises]
+    aux.jsonfile(filtered_list)
+    return filtered_list
+
+
+def spokensentence_ws(n_exercises = 5, topic = 'Business'):
+    """
+    pre: You are asked to fill in the type of exercise you want to create and n_exercises is the number of vocabulary items generated by OpenAI 
+    post: 
+    Example:
+    """
+    
+    # Creating a panda Dataframe to retrieve all of the example data
+    df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
+
+    # we take some FW examples, but we'll just check that we have >=2 sylables in the filtering steps
+    examples_dicts=[ast.literal_eval(el) for el in aux.remove_numbering(df['FW highlight'].dropna().tolist())][:10]
+    examples_string='\n'.join([str(i+1)+'. '+el['question']+" | "+el['answer'] for i,el in enumerate(examples_dicts)])
+    # Each dialogue must contain a word from the list inbetween asterisks (*) in the second part after the "|". 
+    
+
+    prompt = """Here is a list of dialogues relating to the topic of "business".
+    """ + examples_string + "\n\nGenerate a numbered list of " + str(n_exercises*2) + """ dialogues with only one interaction (each of the 2 persons talks once) like the example above.
+    Each dialogue must contain a word that has at least 2 syllables, inbetween asterisks (*), in the second part after the "|". The topic needs to be about """+ topic + """. 
+    The 2 parts of every dialogue must each contain maximum 15 words."""
+
+    response=aux.generate_response(prompt)
+    text = response.choices[0]['text']
+    l = [x for x in text.split('\n') if x!='']
+    l = aux.remove_numbering(l)
+    l=list(set(l))
+
+    records=[{"question":el.split("|")[0].strip(), "answer":el.split("|")[1].strip()} for el in l]
+    
+    # the regex is ignored, as it just count syllables and return true if >=2
+    filtered_list=check_correct_target_word_and_filter(records, checking_function=has_at_least_2_syls, target_regexes=[''])
+
+    if len(filtered_list) > n_exercises: # we have to limit the number of outputs in case there are more than asked for
+        filtered_list = filtered_list[:n_exercises]
+    aux.jsonfile(filtered_list)
+    return filtered_list
+
+
+def spokensentence_fw(n_exercises = 5, topic = 'Business'):
     """
     pre: You are asked to fill in the type of exercise you want to create and n_exercises is the number of vocabulary items generated by OpenAI 
     post: 
@@ -1190,28 +1098,37 @@ def spokensentence_vc2(n_exercises = 5, topic = 'Business'):
     """
     # Creating a panda Dataframe to retrieve all of the example data
     df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
+
+    # doesn't work very well, most of the time the output does not have the required format. I think the prompt is a bit too complicated for OpenAI to understand.
+    fw_correction_examples = '\n'.join(df['FW correction'].dropna().tolist())+'\n'
+    fw_correction = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word is indicated using asterisks (*)
+    in "question", and a correction occurs in "answer", using asterisks (*). The stress category 'Correction' is also indicated in "stress_category".\n""" + fw_correction_examples
+    fw_highlight_examples = '\n'.join(df['FW highlight'].dropna().tolist())+'\n'
+    fw_highlight = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, or none, is indicated using asterisks (*)
+    in "question" , and another word is emphasized in "answer", using asterisks (*). The stress category 'Highlight' is also indicated in "stress_category".\n""" + fw_highlight_examples    
+    fw_emotion_examples = '\n'.join(df['FW emotion'].dropna().tolist())+'\n'
+    fw_emotion = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word, or none, is indicated using asterisks (*) in "question" ,
+    and emotion is expressed in "answer" by emphasizing a word in particular using asterisks (*). The stress category 'Emotion' is also indicated in "stress_category".\n""" + fw_emotion_examples
+    prompt1 = fw_correction + "/nGenerate " + str(n_exercises*2) + " more exercise relating to the topic of " + topic + ", alternating between the stress categories 'Correction', 'Highlight' and 'Emotion'."
     
-    examples = '\n'.join(df['VC2'].dropna().tolist())+'\n'
-    prompt = """Here is a list of exercise outputs from a Business English vocabulary list where emphasis on one word containing either the phoneme /ɔː/ or /əʊ/ is indicated using asterisks (*)
-    in "answer".""" + examples + "/nGenerate " + str(n_exercises*2) + " more exercise outputs that could be found in a " + topic + " English vocabulary list."  
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    l = text.split('\n')
-    l = aux.remove_numbering(l)
-    filtered_list = []
-    for element in l:
-        x = re.search('\*.+\*',element) # the word inbetween asterisks has to be isolated
-        if x: # only proceeds if asterisks were found
-            y = x.group()
-            y = re.sub("\*", "", y) # asterisks need to be removed to check if entry is in cmudictresponse=aux.generate_response(prompt)
-            if y in cmudict_dict:
-                for phon in cmudict_dict[y][0]:
-                    if re.search('AO|OW[012]',phon):
-                        filtered_list.append(element)
-                        break
+    response1=aux.generate_response(prompt1)
+    text1 = response1.choices[0]['text']
+    l1 = text1.split('\n')
+    l1 = aux.remove_numbering(l1)
+    prompt2 = fw_highlight + "/nGenerate " + str(n_exercises) + " more exercise relating to the topic of " + topic + "."
+    response2=aux.generate_response(prompt2)
+    text2 = response2.choices[0]['text']
+    l2 = text2.split('\n')
+    l2 = aux.remove_numbering(l2)
+    prompt3 = fw_emotion + "/nGenerate " + str(n_exercises) + " more exercise relating to the topic of " + topic + "."
+    response3=aux.generate_response(prompt3)
+    text3 = response3.choices[0]['text']
+    l3 = text3.split('\n')
+    l3 = aux.remove_numbering(l3)
+    l = l1 + l2 + l3
     liste = []
-    for i in range(len(filtered_list)):
-        filtered_output = re.search('{.+}',random.choice(filtered_list)) # making sure the string looks something like a dictionary
+    for i in range(len(l)):
+        filtered_output = re.search('{.+}',random.choice(l)) # making sure the string looks something like a dictionary
         if filtered_output:
             try:
                 d = ast.literal_eval(filtered_output.group())
@@ -1223,59 +1140,9 @@ def spokensentence_vc2(n_exercises = 5, topic = 'Business'):
         liste = liste[:n_exercises]
     aux.jsonfile(liste)
     return liste
-    
-def spokensentence_ed(n_exercises = 5, topic = 'Business'):
-    """
-    pre: You are asked to fill in the type of exercise you want to create and n_exercises is the number of vocabulary items generated by OpenAI 
-    post: 
-    Example:
-    """
-
-    
-    # df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-    
-    # pick_phonetics_ed = '\n'.join(df['-ED'].dropna().tolist())+'\n'
-    # prompt = "Here is a list of words ending in -ed, from a Business English vocabulary list.\n" + pick_phonetics_ed + "\nGenerate " + str(n_exercises*3) + " more words that also end in -ed and that could be found in a " + topic + " English vocabulary list."
-    # response=aux.generate_response(prompt)
-    # text = response.choices[0]['text']
-    # l=text_response_to_words_with_target_word_regex(text, 'ed$', n_exercises)
-    # string='\n'.join(l)+'\n'
-
-    # prompt = "Here is a list of words ending in -ed, from a " + topic + " English vocabulary list.\n" + string + """
-    # Generate a numbered list of dialogues with only one interaction (each of the 2 persons talks once) like the example below.
-    # Each dialogue must contain a word from the list inbetween asterisks (*) in the second part after the "|". The topic needs to be about """+ topic + """.
-    # Example with the word "finished": 
-    # So, how did the first round of interviews go? | I just *finished*, I think it went pretty well actually.
-    # """ 
-    
-    
-    # Creating a panda Dataframe to retrieve all of the example data
-    df= pd.read_csv("content_tools/content_examples_csvs/spokensentence.csv")
 
 
-    examples_dicts=[ast.literal_eval(el) for el in aux.remove_numbering(df['-ED'].dropna().tolist())][:10]
-    examples_string='\n'.join([str(i+1)+'. '+el['question']+" | "+el['answer'] for i,el in enumerate(examples_dicts)])
-    # Each dialogue must contain a word from the list inbetween asterisks (*) in the second part after the "|". 
-    prompt = """Here is a list of dialogues relating to the topic of Business.
-    Each dialogue must contain a word ending in "ed", inbetween asterisks (*), in the second part after the "|". 
-    """ + examples_string + "\n\nGenerate a numbered list of " + str(n_exercises*2) + """ more dialogues with a word ending in "ed", inbetween asterisks (*), in the second part after the "|", relating to the topic of """ + topic +""".
-    Each phrase should contain maximum 20 words."""
 
-    response=aux.generate_response(prompt)
-    text = response.choices[0]['text']
-    l = filter(None,text.split('\n'))
-    l = aux.remove_numbering(l)
-    l=list(set(l))
-
-    records=[{"question":el.split(" | ")[0], "answer":el.split(" | ")[1]} for el in l]
-    
-    filtered_list=check_correct_target_word_and_filter(records, checking_function=has_target_text_pattern, target_regexes=['ed$'])
-
-    if len(filtered_list) > n_exercises: # we have to limit the number of outputs in case there are more than asked for
-        filtered_list = filtered_list[:n_exercises]
-    aux.jsonfile(filtered_list)
-    return filtered_list
-    
 """
 Putting everything together
 """
@@ -1309,20 +1176,20 @@ def generate_exercise(exercise_type, pronunciation_aspect = 'VC1', n_exercises =
     elif exercise_type == 'Pick Stressed Syllable':
         return pick_stressed_syllable(n_exercises, topic)
     elif exercise_type == 'Pick Phonetics':
-        if pronunciation_aspect == 'VC1':
-            return pick_phonetics_vc1(n_exercises, topic)
-        elif pronunciation_aspect == 'VC2':
-            return pick_phonetics_vc2(n_exercises, topic)
+        if pronunciation_aspect == 'VC1': return pick_phonetics_phones(ipa_targets=["i:", "ɪ"], n_exercises = n_exercises, topic = topic)
+            # return pick_phonetics_vc1(n_exercises, topic)
+        elif pronunciation_aspect == 'VC2': return pick_phonetics_phones(ipa_targets=["ɔ", "ow"], n_exercises = n_exercises, topic = topic)
+            # return pick_phonetics_vc2(n_exercises, topic)
         elif pronunciation_aspect == '-ED':
             return pick_phonetics_ed(n_exercises, topic)
-        elif pronunciation_aspect == 'VC3':
-            return pick_phonetics_vc3(n_exercises, topic)
-        elif pronunciation_aspect == 'VC4':
-            return pick_phonetics_vc4(n_exercises, topic)
-        elif pronunciation_aspect == 'TH':
-            return pick_phonetics_th(n_exercises, topic)
-        elif pronunciation_aspect == 'H':
-            return pick_phonetics_h(n_exercises, topic)
+        elif pronunciation_aspect == 'VC3': return pick_phonetics_phones(ipa_targets=["ʊ", "u:"], n_exercises = n_exercises, topic = topic)
+            # return pick_phonetics_vc3(n_exercises, topic)
+        elif pronunciation_aspect == 'VC4': return pick_phonetics_phones(ipa_targets=["æ", "ɑ:"], n_exercises = n_exercises, topic = topic)
+            # return pick_phonetics_vc4(n_exercises, topic)
+        elif pronunciation_aspect == 'TH': return pick_phonetics_phones(ipa_targets=["θ", "ð"], n_exercises = n_exercises, topic = topic)
+            # return pick_phonetics_th(n_exercises, topic)
+        elif pronunciation_aspect == 'H': return pick_phonetics_phones(ipa_targets=["h"], n_exercises = n_exercises, topic = topic)
+            # return pick_phonetics_h(n_exercises, topic)
         elif pronunciation_aspect == '-S':
             return pick_phonetics_final_s(n_exercises, topic)
     elif exercise_type == 'Pick Audio Unlike Others':
@@ -1348,11 +1215,19 @@ def generate_exercise(exercise_type, pronunciation_aspect = 'VC1', n_exercises =
     elif exercise_type == 'Match Audio to Meaning':
         return match_audio_to_meaning(n_exercises, topic)
     elif exercise_type == 'SpokenSentence':
-        if pronunciation_aspect == 'VC1':
-            return spokensentence_vc1(n_exercises, topic)
-        elif pronunciation_aspect == 'VC2':
-            return spokensentence_vc2(n_exercises, topic)
+        if pronunciation_aspect == 'VC1': return spokensentence_vc(ipa_targets=["i:", "ɪ"], phone_type="vowel", n_exercises = n_exercises, topic = topic)
+            # return spokensentence_vc1(n_exercises, topic)
+        elif pronunciation_aspect == 'VC2': return spokensentence_vc(ipa_targets=["ɔ", "ow"], phone_type="vowel", n_exercises = n_exercises, topic = topic)
+            # return spokensentence_vc2(n_exercises, topic)
         elif pronunciation_aspect == '-ED':
             return spokensentence_ed(n_exercises, topic)
         elif pronunciation_aspect == 'FW':
             return spokensentence_fw(n_exercises, topic)
+        elif pronunciation_aspect == 'WS':
+            return spokensentence_ws(n_exercises, topic)
+
+
+if __name__=="__main__":
+    generate_exercise('SpokenSentence', pronunciation_aspect = 'VC1', n_exercises = 10, topic = 'Business')
+    generate_exercise('SpokenSentence', pronunciation_aspect = 'WS', n_exercises = 10, topic = 'biology')
+    
