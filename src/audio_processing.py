@@ -67,6 +67,9 @@ def getf0Samples(s, fs):
     Returns:
         numpy array: upsampled f0 contour in semitones
     """
+
+    # pyin works as a replacement of pyworld, but I saw a slightly lower performance with it, so I'm not changing that for now
+    # f0, voiced_flag, voiced_prob=librosa.pyin(s, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=fs)
     f0, sp, ap = pw.wav2world(s.astype(np.float64), fs)
 
     f0+=10**-10 #to avoid zeros going in the log, add a tiny number
@@ -124,7 +127,7 @@ def getIntensity(s, fs):
         float: intensity of signal
     """
     # this is done similarly to praat:
-    minimum_pitch = 70; # in Hz
+    minimum_pitch = 70 # in Hz
     analysis_win = round((3.2/minimum_pitch)*fs)
 
     # smoothing the signal power using a moving average
@@ -243,9 +246,6 @@ def align_audios(
     return out
 
 
-
-
-
 def read_audio_bytes(audio_bytes, fs=16000):
     """
     -put into a file-like object with "io", 
@@ -336,21 +336,42 @@ def audio64_from_file(path, fs=16000):
     encode_string = base64.b64encode(audio_string)
     return encode_string
 
-# def audio_utf8_from_file(path, fs=16000):
-#     # writing bytes of an ogg file with virtual io, then encoding with base64
-#     s,fs=librosa.load(path, sr=fs)
-#     with io.BytesIO() as fio:
-#         sf.write(fio, s, samplerate=fs, format='ogg')
-#         audio_string = fio.getvalue()
 
-#     encode_string = base64.b64encode(audio_string)
-#     print(len(encode_string))
-#     decode_string = base64.b64decode(encode_string)
+def test_pyin():
+    path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
+    s,fs=librosa.load(path, sr=16000)
+    f0, voiced_flag, voiced_prob=librosa.pyin(s, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=fs)
 
-#     encode_latin=audio_string.decode('latin-1')
-#     print(len(encode_latin))
-#     decode_latin=encode_latin.encode('latin-1')
-#     return encode_string
+    
+    f0+=10**-10 #to avoid zeros going in the log, add a tiny number
+
+    # convert in semitones
+    f0Frames=40*np.log10(f0)
+
+    # replace any inf due to the log operation with nan (which are treated below)
+    f0Frames[f0Frames==-np.inf]=np.nan
+    x=np.arange(len(f0Frames))
+    f = interp1d(x, f0Frames, kind='linear')
+
+    xnew = np.floor(np.arange(len(s))/len(s)*len(f0Frames))
+    f0Samples = f(xnew)
+
+    
+
+    # f0_pw, sp, ap = pw.wav2world(s.astype(np.float64), fs)
+
+    f0Samples_pw=getf0Samples(s, fs)
+
+    f0Samples_pw[f0Samples_pw==-400]=np.nan
+
+    
+    import matplotlib.pyplot as plt
+    plt.cla()
+    plt.plot(f0Samples, label="pyin")
+    plt.plot(f0Samples_pw, label="pyworld")
+    plt.legend()
+    plt.savefig('f0.png')
+
 
 def test_audio_file_like():
     # from six.moves.urllib.request import urlopen
