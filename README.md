@@ -44,6 +44,27 @@ conda activate flowspeech
 
 Then basically follow the sme installation steps as in the Dockerfile
 
+<details>
+<summary>Try torch compile (optional)</summary>
+<br>
+For torch.compile() optimizations, see https://pytorch.org/get-started/pytorch-2.0/#getting-started :
+In CPU:
+`pip3 install numpy numba --pre torch torchvision torchaudio --force-reinstall --extra-index-url https://download.pytorch.org/whl/nightly/cpu`
+
+GPU:
+`pip3 install numpy --pre torch[dynamo] torchvision torchaudio --force-reinstall --extra-index-url https://download.pytorch.org/whl/nightly/cu116`
+
+
+For GPU support on Windows with WSL2, I followed this:
+https://docs.nvidia.com/cuda/wsl-user-guide/index.html#getting-started-with-cuda-on-wsl
+https://github.com/pytorch/pytorch/issues/73487#issuecomment-1115441977
+
+i.e.: `pip install torch==1.11.0+cu115 torchvision==0.12.0+cu115 -f https://download.pytorch.org/whl/torch_stable.html`
+
+Then for doing AutoML: `pip install autoPyTorch`
+
+</details>
+
 ## Data
 
 ### Data of actor recordings with sentenceID etc.
