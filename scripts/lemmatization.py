@@ -74,6 +74,7 @@ if __name__=='__main__':
 
 
 
+    df=pd.read_csv('data/query_results-2022-08-31_101957.csv')
     ws=lemmatize_from_df(df)
     lexique=pd.DataFrame(ws)
     lexique.to_csv("data/lexique.csv")
