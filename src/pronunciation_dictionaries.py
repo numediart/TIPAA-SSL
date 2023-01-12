@@ -388,8 +388,10 @@ cmu_reducer['ɜ']=cmu_reducer['ə']
 
 
 long_vowels=[el for el in ipa_alphabet if el[-1]=='ː']
+long_vowels_ascii=[el[:-1]+':' for el in long_vowels]
 # cmu does not have a symbol to differentiate long and short vowels with the same acoustics
 for lv in long_vowels: cmu_reducer[lv]=cmu_reducer[lv[:-1]]
+for lv in long_vowels_ascii: cmu_reducer[lv]=cmu_reducer[lv[:-1]]
 
 j_consonants=[el for el in ipa_alphabet if el[-1]=='ʲ']
 for jc in j_consonants: cmu_reducer[jc]=cmu_reducer[jc[:-1]]
