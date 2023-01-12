@@ -1,0 +1,514 @@
+{
+  "title": "LEARNING PROGRAM",
+  "type": "array",
+  "format": "grid",
+  "structure_1": {
+    "type": "object",
+    "title": "single_word",
+    "properties": {
+      "target_content": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "graduated"
+      }
+    }
+  },
+  "structure_2": {
+    "type": "object",
+    "title": "word_with_2_incorrect_alternatives",
+    "properties": {
+      "target_content": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "application"
+      },
+      "incorrect1": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "apprenticeship"
+      },
+      "incorrect2": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "experiences"
+      }
+    }
+  },
+  "structure_3": {
+    "type": "object",
+    "title": "word_with_3_incorrect_alternatives",
+    "properties": {
+      "target_content": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "felony"
+      },
+      "incorrect1": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "fiduciary"
+      },
+      "incorrect2": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "delinquency"
+      },
+      "incorrect3": {
+        "type": "string",
+        "pattern": "^[A-Za-z'\\-]+$",
+        "default": "alimony"
+      }
+    }
+  },
+  "structure_4": {
+    "type": "object",
+    "title": "phrase_display_target_incorrect",
+    "properties": {
+      "text_to_display": {
+        "type": "string",
+        "pattern": "^([A-Za-z0-9,.:;?!'’\\-\"]+\\s*)+$",
+        "default": "Why do you want to use historical evidence?"
+      },
+      "target_content": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$",
+        "default": "Why are *historical* evidence the best choice in this case?",
+        "maxLength": 250
+      },
+      "incorrect": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$",
+        "default": "Why don't you want to use *statistical* evidence?",
+        "maxLength": 250
+      }
+    }
+  },
+  "structure_5": {
+    "type": "object",
+    "title": "phrase_audio_target_2_incorrect_alternatives",
+    "properties": {
+      "phrase_audio_recorded": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$",
+        "default": "Peter was *drug* sick."
+      },
+      "target_content": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$",
+        "default": "Peter wasn't *sea* sick.",
+        "maxLength": 250
+      },
+      "incorrect1": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$",
+        "default": "*Chloe* wasn't drug sick.",
+        "maxLength": 250
+      },
+      "incorrect2": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$",
+        "default": "Peter wasn't in *withdrawal*.",
+        "maxLength": 250
+      }
+    }
+  },
+  "structure_single_phrase_with_single_asterisks_target_or_single_word": {
+    "type": "object",
+    "title": "single_phrase_with_single_asterisks_target",
+    "properties": {
+      "target_content": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$|^[A-Za-z'\\-]+$",
+        "default": "The *interview* process is challenging.",
+        "maxLength": 120
+      }
+    }
+  },
+  "structure_6": {
+    "type": "object",
+    "title": "single_phrase_with_asterisks_target",
+    "properties": {
+      "target_content": {
+        "type": "string",
+        "pattern": "^(\\**[A-Za-z0-9,.:;?!'’\\-\"]+\\**\\s*)+$",
+        "default": "The *interview* process is challenging.",
+        "maxLength": 120
+      }
+    }
+  },
+  "structure_7": {
+    "type": "object",
+    "title": "phrase_question_answer",
+    "properties": {
+      "stress_category":{
+        "type": "string",
+        "enum": [
+        "Highlight",
+        "Correction",
+        "Emotion"
+      ]
+    },
+      "question": {
+        "type": "string",
+        "pattern": "^([A-Za-z0-9,.:;?!'’\\-\"\\*]+\\s*)+$",
+        "default": "I finally took the bar exam, and I passed!"
+      },
+      "answer": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9,.?!'\\-\"\\s]*\\*[A-Za-z'\\-]+\\*[A-Za-z0-9,.?!'\\-\"\\s]*$$",
+        "default": "*Congratulations*, you can be proud of yourself!",
+        "maxLength": 250
+      }
+    }
+  },
+  "structure_8": {
+    "type": "object",
+    "title": "single_phrase_without_asterisks_target",
+    "properties": {
+      "target_content": {
+        "type": "string",
+        "pattern": "^([A-Za-z0-9,.:;?!'’\\-\"]+\\s*)+$",
+        "default": "The offer ended up being rejected."
+      }
+    }
+  },
+  "items": {
+    "title": "Module",
+    "required": [
+      "Module title",
+      "Activity sets"
+    ],
+    "properties": {
+      "Module title": {
+        "type": "string",
+        "default": "Working in court 👨🏻‍⚖"
+      },
+      "Activity sets": {
+        "type": "array",
+        "format": "grid",
+        "title": "Activity set(s)",
+        "items": {
+          "title": "Activity set",
+          "required": [
+            "Activity set",
+            "Activity"
+          ],
+          "properties": {
+            "Activity set": {
+              "type": "string",
+              "default": "The Bar is calling ☎️"
+            },
+            "Activity": {
+              "type": "array",
+              "format": "grid",
+              "title": "Content",
+              "items": {
+                "title": "Activity",
+                "required": [
+                  "Activity title",
+                  "Activity type",
+                  "Listening activity",
+                  "Speaking activity"
+                ],
+                "properties": {
+                  "Activity title": {
+                    "title": "Activity title",
+                    "type": "string",
+                    "default": "Start here!"
+                  },
+                  "Activity type": {
+                    "type": "string",
+                    "enum": [
+                      "Listening",
+                      "Speaking"
+                    ]
+                  },
+                  "Listening activity": {
+                    "type": "array",
+                    "format": "grid",
+                    "title": "Listening activity",
+                    "items": {
+                      "type": "object",
+                      "title": "Exercise",
+                      "required": [
+                        "Pronunciation aspect",
+                        "Exercise type",
+                        "content_count_syllables",
+                        "content_input_stress_pattern",
+                        "content_match_audio_to_meaning",
+                        "content_match_word_to_audio",
+                        "content_match_word_to_stress_pattern",
+                        "content_pick_audio_unlike_others",
+                        "content_pick_meaning_of_audio",
+                        "content_pick_phonetics",
+                        "content_pick_stressed_word",
+                        "content_pick_stress_pattern",
+                        "content_pick_stressed_syllabe"
+                      ],
+                      "properties": {
+                        "Pronunciation aspect": {
+                            "type": "string",
+                            "enum": [
+                              "WS",
+                              "FW",
+                              "VC1",
+                              "VC2",
+                              "ED"
+                            ]
+                          },
+                        "Exercise type": {
+                          "title": "Exercise type",
+                          "type": "string",
+                          "enum": [
+                            "count_syllables",
+                            "input_stress_pattern",
+                            "match_audio_to_meaning",
+                            "match_word_to_audio",
+                            "match_word_to_stress_pattern",
+                            "pick_audio_unlike_others",
+                            "pick_meaning_of_audio",
+                            "pick_phonetics",
+                            "pick_stressed_word",
+                            "pick_stress_pattern",
+                            "pick_stressed_syllabe"
+                          ]
+                        },
+                        "content_pick_audio_unlike_others": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "pick_audio_unlike_others",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_2"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "pick_audio_unlike_others"
+                            }
+                          }
+                        },
+                        "content_pick_phonetics": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "pick_phonetics",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_1"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "pick_phonetics"
+                            }
+                          }
+                        },
+                        "content_count_syllables": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "count_syllables",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_1"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "count_syllables"
+                            }
+                          }
+                        },
+                        "content_pick_stressed_syllabe": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "pick_stressed_syllabe",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_1"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "pick_stressed_syllabe"
+                            }
+                          }
+                        },
+                        "content_pick_stress_pattern": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "pick_stress_pattern",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_1"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "pick_stress_pattern"
+                            }
+                          }
+                        },
+                        "content_pick_stressed_word": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "pick_stressed_word",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_6"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "pick_stressed_word"
+                            }
+                          }
+                        },
+                        "content_match_word_to_stress_pattern": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "match_word_to_stress_pattern",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_2"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "match_word_to_stress_pattern"
+                            }
+                          }
+                        },
+                        "content_match_word_to_audio": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "match_word_to_audio",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_3"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "match_word_to_audio"
+                            }
+                          }
+                        },
+                        "content_input_stress_pattern": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "input_stress_pattern",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_1"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "input_stress_pattern"
+                            }
+                          }
+                        },
+                        "content_match_audio_to_meaning": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "match_audio_to_meaning",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_4"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "match_audio_to_meaning"
+                            }
+                          }
+                        },
+                        "content_pick_meaning_of_audio": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "pick_meaning_of_audio",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_5"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "pick_meaning_of_audio"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "options": {
+                      "dependencies": {
+                        "Activity type": "Listening"
+                      }
+                    }
+                  },
+                  "Speaking activity": {
+                    "type": "array",
+                    "format": "grid",
+                    "title": "Speaking activity",
+                    "items": {
+                      "type": "object",
+                      "title": "Exercise",
+                      "required": [
+                        "Pronunciation aspect",
+                        "Exercise type",
+                        "content_spoken_card",
+                        "content_spoken_sentence"
+                      ],
+                      "properties": {
+                        "Pronunciation aspect": {
+                            "type": "string",
+                            "enum": [
+                              "WS",
+                              "FW",
+                              "VC1",
+                              "VC2",
+                              "ED"
+                            ]
+                          },
+                        "Exercise type": {
+                          "title": "Exercise type",
+                          "type": "string",
+                          "enum": [
+                            "spoken_card",
+                            "spoken_sentence"
+                          ]
+                        },
+                        "content_spoken_card": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "spoken_card",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_single_phrase_with_single_asterisks_target_or_single_word"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "spoken_card"
+                            }
+                          }
+                        },
+                        "content_spoken_sentence": {
+                          "type": "array",
+                          "format": "table",
+                          "title": "spoken_sentence",
+                          "uniqueItems": false,
+                          "items": {
+                            "$ref": "#/structure_7"
+                          },
+                          "options": {
+                            "dependencies": {
+                              "Exercise type": "spoken_sentence"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "options": {
+                      "dependencies": {
+                        "Activity type": "Speaking"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -11,7 +11,7 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     gawk \
     curl \
     git \
-	make \
+	 make \
     cron \
     # These two are  necessary for pyworld library (f0 extraction)
     g++ \
@@ -27,14 +27,16 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
 RUN conda install ffmpeg && \
 # For using e.g. MelGAN or wav2vec2
    conda install pytorch torchaudio cpuonly -c pytorch && \
+#    conda install -c conda-forge tensorflow-cpu && \
    conda install -c conda-forge montreal-forced-aligner && \
+#    conda install tensorflow && \
 # clean unnecessary setup files 
    conda clean --all -y
 
 
 COPY ./requirements.txt $HOME/requirements.txt
 # pip
-RUN pip install --upgrade pip && pip install pyworld && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install pyworld==0.3 && pip install -r requirements.txt
 
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000

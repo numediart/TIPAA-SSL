@@ -42,8 +42,8 @@ def replace_with_tag(sentence, tag='emphasis', options='level="strong"'):
     return sentence
 
 def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',path="synth_audio",synth_technique='standard',voice_id="Joanna", name="sample"):
-    sentence=sentence.replace("'","&apos;").replace('"','&quot;')
-    text=replace_with_tag(sentence, tag=tag, options=options)
+    # sentence=sentence.replace("'","&apos;").replace('"','&quot;')
+    text=replace_with_tag(sentence.replace("'","&apos;").replace('"','&quot;'), tag=tag, options=options)
     # reserved characters : https://docs.aws.amazon.com/polly/latest/dg/escapees.html
 
     cmd= "aws polly synthesize-speech \
@@ -59,6 +59,28 @@ def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',path
     # print(path+'/'+name+".mp3")
     if not os.path.exists(path+'/'+name+".mp3"):    
         os.system(cmd)
+
+
+def synthesize_list(df, voices, root_folder="synth_audio/user_texts"):
+    if not os.path.exists(root_folder):os.makedirs(root_folder)
+    records=[]
+    print("n of iterations: ", len(df))
+    for i,r in tqdm(df.iterrows()):
+        sentence=r.text
+        name='_'.join(remove_special_characters(sentence).split(' ')).replace('*','+').replace("'",'_')
+        print(sentence)
+        for voice in voices:
+            # gender=voices[voice].split('_')[0]
+            # lang_code=lang_dict[voices[voice].split('_')[1]]
+            fn=voice+'_'+voices[voice]+'__'+name
+            x=r.to_dict()
+            y={'filename':fn,'voice':voice, 'voice_type':voices[voice]}
+            record={**x, **y}
+            records.append(record)
+            synthesize(sentence, tag=tag, options=options,path=root_folder,synth_technique=synth_technique,voice_id=voice,name=fn)
+    results=pd.DataFrame.from_records(records)
+    results.to_csv(root_folder+'/data.csv')
+    
 
 def synthesize_cmu(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk_id="F_US"):
     import cmudict
@@ -88,8 +110,14 @@ if __name__ == "__main__":
     # df=pd.read_csv("data/BE_linguistic_data_target_syl_idx.csv")
     df=pd.read_csv("data/BE_phrases_from_DB.csv")
 
-    col=df.text
-    root_folder="synth_audio/BE_english"
+    # path='/mnt/c/Users/noe_t/datasets/user_recordings_annotated/'
+    # df=pd.read_csv(path+'/unique_sentences_data.csv')
+
+    df=pd.read_json('/data/speechocean762/text_ipa.json')
+    df=df[['text']]
+
+    # col=df.text
+    root_folder="scripts/synth_audio/speechocean762"
     synth_technique='neural' # "standard" or "neural"
     # tag=''
     # options=''
@@ -99,17 +127,25 @@ if __name__ == "__main__":
 
     # tag='emphasis'
     # options='level="strong"'
-    # voices={'Joanna':'F_US', "Amy":"F_UK", "Matthew":"M_US", "Brian":"M_UK"}
-    voices={"Brian":"M_UK",  "Matthew":"M_US"}
-    lang_dict={'US':'en-US', 'UK':'en-GB'}
+    # voices={'Joanna':'F_US', 'Kendra':'F_US', "Amy":"F_UK", "Emma":"F_UK", "Matthew":"M_US",  "Joey":"M_US", "Brian":"M_UK", "Arthur":"M_UK"}
+    voices={'Joanna':'F_US', "Amy":"F_UK", "Matthew":"M_US",  "Brian":"M_UK"}
+    # voices={"Brian":"M_UK",  "Matthew":"M_US"}
 
+    # lang_dict={'US':'en-US', 'UK':'en-GB'}
+
+    synthesize_list(df, voices, root_folder=root_folder)
+
+    # ------------- synthesize cmu words
     for k in voices:
         voice_id=k
         spk_id=voices[k]
         print(k)
-        synthesize_cmu(voice_id=voice_id, spk_id=spk_id)
+        synthesize_cmu(root_folder=root_folder, voice_id=voice_id, spk_id=spk_id)
 
-    dest_folder="data/BE_english_DB_audio/"
+
+
+    # --------------- synthesize program
+    dest_folder="synth_audio/BE_english_DB_audio/"
     if not os.path.exists(dest_folder):os.makedirs(dest_folder)
 
     # path='/'.join([root_folder,synth_technique,tag,voice_id])+'/'

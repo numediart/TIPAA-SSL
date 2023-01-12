@@ -1,5 +1,6 @@
+# The speech tech
 
-Download codes and models:
+Download code:
 ```
 git clone https://github.com/flowchase/flowspeech
 cd flowspeech
@@ -10,11 +11,21 @@ cd flowspeech
 # this is for deploying the release e.g. v1.3.0
 # git checkout v1.3.0
 
+# this is for deploying the branch new_model
+# git checkout new_model
+```
+
+Download models (charsiu and wav2vec2, you can see that in the download_models.py file what is being downloaded)
+```
 git clone https://github.com/noetits/charsiu
 sudo apt-get install git-lfs
 git lfs install
 python scripts/download_models.py
 ```
+
+For using the new model pipeline, you need to put a trained reducer and frame_classifier in a folder "models/" to be loaded. (Drag and drop in VS code works as these models are light)
+
+Or train a pipeline based on a phoneme frames dataset.
 
 Build docker containers then run them:
 ```
@@ -50,8 +61,13 @@ Rebuild and launch right away:
 docker-compose up -d --no-deps --build flaskapp
 ```
 
+# For content-tools
 
-Additional notes: 
+Same for downloading code and models. 
+
+But `docker compose -f docker-compose_streamlit.yml build` then up
+
+# Additional notes: 
 
 To kill all containers, e.g. to restart afterwards:
 ```

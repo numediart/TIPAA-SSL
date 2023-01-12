@@ -1,0 +1,147 @@
+import pandas as pd
+from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
+from src.text_processing import remove_stress_annots
+import ast
+import librosa
+from src.libri_phonetization_data import libri_phonetics_data
+from src.wav2vec2_utils import instances_per_frame, instances_per_phoneme
+from src.text_processing import prefill_for_sentence
+
+def df_all_frames_to_X_y(df_all_frames):
+    X = df_all_frames['vector'].tolist()
+    y = df_all_frames['phoneme'].tolist()
+    return X, y
+
+def build_df_all_frames(df_t, phone_type, number_of_examples=100, model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
+    try:
+        processor = Wav2Vec2Processor.from_pretrained(model_path)
+    except OSError:
+        # some don't have one, take a default from facebook/wav2vec2-base-960h
+        processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+    model = Wav2Vec2ForCTC.from_pretrained(model_path, output_hidden_states=True)
+
+    # Here I have to shuffle. Because if there are several languages sorted and I select only some examples, it might take only examples from one language
+    df_t=df_t.sample(frac=1, random_state=1)
+    df_all_frames = instances_per_frame(df_t, processor, model, number_of_examples=number_of_examples, phone_type=phone_type)
+    return df_all_frames
+
+def build_df_all_phoneme_instances(df_t_train, phone_type='phone', model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
+    processor = Wav2Vec2Processor.from_pretrained(model_path)
+    model = Wav2Vec2ForCTC.from_pretrained(model_path, output_hidden_states=True)
+    df_t_train['phone_df']=df_t_train.phone_df.apply(lambda r: pd.DataFrame(r))
+    df_all_instances=instances_per_phoneme(df_t_train, processor, model, number_of_examples=None, time_per_output=0.02,  phone_type=phone_type)
+    return df_all_instances
+
+
+def load_dataset_MAILABS(lang_codes, path='./data/MAILABS', phone_set='CMU'):
+    """phone_set: 'CMU' or 'MFA_IPA'
+    """
+    df_train = pd.DataFrame()
+    for lang_code in lang_codes:
+        df_temp = pd.read_csv(path+'/MAILABS_shuffled_aligned-{}_{}.csv'.format(lang_code, phone_set))
+        for i, row in df_temp.iterrows():
+            # df_temp.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
+            if type(row.phone_df) == str:
+                res = ast.literal_eval(row.phone_df)
+                df_temp.at[i, "phone_df"] = res
+
+        df_train = pd.concat([df_train, df_temp])
+        
+    df_train = df_train.rename(columns={"path": "wav_path"}, errors="raise")
+    df_train['genre']=df_train.wav_path.str.split('/').apply(lambda r: r[-5])
+    df_train['speaker']=df_train.wav_path.str.split('/').apply(lambda r: r[-4])
+
+    return df_train
+
+
+def load_libri_dataset():
+    df_t_train, _=libri_phonetics_data(data_set='dev-clean')
+    df_t_test, _=libri_phonetics_data(data_set='test-clean')
+    df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
+    return df_t_train, df_t_test
+
+def load_cmu_test_dataset(df_t_test, number_of_examples=100):
+    df_cmu_phones=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
+    test_examples=[]
+    for N in range(number_of_examples):
+        example=df_t_test.iloc[N]
+        path=example.wav_path
+        example['cmu_phones']=df_cmu_phones.iloc[N]
+        example['cmu_phones']=remove_stress_annots(example.cmu_phones)
+        example['s'], example['fs']=librosa.load(path, sr=16000)
+        test_examples.append(example)
+    return pd.DataFrame(test_examples)
+
+def load_test_dataset(df_t_test, number_of_examples=100):
+    df_ipa_phones_test = pd.Series(df_t_test.phone_df.apply(lambda r: list(r['ipa_phone'].values())))
+    test_examples = []
+    for N in range(number_of_examples):
+        example=df_t_test.iloc[N]
+        path=example.wav_path
+        example['ipa_phones']=df_ipa_phones_test.iloc[N]
+        example['s'], example['fs']=librosa.load(path, sr=16000)
+        test_examples.append(example)
+    return pd.DataFrame(test_examples)
+
+def build_df_segmented(df_t, model, forced_aligner, mode): # mode = "CMU" or "MFA_IPA"
+    df_segmented = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end'])
+
+    for _, row in df_t.iterrows():
+        df = pd.DataFrame(columns=['phones', 'pred_phones_audio', 'start', 'end'])
+        if mode=='CMU':
+            df.phones = remove_stress_annots(row.phone_df['cmu_phone'].values())
+        else:
+            df.phones = row.phone_df['ipa_phone'].values()
+        
+        df.start = row.phone_df['start'].values()
+        df.end = row.phone_df['end'].values()
+
+        s, fs = librosa.load(row.wav_path, sr=16000)
+        target_phonemes = df.phones
+        phone_prob_matrix = model.predict_phone_prob_matrix(s, fs)
+        cost_nonsil, _, _ = forced_aligner.get_cost_non_sil(phone_prob_matrix)
+        aligned_phones = forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
+        pred_phones_audio, probs_means = forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
+
+        df.pred_phones_audio = pred_phones_audio
+
+        df_segmented = pd.concat([df_segmented, df])
+
+    return df_segmented
+
+def build_df_segmented_all(df_t, model, forced_aligner, mode, language_code): # mode = "CMU" or "MFA_IPA"
+    df_segmented = pd.DataFrame(columns=['phones', 'predicted_phones', 'start', 'end', 'wav_path', 'target_phonemes'])
+
+    df_segmented.start = df_t.phone_df.apply(lambda r: list(r['start'].values()))
+    df_segmented.end = df_t.phone_df.apply(lambda r: list(r['end'].values()))
+    if mode=='CMU':
+        df_segmented.target_phonemes=df_t.phone_df.apply(lambda r: list(r['cmu_phone'].values()))
+    else:
+        df_segmented.target_phonemes=df_t.phone_df.apply(lambda r: list(r['ipa_phone'].values()))
+    df_segmented.wav_path = df_t.wav_path
+
+    phones = []
+    for _, r in df_t.iterrows():
+        phones.append(prefill_for_sentence(sentence=r.text, lang=language_code, mode=mode)['cmu_phonetics'])
+    df_segmented.phones = phones
+
+    predictions = []
+    for _, ex in df_segmented.iterrows():
+        s, fs = librosa.load(ex.wav_path, sr=16000)
+        target_phonemes = ex.target_phonemes
+        phone_prob_matrix = model.predict_phone_prob_matrix(s, fs)
+        cost_nonsil, _, _ = forced_aligner.get_cost_non_sil(phone_prob_matrix)
+        aligned_phones = forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
+        predicted_phones, probs_means = forced_aligner.predict(aligned_phones, cost_nonsil)
+        predictions.append(predicted_phones)
+
+    df_segmented.predicted_phones = predictions
+
+    return df_segmented
+
+if __name__=="__main__":
+    
+    df_t_train = load_dataset_MAILABS('en_US', ['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    df_t_train=df_t_train.dropna()
+    df_all_frames = build_df_all_frames(df_t_train, 'phone')
+    X, y = df_all_frames_to_X_y(df_all_frames)
