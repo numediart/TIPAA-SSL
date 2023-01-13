@@ -78,7 +78,6 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
                 target_word_idx=r.target_word_indexes
                 target_syllable_idx=r.target_syllable_indexes
             try:
-                # status_audio, rID=prepare_audio_file(r.fpath)
                 s,fs=librosa.load(r.fpath, sr=16000)
             except Exception as e: 
                 print('error in reading audio in compute_predictions')
@@ -118,7 +117,6 @@ def stress_GE_performance_test(level='sentence'):
     print('n rows:',len(df))
     for i,row in tqdm(df.iterrows()):
         # formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
-        # _, rID=prepare_audio_file(row.audio_path)
         s,fs=librosa.load(row.audio_path, sr=16000)
         
         n_words_by_chunk=chunk_text(text=row.text)

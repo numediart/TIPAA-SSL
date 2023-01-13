@@ -617,10 +617,6 @@ if __name__=="__main__":
     model_ipa.predict_phone_prob_matrix(s,fs).shape
     model_ipa.predict_with_timings(s, sum(sum(split_phonetics(formatted_phonetics),[]),[]))
 
-
-
-    # _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
-    # _, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
     s,fs=librosa.load('data/audio_recordings/turned_around.mp3', sr=16000)
     start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, target_word_idx=0, target_phones='d',basis='ɪ_d',
                             model=model_ipa,
@@ -640,40 +636,31 @@ if __name__=="__main__":
     #                         model=model_ipa,
     #                         to_gibberish=ipa_to_gibberish)
     
-    formatted_phonetics=prefill_for_sentence('turned around')['cmu_phonetics']
-    _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
-    # _, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
-    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
-                            target_word_idx=0, 
-                            target_phones='D',
-                            basis='IH0_D',
-                    )
-    
     path='scripts/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
     formatted_phonetics=prefill_for_sentence('hate')['cmu_phonetics']
-    _, rID=prepare_audio_file(path)
-    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+    s,fs=librosa.load(path, sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
                             target_word_idx=0, 
                             target_phones='HH',
-                            basis='HH', contrast="start"
+                            basis='HH', contrast="start", mode='numpy'
                     )
     
     path='scripts/synth_audio/cmu_words/standard/prosody/Amy/F_UK_ate.mp3'
     formatted_phonetics=prefill_for_sentence('ate')['cmu_phonetics']
-    _, rID=prepare_audio_file(path)
-    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+    s,fs=librosa.load(path, sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
                             target_word_idx=0, 
                             target_phones='',
-                            basis='HH', contrast="start"
+                            basis='HH', contrast="start", mode='numpy'
                     )
     
     df=actor_recordings()
     target_phones='T'
     selection=df[df.target_phoneme==target_phones]
     row=selection.iloc[0]
-    _, rID=prepare_audio_file(row.audio_file_url)
-    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=row.cmu_phonetics, 
+    s,fs=librosa.load(path, sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=row.cmu_phonetics, 
                             target_word_idx=0, 
                             target_phones=target_phones,
-                            basis='IH0_D',
+                            basis='IH0_D', mode='numpy'
                     )

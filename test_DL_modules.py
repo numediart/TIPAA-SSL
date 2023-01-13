@@ -23,12 +23,12 @@ def test_DL_speech_tech_functions():
     path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
     # encode_string = base64.b64encode(open(path, "rb").read())
     formatted_phonetics=prefill_for_sentence('ekk')['cmu_phonetics']
-    _, rID=prepare_audio_file(path)
-    phonemeContrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+    s,fs=librosa.load(path, sr=16000)
+    phonemeContrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
                                                         target_word_idx=0, 
                                                         target_syllable_idx=1, 
                                                         target_phones='EY1',
-                                                        alternatives=cmu_vowels, mode='file')
+                                                        alternatives=cmu_vowels, mode='numpy')
 
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
     # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
@@ -43,21 +43,21 @@ def test_DL_speech_tech_functions():
 
 
     formatted_phonetics=prefill_for_sentence('turned around')['cmu_phonetics']
-    _, rID=prepare_audio_file('data/audio_recordings/turnEED_around.mp3')
-    # _, rID=prepare_audio_file('data/audio_recordings/turned_around.mp3')
-    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+    path='data/audio_recordings/turnEED_around.mp3'
+    s,fs=librosa.load(path, sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
                             target_word_idx=0, 
                             target_phones='D',
-                            basis='IH0_D',
+                            basis='IH0_D', mode="numpy"
                     )
     
     path='scripts/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
     formatted_phonetics=prefill_for_sentence('hate')['cmu_phonetics']
-    _, rID=prepare_audio_file(path)
-    start_end_contrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
+    s,fs=librosa.load(path, sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
                             target_word_idx=0, 
                             target_phones='HH',
-                            basis='HH', contrast="start"
+                            basis='HH', contrast="start", mode="numpy"
                     )
 
 def test_particular_cases():
@@ -74,9 +74,9 @@ def test_particular_cases():
 
     # row=df_sentence_stress.iloc[0]
 
-    _, rID=prepare_audio_file(row.audio_file_url)
+    s,fs=librosa.load(row.audio_file_url, sr=16000)
     n_words_by_chunk=chunk_text(text=row.text)
-    res=stress_from_formatted_phonetics(rID,phonetics=row.cmu_phonetics, n_words_by_chunk=n_words_by_chunk, level='word')
+    res=stress_from_formatted_phonetics(s,phonetics=row.cmu_phonetics, n_words_by_chunk=n_words_by_chunk, level='word', mode="numpy")
 
     # model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     s,fs=librosa.load(row.audio_file_url, sr=16000)
