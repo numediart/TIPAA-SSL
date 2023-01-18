@@ -4,7 +4,7 @@ import pandas as pd
 from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
 import soundfile as sf
 from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
-from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish
+from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish, cmu_diphtongs
 from src.pronunciation_dictionaries import ipa_vowels, ipa_consonants, ipa_to_gibberish
 from syllabipy.sonoripy import SonoriPy
 import base64
@@ -34,7 +34,7 @@ default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
 
 
 target_accepted_alternatives={
-    # 'AA': ['AA', 'AO'],
+    'AA': ['AA', 'AO'],
     'AO': ['AA', 'AO'],
     # 'OW': ['AA', 'OW'],
     'D': ['D', 'T'],
@@ -55,23 +55,27 @@ terminations_accepted_alternatives={
 # I want to accept these as correct
 
 # for "D", I want to accept anything finishing with "D" except those corresponding to "IH_D"
-# but if I accept all vowels, it mens I wouldn't give feedback for a mistake like "S_T_AA_R_T_EY_D" for "started"
-# therefore, I accept only consonants. It's also more likely to have this border effect with consonant because the target is a consonant (verified experimentally looking at confusions)
+# but if I accept all vowels, it means I wouldn't give feedback for a mistake like "S_N_OW_EH_D" for "snowed"
+# therefore, I accept only consonants and diphtongs. 
+# It's also more likely to have this border effect with consonant because the target is a consonant (verified experimentally looking at confusions)
 
-# all_Z=[p+"_Z" for p in (list(cmu_vowels) + list(cmu_consonants))]
-# all_S=[p+"_S" for p in (list(cmu_vowels) + list(cmu_consonants))]
-all_Z=[p+"_Z" for p in list(cmu_consonants)]+["Z_"+p for p in list(cmu_consonants)]
-all_S=[p+"_S" for p in list(cmu_consonants)]+["S_"+p for p in list(cmu_consonants)]
+# TODO: try both with a long "IH_D" basis, and with a short one, and pick the most likely solution
+
+# However, for the phoneme after, I want to accept both vowels and consonants
+
+all_Z=[p+"_Z" for p in list(cmu_consonants)]+["Z_"+p for p in list(cmu_consonants)+list(cmu_vowels)]
+all_S=[p+"_S" for p in list(cmu_consonants)]+["S_"+p for p in list(cmu_consonants)+list(cmu_vowels)]
 terminations_accepted_alternatives["Z"]=[el for el in all_Z if el not in terminations_accepted_alternatives['IH_Z']]
 terminations_accepted_alternatives["S"]=[el for el in all_S if el not in terminations_accepted_alternatives['IH_Z']]
 
 
-# all_Z=[p+"_Z" for p in (list(cmu_vowels) + list(cmu_consonants))]
-# all_S=[p+"_S" for p in (list(cmu_vowels) + list(cmu_consonants))]
-all_D=[p+"_D" for p in list(cmu_consonants)]+["D_"+p for p in list(cmu_consonants)]
-all_T=[p+"_T" for p in list(cmu_consonants)]+["T_"+p for p in list(cmu_consonants)]
+all_D=[p+"_D" for p in list(cmu_consonants)+list(cmu_diphtongs)]+["D_"+p for p in list(cmu_consonants)+list(cmu_vowels)]
+all_T=[p+"_T" for p in list(cmu_consonants)]+["T_"+p for p in list(cmu_consonants)+list(cmu_vowels)]
 terminations_accepted_alternatives["D"]=[el for el in all_D if el not in terminations_accepted_alternatives['IH_D']]
 terminations_accepted_alternatives["T"]=[el for el in all_T if el not in terminations_accepted_alternatives['IH_D']]
+
+# As in target_accepted_alternatives, we want to accept ['D','T'] for 'D', we should do the same when there is a superfluous phoneme, therefore:
+terminations_accepted_alternatives["D"]+=terminations_accepted_alternatives["T"]
 
 def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
     """Load audio with 2 modes: from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array

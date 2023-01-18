@@ -139,7 +139,7 @@ class Wav2Vec2ForFramePrediction:
         phone_prob_matrix = self.frame_classifier.predict_proba(reduced_lhs)
         self.timestamps.append(time()-start)
 
-        # if during the classifier has not seen some of the labels, it won't be in the possible labels, and the proba matrix will have a reduced shape
+        # if during training, the classifier has not seen some of the labels, it won't be in the possible labels, and the proba matrix will have a reduced shape
         # thus here I extract indices that don't have a column in the matrix to then add rows of zeros and have a correct shape
         ids_to_add=[el for el in range(len(self.id_to_p)) if el not in self.frame_classifier.classes_]
 

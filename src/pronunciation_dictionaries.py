@@ -326,6 +326,9 @@ cmu_phones=set([el[0] for el in cmu_phones_info])
 cmu_vowels=set([p[0] for p in cmu_phones_info if p[1][0]=='vowel'])
 cmu_consonants=set([p[0] for p in cmu_phones_info if p[1][0]!='vowel'])
 
+cmu_diphtongs=[p[0] for p in cmu_phones_info if (p[1][0]=='vowel' and p[0][-1] in cmu_consonants)]
+
+
 cmu_stressed_vowels=set(cmudict.symbols())-cmu_phones
 
 # CMU is a subset of arpabet
