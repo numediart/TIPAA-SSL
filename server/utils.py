@@ -195,6 +195,7 @@ def check_target_access(d, target_occurence_idx=0, target_type='phone'):  # targ
 
     if int(d['word_idx'])<len(split_phonetics_lists):
         word_lists=split_phonetics_lists[int(d['word_idx'])]
+        if target_type=='termination': d['syl_idx']=-1
         if int(d['syl_idx'])<len(word_lists):
             syl_list=word_lists[int(d['syl_idx'])]
             syl='_'.join(syl_list)
