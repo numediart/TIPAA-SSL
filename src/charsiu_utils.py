@@ -43,6 +43,7 @@ get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[co
 class charsiu_phone_forced_aligner(charsiu_forced_aligner):
     def __init__(self, aligner, sil_threshold=4, **kwargs):
         super().__init__(aligner, sil_threshold, **kwargs)
+        # this is a state variable that impact the worflow. I check for success after calling align_phone, if it's not, I return None an this status variable will also be checked in DL_speech_tech
         self.status="success"
         self.phonetic_content=None
         self.pred_phones_audio=""
@@ -92,7 +93,11 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         nonsil_idx = np.argwhere(sil_mask!=self.charsiu_processor.sil_idx).squeeze()
 
         if len(nonsil_idx)>0:
-            aligned_phone_ids = forced_align(cost[nonsil_idx,:],phone_ids[1:-1])
+            try:
+                aligned_phone_ids = forced_align(cost[nonsil_idx,:],phone_ids[1:-1])
+            except:
+                self.status="success: the phrase was not recognized in expected phonemes"
+                return None, None, None
             aligned_phones = [self.charsiu_processor.mapping_id2phone(phone_ids[1:-1][i]) for i in aligned_phone_ids]
             pred_phones = self._merge_silence(aligned_phones,sil_mask)
             alignment_phones = seq2duration(pred_phones,resolution=self.resolution)
@@ -173,25 +178,33 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
                 blocks.append(r.to_dict())
             return pd.DataFrame.from_records(blocks)
         
+        
+        # drop silence, collapse consecutive duplicates (some are superfluous, 
+        # e.g. phonemes interrupted by a silence), 
+        # then divide interval for consecutive duplicate phonemes in the ground truth            
+        df_segmented2=df_segmented[df_segmented.phones != '[SIL]']
+        # collapse_consecutive_duplicates(df_segmented)
         try:
-            # drop silence, collapse consecutive duplicates (some are superfluous, 
-            # e.g. phonemes interrupted by a silence), 
-            # then divide interval for consecutive duplicate phonemes in the ground truth            
-            df_segmented2=df_segmented[df_segmented.phones != '[SIL]']
-            # collapse_consecutive_duplicates(df_segmented)
             df_segmented2=collapse_consecutive_duplicates(df_segmented2)
+        except: 
+            # import pdb;pdb.set_trace()
+            self.status= "error: error in align_phones(), when collapsing consecutive duplicates"
+            return None, None, None
 
+        try:
             phone_list=sum(phones,[])
-            if len(df_segmented)>0:
+            if len(df_segmented2)>0:
                 df_segmented=divide_consecutive_duplicates(df_segmented2, phone_list)
         except: 
             # import pdb;pdb.set_trace()
-            raise "error in collapse or divide consecutive duplicates"
+            self.status= "error: error in align_phones(), when dividing collapsed consecutive duplicates"
+            return None, None, None
         
         if df_segmented[df_segmented.phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
             self.status="success"
         else:
             self.status="success: the phrase was not recognized in expected phonemes"
+            return None, None, None
 
         
         
@@ -233,6 +246,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         phones=sum(split_phonetics,[])
         # seq_p=[[p] for p in  remove_stress_annots(phones)]
         alignment_phones, pred_phones_audio, detailed_alignment_phones = self.align_phones(audio=audio,phones=phones)
+        if self.status!="success": return None
 
         detailed_alignment_phones=detailed_alignment_phones[detailed_alignment_phones.pred_phones != '[SIL]']
 
@@ -280,6 +294,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         # merge lists
         phones=sum(phonetics,[])
         alignment_phones, df_segmented, phonetic_content = self.align_phones(audio=audio,phones=phones)
+        
+        if self.status!="success": return None
 
         df_word=extract_word(df_segmented, phonetics, target_word_idx)
         return df_word
@@ -291,6 +307,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         phoneme_set=[[p] for p in  remove_stress_annots(phoneme_set)]
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         df_word=self.predict_word(audio, split_phonetics, target_word_idx)
+        
+        if self.status!="success": return None
 
         if len(df_word)>0:
             word=phonetics.split(' ')[target_word_idx]
@@ -347,6 +365,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         split_phonetics=sum(split_phonetics,[])
         _, df_segmented, _ = self.align_phones(audio=audio,phones=split_phonetics)
+        if self.status!="success": return None
 
         # select vowels
         filtered_df=df_segmented[df_segmented.phones.isin(cmu_vowels)]#.index.tolist()
@@ -374,7 +393,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             Imean.append(np.mean(Ivowel))
             Fmax.append(max(Fvowel))
             Fmean.append(np.mean(Fvowel))
-
             Dur.append(filtered_df['end'].iloc[i]-filtered_df['start'].iloc[i])
         
         # normalization of features (projection to [0 1] range)
