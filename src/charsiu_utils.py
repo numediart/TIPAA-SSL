@@ -200,14 +200,13 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
             self.status= "error: error in align_phones(), when dividing collapsed consecutive duplicates"
             return None, None, None
         
-        if df_segmented[df_segmented.phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
-            self.status="success"
-        else:
-            self.status="success: the phrase was not recognized in expected phonemes"
-            return None, None, None
+        if df_segmented.phones.tolist()!=df_segmented.pred_phones_audio.tolist():
+            if df_segmented[df_segmented.phones!='[SIL]'].GT_proba.mean() > GT_alignment_proba_threshold:
+                self.status="success"
+            else:
+                self.status="success: the phrase was not recognized in expected phonemes"
+                return None, None, None
 
-        
-        
         df=pd.DataFrame()
         df.loc[:,'pred_phones']=pred_phones
         df.loc[:,'pred_phones_audio']=pred_phones_audio
@@ -308,7 +307,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         df_word=self.predict_word(audio, split_phonetics, target_word_idx)
         
-        if self.status!="success": return None
+        if self.status!="success": return None, None
 
         if len(df_word)>0:
             word=phonetics.split(' ')[target_word_idx]
