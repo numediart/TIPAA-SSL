@@ -213,6 +213,7 @@ def get_results(df, base_url = 'http://localhost:8000', endpoint='/v2/w2v/contra
     print(len(df))
     for i,r in tqdm(df.iterrows()):
         res=request_for_audio_file(r, base_url = base_url, endpoint=endpoint, client=client, mode=mode)
+        assert res.status_code==200
         if 'success' in res.data.decode('utf-8'):
             # d=ast.literal_eval(res.data.decode('utf-8'))
             d=json.loads(res.data.decode('utf-8'))
@@ -243,6 +244,9 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
     results_v, failures_v=get_results(df_v.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'vowel', client=client, mode=mode)
     # results_ed_s, failures_ed_s=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'syllable', client=client, mode=mode)
     results_ed, failures_ed=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'termination', client=client, mode=mode)
+
+    assert failures_v==[]
+    assert failures_ed==[]
 
     results_v[results_v.phonetic_detection!=results_v.target_phoneme]
     
@@ -285,6 +289,9 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/str
     results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client, mode=mode)
 
     request_for_audio_file(df_test.iloc[0], base_url = base_url, endpoint=route+'word', client=client, mode=mode)
+
+    assert failures_ss==[]
+    assert failures_ws==[]
 
     return results_ss, failures_ss, results_ws, failures_ws
 
@@ -330,6 +337,28 @@ def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
     res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
     print(res.data)
     assert res.status_code==200
+
+def test_edge_cases(base_url = 'http://localhost:8000', client=app.test_client()):
+
+    path='data/AY1_L HH_AE1_V S_AH1_M T_IY1 TH_AE1_NG_K_S'
+    
+    from src.text_processing import prefill_for_sentence
+    import soundfile as sf
+    from glob import glob
+    paths=glob(path+'/*')
+
+    for p in paths:
+        text="I'll have some tea thanks"
+        r={}
+        r['cmu_phonetics']=prefill_for_sentence(text)['cmu_phonetics']
+        r['text']=text
+        r['audio_file_url']=p
+        r['target_phoneme']=float('nan')
+        res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+        print(res.data)
+        assert res.status_code==200
+
+
 
 def pContrast_for_user_data( target_phones='AO1', n_user=10, n_ex_by_ex_type=10):
     user_data=build_user_data_df()
