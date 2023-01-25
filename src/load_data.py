@@ -33,6 +33,31 @@ def build_df_all_phoneme_instances(df_t_train, phone_type='phone', model_path="h
     return df_all_instances
 
 
+def load_dataset_commonvoice(lang_codes=['en'], path='./data/cv-corpus-10.0-delta-2022-07-04', split="dev", phone_set='CMU'):
+    """phone_set: 'CMU' or 'MFA_IPA'
+    """
+    df = pd.DataFrame()
+    for lang_code in lang_codes:
+        df_temp = pd.read_json(path+'/{}/{}_{}.json'.format(lang_code, split, phone_set))
+        df_temp_metadata = pd.read_csv(path+'/{}/{}.tsv'.format(lang_code, split), sep='\t')
+
+        df_temp_metadata=df_temp_metadata.loc[df_temp_metadata.path.isin(df_temp.filename+'.mp3')]
+
+        map=df_temp.set_index('filename').to_dict()['phone_df']
+
+        df_temp_metadata['phone_df']=df_temp_metadata.apply(lambda r: map[r.path.split('.')[0]], axis=1)
+
+        for i, row in df_temp_metadata.iterrows():
+            # df_temp.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
+            if type(row.phone_df) == str:
+                res = ast.literal_eval(row.phone_df)
+                df_temp_metadata.at[i, "phone_df"] = res
+
+        df_temp_metadata['wav_path']=path+'/'+lang_code+'/clips/'+df_temp_metadata.path
+        df = pd.concat([df, df_temp_metadata])
+    
+    return df
+
 def load_dataset_MAILABS(lang_codes, path='./data/MAILABS', phone_set='CMU'):
     """phone_set: 'CMU' or 'MFA_IPA'
     """
@@ -141,7 +166,25 @@ def build_df_segmented_all(df_t, model, forced_aligner, mode, language_code): # 
 
 if __name__=="__main__":
     
-    df_t_train = load_dataset_MAILABS('en_US', ['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
+    df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
     df_t_train=df_t_train.dropna()
     df_all_frames = build_df_all_frames(df_t_train, 'phone')
     X, y = df_all_frames_to_X_y(df_all_frames)
+
+    df_t=load_dataset_commonvoice(lang_codes=['en'], path='./data/cv-corpus-10.0-delta-2022-07-04', split="dev", phone_set='CMU')
+    df_t.accents.unique()
+
+    accents=['United States English', 'England English,United States English', 'England English', 'Canadian English', 'England English,Canadian English']
+    df_t=df_t[df_t.accents.isin(accents)]
+    df_all_frames = build_df_all_frames(df_t.sample(frac=1, random_state=0), 'phone', number_of_examples=1000)
+    df_all_frames.to_pickle('df_all_frames_commonvoice_en_dev_uk_us_ca_n_1000.pkl')
+
+    accents=['England English']
+    df_t=df_t[df_t.accents.isin(accents)]
+    df_all_frames = build_df_all_frames(df_t.sample(frac=1, random_state=0), 'phone')
+    df_all_frames.to_pickle('df_all_frames_commonvoice_en_dev_uk.pkl')
+
+    
+    df_t_test=load_dataset_commonvoice(lang_codes=['en'], path='./data/cv-corpus-10.0-delta-2022-07-04', split="test", phone_set='CMU')
+    df_all_frames = build_df_all_frames(df_t_test.sample(frac=1, random_state=0), 'phone')
+    df_all_frames.to_pickle('df_all_frames_commonvoice_en_test.pkl')
