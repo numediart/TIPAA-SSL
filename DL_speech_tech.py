@@ -59,8 +59,6 @@ terminations_accepted_alternatives={
 # therefore, I accept only consonants and diphtongs. 
 # It's also more likely to have this border effect with consonant because the target is a consonant (verified experimentally looking at confusions)
 
-# TODO: try both with a long "IH_D" basis, and with a short one, and pick the most likely solution
-
 # However, for the phoneme after, I want to accept both vowels and consonants
 
 all_Z=[p+"_Z" for p in list(cmu_consonants)]+["Z_"+p for p in list(cmu_consonants)+list(cmu_vowels)]
@@ -283,11 +281,25 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
     else:
         return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
+
+
+
+
+target_to_basis={
+    'D':'IH0_D',
+    'IH0_D':'IH0_D',
+    'T':'IH0_T',
+    '':'IH0_Z',
+    'S':'IH0_S',
+    'Z':'IH0_Z',
+    'IH0_Z':'IH0_Z',
+}
+
 def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
                             target_phones='D',
                             # basis='[UNK]_D',
-                            basis='IH0_D',
+                            basis=None,
                             max_speech_rate=8, mode='file', contrast="end", 
                             model=default_model,
                             vowels=cmu_vowels,
@@ -304,12 +316,14 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         print("contrast should be start or end")
 
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
-    status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
+    audio_status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
 
     phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics.split(' ')[target_word_idx])
     idx_syl_ter=phonetics_indexed_df.syl_idx.iloc[contrast_idx]
     df_syl_GT=phonetics_indexed_df[phonetics_indexed_df.syl_idx==idx_syl_ter]
     syl_GT=remove_stress_annots(df_syl_GT.phones.tolist())
+
+    if basis is None: basis: basis=target_to_basis[target_phones]
 
     n_p_target=len(target_phones.split('_'))
     n_ter_basis=len(basis.split('_'))
@@ -320,7 +334,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         GT=syl_GT[:n_p_target+1]
 
     g_t=[to_gibberish[unstress(p)] for p in GT]
-    if status=="success":
+    if audio_status=="success":
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         target_word=split_phonetics[target_word_idx]
 
@@ -364,10 +378,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
             filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
             idx_mean_max=np.argmax(filtered_proba_means)
-
-            # phonetic_detection=model.charsiu_processor.mapping_id2phone(int(idx_mean_max))
             phonetic_detection=model.id_to_p[int(idx_mean_max)]
-
             ter=[phonetic_detection]
 
         else:
@@ -376,17 +387,23 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
             df_syl=df_word[df_word.syl_idx==syl_idxs[contrast_idx]]
             print(df_syl)
             df_syl=df_syl[df_syl.pred_phones_audio!='[SIL]']
-            syl_detected=drop_consecutive_duplicates(df_syl[['pred_phones_audio']]).pred_phones_audio.tolist()
+
+            # filter out phonemes too short inside the termination, 
+            # if forced alignment lead to assigning very few frames for a phoneme, we assume it means it does not really exists
+            # df_syl=df_syl[(df_syl.end-df_syl.start)>0.03]
+
+            # syl_detected=drop_consecutive_duplicates(df_syl[['pred_phones_audio']]).pred_phones_audio.tolist()
+            syl_detected=df_syl[['pred_phones_audio']].pred_phones_audio.tolist()
+
+            
 
             if contrast=="end":
-                # root based on GT
-                root=df_syl.phones.tolist()[:-n_ter_basis]
-                # detected termination
-                ter=syl_detected[len(root)-1:]
+                ter=syl_detected[-n_ter_basis-1:]
             elif contrast=="start":
                 # detected start
                 ter=syl_detected[:n_ter_basis+1]
-                # root=df_syl.phones.tolist()[:-n_ter_basis]
+            
+            ter=drop_consecutive_duplicate_elements(ter)
         
         print(ter)
         if len(ter)==len(GT):
@@ -445,7 +462,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         print('detection', detection)
         return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     else:
-        return {"status": status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+        return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
 def phonetic_content_analysis(s, phonetics, model=default_model,
                             vowels=cmu_vowels,
@@ -584,7 +601,18 @@ if __name__=="__main__":
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=cmu_phonetics,target_word_idx=0,target_syllable_idx=0,target_occurence_idx=0,target_phones='T',basis='IH0_D',contrast='end',mode='numpy',model=default_model_charsiu)
 
     
+    
+    df=synth_words_data()
+    df['target_word_indexes']=0
+    df['target_syllable_indexes']=-1
+    df['fpath']=df['path']
+    df=df.dropna()
+    df_z=df[(~(df.phonetics.str.endswith('AH0_Z')|df.phonetics.str.endswith('IH0_Z'))&~df.phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
+    r=df_z.sample(frac=1, random_state=0)[:100].iloc[-4]
+    s,fs=librosa.load(r.path, sr=16000)
+    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=r.phonetics,target_word_idx=0,target_syllable_idx=-1,target_occurence_idx=0,target_phones='Z',basis='Z_Z',contrast='end',mode='numpy',model=default_model_charsiu)
 
+    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=r.phonetics,target_word_idx=0,target_syllable_idx=-1,target_occurence_idx=0,target_phones='Z',basis='Z_Z',contrast='end',mode='numpy',model=default_model_charsiu)
 
     
 
@@ -631,6 +659,8 @@ if __name__=="__main__":
     
     
     
+    s,fs=librosa.load('data/audio_recordings/turnEED_around.mp3', sr=16000)
+    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, target_word_idx=0, target_phones='D',model=default_model,mode='numpy')
     
     # phonemeContrast_from_formatted_phonetics_audio(rID,phonetics=formatted_phonetics, 
     #                         target_word_idx=0, 
