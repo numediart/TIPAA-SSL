@@ -270,7 +270,7 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
     #     success_rate = lambda df : len(df[df.gibberish_truth==df.gibberish_detected])/len(df) if len(df)>0 else float('nan')
     #     print('success rate for '+t, success_rate(res))
     
-    return results_v, results_ed#, results_ed_s
+    # return results_v, results_ed#, results_ed_s
 
 def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/stress/', client=app.test_client(), n_ex_by_module=10, mode='v2'):
     df=actor_recordings()
