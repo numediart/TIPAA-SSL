@@ -88,11 +88,11 @@ def kwargs_def(example):
     params={}
     for prop in example:
         type_dict={
-                str : fields.String( example=example[prop]), 
-                int: fields.Integer( example=example[prop]), 
+                str : fields.Str( metadata= {'example':example[prop]}), 
+                int: fields.Int( metadata= {'example':example[prop]}), 
                 list: fields.List(fields.Str(), example=example[prop]),
-                _io.BytesIO: fields.Raw(type='file', required=True),  # https://stackoverflow.com/questions/59642902/how-to-handle-file-upload-validations-using-flask-marshmallow
-                _io.BufferedReader: fields.Raw(type='file', required=True) 
+                _io.BytesIO: fields.Raw(metadata={'type':'file', 'required':True}) ,  # https://stackoverflow.com/questions/59642902/how-to-handle-file-upload-validations-using-flask-marshmallow
+                _io.BufferedReader: fields.Raw(metadata={'type':'file', 'required':True}) 
             }
         param_type = type_dict[type(example[prop])]
         params[prop]=param_type
@@ -148,16 +148,16 @@ def debug_only(f):
         return f(**kwargs)
     return wrapped
 
-def properties_to_args(properties, default=None, required=True):
-    args={}
-    for i,prop in enumerate(properties):
-        if default is not None and prop in default: 
-            d=default[prop]
-            args[prop]=fields.Str(required=required,example=d,default=d)
-        else:
-            args[prop]=fields.Str(required=required)
+# def properties_to_args(properties, default=None, required=True):
+#     args={}
+#     for i,prop in enumerate(properties):
+#         if default is not None and prop in default: 
+#             d=default[prop]
+#             args[prop]=fields.Str(required=required,example=d,default=d)
+#         else:
+#             args[prop]=fields.Str(required=required)
 
-    return args
+#     return args
 
 def access_property_error(content, property):
     try:
@@ -236,7 +236,7 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
     
     if res['status'].split(':')[0]=='error':
         res['error']=True
-        res['detected']=define_detected_flag(res['status'])
+        # res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=500,mimetype="application/json")
     else:
@@ -260,14 +260,14 @@ def request_syl_contrast(d, properties, tech_function=syllable_contrast_from_for
     if word_idx>=len(d['phonetics'].split(' ')):
         res={"status": "error: word_idx >= n of words"}
         res['error']=True
-        res['detected']=define_detected_flag(res['status'])
+        # res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=400,mimetype="application/json")    
     res=tech_function(d['audio64'],phonetics=d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, mode=mode)
     
     if res['status'].split(':')[0]=='error':
         res['error']=True
-        res['detected']=define_detected_flag(res['status'])
+        # res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=500,mimetype="application/json")
     else:
@@ -302,7 +302,7 @@ def call_stress_fn(audio, p, module, n_words_by_chunk=[], mode='file', version='
     
     if res['status'].split(':')[0]=='error':
         res['error']=True
-        res['detected']=define_detected_flag(res['status'])
+        # res['detected']=define_detected_flag(res['status'])
         response=json.dumps(res)
         return Response(response,status=500,mimetype="application/json")
     else:
