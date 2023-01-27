@@ -28,9 +28,9 @@ for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
 
 from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 default_model = Wav2Vec2ForFramePrediction('cmu')
-# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 # default_model.load(name='model_mailabs_pca_99_logistic_regression')
-default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
+# default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
 
 
 target_accepted_alternatives={
