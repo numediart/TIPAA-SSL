@@ -1,18 +1,34 @@
+
+import os, psutil;
+print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+
+print_memory_usage("RAM - start of DL_speech_tech")
 from scipy.io.wavfile import  read
 import numpy as np
 import pandas as pd
-from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
 import soundfile as sf
-from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
-from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish, cmu_diphtongs
-from src.pronunciation_dictionaries import ipa_vowels, ipa_consonants, ipa_to_gibberish
 from syllabipy.sonoripy import SonoriPy
 import base64
 from linetimer import CodeTimer
 
+print_memory_usage("RAM - DL_speech_tech after external dependencies")
+
+from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
+print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
+
+from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
+print_memory_usage("RAM - DL_speech_tech after src.text_processing")
+from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish, cmu_diphtongs
+from src.pronunciation_dictionaries import ipa_vowels, ipa_consonants, ipa_to_gibberish
+print_memory_usage("RAM - DL_speech_tech after src.pronunciation_dictionaries")
+
+
+
 # initialize model
 from src.charsiu_utils import charsiu_phone_forced_aligner
 default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+
+print_memory_usage("RAM - DL_speech_tech after default_model_charsiu")
 
 
 phoneme_GT_proba_threshold_dict={}
@@ -31,6 +47,8 @@ default_model = Wav2Vec2ForFramePrediction('cmu')
 default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 # default_model.load(name='model_mailabs_pca_99_logistic_regression')
 # default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
+
+print_memory_usage("RAM - DL_speech_tech after default_model")
 
 
 target_accepted_alternatives={
