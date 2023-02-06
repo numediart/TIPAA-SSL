@@ -4,7 +4,7 @@ services:
   streamlitapp:
     build: 
       context: ./
-      dockerfile: ./content_tools/Dockerfile_streamlit
+      dockerfile: ./content_tools/Dockerfile
     volumes:
       # Just specify a path and let the Engine create a volume
       - ./:/root
@@ -15,7 +15,9 @@ services:
     restart: on-failure
 
   nginx:
-    build: ./nginx
+    build:
+      context: ./nginx
+      dockerfile: ./Dockerfile_streamlit
     container_name: nginx
     environment:
       - SERVER_NAME=0.0.0.0
