@@ -430,7 +430,7 @@ def get_formatted_cmudict(phonetic_dict=cmudict_dict, mode='CMU'):
     df=pd.DataFrame()
     df['text']=phonetic_dict.keys()
 
-    
+    print('get_formatted_cmudict')
     from tqdm import tqdm
     tqdm.pandas()
     df['phonetics']=df.progress_apply(lambda r: phonetic_dict[r.text] if r.text in phonetic_dict else float('nan'), axis=1)

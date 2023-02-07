@@ -1,3 +1,6 @@
+import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+print_memory_usage('RAM - text_processing start')
+
 import re
 from tqdm import tqdm
 import pandas as pd
@@ -11,7 +14,11 @@ from itertools import groupby
 from num2words import num2words
 import unidecode
 
+print_memory_usage('RAM - text_processing after external libraries')
+
+
 g2p = G2p()
+print_memory_usage('RAM - text_processing after g2p model')
 
 drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
 drop_consecutive_duplicate_elements= lambda L: [key for key, _group in groupby(L)]
@@ -19,8 +26,14 @@ unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
-from src.pronunciation_dictionaries import mfa_dicts, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
+print_memory_usage('RAM - text_processing after lambda functions')
+from src.pronunciation_dictionaries import get_augmented_mfa_dict, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
+print_memory_usage('RAM - text_processing after pronunciation_dictionaries')
+# mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
+# print_memory_usage('RAM - text_processing after mfa_dicts')
 from src.syllables_processing import syllabified_text, n_vowels
+print_memory_usage('RAM - text_processing after syllable_processsing')
+
 
 syllables_df={
             'en_GB':pd.read_csv('data/syllables.csv'),
@@ -30,6 +43,7 @@ syllables_df={
             'es_LA':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
             }
 
+print_memory_usage('RAM - text_processing after syllables_df')
 
 
 def show_alternatives_distributions():
@@ -136,7 +150,7 @@ def check_phonemes(phonemes):
 
 
 
-def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=mfa_dicts['es_ES'], g2p_model="spanish_spain_mfa"):
+def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=get_augmented_mfa_dict('es_ES'), g2p_model="spanish_spain_mfa"):
     # fallbacks
     if '-' in word:
         w_parts=word.split('-')
@@ -343,7 +357,7 @@ def prefill_for_sentence(
         dict: see structure a the end of the function
     """
     if mode=="MFA_IPA":
-        word_dict=mfa_dicts[lang]
+        word_dict=get_augmented_mfa_dict(lang)
     else:
         word_dict=cmudict_dict
 
@@ -707,7 +721,8 @@ if __name__ == "__main__":
     
     sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
     sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
-    sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    # sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    sentence="A 22 heures, j'ai rendez-vous avec le CEO, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
 
     lang="fr_FR"
     r=prefill_for_sentence(

@@ -1,6 +1,4 @@
-
-import os, psutil;
-print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
 
 print_memory_usage("RAM - start of DL_speech_tech")
 from scipy.io.wavfile import  read

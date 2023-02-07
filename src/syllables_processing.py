@@ -3,13 +3,17 @@ import pandas as pd
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
 import os
 from tqdm import tqdm
-from src.pronunciation_dictionaries import cmudict_dict, mfa_dicts
+from src.pronunciation_dictionaries import cmudict_dict
 
 #### Syllables function  ####
 def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0'], mode='CMU'):
     return len(SonoriPy(phonetics, mode=mode)[0])
 
 def syllables_data_fr(syl_sep='|'):
+    from src.pronunciation_dictionaries import mfa_dicts
+    from src.pronunciation_dictionaries import get_augmented_mfa_dict, lang_to_MFA_g2p_models
+    mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
+
     # from http://www.lexique.org/  
     df=pd.read_csv('data/Lexique383.tsv', sep='\t')
 
@@ -278,6 +282,8 @@ def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
 
 
 if __name__=="__main__":
+    from src.pronunciation_dictionaries import get_augmented_mfa_dict, lang_to_MFA_g2p_models
+    mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
     word='dépendance'
     phonetic_dict=mfa_dicts['fr_FR']

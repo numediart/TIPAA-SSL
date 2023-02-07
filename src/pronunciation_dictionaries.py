@@ -1,3 +1,5 @@
+import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+print_memory_usage('RAM - pronunciation_dictionaries start')
 import cmudict
 import pandas as pd
 from glob import glob
@@ -17,6 +19,8 @@ def invert_dict(d):
         else: 
             inverse[item].append(key) 
     return inverse
+
+print_memory_usage('RAM - pronunciation_dictionaries after external libraries')
 
 # standard from FB http://fbdevwiki.com/wiki/Locales
 lang_to_MFA_g2p_models={'en_GB':'english_uk_mfa',
@@ -137,8 +141,6 @@ def generate_acronym_letter_dicts():
 
     with open('data/acronyms_fr_FR_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long))
 
-
-
 def get_augmented_mfa_dict(lang='es_ES'):
     d=get_mfa_dict(path='data/'+lang_to_MFA_g2p_models[lang]+'.dict')
     with open('data/acronyms_'+lang+'_mfa.dict','r') as f: acronyms=json.loads(f.read())
@@ -146,11 +148,6 @@ def get_augmented_mfa_dict(lang='es_ES'):
     return d
 
 
-
-mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
-
-# mfa_dicts['en_US']
-# len(mfa_dicts['en_US'])
 
 
 def build_mfa_phone_set():
