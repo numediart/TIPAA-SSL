@@ -42,3 +42,4 @@ streamlit
 biopython
 datasets
 openai
+psutils
