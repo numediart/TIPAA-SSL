@@ -4,7 +4,12 @@ import pickle
 import ast
 import librosa
 
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, default_model, default_model_charsiu
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, default_model
+
+
+
+from src.charsiu_utils import charsiu_phone_forced_aligner
+default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
 from src.label_data_processing import actor_recordings, final_s_artificial_data, synth_words_data
 from src.text_processing import *
@@ -28,7 +33,7 @@ from scipy.stats import gaussian_kde
 
 from performance_functions import compute_predictions, count_values, pContrast_on_synth_words, \
                                 pContrast_for_actor_recordings, start_end_phoneme_from_audiobook_data, \
-                                final_ed_for_actor_recordings, stress_GE_performance_test, final_ed_from_audiobook_data, pContrast_from_audiobook_data, pContrast_for_user_data
+                                final_ed_for_actor_recordings, stress_GE_performance_test, final_ed_from_audiobook_data, pContrast_from_audiobook_data, pContrast_for_user_data, final_ed_for_user_data
 
 
 def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
@@ -346,7 +351,7 @@ def syllable_contrast_for_actor_recordings(model=default_model):
     all_phones_df[all_phones_df.sentence_idx==r.sentence_idx]
 
 
-def phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=None, accent=None, name='plots/consonants_confusions_on_synth_words'):
+def phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=None, accent=None, name='plots/vowels_confusions_on_synth_words'):
     results={}
     predictions={}
     for p in sorted(phonemes):
@@ -435,12 +440,23 @@ def final_ed_confusions_for_actor_recordings():
     return predictions, results
 
 
+# target_to_basis={
+#     'D':'D_D',
+#     'IH0_D':'IH0_D',
+#     'T':'T_T',
+#     '':'IH0_Z',
+#     'S':'S_S',
+#     'Z':'Z_Z',
+#     'IH0_Z':'IH0_Z',
+# }
+
+
 target_to_basis={
     'D':'IH0_D',
     'IH0_D':'IH0_D',
-    'T':'IH0_D',
+    'T':'IH0_T',
     '':'IH0_Z',
-    'S':'IH0_Z',
+    'S':'IH0_S',
     'Z':'IH0_Z',
     'IH0_Z':'IH0_Z',
 }
@@ -509,8 +525,8 @@ def syl_confusions_on_synth_words():
 
 
 
-# final_ed_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu')
-# final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline')
+# final_ed_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu_basis_it')
+# final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline_basis_it')
 def final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words'):
 
     df=synth_words_data()
@@ -538,8 +554,8 @@ def final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_syn
     plot_confusion_results(results, name=name)
 
 
-# final_s_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu')
-# final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline')
+# final_s_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu_target_to_basis')
+# final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline_target_to_basis')
 def final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words'):
 
     df=synth_words_data()
@@ -575,9 +591,9 @@ def final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth
 
 def final_ed_s_confusions_on_synth_words():
     final_ed_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu')
-    final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline')
+    final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline_onnx')
     final_s_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu')
-    final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline')
+    final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline_onnx')
 
 def final_s_from_artificial_data(model=default_model):
     df=final_s_artificial_data()    
@@ -653,6 +669,140 @@ def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other', mode
 
     with open('vowels_consonant_contrast_audiobook_w2v'+data_set+'_n_'+str(n)+'.pickle', 'wb') as handle:pickle.dump(results,handle)
     plot_confusion_results(results, name='vowels_consonant_contrast_audiobook_w2v'+data_set+'_n_'+str(n))
+
+
+def model_comparison():
+    
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    # model = Wav2Vec2ForFramePrediction('cmu')
+    model = Wav2Vec2ForFramePrediction('cmu', w2v2_model_format='onnx')
+
+
+    models=[
+            # 'model_commonvoice_pca_99_knn_uk',
+            'model_commonvoice_pca_99_knn_uk_us_ca_n_1000',
+            # 'model_commonvoice_pca_99_knn_us',
+            'model_mailabs_pca_99_knn_5_cos_w',
+            'model_mailabs_pca_0.95_knn_10_w',
+            # 'model_mailabs_pca_0.95_knn_10_w_US',
+            ]
+    
+    # from src.charsiu_utils import charsiu_phone_forced_aligner
+    # prod_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+
+    def stats_pronunciation_aspects(model):
+        
+        o_list=['AA1', 'AO1', 'OW1']
+        i_list=['IH1', 'IY1']
+        ed_list=["IH0_D", "D", "T"]
+
+        # ----------------- test on actors -----------------------
+        ds_actor_o=[]
+        for p in o_list:
+            results_df, d = pContrast_for_actor_recordings(target_phones=p, model=model)
+            ds_actor_o.append(d)
+        ds_actor_ed=[]
+        for p in ed_list:
+            results_df, d = final_ed_for_actor_recordings(target_phones=p, model=model)
+            ds_actor_ed.append(d)
+        # ----------------- test on users -----------------------
+        ds_user_o=[]
+        for p in o_list:
+            results_df, d = pContrast_for_user_data(target_phones=p, model=model, n=100)
+            ds_user_o.append(d)
+        ds_user_ed=[]
+        for p in ed_list:
+            results_df, d = final_ed_for_user_data(target_phones=p, model=model, n=100)
+            ds_user_ed.append(d)
+
+        stats={
+            'ds_actor_o':[el.T for el in ds_actor_o],
+            'ds_actor_ed':[el.T for el in ds_actor_ed],
+            'ds_user_o':[el.T for el in ds_user_o],
+            'ds_user_ed':[el.T for el in ds_user_ed],
+        }
+        return stats
+
+    stats_prod=stats_pronunciation_aspects(default_model_charsiu)
+    with open('stats_prod_target_to_basis','w') as f: f.write(stats_prod.__str__())
+
+    stats_pipeline={}
+    for m in models:
+        model.load(name=m)    
+        stats=stats_pronunciation_aspects(model)
+        stats_pipeline[m]=stats
+    with open('stats_pipeline_basis_it_is_onnx','w') as f: f.write(stats_pipeline.__str__())
+
+    import pickle
+    pickle.dump(stats_prod, open('stats_prod_target_to_basis.p','wb'))
+    pickle.dump(stats_pipeline, open('stats_pipeline_basis_it_is_onnx.p','wb'))
+
+    
+    stats_pipeline=pickle.load(open('stats_pipeline_target_to_basis.p','rb'))
+    stats_prod=pickle.load(open('stats_prod_target_to_basis.p','rb'))
+
+    # with open('stats_pipeline','r') as f: 
+    # with open('stats_prod','r') as f:
+
+    records=[]
+    keys=list(stats_pipeline.keys())
+    for k in keys:
+        d=stats_pipeline[k]
+        r={}
+        
+        r['ds_actor_o']=d['ds_actor_o'][1]['AO1'].values[0]
+        r['ds_user_o']=d['ds_user_o'][1]['AO1'].values[0]
+        r['ds_actor_ed']=d['ds_actor_ed'][2]['T'].values[0]
+        r['ds_user_ed']=d['ds_user_ed'][2]['T'].values[0]
+        records.append(r)
+
+    r={}
+    r['ds_actor_o']=stats_prod['ds_actor_o'][1]['AO1'].values[0]
+    r['ds_user_o']=stats_prod['ds_user_o'][1]['AO1'].values[0]
+    r['ds_actor_ed']=stats_prod['ds_actor_ed'][2]['T'].values[0]
+    r['ds_user_ed']=stats_prod['ds_user_ed'][2]['T'].values[0]
+
+
+    records.append(r)
+    keys.append('stats_prod')
+
+    o_final_ed_res_df=pd.DataFrame.from_records(records)
+    o_final_ed_res_df.index=keys
+
+
+    def perfs_from_stats(stats_prod):
+        r={}
+        for k in stats_prod:
+            for el in stats_prod[k]:
+                target=el.index.values[0]
+                perf=el[target].values[0]
+                r[k+' '+target]=perf
+        return r
+
+
+    records=[]
+    keys=list(stats_pipeline.keys())
+    for k in keys:
+        d=stats_pipeline[k]
+        perfs=perfs_from_stats(d)
+        records.append(perfs)
+
+    r=perfs_from_stats(stats_prod)
+    records.append(r)
+    keys.append('stats_prod')
+
+    
+    perfs_df=pd.DataFrame.from_records(records)
+    perfs_df.index=keys
+
+    # perfs_df=perfs_df.T
+    # perfs_df[perfs_df]
+
+    a=1
+    for k in perfs_df.columns.tolist():
+        a=a&(perfs_df[k]>=perfs_df[k]['stats_prod']-15) 
+
+    perfs_df.loc[['stats_prod','model_commonvoice_pca_99_knn_uk','model_mailabs_pca_0.95_knn_10_w'],:].T
 
 
 
