@@ -1,17 +1,8 @@
 import streamlit as st
 import exercise_generation.exercises as ex
-import os
-import openai
 import re
-import random
 import ast
-import json # everything needs to be accessible in a JSON file
-import cmudict
-cmudict_dict=cmudict.dict() # initializes an access to the CMU dictionary
 import exercise_generation.auxiliary as aux
-import csv
-import pandas as pd
-
 from utils import check_password
 
 def make_exercise():

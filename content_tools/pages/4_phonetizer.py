@@ -4,7 +4,6 @@ import pandas as pd
 from streamlit import download_button
 from glob import glob
 import io
-
 from utils import check_password, prefill_content
 
 
@@ -17,8 +16,6 @@ def report_function(i, title=""):
     progress_bar.progress(i)
 
 st.title("Phonetization, syllabification ")
-
-import json
 
 @st.experimental_memo
 def process(json_str):

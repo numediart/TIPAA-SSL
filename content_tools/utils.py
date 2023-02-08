@@ -11,24 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+
 
 import streamlit as st
 import inspect
 import textwrap
 
-from transformers import Wav2Vec2ForCTC
-
 
 import sys
 sys.path.append('./')
-from src.label_data_processing import get_formatted_cmudict
-from src.pronunciation_dictionaries import cmu_reducer
+print_memory_usage('RAM - streamlit utils, before loading')
 from src.text_processing import prefill_content
+print_memory_usage('RAM - streamlit utils, after loading text_processing')
+from src.label_data_processing import get_formatted_cmudict
+print_memory_usage('RAM - streamlit utils, after loading label_data_processing')
+from src.pronunciation_dictionaries import cmu_reducer
+print_memory_usage('RAM - streamlit utils, after loading pronunciation_dictionaries')
 
 formatted_cmudict_df=get_formatted_cmudict()
+print_memory_usage('RAM - streamlit utils, after formatted_cmudict_df')
+
 
 @st.experimental_singleton
 def get_model(model_type):
+    from transformers import Wav2Vec2ForCTC
     # Create a model of the specified type
     return Wav2Vec2ForCTC.from_pretrained(model_type)
 
