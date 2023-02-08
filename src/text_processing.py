@@ -713,6 +713,8 @@ if False:
         return selection
 
 
+print_memory_usage('RAM - text_processing after all function declarations')
+
 
 if __name__ == "__main__":
     from src.text_processing import *
