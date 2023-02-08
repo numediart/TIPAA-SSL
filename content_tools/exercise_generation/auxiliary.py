@@ -6,6 +6,12 @@ import ast
 import json # everything needs to be accessible in a JSON fileimport json # everything needs to be accessible in a JSON file
 import cmudict
 cmudict_dict=cmudict.dict() # initializes an access to the CMU dictionary
+
+# cmu_phones_info=cmudict.phones()
+# cmu_phones=set([el[0] for el in cmu_phones_info])
+# cmu_vowels=set([p[0] for p in cmu_phones_info if p[1][0]=='vowel'])
+# cmu_consonants=set([p[0] for p in cmu_phones_info if p[1][0]!='vowel'])
+
 openai.api_key = "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"
 import csv
 import pandas as pd

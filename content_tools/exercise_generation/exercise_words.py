@@ -1,39 +1,41 @@
+import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
 
-import cmudict
-cmudict_dict=cmudict.dict()
 import random
 import pandas as pd
 import re
 import numpy as np
 
+print_memory_usage('RAM - exercise_words start')
 
 from utils import cmu_reducer
-from exercise_generation.auxiliary import has_a_target_phone, has_target_text_pattern, word_has_a_target_phone
+from exercise_generation.auxiliary import has_a_target_phone, has_target_text_pattern, word_has_a_target_phone, cmudict_dict
 import exercise_generation.auxiliary as aux
+print_memory_usage('RAM - exercise_words ex gen deps')
 
-words_rank_by_frequence=pd.read_csv('https://norvig.com/ngrams/count_1w.txt', header=None, sep='\t')
-words_rank_by_frequence.columns=['word', 'occurences']
-words_rank_by_frequence['probability']=words_rank_by_frequence['occurences']/sum(words_rank_by_frequence['occurences'])*100
-words_rank_by_frequence['percentile']=words_rank_by_frequence['probability'].cumsum()
 
-# # most common words
-# words_rank_by_frequence[(words_rank_by_frequence.percentile>25)&(words_rank_by_frequence.percentile<30)]
-# # first useful words
-# words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<35)]
-# words_rank_by_frequence[(words_rank_by_frequence.percentile>35)&(words_rank_by_frequence.percentile<36)]
+def make_useful_words():
+    words_rank_by_frequence=pd.read_csv('https://norvig.com/ngrams/count_1w.txt', header=None, sep='\t')
+    words_rank_by_frequence.columns=['word', 'occurences']
+    words_rank_by_frequence['probability']=words_rank_by_frequence['occurences']/sum(words_rank_by_frequence['occurences'])*100
+    words_rank_by_frequence['percentile']=words_rank_by_frequence['probability'].cumsum()
+    # # most common words
+    # words_rank_by_frequence[(words_rank_by_frequence.percentile>25)&(words_rank_by_frequence.percentile<30)]
+    # # first useful words
+    # words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<35)]
+    # words_rank_by_frequence[(words_rank_by_frequence.percentile>35)&(words_rank_by_frequence.percentile<36)]
 
-# # last useful words
-# words_rank_by_frequence[(words_rank_by_frequence.percentile>95)&(words_rank_by_frequence.percentile<96)]
-# words_rank_by_frequence[words_rank_by_frequence.percentile>96]
+    # # last useful words
+    # words_rank_by_frequence[(words_rank_by_frequence.percentile>95)&(words_rank_by_frequence.percentile<96)]
+    # words_rank_by_frequence[words_rank_by_frequence.percentile>96]
 
-# useful words (carries info, and not too weird)
-# useful_words_freq=words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<95)]
-useful_words_freq=words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<90)]
+    # useful words (carries info, and not too weird)
+    # useful_words_freq=words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<95)]
+    useful_words_freq=words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<90)]
+    return useful_words_freq
 
-cmu_phones_info=cmudict.phones()
-cmu_phones=set([el[0] for el in cmu_phones_info])
-cmu_vowels=set([p[0] for p in cmu_phones_info if p[1][0]=='vowel'])
-cmu_consonants=set([p[0] for p in cmu_phones_info if p[1][0]!='vowel'])
+useful_words_freq=make_useful_words()
+
+print_memory_usage('useful words norvig')
 
 
 

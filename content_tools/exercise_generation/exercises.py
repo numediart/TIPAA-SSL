@@ -4,8 +4,6 @@ import re
 import random
 import ast
 import json # everything needs to be accessible in a JSON file import json
-import cmudict
-cmudict_dict=cmudict.dict() # initializes an access to the CMU dictionary
 
 import csv
 import pandas as pd
@@ -14,7 +12,7 @@ import numpy as np
 
 # import sys
 # sys.path.append('../')
-from exercise_generation.auxiliary import has_a_target_phone, has_target_text_pattern, word_has_a_target_phone, has_at_least_2_syls
+from exercise_generation.auxiliary import has_a_target_phone, has_target_text_pattern, word_has_a_target_phone, has_at_least_2_syls, cmudict_dict
 from exercise_generation.exercise_words import generate_words, pick_phonetics_phones
 import exercise_generation.auxiliary as aux
 
