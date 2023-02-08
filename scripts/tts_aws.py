@@ -109,7 +109,8 @@ def synthesize_words(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk
 
 def synthesize_voices():
 
-    from src.pronunciation_dictionaries import mfa_dicts
+    from src.pronunciation_dictionaries import get_augmented_mfa_dict, lang_to_MFA_g2p_models
+    mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
     root_folder="scripts/synth_audio/mfa_words"
 
