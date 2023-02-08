@@ -10,7 +10,6 @@ import base64
 from linetimer import CodeTimer
 
 print_memory_usage("RAM - DL_speech_tech after external dependencies")
-
 from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
 print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
 
@@ -22,11 +21,10 @@ print_memory_usage("RAM - DL_speech_tech after src.pronunciation_dictionaries")
 
 
 
-# initialize model
-from src.charsiu_utils import charsiu_phone_forced_aligner
-default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
-
-print_memory_usage("RAM - DL_speech_tech after default_model_charsiu")
+# # initialize model
+# from src.charsiu_utils import charsiu_phone_forced_aligner
+# default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+# print_memory_usage("RAM - DL_speech_tech after default_model_charsiu")
 
 
 phoneme_GT_proba_threshold_dict={}
@@ -41,7 +39,8 @@ for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
 # model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
 
 from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-default_model = Wav2Vec2ForFramePrediction('cmu')
+# default_model = Wav2Vec2ForFramePrediction('cmu')
+default_model = Wav2Vec2ForFramePrediction('cmu',w2v2_model_format="onnx")
 default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 # default_model.load(name='model_mailabs_pca_99_logistic_regression')
 # default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
@@ -182,7 +181,7 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
                                     level="sentence", 
                                     # chunking_chars=[',',';','.','!','?', ':', '/'],
                                     max_speech_rate=8, mode='file',
-                                    model=default_model_charsiu,
+                                    model=default_model,
                                     vowels=cmu_vowels
                                     ): #'[\,\?\.\!\;\:\"\*]'
     
@@ -204,7 +203,21 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
         is_vowel=phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
         vowels_indexed_df=phonetics_indexed_df[is_vowel]
         # print(vowels_indexed_df)
-        vowels_indexed_df.loc[:,'stress_scores']=(100*ws).astype(int)
+
+        # assert len(vowels_indexed_df) == len(ws), "n of vowels should be the same as length of vowel stresses"
+
+        if len(vowels_indexed_df) != len(ws):
+            status = "error: n of vowels should be the same as length of vowel stresses"
+            print("n of vowels should be the same as length of vowel stresses")
+            return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
+        try:
+            vowels_indexed_df.loc[:,'stress_scores']=(100*ws).astype(int)
+        except:
+            status = "error: n of vowels should be the same as length of vowel stresses"
+            print("n of vowels should be the same as length of vowel stresses")
+            return {"status": status, "stress_intensities": [], "stress_binaries": []}
+            # import pdb;pdb.set_trace()
     else:
         return {"status": status, "stress_intensities": [], "stress_binaries": []}
 
@@ -614,7 +627,7 @@ if __name__=="__main__":
     cmu_phonetics="T_AO1_S_T"
     path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_tossed.mp3"
     s,fs=librosa.load(path, sr=16000)
-    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=cmu_phonetics,target_word_idx=0,target_syllable_idx=0,target_occurence_idx=0,target_phones='T',basis='IH0_D',contrast='end',mode='numpy',model=default_model_charsiu)
+    # res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=cmu_phonetics,target_word_idx=0,target_syllable_idx=0,target_occurence_idx=0,target_phones='T',basis='IH0_D',contrast='end',mode='numpy',model=default_model_charsiu)
 
     
     
@@ -626,9 +639,9 @@ if __name__=="__main__":
     df_z=df[(~(df.phonetics.str.endswith('AH0_Z')|df.phonetics.str.endswith('IH0_Z'))&~df.phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
     r=df_z.sample(frac=1, random_state=0)[:100].iloc[-4]
     s,fs=librosa.load(r.path, sr=16000)
-    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=r.phonetics,target_word_idx=0,target_syllable_idx=-1,target_occurence_idx=0,target_phones='Z',basis='Z_Z',contrast='end',mode='numpy',model=default_model_charsiu)
+    # res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=r.phonetics,target_word_idx=0,target_syllable_idx=-1,target_occurence_idx=0,target_phones='Z',basis='Z_Z',contrast='end',mode='numpy',model=default_model_charsiu)
 
-    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=r.phonetics,target_word_idx=0,target_syllable_idx=-1,target_occurence_idx=0,target_phones='Z',basis='Z_Z',contrast='end',mode='numpy',model=default_model_charsiu)
+    # res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=r.phonetics,target_word_idx=0,target_syllable_idx=-1,target_occurence_idx=0,target_phones='Z',basis='Z_Z',contrast='end',mode='numpy',model=default_model_charsiu)
 
     
 
