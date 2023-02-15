@@ -33,10 +33,19 @@ def nested_dict_to_df(content):
                 k = 'Speaking activity' if 'Speaking activity' in activity.keys() else 'Listening activity'
                 for exercise in activity[k]:
                     d['exercise_type']=exercise[param_to_name['exercise_type']]
-                    d['pronunciation_aspect']=exercise[param_to_name['pronunciation_aspect']]
-                    k2=list(exercise.keys())[-1]
+
+                    if 'Listening' in k:
+                        d['pronunciation_aspect']=exercise[param_to_name['pronunciation_aspect']]
+
+                    content_key=[el for el in exercise.keys() if "content_" in el]
+                    assert len(content_key)==1
+
+                    k2=content_key[0]
                     for ex in exercise[k2]:
                         record=deepcopy(d)
+
+                        if 'Speaking' in k:
+                            record['pronunciation_aspect']=ex['pronunciation_aspect']
                         record['phrase_data']=ex
                         records.append(record)
     df=pd.DataFrame.from_records(records)
@@ -63,11 +72,18 @@ def df_to_nested_dict(df):
                 exercises=[]
                 for ex_g, exs  in exercise_groups:
                     d={}
+
+                    if ex_g[-1] in ['spoken_card','spoken_sentence']:
+                        # put pronunciation aspect in phrase_data so that it'll be in the exercise unit data
+                        exs['phrase_data']=exs.apply(lambda r: {'pronunciation_aspect':r.pronunciation_aspect} | r.phrase_data, axis=1)
+
                     d['content_'+ex_g[-1]]=exs['phrase_data'].tolist()
                     assert len(exs['exercise_type'].unique())==1
                     d[param_to_name['exercise_type']]=exs['exercise_type'].iloc[0]
-                    assert len(exs['pronunciation_aspect'].unique())==1
-                    d[param_to_name['pronunciation_aspect']]=exs['pronunciation_aspect'].iloc[0]
+                    # assert len(exs['pronunciation_aspect'].unique())==1
+                    if ex_g[-1] not in ['spoken_card','spoken_sentence']:
+                        d[param_to_name['pronunciation_aspect']]=exs['pronunciation_aspect'].iloc[0]
+
                     assert len(exs['activity_type'].unique())==1
                     exercises.append(d)
                 act_d[param_to_name['activity_type']]=exs['activity_type'].iloc[0]
@@ -84,7 +100,7 @@ def df_to_nested_dict(df):
 
 
 def process_content(df):
-    not_content_keys={'stress_category', 'text_to_display'}
+    not_content_keys={'stress_category', 'text_to_display', 'pronunciation_aspect'}
 
     all_sentences=df.phrase_data.apply(lambda r: [r[k] for k in r if k not in not_content_keys]).sum()
 
@@ -109,8 +125,108 @@ def process_content(df):
 
     return all_sentences_df, linguistic_data
 
+def remove_duplicates(db_content, all_phrases_df):
+    all_phrases_df[all_phrases_df.apply(lambda r: r['sentence'] in db_content.sentence.tolist(), axis=1)]
+
+    len(all_phrases_df)
+    all_phrases_df_drop=all_phrases_df.iloc[all_phrases_df.sentence.drop_duplicates().index]
+    len(all_phrases_df_drop)
+    all_phrases_df_drop_db=all_phrases_df_drop[~all_phrases_df_drop.apply(lambda r: r['sentence'] in db_content.sentence.tolist(), axis=1)]
+    len(all_phrases_df_drop_db)
+    return all_phrases_df_drop_db
 
 if __name__=="__main__":
+
+    db_content=pd.read_csv('/mnt/c/Users/noe_t/Downloads/All content minus audio 2023-02-14 - Sheet1.csv')
+    db_content.columns=['sentence','id']
+
+    PE_all_phrases=pd.read_csv('/mnt/c/Users/noe_t/Downloads/all_phrases_df (7).csv')
+
+    
+    standard_payload={
+                        'text_to_display': 'text_to_display',
+                        'incorrect1': 'incorrect1',
+                        'incorrect2': 'incorrect2',
+                        'incorrect': 'incorrect',
+                        'question': 'question',
+                        'answer': 'answer',
+                        'category': 'stress_category',
+
+                        'phrase_audiorecorded': 'phrase_audio_recorded',
+                        'phrase_prompt': 'question',
+                        'phrase_annotated': 'target_content',
+                        'target_content': 'target_content',
+                        'text_correct': 'target_content',
+                        'text_incorrect1': 'incorrect1',
+                        'text_incorrect2': 'incorrect2',
+                        'correct': 'target_content',
+                        'displayed_text': 'text_to_display',
+                        'phrase_correct': 'target_content',
+                        'phrase_incorrect': 'incorrect',
+                        'word': 'target_content',
+                        # 'phrase_annotated': 'target_content',
+                        'phrase_answertorecord': 'answer'}
+
+    def replace_keys(dictionary):
+        for k in standard_payload:
+            dict_keys_orig=dictionary.keys()
+            dict_keys_lower=[el.lower() for el in dictionary.keys()]
+            new_dict={}
+            for k_low, k in zip(dict_keys_lower, dict_keys_orig):
+                new_dict[standard_payload[k_low]] = dictionary[k]
+        return new_dict
+
+    
+
+    import ast
+    df=pd.read_csv("scripts/PE_syllabus_tree_and_stress.csv")
+    df.phrase_data=df.phrase_data.str.replace('…','...')
+    df.phrase_data=df.phrase_data.apply(lambda r: ast.literal_eval(r))
+
+    df.phrase_data=df.phrase_data.apply(lambda r: {k.lower().strip():r[k] for k in r})
+    keys=set(df.phrase_data.apply(lambda r: list(r.keys())).sum())
+
+    properties_phrase_data_to_correct={k:k for k in keys}
+    properties_phrase_data_to_correct["phrase_annotated"]="target_content"
+    df.phrase_data=df.phrase_data.apply(lambda r: {properties_phrase_data_to_correct[k.lower().strip()]:r[k] for k in r})
+    # df.phrase_data=df.phrase_data.apply(lambda r: {k.lower().strip():r[k] for k in r if k not in properties_phrase_data_to_correct else properties_phrase_data_to_correct[k.lower().strip()]:r[k] })
+    df.phrase_data=df.phrase_data.apply(lambda r:{k.lower().strip():r[k].strip() for k in r if k not in ['pos','phrase_raw']})
+    # df['phrase_data']=df['phrase_data'].apply(lambda r: replace_keys(r))
+
+    import re
+    # for single words, there shouldn't be asterisks
+    df_star=df[df.phrase_data.apply(lambda r: re.match("^\*[a-z]*\*$", r["target_content"]) if "target_content" in r else False).astype(bool)]
+    df.loc[df.phrase_data.apply(lambda r: re.match("^\*[a-z]*\*$", r["target_content"]) if "target_content" in r else False).astype(bool), 'phrase_data']=df_star.phrase_data.apply(lambda r: {k:r[k].replace('*','') for k in r})
+
+
+    df.columns=['id', 'phrase_data', 'module_title', 'activity_set_title', 'activity_title', 'activity_type', 'exercise_type', 'pronunciation_aspect', 'stress_category']
+    df.activity_type=df.activity_type.apply(lambda r: r.strip())
+    df.pronunciation_aspect=df.pronunciation_aspect.apply(lambda r: r.strip())
+    df.exercise_type=df.exercise_type.apply(lambda r: r.lower().strip().replace(' ','_'))
+
+    modules=df_to_nested_dict(df)
+
+    with open("scripts/PE_data_entry.json", 'w') as f: json.dump(modules, f, indent=2)
+
+    with open("scripts/PE_data_entry.json", 'r') as f: content=json.load(f)
+
+    df_back=nested_dict_to_df(content)
+
+    for c in df_back.columns:
+        if len(df[df[c]!=df_back[c]])>0:
+            print(c)
+            print(df[df[c]!=df_back[c]])
+
+    c='pronunciation_aspect'
+    df[df[c]!=df_back[c]]
+    df_back[df[c]!=df_back[c]]
+
+
+
+    df[df[c]!=df_back[c]].phrase_data.apply(lambda r: r.keys())
+    
+    with open("scripts/marie_program_modified.json", 'r') as f: content=json.load(f)
+
     with open("scripts/marie_program_modified.json", 'r') as f: content=json.load(f)
     df=nested_dict_to_df(content)
     df.to_csv("data/marie_program_syllabus_tree.csv")
@@ -123,7 +239,6 @@ if __name__=="__main__":
 
     df=nested_dict_to_df(content)
     modules=df_to_nested_dict(df)
-
     with open("scripts/data_entry_conversion_ex.json", 'w') as f: json.dump(modules, f, indent=2)
 
 
@@ -133,38 +248,6 @@ if __name__=="__main__":
     set(BE['phrase_data'].apply(lambda r: list(r.keys())).sum())
     # modules==content
 
-    standard_payload={
-                        'text_to_display': 'text_to_display',
-                        'incorrect1': 'incorrect1',
-                        'incorrect2': 'incorrect2',
-                        'incorrect': 'incorrect',
-                        'question': 'question',
-                        'answer': 'answer',
-                        'category': 'stress_category',
-
-                        'phrase_audiorecorded': 'phrase_audio_recorded',
-                        'phrase_prompt': 'question',
-                        'phrase_raw': 'target_content',
-                        'target_content': 'target_content',
-                        'text_correct': 'target_content',
-                        'text_incorrect1': 'incorrect1',
-                        'text_incorrect2': 'incorrect2',
-                        'correct': 'target_content',
-                        'displayed_text': 'text_to_display',
-                        'phrase_correct': 'target_content',
-                        'phrase_incorrect': 'incorrect',
-                        'word': 'target_content',
-                        'phrase_annotated': 'target_content',
-                        'phrase_answertorecord': 'answer'}
-
-    def replace_keys(dictionary):
-        for k in standard_payload:
-            dict_keys_orig=dictionary.keys()
-            dict_keys_lower=[el.lower() for el in dictionary.keys()]
-            new_dict={}
-            for k_low, k in zip(dict_keys_lower, dict_keys_orig):
-                new_dict[standard_payload[k_low]] = dictionary[k]
-        return new_dict
 
     BE['phrase_data']=BE['phrase_data'].apply(lambda r: replace_keys(r))
     BE['module_title']=BE['module']
@@ -183,7 +266,7 @@ if __name__=="__main__":
 
     modules=df_to_nested_dict(BE)
 
-    with open("scripts/BE_data_entry.json", 'w') as f: json.dump(modules, f, indent=2)
+    with open("scripts/PE_data_entry.json", 'w') as f: json.dump(modules, f, indent=2)
 
 
 
