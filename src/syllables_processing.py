@@ -281,7 +281,7 @@ def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
     return n
 
 
-if __name__=="__main__":
+def use_tests():
     from src.pronunciation_dictionaries import get_augmented_mfa_dict, lang_to_MFA_g2p_models
     mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 

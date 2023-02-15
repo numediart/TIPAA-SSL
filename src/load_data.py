@@ -164,7 +164,7 @@ def build_df_segmented_all(df_t, model, forced_aligner, mode, language_code): # 
 
     return df_segmented
 
-if __name__=="__main__":
+def use_tests():
     
     df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
     df_t_train=df_t_train.dropna()

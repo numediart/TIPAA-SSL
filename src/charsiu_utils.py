@@ -416,8 +416,8 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
 
 
-if __name__=="__main__":
-    from src.charsiu_utils import *
+def use_tests():
+    # from src.charsiu_utils import *
     from transformers import Wav2Vec2Processor
     from src.libri_phonetization_data import libri_phonetics_data
     import warnings

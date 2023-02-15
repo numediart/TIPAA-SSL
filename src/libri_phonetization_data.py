@@ -377,7 +377,7 @@ def frequent_ed_word_selections_by_termation(libri_words_df, n=200):
         df.columns=preterm_selection
         df.to_csv('results/ed_in_'+term+'.csv')
 
-if __name__ == "__main__":
+def use_tests():
     libri_words_df=build_librispeech_words_df()
     # libri_words_df=build_librispeech_words_df(n=10000)
 

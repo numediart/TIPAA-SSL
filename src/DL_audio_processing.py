@@ -134,7 +134,7 @@ def pred_to_gibberish(pred):
     
     return gibberish
 
-if __name__=="__main__":
+def use_tests():
 
     path = 'dl_models/wav2vec2-base-libri-pr'
     processor = Wav2Vec2Processor.from_pretrained(path)

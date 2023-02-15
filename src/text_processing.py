@@ -561,7 +561,7 @@ def prefill_for_sentence(
             }
     return record
 
-def prefill_content(sentences, syl_sep='|', lang='en_US'):
+def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
     """This function extract information of syllabified texts and phonetics using prefill_for_sentence on a list of sentences.
     The result is saved in a DataFrame.
 
@@ -576,7 +576,7 @@ def prefill_content(sentences, syl_sep='|', lang='en_US'):
     print("n sentences", len(sentences))
     for i,s in tqdm(enumerate(sentences)):
         try:
-            record=prefill_for_sentence(s, syllables_df[lang], syl_sep=syl_sep)
+            record=prefill_for_sentence(s, syllables_df[lang], syl_sep=syl_sep, mode=mode, lang=lang)
         except:
             print('Error with sentence: '+s)
             
@@ -716,8 +716,8 @@ if False:
 print_memory_usage('RAM - text_processing after all function declarations')
 
 
-if __name__ == "__main__":
-    from src.text_processing import *
+def use_tests():
+    # from src.text_processing import *
     prefill_for_sentence()
 
     
@@ -760,6 +760,40 @@ if __name__ == "__main__":
     sentences=words+['yesterday morning','coffee','seek','take the lead','worked','started a company','think','visited']
     # from syllabipy.sonoripy import generate_gibberish_alternatives
     # g=generate_gibberish_alternatives(sentences)
+
+    content=pd.read_csv('/mnt/c/Users/noe_t/Downloads/All content minus audio 2023-02-14 - Sheet1.csv')
+    sentences=content.words.apply(lambda r: remove_special_characters(r)).tolist()
+
+
+
+    # https://www.angmohdan.com/22-words-with-british-and-american-pronunciations-that-may-confuse-you/
+    words="Advertisement,Bald,Clique,Either,Envelope,Esplanade,Leisure,Mobile,Missile,Neither,Niche,Often,Parliament,Privacy,Semi,Schedule,Scone,Stance,Tomato,Vase,Vitamin,Wrath".split(',')
+    df_us_mfa=prefill_content(words, lang="en_US", mode="MFA_IPA")
+    df_gb_mfa=prefill_content(words, lang="en_GB", mode="MFA_IPA")
+    df_us_cmu=prefill_content(words)
+
+    # ' '.join(['|'.join(['_'.join([arpabet_to_2_char_ipa[unstress(p).lower()] for p in syl]) for syl in word]) for word in split_phonetics('AE0|D_V_ER1|T_AH0|Z_M_AH0_N_T')])
+
+    from src.pronunciation_dictionaries import arpabet_to_2_char_ipa, mfa_to_display_ipa
+
+    
+    import unicodedata
+    # https://stackoverflow.com/questions/61811872/how-do-i-remove-subscript-superscript-in-python
+    remove_superscripts = lambda s: "".join(c for c in s if (unicodedata.category(c) not in ["No", "Lo", "Lm"]) or (c=="ː"))
+
+    map_phonemes= lambda mapper, formatted_phonetics: ' '.join(['|'.join(['_'.join([mapper[unstress(p).lower()] for p in syl]) for syl in word]) for word in split_phonetics(formatted_phonetics)])
+
+    df_us_cmu_to_ipa=df_us_cmu.cmu_phonetics.apply(lambda r:map_phonemes(arpabet_to_2_char_ipa, r))
+    df_us_mfa_disp=df_us_mfa.cmu_phonetics.apply(lambda r:map_phonemes(mfa_to_display_ipa, r)).apply(lambda r: remove_superscripts(r))
+    df_gb_mfa_disp=df_gb_mfa.cmu_phonetics.apply(lambda r:map_phonemes(mfa_to_display_ipa, r)).apply(lambda r: remove_superscripts(r))
+
+    df_all_variations=pd.DataFrame([df_us_cmu.text, df_us_cmu_to_ipa, df_us_mfa.cmu_phonetics, df_us_mfa_disp, df_gb_mfa.cmu_phonetics,df_gb_mfa_disp]).T
+    df_all_variations.columns=['text','cmu_to_ipa','mfa_us','mfa_us_disp','mfa_gb','mfa_gb_disp']
+    df_all_variations.replace('_','', regex=True).replace('\|','', regex=True).to_csv('ipa_variations.csv')
+
+    df_us_mfa_disp.apply(lambda r: remove_superscripts(r))
+
+
 
     df=prefill_content(sentences)
     

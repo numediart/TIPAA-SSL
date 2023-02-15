@@ -352,7 +352,7 @@ class Wav2Vec2ForFramePrediction:
 def train_Wav2Vec2ForFramePrediction_model():
     
 
-    from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis
+    from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis, LogisticRegression
     # Basis model Wav2Vec2ForFramePrediction, a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
@@ -464,7 +464,7 @@ def inference_demo():
     prob_matrix = default_model_cmu.predict_phone_prob_matrix(data.s.iloc[0], 16000)
     return pred, prob_matrix
 
-if __name__ == '__main__':
+def use_tests():
 
     
     # from sklearn.model_selection import train_test_split
@@ -490,9 +490,8 @@ if __name__ == '__main__':
     # elif reducer == "pca":
     #     self.reducer = PCA(n_components=target_dim, random_state=42)
 
-    from src.load_data import *
-    from src.wav2vec2_frame_prediction import *
-    # from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from src.load_data import load_dataset_MAILABS, load_dataset_commonvoice, build_df_all_frames
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     df_t=load_dataset_commonvoice(lang_codes=['en'], path='./data/cv-corpus-10.0-delta-2022-07-04', split="dev", phone_set='CMU')
     df_t.accents.unique()

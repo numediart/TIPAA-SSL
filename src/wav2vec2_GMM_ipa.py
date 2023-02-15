@@ -381,10 +381,9 @@ class Wav2Vec2ForFrameGMMAssignment:
             cbar.set_ticks(np.arange(self.nbr_clusters))
             cbar.set_ticklabels(list(self.component_to_phoneme.values()))
 
-if __name__ == '__main__':
+def use_tests():
 
-    from src.load_data import *
-    from src.wav2vec2_GMM_ipa import *
+    from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_dataset_MAILABS
     from src.wav2vec2_GMM_ipa import Wav2Vec2ForFrameGMMAssignment
 
     df_t_train, df_t_test = load_libri_dataset()
@@ -413,20 +412,20 @@ if __name__ == '__main__':
     # loading a train sample
     #df_t, df=libri_phonetics_data(data_set='dev-clean')
     #df_cmu_phones=df_t.apply(lambda r: pd.DataFrame.from_records(r.phone_df).cmu_phone.tolist(), axis=1)
-    N=0
-    example=df.iloc[N]
-    path=example.wav_path
-    example['cmu_phones']=df_cmu_phones.iloc[N]
-    example['cmu_phones']=remove_stress_annots(example.phones)
-    s,fs=librosa.load(path, sr=16000)
+    # N=0
+    # example=df.iloc[N]
+    # path=example.wav_path
+    # example['cmu_phones']=df_cmu_phones.iloc[N]
+    # example['cmu_phones']=remove_stress_annots(example.phones)
+    # s,fs=librosa.load(path, sr=16000)
 
-    # loading a test sample (unseen by the model)
-    N=0
-    example=df_test.iloc[N]
-    path=example.wav_path
-    example['cmu_phones']=df_cmu_phones_test.iloc[N]
-    example['cmu_phones']=remove_stress_annots(example.phones)
-    s,fs=librosa.load(path, sr=16000)
+    # # loading a test sample (unseen by the model)
+    # N=0
+    # example=df_test.iloc[N]
+    # path=example.wav_path
+    # example['cmu_phones']=df_cmu_phones_test.iloc[N]
+    # example['cmu_phones']=remove_stress_annots(example.phones)
+    # s,fs=librosa.load(path, sr=16000)
 
     #comment if you want cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
@@ -435,7 +434,6 @@ if __name__ == '__main__':
     X, y = df_all_frames_to_X_y(df_all_frames)
 
 
-    from src.wav2vec2_GMM_ipa import *
     # leave one speaker out
     all_speakers = ['fr_FR', 'es_ES', 'en_UK', 'en_US']
     speaker_lang_code = 'en_UK'
@@ -506,9 +504,9 @@ if __name__ == '__main__':
     x = [[el.s,el.fs,el.phones] for _,el in data.iterrows()]
     preds = model.predict(x[:3])
 
-    # phoneme predictions on a single audio sample with forced alignment
-    preds = model.predict_sample(s, fs, target_phonemes)
-    prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    # # phoneme predictions on a single audio sample with forced alignment
+    # preds = model.predict_sample(s, fs, target_phonemes)
+    # prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa
@@ -551,9 +549,9 @@ if __name__ == '__main__':
     phonetics_list = [[i] for i in phonetics_list]
     phonetics = [i[0].replace('|', '_').split('_') for i in phonetics_list]
 
-    df_word = classe.predict_word(s, split_phonetics, target_word_idx)
+    # df_word = classe.predict_word(s, split_phonetics, target_word_idx)
 
-    target_word_idx = 9
-    target_syllable_idx = 0
-    target_phones = 'AH'
-    pred_phone = classe.predict_phone(s, ph, target_word_idx, target_syllable_idx, target_phones)
+    # target_word_idx = 9
+    # target_syllable_idx = 0
+    # target_phones = 'AH'
+    # pred_phone = classe.predict_phone(s, ph, target_word_idx, target_syllable_idx, target_phones)
