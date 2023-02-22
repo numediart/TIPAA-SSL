@@ -225,7 +225,7 @@ def plot_reduction(df_all_instances, reduction_technique='umap', base_name='wav2
 
 
 
-if __name__=="__main__":
+def use_tests():
     # load model and processor
     # I download first, do "from_pretrained(path)" instead to know easier where they are and access the vocabs, config etc.
     # Else models are in: "~/.cache/huggingface/transformers"

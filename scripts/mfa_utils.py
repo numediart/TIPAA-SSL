@@ -5,21 +5,14 @@ import shutil
 # from src.libri_phonetization_data import get_all_phone_with_timings
 import textgrid
 import numpy as np
-
 import librosa
-
 from src.text_processing import unstress
-
-
 from src.text_processing import remove_stress_annots
 import pandas as pd
 import csv
 import ast
-
 import soundfile as sf
-
 from Bio import pairwise2
-from Bio.pairwise2 import format_alignment
 
 
 def get_all_phone_with_timings(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):

@@ -229,8 +229,6 @@ class Wav2Vec2ForFramePrediction:
         """
         phones=sum(phonetics,[])
         df_segmented = self.predict_with_timings(s, phones)
-        
-
         df_word=extract_word(df_segmented, phonetics, target_word_idx)
         return df_word
 
