@@ -14,6 +14,8 @@ from itertools import groupby
 from num2words import num2words
 import unidecode
 
+from src.phonemizer_utils import word_to_stressed_syl
+
 print_memory_usage('RAM - text_processing after external libraries')
 
 
@@ -27,7 +29,7 @@ split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w 
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
 print_memory_usage('RAM - text_processing after lambda functions')
-from src.pronunciation_dictionaries import get_augmented_mfa_dict, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish
+from src.pronunciation_dictionaries import get_augmented_mfa_dict, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish, normalize_termination
 print_memory_usage('RAM - text_processing after pronunciation_dictionaries')
 # mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 # print_memory_usage('RAM - text_processing after mfa_dicts')
@@ -36,12 +38,12 @@ print_memory_usage('RAM - text_processing after syllable_processsing')
 
 
 syllables_df={
-            'en_GB':pd.read_csv('data/syllables.csv'),
-            'en_US':pd.read_csv('data/syllables.csv'),
-            'fr_FR':pd.read_csv('data/syllables_fr_FR.csv'),
-            'es_ES':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
-            'es_LA':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
-            }
+    'en_GB':pd.read_csv('data/syllables.csv'),
+    'en_US':pd.read_csv('data/syllables.csv'),
+    'fr_FR':pd.read_csv('data/syllables_fr_FR.csv'),
+    'es_ES':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+    'es_LA':pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']),
+}
 
 print_memory_usage('RAM - text_processing after syllables_df')
 
@@ -150,11 +152,47 @@ def check_phonemes(phonemes):
 
 
 
-def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", word_dict=get_augmented_mfa_dict('es_ES'), g2p_model="spanish_spain_mfa"):
+
+# adding stresses to vowels thanks to "word_to_stressed_syl" that got us stressed syllables from espeak sonoripyed
+def add_stress(syls_ps, word_stress):
+    vowels=define_categories(mode='MFA_IPA')['vowels']
+    for alt_idx, alt in enumerate(syls_ps):
+        # assert len(word_stress_syls_parts)==len(alt), "The number of word parts should be the same"
+        # for w_part_idx, syls_p in enumerate(alt):
+
+        # Here I only put the stresses if there is consistency in terms of number of syllables. This has to be filtered afterwards.
+        if len(alt)==word_stress[-1]:#, "The number of syllables should be the same"
+            for syl_idx, syl_p in enumerate(alt):
+                # print(syl_p)
+                stress_mark="1" if syl_idx==word_stress[0] else "0"
+                syl_p=[p+stress_mark if p in vowels else p for p in syl_p]
+                syls_ps[alt_idx][syl_idx]=syl_p
+
+# adding stresses to vowels thanks to "word_to_stressed_syl" that got us stressed syllables from espeak sonoripyed
+def add_stress_w_parts(syls_ps, word_stress_syls_parts):
+    vowels=define_categories(mode='MFA_IPA')['vowels']
+    for alt_idx, alt in enumerate(syls_ps):
+        assert len(word_stress_syls_parts)==len(alt), "The number of word parts should be the same"
+        for w_part_idx, syls_p in enumerate(alt):
+
+            # Here I only put the stresses if there is consistency in terms of number of syllables. This has to be filtered afterwards.
+            if len(syls_p)==word_stress_syls_parts[w_part_idx][-1]:#, "The number of syllables should be the same"
+            
+                for syl_idx, syl_p in enumerate(syls_p):
+                    # print(syl_p)
+                    stress_mark="1" if syl_idx==word_stress_syls_parts[w_part_idx][0] else "0"
+                    syl_p=[p+stress_mark if p in vowels else p for p in syl_p]
+                    syls_ps[alt_idx][w_part_idx][syl_idx]=syl_p
+
+
+# word_dict=get_augmented_mfa_dict('en_US')
+# generate_syl_phonetics_alternatives_from_word_ipa(word="start", lang='en_US', word_dict=word_dict, g2p_model=lang_to_MFA_g2p_models['en_US'])
+def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico", lang='es_ES', word_dict=get_augmented_mfa_dict('es_ES'), g2p_model="spanish_spain_mfa"):
     # fallbacks
     if '-' in word:
         w_parts=word.split('-')
         p_parts=[]
+        word_stress_syls_parts=[]
         for w_part in w_parts:
             try:
                 p_part=word_dict[w_part]
@@ -166,11 +204,16 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
                 except KeyError: p_part=mfa_g2p(w_part, model=g2p_model)[w_part]
             p_parts.append(p_part)
 
+            word_stress_syls_parts.append(word_to_stressed_syl(w_part, lang=lang))
+
         # Here I generate all alternatives of combination of word parts
-        # It corresponds to cmu alternatives for other words
+        # It corresponds to MFA_IPA alternatives for other words
         ps=list(itertools.product(*p_parts))
         syls_ps=[[SonoriPy(p, mode='MFA_IPA')[0] for p in alt] for alt in ps]
-        
+
+        # adding stresses, by reference, to vowels thanks to "word_to_stressed_syl" that got us stressed syllables from espeak sonoripyed
+        add_stress_w_parts(syls_ps, word_stress_syls_parts)
+
         # This puts 
         # '_' between phonemes
         # '-' between word components (hyphenated words and acronyms, not to have more than 1 stressed syllable by word component)
@@ -190,12 +233,16 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
             try: ps=word_dict[unaccented_string]
             except KeyError: ps=mfa_g2p(word, model=g2p_model)[word]
         
+        word_stress=word_to_stressed_syl(word, lang=lang)
+        
         # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
         # for p in ps:
         #     if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==[ 'D', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
         #         p[-2:]=['IH0','D']
         
         syls_ps=[SonoriPy(p, mode='MFA_IPA')[0] for p in ps]
+        add_stress(syls_ps, word_stress)
+
         syls_ps_formatted=['|'.join(['_'.join(s) for s in w]) for w in syls_ps]
     return syls_ps_formatted
 
@@ -219,6 +266,8 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
             if p_part==[]:
                 p_part=[g2p(w_part)]
             p_parts.append(p_part)
+            
+            normalize_termination(p_part, w_part)
 
         # Here I generate all alternatives of combination of word parts
         # It corresponds to cmu alternatives for other words
@@ -238,11 +287,8 @@ def generate_syl_phonetics_alternatives_from_word(word="before"):
         ps=cmudict_dict[word]
         if ps==[]:
             ps=[g2p(word)]
-        
-        # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
-        for p in ps:
-            if (p[-3:]==[ 'T', 'AH0', 'D'] or p[-3:]==['D', 'AH0', 'D']) and (word[-3:]=='ted' or word[-3:]=='ded'):
-                p[-2:]=['IH0','D']
+
+        normalize_termination(ps, word)
         
         syls_ps=[SonoriPy(p)[0] for p in ps]
         syls_ps_formatted=['|'.join(['_'.join(s) for s in w]) for w in syls_ps]
@@ -256,6 +302,8 @@ def insert(s, ch, i):
     return s[:i] + ch + s[i:]
 
 
+
+# processing steps for "prefill_for_sentence"
 def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
     """To have syllable parts with capital letters, this function compare segmented syllable string to original text.
     Indeed the segmented version had to be lowercased to look-up in a word dataset without being sensitive to case.
@@ -282,15 +330,12 @@ def insert_seps_in_cased_text(s, s_case, syl_sep='|'):
             w_case=insert(w_case, syl_sep, idx)
         s_case_sep.append(w_case)
     return ' '.join(s_case_sep)
-
-
-def normalize_sentence_numbers(sentence, lang="en_GB", mode="CMU"):
+def normalize_sentence_numbers(sentence, lang="en_GB"):
     # this takes care of e.g. "2021", "$110"
     # curly braces for numbers, if they are in several words
     # also add curly braces in original sentence around numbers
-
-    def normalize(word, lang="en"):
-        if mode=="CMU":
+    def normalize(word, lang="en_GB"):
+        if lang.split('_')[0]=="en":
             n_word=normalize_numbers(word)
         else:
             try:
@@ -315,7 +360,6 @@ def normalize_sentence_numbers(sentence, lang="en_GB", mode="CMU"):
     norm_sent=" ".join(norm_sent_list)
     sent=" ".join(sent_list)
     return norm_sent, sent
-
 def extract_special_chars(norm_sent, special_chars):
     # memorize special characters glued before and after words
     special_chars_dict_end={}
@@ -333,21 +377,48 @@ def extract_special_chars(norm_sent, special_chars):
 
 get_acronyms_idxs=lambda words: [w_idx for w_idx,w in enumerate(words) if w.isupper()]
 
+def add_special_chars(split_text, special_chars_dict_start, special_chars_dict_end):
+    for k in special_chars_dict_end:
+        split_text[k]+=special_chars_dict_end[k]
+    for k in special_chars_dict_start:
+        split_text[k]=special_chars_dict_start[k]+split_text[k]
+    return split_text
+def acronyms_hyphen_to_compound(split_text, acronym_idxs):
+    # remove '-' in acronyms
+    # And if it was only 1 letter, then it's not a compound word.
+    for i,el in enumerate(split_text):
+        if i in acronym_idxs:
+            if '-' in el:
+                split_text[i]='{'+el.replace('-',' ')+'}'
+            else:
+                split_text[i]=el.replace('{','').replace('}','')
+    return split_text
+def acronyms_to_compound(split_text, acronym_idxs):
+        # remove '-' in acronyms
+        # And if it was only 1 letter, then it's not a compound word.
+        for i,el in enumerate(split_text):
+            if i in acronym_idxs:
+                if len(el)>1:
+                    split_text[i]='{'+el.replace('-',' ')+'}'
+                else:
+                    split_text[i]=el.replace('{','').replace('}','')
+        return split_text
+
 
 # sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
 # sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una start-up de 30000 dólares en etapa inicial, ¡luego con el CTO!"
 # sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
 def prefill_for_sentence(
-    sentence="I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!",
-    # sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!", 
-                        syllables_df=pd.read_csv('data/syllables.csv'), 
-                        syl_sep='|', 
-                        special_chars = [',','?','.','!','¡',';',':','"', '{', '}', '*'],
-                        lang="en_US",
-                        mode='CMU'):  # "CMU" or "MFA_IPA"
+            sentence="I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!",
+            # sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!", 
+            syllables_df=pd.read_csv('data/syllables.csv'), 
+            syl_sep='|', 
+            special_chars = [',','?','.','!','¡',';',':','"', '{', '}', '*','…'],
+            lang="en_US",
+            mode='CMU', word_dict=cmudict_dict):  # "CMU" or "MFA_IPA"
     """This function extract information of syllabified texts and phonetics. 
     It uses a combination of datasets (CMUdict, data from syllable_data() ) and algorithm (SonoriPy)
-
+    
     Args:
         sentence (str): a phrase to be processed. It can contain captial letters and punctuation.
         syllables_df (DataFrame): The syllables dataset built from syllables_data()
@@ -356,23 +427,18 @@ def prefill_for_sentence(
     Returns:
         dict: see structure a the end of the function
     """
-    if mode=="MFA_IPA":
-        word_dict=get_augmented_mfa_dict(lang)
-    else:
-        word_dict=cmudict_dict
-
     sentence=sentence.strip()
     # there shouldn't be a space before a special char, they must be glued to words (in english)
     # correct that if it's not the case
     for c in special_chars: 
-        if c not in ['¡', '*']:  # these punctuation mark can be at the beginning of a word (spanish exception, and our asterisk mark for target words)
+        if c not in ['¡', '*', '"']:  # these punctuation mark can be at the beginning of a word (spanish exception, and our asterisk mark for target words)
             sentence=sentence.replace(' '+c, c)
     
-    norm_sent, c=normalize_sentence_numbers(sentence, lang=lang, mode=mode)
+    norm_sent, c=normalize_sentence_numbers(sentence, lang=lang)
     special_chars_dict_start, special_chars_dict_end=extract_special_chars(norm_sent, special_chars)
     words=remove_special_characters(norm_sent, lowercase=False).split(' ')
 
-    # little dictionnary mapping e.g. Mr -> Mister
+    # expand_dict is a little dictionnary mapping e.g. Mr -> Mister
     words=[expand_dict[word] if word in expand_dict else word for word in words]
     norm_words=words
     
@@ -395,7 +461,7 @@ def prefill_for_sentence(
         # there is only one alternative except for letter 'A' which has  [['AH0'], ['EY1']]
         for i in acronym_idxs:  p[i]=['-'.join(['_'.join(cmudict_dict[w][-1]) for w in words[i].split('-')])]
     else:
-        p=[generate_syl_phonetics_alternatives_from_word_ipa(word, word_dict=word_dict, g2p_model=lang_to_MFA_g2p_models[lang]) for word in words]
+        p=[generate_syl_phonetics_alternatives_from_word_ipa(word, word_dict=word_dict, lang=lang, g2p_model=lang_to_MFA_g2p_models[lang]) for word in words]
 
 
     syls_texts=[]
@@ -430,55 +496,31 @@ def prefill_for_sentence(
 
     case_syls_texts=insert_seps_in_cased_text(' '.join(syls_texts), ' '.join(norm_words), syl_sep=syl_sep)
     case_syls_texts_special_chars=case_syls_texts.split(' ')
-
-    def add_special_chars(split_text, special_chars_dict_start, special_chars_dict_end):
-        for k in special_chars_dict_end:
-            split_text[k]+=special_chars_dict_end[k]
-        for k in special_chars_dict_start:
-            split_text[k]=special_chars_dict_start[k]+split_text[k]
-        return split_text
-    def acronyms_hyphen_to_compound(split_text, acronym_idxs):
-        # remove '-' in acronyms
-        # And if it was only 1 letter, then it's not a compound word.
-        for i,el in enumerate(split_text):
-            if i in acronym_idxs:
-                if '-' in el:
-                    split_text[i]='{'+el.replace('-',' ')+'}'
-                else:
-                    split_text[i]=el.replace('{','').replace('}','')
-        return split_text
-    def acronyms_to_compound(split_text, acronym_idxs):
-            # remove '-' in acronyms
-            # And if it was only 1 letter, then it's not a compound word.
-            for i,el in enumerate(split_text):
-                if i in acronym_idxs:
-                    if len(el)>1:
-                        split_text[i]='{'+el.replace('-',' ')+'}'
-                    else:
-                        split_text[i]=el.replace('{','').replace('}','')
-            return split_text
-    
     case_syls_texts_special_chars=acronyms_hyphen_to_compound(case_syls_texts_special_chars, acronym_idxs)
     # this adds punctuation and the curly brackets:
     case_syls_texts_special_chars=add_special_chars(case_syls_texts_special_chars, special_chars_dict_start, special_chars_dict_end)
-
     segmented_text=' '.join(case_syls_texts_special_chars)
 
-    # Here I want to remove only punctuation
-    segmented_text=remove_special_characters(sentence=segmented_text, lowercase=False, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*]')
+    # Here I want to remove only punctuation, i.e. all special chars minus curly brackets used forcomound words
+    segmented_text=remove_special_characters(sentence=segmented_text, lowercase=False, chars_to_ignore_regex = '['+'\\'.join(set(special_chars)-{"}","{"})+']')
     
-
-
     stress_inconsistencies=[]
     for w_i,w in enumerate(p):
         for alt_i,alt in enumerate(w):
             # if there is several primary stress inside a word part, it is a problem. It breaks our assumptions, so we memorize its index to treat it
             # below
-            if alt.count('1')>alt.count('-')+1: 
-                # print(alt)
-                # print(w)
+            if alt.count('1')>alt.count('-')+1:
                 d={'w_i':w_i,'alt_i':alt_i,'n_alt':len(w)}
                 stress_inconsistencies.append(d)
+            
+            # Also, if there is neither 0 or 1 in the phonetics, the algorithm was not able to find a consistent way of extracting a stress pattern from different sources:
+            # This is for MFA_IPA and extraction of the stress pattern from espeak annotation
+            for w_part in alt.split('-'):
+                if alt.count('1')+alt.count('0')==0:
+                    d={'w_i':w_i,'alt_i':alt_i,'n_alt':len(w)}
+                    stress_inconsistencies.append(d)
+
+
     stress_inconsistencies=pd.DataFrame(stress_inconsistencies)
     
     n_alternatives=[len(el) for el in p]
@@ -535,7 +577,7 @@ def prefill_for_sentence(
 
     # processing on the raw text to add curly brackets around compound words
     special_chars_dict_start_raw, special_chars_dict_end_raw=extract_special_chars(sentence, special_chars)
-    sent_=acronyms_to_compound(remove_special_characters(sentence=sentence, lowercase=False, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]').split(' '), get_acronyms_idxs(remove_special_characters(sentence, lowercase=False).split(' ')))
+    sent_=acronyms_to_compound(remove_special_characters(sentence=sentence, lowercase=False, chars_to_ignore_regex = '['+'\\'.join(special_chars)+']').split(' '), get_acronyms_idxs(remove_special_characters(sentence, lowercase=False).split(' ')))
     sent_brackets=' '.join(add_special_chars(sent_, special_chars_dict_start_raw, special_chars_dict_end_raw))
 
     if mode!='MFA_IPA':
@@ -561,7 +603,9 @@ def prefill_for_sentence(
             }
     return record
 
-def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
+from src.code_utils import internal_error
+from datetime import datetime
+def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU', output_errors=False):
     """This function extract information of syllabified texts and phonetics using prefill_for_sentence on a list of sentences.
     The result is saved in a DataFrame.
 
@@ -572,15 +616,33 @@ def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
     Returns:
         [type]: [description]
     """
+    
+    if mode=="MFA_IPA":
+        word_dict=get_augmented_mfa_dict(lang)
+    else:
+        word_dict=cmudict_dict
+
     records=[]
+    error_records=[]
     print("n sentences", len(sentences))
     for i,s in tqdm(enumerate(sentences)):
         try:
-            record=prefill_for_sentence(s, syllables_df[lang], syl_sep=syl_sep, mode=mode, lang=lang)
+            record=prefill_for_sentence(s.replace('{','').replace('}',''), syllables_df[lang], syl_sep=syl_sep, mode=mode, lang=lang, word_dict=word_dict)
         except:
             print('Error with sentence: '+s)
+            err=internal_error()
+            err["sentence"]=s
+            error_records.append(err)
+
             
         records.append(record)
+    
+    if output_errors:
+        now=datetime.now()
+        date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+        df_errors=pd.DataFrame.from_records(error_records)
+        df_errors.to_csv('prefill_content_errors_'+date_time+'.csv')
+
     df=pd.DataFrame.from_records(records)
     return df
 
@@ -618,121 +680,65 @@ def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
     # consonants do not end by a number
     # here I return a list that is one if primary stressed and else 0
     return [1 if p[-1]==str(1) else 0 for p in phonetics if p[-1] in str([0,1,2])]
-    
-# unused functions
-if False:
-    def word_selection():
-        # words that finish in "s" with phoneme "S" that also exist without an "s" and with last phoneme then not being "S"
-        words_in_s=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='S' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='S']
-        words_in_z=[el for el in cmudict_dict.keys() if el[-1]=='s' and cmudict_dict[el][0][-1]=='Z' and el[:-1] in cmudict_dict and cmudict_dict[el[:-1]][0][-1]!='Z']
-    def get_cmudict_info(word='university'):
-        """get the first possible phonetisation of a word from cmudict
-
-        Args:
-            word (str, optional): input. Defaults to 'university'.
-        Returns:
-            list: phonemes and a number for each vowel indicating stress: 0=no stress, 1=primary stress, 2=secondary stress
-        """
-        return cmudict_dict[word][0]
-
-    def phonetics_from_sentence(sentence="Where's the best place to have coffee?"):
-        sentence=remove_special_characters(sentence)
-        words=sentence.split(' ')
-        # drop empty strings
-        words = list(filter(None, words))
-        words_phones=[]
-        for w in tqdm(words):
-            phones=get_cmudict_info(w)
-            words_phones.append(phones)
-        return words_phones
-
-    
-    def word_stress_from_text(sentence="Where's the best place to have coffee ?"):
-        phonetics=phonetics_from_sentence(sentence) #return a list of phoneme list (by word)
-        result = []
-        for el in phonetics:
-            result+=el
-        binResult=word_stress_from_cmu(result)
-        return binResult
-    def x_in_y(query, base):
-        """Check if a (query) is a subsequence of another list (base)
-
-        Args:
-            query (list): subsequence to find
-            base (list): main list
-
-        Returns:
-            Boolean: True if subsequence found in list, else False
-        """
-        # from https://stackoverflow.com/questions/33392219/how-to-check-subsequence-exists-in-a-list
-        try:
-            l = len(query)
-        except TypeError:
-            l = 1
-            query = type(base)((query,))
-
-        for i in range(len(base)):
-            if base[i:i+l] == query:
-                return True
-        return False
-
-    def get_words_that_end_with(phones=['IH0', 'D']):
-        """Goes through cmudict items and those who end by "phones"
-
-        Args:
-            phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
-
-        Returns:
-            dict: words that end by phones
-        """
-        # cmudict_first_alternatives={}
-        selection={}
-        for k,v in cmudict_dict.items():
-            # cmudict_first_alternatives[k]=v[0]
-            if len(v[0])>=len(phones):
-                if v[0][-len(phones):]==phones:
-                    selection[k]=v[0]
-        return selection
-
-    def words_that_contains(phones=['IH0', 'D']):
-        """Goes through cmudict items and those who end by "phones"
-
-        Args:
-            phones (list, optional): list of cmu phonemes. Defaults to ['IH0', 'D'].
-
-        Returns:
-            dict: words that end by phones
-        """
-        selection={}
-        for k,v in cmudict_dict.items():
-            # cmudict_first_alternatives[k]=v[0]
-            if v!=[]:
-                if len(v[0])>=len(phones):
-                    if x_in_y(phones, v[0]):
-                        selection[k]=v[0]
-        return selection
-
 
 print_memory_usage('RAM - text_processing after all function declarations')
 
 
 def use_tests():
     # from src.text_processing import *
-    prefill_for_sentence()
+    prefill_for_sentence(sentence)
 
     
     sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
-    sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
+    
     # sentence="A 22 heures, j'ai rendez-vous avec le CEO, Indya, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
     sentence="A 22 heures, j'ai rendez-vous avec le CEO, et un ingénieur d'une start-up à 300 k dollars, puis avec le CTO !"
+    sentence="At 22 o'clock, I have a *meeting* with the CEO, Indya, and an engineer of a 300 k dollars early-stage start-up, then with the CTO!"
+    # sentence="twenty"
+    # lang="fr_FR"
 
-    lang="fr_FR"
+    sentence="*My* email campaigns have a better opening rate."
+    sentence="If you don't mind, I'll start."
+    sentence="Great, I'll be grateful to have your advice on *it*."
+    sentence="Great! I'll send you an invite for *10* AM."
+    sentence="Mmh, it might be true then. Do you *know* what happened?"
+    sentence="Amazing, would next Thursday the 16th at 2 PM work for you?"
+    sentence="And it did. I'm sure they'll take the deal you offered."
+    lang="en_GB"
+    # r=prefill_for_sentence(sentence=sentence)
     r=prefill_for_sentence(
                         sentence=sentence,
-                        syllables_df=syllables_df[lang], 
+                        syllables_df=syllables_df, 
                         lang=lang,
-                        mode='MFA_IPA')  # "CMU" or "MFA_IPA"
+                        mode='MFA_IPA', word_dict=get_augmented_mfa_dict(lang))  # "CMU" or "MFA_IPA"
     
+    db=pd.read_csv('data/query_results-2023-02-21_102331.csv')
+    sentences=db.words.tolist()
+    df=prefill_content(sentences, lang='en_US', mode='MFA_IPA', output_errors=True)
+    df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
+    df=prefill_content(sentences, lang='en_GB', mode='MFA_IPA', output_errors=True)
+    df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
+    df=prefill_content(sentences, lang='en_US', mode='CMU', output_errors=True)
+    df.to_csv('prefill_export_2023-02-21_CMU_en_US.csv')
+
+    df_compare=pd.DataFrame()
+    df_compare['db']=db[df.cmu_phonetics!=db.phonetics].phonetics
+    df_compare['prefill']=df[df.cmu_phonetics!=db.phonetics].cmu_phonetics
+
+
+    # import difflib
+    # diff_string = lambda case_a, case_b : [li for li in difflib.ndiff(case_a, case_b) if li[0] != ' ']
+    # df_compare.apply(lambda r: diff_string(r.db, r.prefill), axis=1)
+
+    df_compare.apply(lambda r: [el for el in zip(r.db.split(' '),r.prefill.split(' ')) if el[0]!=el[1]], axis=1)
+
+
+    df[df.apply(lambda r:len(r.n_stress_inconsistencies), axis=1)>0]
+    df[df.apply(lambda r:len(r.n_syl_mismatches), axis=1)>0]
+
+    df[df.apply(lambda r:len(r.n_syl_mismatches), axis=1)>0].iloc[0].segmented_text
+    df[df.apply(lambda r:len(r.n_syl_mismatches), axis=1)>0].iloc[0].used_method_for_syl_text
+
     from src.label_data_processing import actor_recordings
     df_phrases=actor_recordings()
     df_phrases=df_phrases.loc[df_phrases.phrase_id.drop_duplicates().index]
