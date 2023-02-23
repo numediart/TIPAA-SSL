@@ -5,6 +5,8 @@ import os
 from tqdm import tqdm
 from src.pronunciation_dictionaries import cmudict_dict
 
+unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
+
 #### Syllables function  ####
 def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0'], mode='CMU'):
     return len(SonoriPy(phonetics, mode=mode)[0])
@@ -117,7 +119,6 @@ def syllables_data_fr(syl_sep='|'):
 
     return syllables
 
-    
 
 
 def syllables_data(syl_sep='|'):
@@ -277,7 +278,10 @@ def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
     d=define_categories(mode=mode)
     n=0
     for el in phonetics:
-        if el.lower() in d['vowels']: n+=1
+        # if the first symbol of a phoneme corresponds to a vowel, I count it as a vowel.
+        # I need this for espeak
+        # 'start'-> 's_t_ˈɑːɹ_t',   'engineer' -> "ˌɛ_n_dʒ_ɪ_n_ˈɪɹ"
+        if (unstress(el.lower()) in d['vowels']) or (unstress(el.lower()[0]) in d['vowels']): n+=1
     return n
 
 
