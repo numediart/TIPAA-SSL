@@ -24,9 +24,7 @@ sys.path.append('./')
 print_memory_usage('RAM - streamlit utils, before loading')
 from src.text_processing import prefill_content
 print_memory_usage('RAM - streamlit utils, after loading text_processing')
-from src.label_data_processing import get_formatted_cmudict
-print_memory_usage('RAM - streamlit utils, after loading label_data_processing')
-from src.pronunciation_dictionaries import cmu_reducer
+from src.pronunciation_dictionaries import cmu_reducer, get_formatted_cmudict
 print_memory_usage('RAM - streamlit utils, after loading pronunciation_dictionaries')
 
 formatted_cmudict_df=get_formatted_cmudict()

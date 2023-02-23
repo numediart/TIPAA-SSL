@@ -5,6 +5,10 @@ import pandas as pd
 from glob import glob
 import json
 
+from tqdm import tqdm
+
+from syllabipy.sonoripy import SonoriPy
+
 from io import StringIO
 import subprocess
 def invert_dict(d): 
@@ -23,12 +27,105 @@ def invert_dict(d):
 print_memory_usage('RAM - pronunciation_dictionaries after external libraries')
 
 # standard from FB http://fbdevwiki.com/wiki/Locales
-lang_to_MFA_g2p_models={'en_GB':'english_uk_mfa',
-'en_US':'english_us_mfa',
-'fr_FR':'french_mfa',
-'es_ES':'spanish_spain_mfa',
-'es_LA':'spanish_latin_america_mfa'
+lang_to_MFA_g2p_models={
+    'en_GB':'english_uk_mfa',
+    'en_US':'english_us_mfa',
+    'fr_FR':'french_mfa',
+    'es_ES':'spanish_spain_mfa',
+    'es_LA':'spanish_latin_america_mfa'
 }
+
+
+def normalize_termination(ps, word):
+
+    termination_correction_data=[
+        ("ed", "AH0_D", "IH0_D"),
+        # ("ded", "D_AH0_D", "D_IH0_D"),
+        ("es", "AH0_Z", "IH0_Z"),
+        # ("ses", "Z_AH0_Z", "Z_IH0_Z"),
+    ]
+
+    for t_data in termination_correction_data:
+        # Rule for verbs in -ded or -ted: we want to get rid of the "AH0_D" alternative
+        for p in ps:
+            if (p[-2:]==t_data[1].split('_')) and (word[-2:]==t_data[0]):
+                p[-2:]= t_data[-1].split('_') # ['IH0','D']
+
+
+def get_augmented_cmudict():
+    cmudict_dict=cmudict.dict()
+    
+    for k in tqdm(cmudict_dict):
+        normalize_termination(cmudict_dict[k], k)
+
+    inconsistent_word_stresses={}
+    for k in cmudict_dict:
+        for alt in cmudict_dict[k]:
+            if '-' not in k:
+                if sum(['1' in p for p in alt])>1:
+                    inconsistent_word_stresses[k]=alt
+    # len(inconsistent_word_stresses)
+    # There are too much to be corrected, and too few to really care, it's less than 1% and most probalably unfrequent words...
+
+    # len([k for k in inconsistent_word_stresses if k[:2]=='re'])
+    # {k:inconsistent_word_stresses[k] for k in inconsistent_word_stresses if k[:2]!='re'}
+
+    corrections={
+        'areas':[['EH1','R','IH0','AH0','Z']],
+        'live':[['L', 'IH1', 'V']],
+        'drawing':[['D','R','AO1','W','IH0','NG']],
+        'drawings':[['D','R','AO1','W','IH0','NG','Z']],
+        'ph':[['P', 'IY1', 'EY2', 'CH']],
+        'pH':[['P', 'IY1', 'EY2', 'CH']],
+        'laboratory':[['L', 'AE1', 'B', 'AH0', 'R', 'AH0', 'T', 'AO2', 'R', 'IY0']],
+        'fourteen':[['F', 'AO2', 'R', 'T', 'IY1', 'N']],
+        'thirteen':[['TH', 'ER2', 'T', 'IY1', 'N']],
+        'fifteen':[['F', 'IH2', 'F', 'T', 'IY1', 'N']],
+        'sixteen':[['S', 'IH2', 'K', 'S', 'T', 'IY1', 'N']],
+        'seventeen':[['S', 'EH2', 'V', 'AH0', 'N', 'T', 'IY1', 'N']],
+        'eighteen':[['EY0', 'T', 'IY1', 'N'], ['EY2', 'T', 'IY1', 'N']],
+        'nineteen':[['N', 'AY2', 'N', 'T', 'IY1', 'N']],
+        'engineer':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R']],
+        'engineers':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'Z']],
+        'engineering':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'IH0', 'NG']],
+        'downstairs':[['D', 'AW0', 'N', 'S', 'T', 'EH1', 'R', 'Z']],
+        'trainee':[['T', 'R', 'EY0', 'N', 'IY1']],
+        'outside':[['AW0', 'T', 'S', 'AY1', 'D']],
+        'trespasser':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0']],
+        'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']],
+        'outdoors':[['AW1', 'T', 'D', 'AO2', 'R', 'Z']]
+	}
+    for k in corrections:
+        cmudict_dict[k]=corrections[k]
+    return cmudict_dict
+
+
+
+cmudict_dict=get_augmented_cmudict()
+
+
+
+def get_formatted_cmudict(phonetic_dict=cmudict_dict, mode='CMU'):
+    
+    df=pd.DataFrame()
+    df['text']=phonetic_dict.keys()
+
+    print('get_formatted_cmudict')
+    from tqdm import tqdm
+    tqdm.pandas()
+    df['phonetics']=df.progress_apply(lambda r: phonetic_dict[r.text] if r.text in phonetic_dict else float('nan'), axis=1)
+
+    df=df.dropna()
+
+    # not sure why, it seems there are empty entries in cmudict
+    df=df[df.apply(lambda r: len(r.phonetics), axis=1)>0]
+    
+    df['syl_p']=df['phonetics'].progress_apply(lambda r: SonoriPy(r[0], mode=mode)[0])
+    df['formatted_phonetics']=df['syl_p'].apply(lambda p: '|'.join(['_'.join(syl) for syl in p]))
+
+    return df
+
+
 
 def get_mfa_df(path='data/english_us_mfa.dict'):
     df=pd.read_csv(path, sep='\t', header=None, encoding='utf8').dropna()
@@ -72,7 +169,8 @@ def get_mfa_dict(path='data/spanish_spain_mfa.dict'):
     ipa_dict=df.groupby(['text']).sum().to_dict()['ipa']
     return ipa_dict
 
-def generate_acronym_letter_dicts():
+
+def generate_acronym_letter_mfa_dicts():
     
     def acro_dict(letters, lang):
         acronym_dict={}
@@ -145,7 +243,42 @@ def get_augmented_mfa_dict(lang='es_ES'):
     d=get_mfa_dict(path='data/'+lang_to_MFA_g2p_models[lang]+'.dict')
     with open('data/acronyms_'+lang+'_mfa.dict','r') as f: acronyms=json.loads(f.read())
     for k in acronyms: d[k]=acronyms[k]
+
+    if lang.split('_')[0]=="en":
+        with open('data/add_dict_'+lang+'.dict','r') as f: add_dict=json.loads(f.read())
+        for k in add_dict: d[k]=add_dict[k]
     return d
+
+
+
+
+from collections import ChainMap
+def add_mfa_dicts():
+    formatted_cmudict_df=get_formatted_cmudict()
+    apostroph_s_words=formatted_cmudict_df[formatted_cmudict_df.text.str.endswith("'s")]
+    
+    # to have all words ending in "'s" in mfa dicts in english, I select all such words from cmudict and look at the end for knowing if it's a "S" or "Z" sound, and take the word in correponding mfa_dict
+    apostroph_s_words["apostroph_s_phone"]=apostroph_s_words.formatted_phonetics.str.split('_').apply(lambda r:r[-1].lower())
+
+    lang="en_GB"
+    mfa_d=get_augmented_mfa_dict(lang)
+    new_words=apostroph_s_words.apply(lambda r: {r['text']:[el+[r['apostroph_s_phone']] for el in mfa_d[r['text'][:-2]]]} if r['text'][:-2] in mfa_d else float('nan'), axis=1).dropna()
+    add_dict=dict(ChainMap(*new_words))
+    add_dict["i'll"]=[['aj', 'ɫ'], ['ɑː', 'ɫ'], ['ɫ̩']]
+    add_dict["they'll"]=[['ð', 'ɫ̩']]
+    add_dict["i've"]=[['aj', 'v']]
+    add_dict["mmh"]=[['m̩']]
+    with open('data/add_dict_en_GB.dict','w') as f: f.write(json.dumps(add_dict))
+
+    lang="en_US"
+    mfa_d=get_augmented_mfa_dict(lang)
+    new_words=apostroph_s_words.apply(lambda r: {r['text']:[el+[r['apostroph_s_phone']] for el in mfa_d[r['text'][:-2]]]} if r['text'][:-2] in mfa_d else float('nan'), axis=1).dropna()
+    add_dict=dict(ChainMap(*new_words))
+    add_dict["i'll"]=[['aj', 'ɫ'], ['ɑː', 'ɫ'], ['ɫ̩']]
+    add_dict["they'll"]=[['ð', 'ɫ̩']]
+    add_dict["i've"]=[['aj', 'v']]
+    add_dict["mmh"]=[['m̩']]
+    with open('data/add_dict_en_US.dict','w') as f: f.write(json.dumps(add_dict))
 
 
 
@@ -160,55 +293,6 @@ def build_mfa_phone_set():
     with open("data/mfa_phones.json", "w") as outfile: outfile.write(json.dumps(phones))
 
     return phones
-
-def get_augmented_cmudict():
-    cmudict_dict=cmudict.dict()
-
-    inconsistent_word_stresses={}
-    for k in cmudict_dict:
-        for alt in cmudict_dict[k]:
-            if '-' not in k:
-                if sum(['1' in p for p in alt])>1:
-                    inconsistent_word_stresses[k]=alt
-    # len(inconsistent_word_stresses)
-    # There are too much to be corrected, and too few to really care, it's less than 1% nd most probalably unfrequend words...
-
-    # len([k for k in inconsistent_word_stresses if k[:2]=='re'])
-    # {k:inconsistent_word_stresses[k] for k in inconsistent_word_stresses if k[:2]!='re'}
-
-    corrections={
-        'areas':[['EH1','R','IH0','AH0','Z']],
-        'live':[['L', 'IH1', 'V']],
-        'drawing':[['D','R','AO1','W','IH0','NG']],
-        'drawings':[['D','R','AO1','W','IH0','NG','Z']],
-        'ph':[['P', 'IY1', 'EY2', 'CH']],
-        'pH':[['P', 'IY1', 'EY2', 'CH']],
-        'laboratory':[['L', 'AE1', 'B', 'AH0', 'R', 'AH0', 'T', 'AO2', 'R', 'IY0']],
-        'fourteen':[['F', 'AO2', 'R', 'T', 'IY1', 'N']],
-        'thirteen':[['TH', 'ER2', 'T', 'IY1', 'N']],
-        'fifteen':[['F', 'IH2', 'F', 'T', 'IY1', 'N']],
-        'sixteen':[['S', 'IH2', 'K', 'S', 'T', 'IY1', 'N']],
-        'seventeen':[['S', 'EH2', 'V', 'AH0', 'N', 'T', 'IY1', 'N']],
-        'eighteen':[['EY0', 'T', 'IY1', 'N'], ['EY2', 'T', 'IY1', 'N']],
-        'nineteen':[['N', 'AY2', 'N', 'T', 'IY1', 'N']],
-        'engineer':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R']],
-        'engineers':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'Z']],
-        'engineering':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'IH0', 'NG']],
-        'downstairs':[['D', 'AW0', 'N', 'S', 'T', 'EH1', 'R', 'Z']],
-        'trainee':[['T', 'R', 'EY0', 'N', 'IY1']],
-        'outside':[['AW0', 'T', 'S', 'AY1', 'D']],
-        'trespasser':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0']],
-        'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']],
-        'outdoors':[['AW1', 'T', 'D', 'AO2', 'R', 'Z']]
-	}
-    for k in corrections:
-        cmudict_dict[k]=corrections[k]
-    return cmudict_dict
-
-
-
-cmudict_dict=get_augmented_cmudict()
-
 
 cmu_to_gibberish={'AA':'o',
                 'AE':'a',
@@ -318,6 +402,18 @@ arpabet_to_1_char_ipa = {
     'pau':'P',   
 }
 
+arpabet_to_2_char_ipa=arpabet_to_1_char_ipa
+
+arpabet_to_2_char_ipa['aw']='aʊ'
+arpabet_to_2_char_ipa['ay']='aɪ'
+arpabet_to_2_char_ipa['ey']='eɪ'
+arpabet_to_2_char_ipa['ow']='oʊ'
+arpabet_to_2_char_ipa['oy']='ɔɪ'
+
+arpabet_to_2_char_ipa['ch']='tʃ'
+arpabet_to_2_char_ipa['jh']='dʒ'
+
+
 cmu_phones_info=cmudict.phones()
 cmu_phones=set([el[0] for el in cmu_phones_info])
 cmu_vowels=set([p[0] for p in cmu_phones_info if p[1][0]=='vowel'])
@@ -339,12 +435,68 @@ for p in cmu_phones:
 cmu_alphabet = [el[0] for el in cmudict.phones()]
 with open('data/mfa_phones.json', 'r') as openfile: ipa_alphabet = json.load(openfile)
 
+
+
 # csv built from tables in https://en.wikipedia.org/wiki/ARPABET  and adapted by looking at some transcriptions in cmudict of the examples in a spreadsheet
 cmu_reducer_df=pd.read_csv('data/cmu_reducer.csv')
 cmu_reducer=dict(zip(cmu_reducer_df.IPA, cmu_reducer_df.CMU))
 
 # doc on mfa phone set, an opinionated ipa phone set: https://mfa-models.readthedocs.io/en/latest/mfa_phone_set.html
 # UK US english
+
+# consonants
+mfa_simplifier={k:k for k in ipa_alphabet}
+mfa_simplifier['ɲ']='n'
+mfa_simplifier['c']='k'
+mfa_simplifier['ʎ']='l'
+mfa_simplifier['ɫ']='l'
+mfa_simplifier['ɟ']='ɡ'
+mfa_simplifier['ç']='h'
+
+mfa_simplifier['pʰ']='p'
+mfa_simplifier['tʰ']='t'
+mfa_simplifier['cʰ']='k'
+mfa_simplifier['kʰ']='k'
+
+# https://en.wikipedia.org/wiki/International_Phonetic_Alphabet_chart_for_English_dialects#Chart
+# https://easypronunciation.com/en/american-english-pronunciation-ipa-chart
+
+mfa_simplifier['ʔ']='t'
+# this can be either "t" or "d". In fact, I hope that its presence is generally not in the first alternatives in mfa dicts, that will generally have the "t" or "d"
+mfa_simplifier['d̪']='ð'
+mfa_simplifier['t̪']='θ'
+
+mfa_simplifier['ʉ']='u'
+mfa_simplifier['ʉː']='uː'
+
+
+for p in ipa_alphabet:
+    if p[-1]=="ʲ":
+        mfa_simplifier[p]=p[:-1]
+
+
+simple_mfa=list(set([mfa_simplifier[p] for p in ipa_alphabet]))
+
+print(sorted(simple_mfa))
+
+mfa_to_display_ipa={k:mfa_simplifier[k] for k in mfa_simplifier}
+mfa_to_display_ipa['aw']='aʊ'
+mfa_to_display_ipa['aj']='aɪ'
+mfa_to_display_ipa['ej']='eɪ'
+mfa_to_display_ipa['ow']='oʊ'
+mfa_to_display_ipa['əw']='əʊ'
+mfa_to_display_ipa['oj']='ɔɪ'
+
+
+# the schwa+consonant ones
+for p in mfa_simplifier:
+    if p[-1]=='̩':
+        mfa_to_display_ipa[p]="ə"+p[:-1]
+
+simple_mfa_display=list(set([mfa_to_display_ipa[p] for p in ipa_alphabet]))
+print(sorted(simple_mfa_display))
+
+
 # consonants
 cmu_reducer['ɲ']=cmu_reducer['n']
 cmu_reducer['c']=cmu_reducer['k']
@@ -376,7 +528,6 @@ cmu_reducer['ɔj']=cmu_reducer['ɔɪ']
 cmu_reducer['əw']=cmu_reducer['ow']
 
 cmu_reducer['ɐ']='AA'
-
 
 # nigerian
 cmu_reducer['a']='AA'

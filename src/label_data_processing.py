@@ -425,25 +425,6 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
     return content
 
 
-def get_formatted_cmudict(phonetic_dict=cmudict_dict, mode='CMU'):
-    
-    df=pd.DataFrame()
-    df['text']=phonetic_dict.keys()
-
-    print('get_formatted_cmudict')
-    from tqdm import tqdm
-    tqdm.pandas()
-    df['phonetics']=df.progress_apply(lambda r: phonetic_dict[r.text] if r.text in phonetic_dict else float('nan'), axis=1)
-
-    df=df.dropna()
-
-    # not sure why, it seems there are empty entries in cmudict
-    df=df[df.apply(lambda r: len(r.phonetics), axis=1)>0]
-    
-    df['syl_p']=df['phonetics'].progress_apply(lambda r: SonoriPy(r[0], mode=mode)[0])
-    df['formatted_phonetics']=df['syl_p'].apply(lambda p: '|'.join(['_'.join(syl) for syl in p]))
-
-    return df
 
 
 def synth_words_data(path="scripts/synth_audio/cmu_words/standard/prosody/", phonetic_dict=cmudict_dict, mode='CMU'):
