@@ -36,13 +36,17 @@ lang_to_MFA_g2p_models={
 }
 
 
-def normalize_termination(ps, word):
+def normalize_termination(ps=[['S', 'T', 'AA1', 'R', 'T', 'AH0', 'D']], word="started"):
+    """normalize final -ed and final -s terminations for CMU to remove the variations "AH0_D" vs "IH0_D" and "AH0_Z" vs "IH0_Z"
+    It does that on all phonetics alternatives
 
+    Args:
+        ps (list, optional): _description_. Defaults to [['S', 'T', 'AA1', 'R', 'T', 'AH0', 'D']].
+        word (str, optional): _description_. Defaults to "started".
+    """
     termination_correction_data=[
         ("ed", "AH0_D", "IH0_D"),
-        # ("ded", "D_AH0_D", "D_IH0_D"),
         ("es", "AH0_Z", "IH0_Z"),
-        # ("ses", "Z_AH0_Z", "Z_IH0_Z"),
     ]
 
     for t_data in termination_correction_data:
@@ -78,13 +82,21 @@ def get_augmented_cmudict():
         'ph':[['P', 'IY1', 'EY2', 'CH']],
         'pH':[['P', 'IY1', 'EY2', 'CH']],
         'laboratory':[['L', 'AE1', 'B', 'AH0', 'R', 'AH0', 'T', 'AO2', 'R', 'IY0']],
-        'fourteen':[['F', 'AO2', 'R', 'T', 'IY1', 'N']],
         'thirteen':[['TH', 'ER2', 'T', 'IY1', 'N']],
+        'fourteen':[['F', 'AO2', 'R', 'T', 'IY1', 'N']],
         'fifteen':[['F', 'IH2', 'F', 'T', 'IY1', 'N']],
         'sixteen':[['S', 'IH2', 'K', 'S', 'T', 'IY1', 'N']],
         'seventeen':[['S', 'EH2', 'V', 'AH0', 'N', 'T', 'IY1', 'N']],
         'eighteen':[['EY0', 'T', 'IY1', 'N'], ['EY2', 'T', 'IY1', 'N']],
-        'nineteen':[['N', 'AY2', 'N', 'T', 'IY1', 'N']],
+
+        'thirteenth':[['TH', 'ER2', 'T', 'IY1', 'N', 'TH']],
+        'fourteenth':[['F', 'AO2', 'R', 'T', 'IY1', 'N', 'TH']],
+        'fifteenth':[['F', 'IH2', 'F', 'T', 'IY1', 'N', 'TH']],
+        'sixteenth':[['S', 'IH2', 'K', 'S', 'T', 'IY1', 'N', 'TH']],
+        'seventeenth':[['S', 'EH2', 'V', 'AH0', 'N', 'T', 'IY1', 'N', 'TH']],
+        'eighteenth':[['EY0', 'T', 'IY1', 'N', 'TH'], ['EY2', 'T', 'IY1', 'N', 'TH']],
+        'nineteenth':[['N', 'AY2', 'N', 'T', 'IY1', 'N', 'TH']],
+
         'engineer':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R']],
         'engineers':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'Z']],
         'engineering':[['EH2', 'N', 'JH', 'AH0', 'N', 'IH1', 'R', 'IH0', 'NG']],
@@ -247,6 +259,13 @@ def get_augmented_mfa_dict(lang='es_ES'):
     if lang.split('_')[0]=="en":
         with open('data/add_dict_'+lang+'.dict','r') as f: add_dict=json.loads(f.read())
         for k in add_dict: d[k]=add_dict[k]
+
+        # "manual" corrections
+        d["have"]=[['h', 'æ', 'v']]
+        d["i'll"]=[['aj', 'ɫ'], ['ɑː', 'ɫ'], ['ɫ̩']]
+        d["they'll"]=[['ð', 'ɫ̩']]
+        d["i've"]=[['aj', 'v']]
+        d["mmh"]=[['m̩']]
     return d
 
 
@@ -259,25 +278,16 @@ def add_mfa_dicts():
     
     # to have all words ending in "'s" in mfa dicts in english, I select all such words from cmudict and look at the end for knowing if it's a "S" or "Z" sound, and take the word in correponding mfa_dict
     apostroph_s_words["apostroph_s_phone"]=apostroph_s_words.formatted_phonetics.str.split('_').apply(lambda r:r[-1].lower())
-
     lang="en_GB"
     mfa_d=get_augmented_mfa_dict(lang)
     new_words=apostroph_s_words.apply(lambda r: {r['text']:[el+[r['apostroph_s_phone']] for el in mfa_d[r['text'][:-2]]]} if r['text'][:-2] in mfa_d else float('nan'), axis=1).dropna()
     add_dict=dict(ChainMap(*new_words))
-    add_dict["i'll"]=[['aj', 'ɫ'], ['ɑː', 'ɫ'], ['ɫ̩']]
-    add_dict["they'll"]=[['ð', 'ɫ̩']]
-    add_dict["i've"]=[['aj', 'v']]
-    add_dict["mmh"]=[['m̩']]
     with open('data/add_dict_en_GB.dict','w') as f: f.write(json.dumps(add_dict))
 
     lang="en_US"
     mfa_d=get_augmented_mfa_dict(lang)
     new_words=apostroph_s_words.apply(lambda r: {r['text']:[el+[r['apostroph_s_phone']] for el in mfa_d[r['text'][:-2]]]} if r['text'][:-2] in mfa_d else float('nan'), axis=1).dropna()
     add_dict=dict(ChainMap(*new_words))
-    add_dict["i'll"]=[['aj', 'ɫ'], ['ɑː', 'ɫ'], ['ɫ̩']]
-    add_dict["they'll"]=[['ð', 'ɫ̩']]
-    add_dict["i've"]=[['aj', 'v']]
-    add_dict["mmh"]=[['m̩']]
     with open('data/add_dict_en_US.dict','w') as f: f.write(json.dumps(add_dict))
 
 
@@ -477,7 +487,7 @@ for p in ipa_alphabet:
 
 simple_mfa=list(set([mfa_simplifier[p] for p in ipa_alphabet]))
 
-print(sorted(simple_mfa))
+# print(sorted(simple_mfa))
 
 mfa_to_display_ipa={k:mfa_simplifier[k] for k in mfa_simplifier}
 mfa_to_display_ipa['aw']='aʊ'
@@ -494,7 +504,7 @@ for p in mfa_simplifier:
         mfa_to_display_ipa[p]="ə"+p[:-1]
 
 simple_mfa_display=list(set([mfa_to_display_ipa[p] for p in ipa_alphabet]))
-print(sorted(simple_mfa_display))
+# print(sorted(simple_mfa_display))
 
 
 # consonants
@@ -579,3 +589,10 @@ ipa_vowels=ipa_vowels.union(ipa_vowels_add)
 ipa_consonants=ipa_consonants.union(ipa_consonants_add)
 
 ipa_to_gibberish={k:cmu_to_gibberish[cmu_reducer[k]] for k in cmu_reducer}
+
+def use_tests():
+    # just to take a look at terminations in MFA_IPA
+    mfa_d=get_augmented_mfa_dict(lang='en_US')
+    for word in mfa_d:
+        p=mfa_d[word]
+        if (word[-2:]=="es"): print(word, p)
