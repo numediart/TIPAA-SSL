@@ -43,10 +43,10 @@ def word_to_stressed_syl(word, lang="en_US"):
 
     phonetize_word=lambda word: backend.phonemize([word], separator=separator, strip=True)[0]
     stress_symbol="ˈ"
-    unstress_symbol="ˌ"
+    second_stress_symbol="ˌ"
 
     p=phonetize_word(word)
-    syl_p=SonoriPy(p.replace(stress_symbol,'').replace(unstress_symbol,'').split('_'), mode="MFA_IPA")[0]
+    syl_p=SonoriPy(p.replace(stress_symbol,'').replace(second_stress_symbol,'').split('_'), mode="MFA_IPA")[0]
 
     # there can be no stress in little words like "at"
     if stress_symbol in p:
@@ -65,13 +65,21 @@ def word_to_stressed_syl(word, lang="en_US"):
     return stress_index, len(syl_p)
 
 
+def phonetize(word, lang="en_GB"):
+    # initialize the espeak backend for English
+    backend = backend_dict[lang]
+
+    # separate phones by a space and ignoring words boundaries
+    separator = Separator(phone='_', word=None)
+    return backend.phonemize([word], separator=separator, strip=True)[0]
+
+
 def words_to_lexicon(words, lang="en"):
     # initialize the espeak backend for English
     backend = EspeakBackend(lang, with_stress=True)
 
     # separate phones by a space and ignoring words boundaries
     separator = Separator(phone='', word=None)
-
     phonetize_word=lambda word: backend.phonemize([word], separator=separator, strip=True)[0]
 
     phonetize_syllabify_word=lambda word:'|'.join([''.join(syl) for syl in SonoriPy(phonetize_word(word), mode="MFA_IPA")[0]])
