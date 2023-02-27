@@ -183,6 +183,8 @@ def filter_index_nans(string):
     return string
 
 def create_syllabus_tree(topic="biology"):
+    # create titles for 10 modules, each 4 activity sets, each 4 activities
+
     df = pd.read_csv("content_tools/content_examples_csvs/titles_theme_based.csv").iloc[:,:-3] #drop last columns
 
     # drop tutorials
@@ -191,7 +193,7 @@ def create_syllabus_tree(topic="biology"):
     print("Genetating module names...")
     data_module = '\n'.join(df["Module (week)"].dropna().unique().tolist())
     prompt = """Here are example of titles for exercise modules from a learning program for English relating to the topic of "Legal profession"
-    """ + data_module + "\nGenerate 10 exercise module titles of the same kind, for a learning program for English relating to the topic of " + topic #fillers[pronunciation_aspect]
+    """ + data_module + "\nGenerate a numbered list of 10 exercise module titles of the same kind, for a learning program for English relating to the topic of " + topic #fillers[pronunciation_aspect]
     response=generate_response(prompt)
     text = response.choices[0]['text']
     liste = text.split("\n")
@@ -225,7 +227,7 @@ def create_syllabus_tree(topic="biology"):
     gen_module_to_act_sets_dict={}
     for module in module_list:
         prompt = """Here are example of titles for exercise modules and associated submodules, from a learning program for English relating to the topic of "Legal profession":
-        """ + module_to_activity_set_str + "\nGenerate 4 short submodule titles of the same kind, for a learning program for English relating to the topic of " + topic +", within the module \"" + module+'".'
+        """ + module_to_activity_set_str + "\nGenerate a numbered list of 4 short submodule titles of the same kind, for a learning program for English relating to the topic of " + topic +", within the module \"" + module+'".'
         response=generate_response(prompt)
         text = response.choices[0]['text']
         liste = text.split("\n")
@@ -242,7 +244,7 @@ def create_syllabus_tree(topic="biology"):
             theme=k+", "+act_set
             print(theme)
             prompt = """Here are example of titles for exercise modules (before ":") and associated submodules (after ":"), from a learning program for English relating to the topic of "Legal profession":
-            """ + activity_set_to_activities_str + "\nGenerate 4 short submodule titles (after \":\") of the same kind, for a learning program for English relating to the topic of " + topic +", within the module \"" + theme+'".'
+            """ + activity_set_to_activities_str + "\nGenerate a numbered list of 4 short submodule titles (after \":\") of the same kind, for a learning program for English relating to the topic of " + topic +", within the module \"" + theme+'".'
             response=generate_response(prompt)
             text = response.choices[0]['text']
             liste = text.split("\n")
@@ -250,6 +252,8 @@ def create_syllabus_tree(topic="biology"):
             act_list=[x for x in liste if x != '']
             act_set_to_acts_dict[act_set]=act_list
             tree[k]=act_set_to_acts_dict
+    
+    with open("scripts/tree_"+topic+".json", 'w') as f: json.dump(tree, f, indent=2)
     return tree
 
 
