@@ -146,10 +146,37 @@ def syllables_data(syl_sep='|'):
     syllables=pd.concat([syllables,syllables_add])
 
     d=cmudict_dict
-    syllables=syllables.dropna()  # there is one row that is nan...
+    syllables=syllables.dropna()  # there is one row that is nan... (maybe just a \n at the end of one of the files)
 
     # syllables.columns=['word', 'syllables']
     syllables.columns=['syllables']
+
+    # correct systematic mistake in words with "ire" in them
+    # 869                 ac|quired taste
+    # 870                   ac|quire|ment
+    # 934                     ac|ro|spire
+    # 1338                        ad|mire
+    # 1339                       ad|mired
+    # 2495                   all-fired|ly
+    # 3072               al|ley|fired|est
+    # 7323                  Ar|gyll|shire
+    # 7688                   ar|thro|dire
+    # 8031                        as|pire
+    # 8032                       as|pired
+    # 8642                        at|tire
+    syllables_ire=syllables[syllables['syllables'].str.lower().str.contains('ire')&~syllables['syllables'].str.lower().str.contains('aire')&~syllables['syllables'].str.lower().str.contains('oire')]
+    syllables.loc[syllables_ire.index,'syllables']=syllables_ire['syllables'].str.replace('ire','i|re').str.replace('Ire', "I|re")
+
+    syllables_ism=syllables[syllables['syllables'].str.lower().str.contains('ism')]
+    syllables.loc[syllables_ism.index,'syllables']=syllables_ism['syllables'].str.replace('ism','i|sm')
+
+    # correct systematic mistake in words with "ithm" in them
+    syllables_ithm=syllables[syllables['syllables'].str.lower().str.contains('ithm')]
+    syllables.loc[syllables_ithm.index,'syllables']=syllables_ithm['syllables'].str.replace('ithm','i|thm')
+
+    syllables_ythm=syllables[syllables['syllables'].str.lower().str.contains('ythm')]
+    syllables.loc[syllables_ythm.index,'syllables']=syllables_ythm['syllables'].str.replace('ythm','y|thm')
+
 
     n_syls=[]
     n_syls_SonoriPy=[]
@@ -184,9 +211,9 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
     """Construct syllabified word from a word.
 
      text with syllable segmentation is done with several rules/steps:
-        -Use our syllables dataset
-        -If does not exist, check if only 1 vowel (trivial because 1 syllable) ==>  in that case syllable=text
-        -If not, fall back to use SonoriPy (sonority sequencing principle) with letters.
+        -check if only 1 vowel (trivial because 1 syllable) ==>  in that case syllable=text
+        -If more, use our syllables dataset
+        -If does not exist,  fall back to use SonoriPy (sonority sequencing principle) with letters.
     It is less accurate than with phonemes but we use it only on fallback.
     I improved this part with logic in this (trailing "e", "-ed", "-es" ):
     https://datascience.stackexchange.com/questions/23376/how-to-get-the-number-of-syllables-in-a-word
@@ -273,9 +300,38 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
         return syls_text, used_method
     return syls_text, used_method
 
+from src.phonemizer_utils import phonetize
 
-def n_vowels(phonetics=['K', 'AA1', 'F', 'IY0'], mode="CMU"):
-    d=define_categories(mode=mode)
+def n_vowels(word="coffee", lang="en_GB"):
+    """use phonemizer with espeak backend and count vowels
+
+    Args:
+        word (str, optional): _description_. Defaults to "coffee".
+        lang (str, optional): _description_. Defaults to "en_GB".
+
+    Returns:
+        _type_: _description_
+    """
+    # print("in n_vowels")
+    # print(lang.split('_')[0])
+    # I choose cmudict as a favourite ground truth for the number of syllables, and fall back to espeak
+    # words like science -> 's_ˈaɪə_n_s', client -> 'k_l_ˈaɪə_n_t'  have a weird phoneme separation in espeak. The schwa is glued to a vowel. I prefer cmudict's conventions.
+    # I therefore make the assumption that en_GB and en_US have the same number of syllables for now, and I hope we can actually choose alternatives accordingly
+    if lang.split('_')[0]=="en":
+        if len(cmudict_dict[word])>0:
+            d=define_categories(mode="CMU")
+            phonetics=cmudict_dict[word][0]
+            n=0
+            for el in phonetics:
+                if (unstress(el.lower()) in d['vowels']) : n+=1
+            # print(word, " n of vowels, from cmudict: ", n)
+            return n
+
+
+    d=define_categories(mode="MFA_IPA")
+    stress_symbol="ˈ"
+    second_stress_symbol="ˌ"
+    phonetics=phonetize(word, lang=lang).replace(stress_symbol,"").replace(second_stress_symbol,"").split('_')
     n=0
     for el in phonetics:
         # if the first symbol of a phoneme corresponds to a vowel, I count it as a vowel.
@@ -290,8 +346,8 @@ def use_tests():
     mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
     word='dépendance'
-    phonetic_dict=mfa_dicts['fr_FR']
-    nv=n_vowels(phonetic_dict[word][0], mode="MFA_IPA")
+    # phonetic_dict=mfa_dicts['fr_FR']
+    nv=n_vowels(word, lang="fr_FR")
     syllabified_text(word, nv, syllables_df=pd.read_csv('data/syllables_fr_FR.csv'), lang="fr_FR")
 
     syllabified_text('dépendance', pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
