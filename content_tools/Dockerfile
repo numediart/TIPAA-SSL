@@ -17,6 +17,8 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     libsndfile-dev \
     # this is for git cloning  
     git-lfs \ 
+    # dependencies for phonemizer
+    festival espeak-ng mbrola \
     # clean up apt cache to save space
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install
