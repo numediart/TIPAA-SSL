@@ -17,7 +17,7 @@ ordered_set
 g2p_en
 # flask-restful
 # flask-apispec==0.11.0
-flask-apispec
+# flask-apispec
 # torch
 pyyaml
 speechbrain
@@ -44,3 +44,4 @@ datasets
 openai
 psutil
 optimum[onnxruntime]
+phonemizer
