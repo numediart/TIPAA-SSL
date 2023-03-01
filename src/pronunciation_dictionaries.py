@@ -88,6 +88,7 @@ def get_augmented_cmudict():
         'sixteen':[['S', 'IH2', 'K', 'S', 'T', 'IY1', 'N']],
         'seventeen':[['S', 'EH2', 'V', 'AH0', 'N', 'T', 'IY1', 'N']],
         'eighteen':[['EY0', 'T', 'IY1', 'N'], ['EY2', 'T', 'IY1', 'N']],
+        'nineteen':[['N', 'AY2', 'N', 'T', 'IY1', 'N']],
 
         'thirteenth':[['TH', 'ER2', 'T', 'IY1', 'N', 'TH']],
         'fourteenth':[['F', 'AO2', 'R', 'T', 'IY1', 'N', 'TH']],
@@ -251,6 +252,34 @@ def generate_acronym_letter_mfa_dicts():
 
     with open('data/acronyms_fr_FR_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long))
 
+def process_diphtongs_r(mfa_us):
+    from syllabipy.sonoripy import define_categories
+    d=define_categories(mode="MFA_IPA")
+    # Here it is explained that diphtong + r-colored schwa was replaced by diphtong + 'ɹ'. For consistency in syllables, I prefer put it back to r-colored one
+    # https://mfa-models.readthedocs.io/en/latest/mfa_phone_set.html#:~:text=Diphthong%20%2B%20rhotic%20standardization%3A
+    mfa_diphtongs={'aw','aj','ej','ow','əw','oj'}
+    for k in mfa_us:
+        # for words like powered
+        for idx_alt in range(len(mfa_us[k])):
+            # print(idx_alt, "for len", len(mfa_us[k]))
+            if len(mfa_us[k][idx_alt])>=3:
+                char_list=mfa_us[k][idx_alt]
+                for i in range(len(char_list) - 2):
+                    if char_list[i] in mfa_diphtongs and char_list[i+1] == 'ɹ' and (char_list[i+2] not in d['vowels']):
+                        # print("Found 'r' after reference character", char_list[i])
+                        # print(k, ': ', mfa_us[k])
+                        # print("after char:", char_list[i+2])
+                        char_list[i+1]="ɚ"
+                        mfa_us[k][idx_alt]=char_list
+                        # print(k, ': ', mfa_us[k])
+            # words like power
+            if len(mfa_us[k][idx_alt])>=2:
+                if mfa_us[k][idx_alt][-1]=='ɹ' and (mfa_us[k][idx_alt][-2] in mfa_diphtongs):
+                    # print(k, ': ', mfa_us[k])
+                    mfa_us[k][idx_alt]=mfa_us[k][idx_alt][:-1]+["ɚ"]
+                    # print(k, ': ', mfa_us[k])
+
+
 def get_augmented_mfa_dict(lang='es_ES'):
     d=get_mfa_dict(path='data/'+lang_to_MFA_g2p_models[lang]+'.dict')
     with open('data/acronyms_'+lang+'_mfa.dict','r') as f: acronyms=json.loads(f.read())
@@ -260,12 +289,15 @@ def get_augmented_mfa_dict(lang='es_ES'):
         with open('data/add_dict_'+lang+'.dict','r') as f: add_dict=json.loads(f.read())
         for k in add_dict: d[k]=add_dict[k]
 
+        if lang=="en_US":
+            process_diphtongs_r(d)
         # "manual" corrections
         d["have"]=[['h', 'æ', 'v']]
         d["i'll"]=[['aj', 'ɫ'], ['ɑː', 'ɫ'], ['ɫ̩']]
         d["they'll"]=[['ð', 'ɫ̩']]
         d["i've"]=[['aj', 'v']]
         d["mmh"]=[['m̩']]
+
     return d
 
 
