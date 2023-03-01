@@ -115,7 +115,11 @@ class dtw_forced_aligner:
         df_segmented[['phones', 'start_idx', 'end_idx']]=timings_df
         df_segmented['pred_phones_audio'] = predicted_phones
         df_segmented['proba_means'] = proba_means
+        
+        # df_segmented['GT_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.phones)], axis=1)
+        # df_segmented['pred_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.pred_phones_audio)], axis=1)
         df_segmented['GT_proba'] = [df_segmented.proba_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
+        df_segmented['pred_proba'] = [df_segmented.proba_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.pred_phones_audio))]
         df_segmented['start']=df_segmented['start_idx']*time_per_output
         df_segmented['end']=df_segmented['end_idx']*time_per_output
 
