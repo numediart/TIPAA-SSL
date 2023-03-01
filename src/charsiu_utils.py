@@ -303,6 +303,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         if self.status!="success": return None
 
         df_word=extract_word(df_segmented, phonetics, target_word_idx)
+        print(df_word)
         return df_word
     
     def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
