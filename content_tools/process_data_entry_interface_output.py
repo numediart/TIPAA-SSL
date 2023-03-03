@@ -116,14 +116,10 @@ def process_content(df):
     all_sentences_df=pd.DataFrame([ids, all_sentences]).T
 
     all_sentences_df.columns=['id','sentence']
-
-    # all_sentences_df.to_csv('data/marie_program_all_phrases.csv')
-
-    linguistic_data=prefill_content(all_sentences)
-    # linguistic_data.to_csv('data/marie_program_linguistic_data.csv')
+    linguistic_data,df_errors=prefill_content(all_sentences)
 
 
-    return all_sentences_df, linguistic_data
+    return all_sentences_df, linguistic_data, df_errors
 
 def remove_duplicates(db_content, all_phrases_df):
     all_phrases_df[all_phrases_df.apply(lambda r: r['sentence'] in db_content.sentence.tolist(), axis=1)]
@@ -165,7 +161,8 @@ if __name__=="__main__":
                         'phrase_incorrect': 'incorrect',
                         'word': 'target_content',
                         # 'phrase_annotated': 'target_content',
-                        'phrase_answertorecord': 'answer'}
+                        'phrase_answertorecord': 'answer'
+                        }
 
     def replace_keys(dictionary):
         for k in standard_payload:
@@ -208,7 +205,7 @@ if __name__=="__main__":
 
     with open("scripts/PE_data_entry.json", 'w') as f: json.dump(modules, f, indent=2)
 
-    with open("scripts/PE_data_entry.json", 'r') as f: content=json.load(f)
+    with open("scripts/PE_data_entry_manually_corrected.json", 'r') as f: content=json.load(f)
 
     df_back=nested_dict_to_df(content)
 

@@ -24,7 +24,7 @@ def process(json_str):
     sentences=[el for el in json_str.split('\n') if el!='']
     # Do something with the data
     # result = data['key']
-    df=prefill_content(sentences)
+    df,df_errors=prefill_content(sentences)
     
     return df
 

@@ -4,10 +4,12 @@ import cmudict
 import pandas as pd
 from glob import glob
 import json
-
 from tqdm import tqdm
-
 from syllabipy.sonoripy import SonoriPy
+
+unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
+def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):     return [unstress(el) for el in transcription]
+
 
 from io import StringIO
 import subprocess
@@ -116,6 +118,76 @@ def get_augmented_cmudict():
 
 cmudict_dict=get_augmented_cmudict()
 
+def differs_by_one_insertion(seq1, seq2):
+    """check if two sequences only differs by one insertion, and what was the element inserted
+
+    Args:
+        seq1 (_type_): _description_
+        seq2 (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    if abs(len(seq2)  - len(seq1))!=  1: return False, None, None
+    if len(seq2)>len(seq1): big_seq=seq2; small_seq=seq1
+    else: big_seq=seq1; small_seq=seq2
+    
+    i = 0
+    j = 0
+    inserted_token = None
+    inserted_idx = None
+
+    while i < len(small_seq):
+        if small_seq[i] != big_seq[j]:
+            if inserted_token is not None: 
+                return False, None, None
+            inserted_token = big_seq[j]
+            inserted_idx = j
+            j += 1
+        else:
+            i += 1
+            j += 1
+    
+
+    if inserted_token is None:
+        inserted_token = seq2[-1]
+        inserted_idx = len(seq2)-1
+    # explicit check that the only difference is the inserted token
+    if small_seq != big_seq[:inserted_idx]+big_seq[inserted_idx+1:]: return False, None, None
+    return True, inserted_token, inserted_idx
+
+def select_keys_with_one_diff(my_dict, token="AH0"):
+    """go through a dictionnary of alternatives, and check if they contain two alternatives that differs only by 1 token that is "AH0" by default.
+    This is, e.g., to look for words like "typically" or "listening" that can differs only by the presence of absence of a schwa and that modify the susequent number of syllables
+
+    Args:
+        my_dict (_type_): _description_
+        token (str, optional): _description_. Defaults to "AH0".
+
+    Returns:
+        _type_: _description_
+    """
+    result_keys = []
+    values_small = []
+    inserted_idxs = []
+
+    for key, value in my_dict.items():
+        if len(value) < 2:
+            continue
+        for i in range(len(value)):
+            for j in range(i+1, len(value)):
+                is_one_diff, inserted_token, inserted_idx = differs_by_one_insertion(value[i], value[j])
+                if is_one_diff and inserted_token==token:
+                    # print(f"Key '{key}' meets the criteria. Inserted token: '{inserted_token}'.")
+                    result_keys.append(key)
+                    if len(value[i])<len(value[j]): small_value=value[i]
+                    else: small_value=value[j]
+                    values_small.append(small_value)
+                    inserted_idxs.append(inserted_idx)
+                    break
+            if key in result_keys:
+                break
+    return result_keys, values_small, inserted_idxs
 
 
 def get_formatted_cmudict(phonetic_dict=cmudict_dict, mode='CMU'):
@@ -175,6 +247,22 @@ def mfa_g2p(word, model="english_us_mfa"):
     ipa_dict=df.groupby(['text']).sum().to_dict()['ipa']
 
     return ipa_dict
+
+def mfa_english_add_schwa_alternative(mfa_d):
+    """Take keys from cmudict that have 2 alternatives for which the only difference is an inserted schwa (AH0 in CMU)
+    And add in mfa this alternative if the word exists in the dictionary and has the same reduced phonetics of the small alternative (without schwa)
+    """
+    # mfa_d=get_augmented_mfa_dict(lang='en_US')
+    result_keys, values_small, inserted_idxs=select_keys_with_one_diff(cmudict_dict, token="AH0")
+    for k, v, idx in zip(result_keys, values_small, inserted_idxs):
+        if k in mfa_d:
+            for alt in mfa_d[k]:
+                if [cmu_reducer[p] for p in alt] == remove_stress_annots(v):
+                    alt_with_schwa=alt[:idx]+["ə"]+alt[idx:]
+                    mfa_d[k].append(alt_with_schwa)
+
+
+
 
 def get_mfa_dict(path='data/spanish_spain_mfa.dict'):
     df=get_mfa_df(path)
@@ -257,7 +345,7 @@ def process_diphtongs_r(mfa_us):
     d=define_categories(mode="MFA_IPA")
     # Here it is explained that diphtong + r-colored schwa was replaced by diphtong + 'ɹ'. For consistency in syllables, I prefer put it back to r-colored one
     # https://mfa-models.readthedocs.io/en/latest/mfa_phone_set.html#:~:text=Diphthong%20%2B%20rhotic%20standardization%3A
-    mfa_diphtongs={'aw','aj','ej','ow','əw','oj'}
+    mfa_diphtongs={'aw','aj','ej','ow','əw','oj', 'ɔj'}
     for k in mfa_us:
         # for words like powered
         for idx_alt in range(len(mfa_us[k])):
@@ -289,6 +377,8 @@ def get_augmented_mfa_dict(lang='es_ES'):
         with open('data/add_dict_'+lang+'.dict','r') as f: add_dict=json.loads(f.read())
         for k in add_dict: d[k]=add_dict[k]
 
+        mfa_english_add_schwa_alternative(d)
+
         if lang=="en_US":
             process_diphtongs_r(d)
         # "manual" corrections
@@ -297,7 +387,16 @@ def get_augmented_mfa_dict(lang='es_ES'):
         d["they'll"]=[['ð', 'ɫ̩']]
         d["i've"]=[['aj', 'v']]
         d["mmh"]=[['m̩']]
+        d['every']=[['ɛ', 'v', 'ə', 'ɹ', 'i'],['ɛ', 'v', 'ɹ', 'i']]
 
+        if lang=="en_US":
+            d["salesperson"]=[['s', 'ej', 'l', 'z', 'p', 'ɝ', 's', 'ə', 'n']]
+            d["salespersons"]=[['s', 'ej', 'l', 'z', 'p', 'ɝ', 's', 'ə', 'n', 'z']]
+            d["salesperson's"]=[['s', 'ej', 'l', 'z', 'p', 'ɝ', 's', 'ə', 'n', 'z']]
+        if lang=="en_GB":
+            d["salesperson"]=[['s', 'ej', 'l', 'z', 'p', 'ɜː', 's', 'ə', 'n']]
+            d["salespersons"]=[['s', 'ej', 'l', 'z', 'p', 'ɜː', 's', 'ə', 'n', 'z']]
+            d["salesperson's"]=[['s', 'ej', 'l', 'z', 'p', 'ɜː', 's', 'ə', 'n', 'z']]
     return d
 
 

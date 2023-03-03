@@ -4,7 +4,6 @@ print_memory_usage('RAM - text_processing start')
 import re
 from tqdm import tqdm
 import pandas as pd
-from glob import glob
 import numpy as np
 import itertools
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
@@ -24,9 +23,11 @@ print_memory_usage('RAM - text_processing after g2p model')
 
 drop_consecutive_duplicates= lambda df: df.loc[(df.shift()!=df).sum(axis=1).astype(bool)]
 drop_consecutive_duplicate_elements= lambda L: [key for key, _group in groupby(L)]
-unstress = lambda el: el[:-1] if el[-1] in str([0,1,2]) else el
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
+
+from src.pronunciation_dictionaries import unstress, remove_stress_annots
+
 
 print_memory_usage('RAM - text_processing after lambda functions')
 from src.pronunciation_dictionaries import get_augmented_mfa_dict, cmudict_dict, lang_to_MFA_g2p_models, mfa_g2p, cmu_phones, cmu_to_gibberish, normalize_termination
@@ -56,11 +57,14 @@ def show_alternatives_distributions():
     print(np.histogram(lens, bins=[0,1,2,3,4,5,6,7]))
 
 # expand some words as Mr or Mrs to Mister and Misses
-expand_dict={'mr':'mister',
-            'mrs':'misses',
-            'Mr':'Mister',
-            'Mrs':'Misses'
-            }
+expand_dict={
+    'mr':'mister',
+    'mrs':'misses',
+    'dr':'docteur',
+    'Mr':'Mister',
+    'Mrs':'Misses',
+    'Dr':'Docteur'
+}
 def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]'):
     """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
 
@@ -99,9 +103,6 @@ def chunk_text(text, chunking_chars=[',',';','.','!','¡','?', ':', '/']):
     # assert sum(n_words_by_chunk)==len(list(filter(None, text.split(' ')))), "Checking number of words is the same after chunking"
     return n_words_by_chunk
     
-def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
-    return [unstress(el) for el in transcription]
-
 
 def phonetics_indexed_df_from_formatted_phonetics(phonetics):
     word_split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
@@ -157,10 +158,8 @@ def check_phonemes(phonemes):
 def add_stress(syls_ps, word_stress):
     vowels=define_categories(mode='MFA_IPA')['vowels']
     for alt_idx, alt in enumerate(syls_ps):
-        # assert len(word_stress_syls_parts)==len(alt), "The number of word parts should be the same"
-        # for w_part_idx, syls_p in enumerate(alt):
-
-        # Here I only put the stresses if there is consistency in terms of number of syllables. This has to be filtered afterwards.
+        # Here I only put the stresses if there is consistency in terms of number of syllables. 
+        # This will be detected in stress inconsistencies and can be manually corrected
         if len(alt)==word_stress[-1]:#, "The number of syllables should be the same"
             for syl_idx, syl_p in enumerate(alt):
                 # print(syl_p)
@@ -174,8 +173,8 @@ def add_stress_w_parts(syls_ps, word_stress_syls_parts):
     for alt_idx, alt in enumerate(syls_ps):
         assert len(word_stress_syls_parts)==len(alt), "The number of word parts should be the same"
         for w_part_idx, syls_p in enumerate(alt):
-
-            # Here I only put the stresses if there is consistency in terms of number of syllables. This has to be filtered afterwards.
+            # Here I only put the stresses if there is consistency in terms of number of syllables. 
+            # This will be detected in stress inconsistencies and can be manually corrected
             if len(syls_p)==word_stress_syls_parts[w_part_idx][-1]:#, "The number of syllables should be the same"
             
                 for syl_idx, syl_p in enumerate(syls_p):
@@ -221,7 +220,7 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
         # '|' between syllables
         # spaces between words 
         # to have less degrees of nested list and be compatible with the database
-        syls_ps_formatted=['-'.join(['|'.join(['_'.join(s) for s in w]) for w in alt]) for alt in syls_ps]
+        syls_ps_formatted_corr=['-'.join(['|'.join(['_'.join(s) for s in w]) for w in alt]) for alt in syls_ps]
     else:
         try:
             ps=word_dict[word]
@@ -239,10 +238,44 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
         # Note: for -ed and -es ending, MFA_IPA seems consistent for the ['ɪ', 'd'] and ['ɪ', 'z'] on the contrary to CMU, so no normalization needed
         
         syls_ps=[SonoriPy(p, mode='MFA_IPA')[0] for p in ps]
-        add_stress(syls_ps, word_stress)
-
         syls_ps_formatted=['|'.join(['_'.join(s) for s in w]) for w in syls_ps]
-    return syls_ps_formatted
+
+        # I am trying to figure out the best decision in terms of consistency from the different variations of english and phoneme/phone sets for a specific case: the words containing what corresponds to our gibberish "eer", like in "fear, beer, fierce, here, career, ..."
+
+        # GB:
+        # f_ɪ_ə
+        # b_ɪ_ə
+        # f_ɪ_ə_s
+
+        # US:
+        # f_ɪ_ɹ
+        # b_ɪ_ɹ
+        # f_ɪ_ɹ_s
+
+        # When I do syllabification, I always consider that there should be exactly 1 vowel in each syllable if we consider diphtongs (like ay, oy, ow, aw) as a single vowel.
+        # However here, these are not considered diphtongs in MFA IPA set. So in GB it would be 2 syllables and in US
+
+        # I could've change the convention and say that ɪə can be a single vowel, i.e. it's considered as a diphtong
+        # However I am not sure what this change would imply on a tech trained on IPA. It means either post-processing alignment frames to merge the ɪ_ə sequence in GB, inside the training corpus for the pipeline tech, or do the merge at inference (when using the model)
+
+        # The other solution, that I choose here, is to do this change only in the notation. As I use this notation in at inference, it would work.
+        # To avoid having a double vowel in 1 syllable, that would violate the rule of 1 vowel per syllable, this schwa is considered in this context, not a "real" vowel...
+        # I thus put the stress pattern on the ɪ, and nothing on the scwha: fear -> f_ɪ1_ə
+
+        # .replace("ɪ|ə", "ɪ_ə")
+
+        syls_ps_formatted=[el.replace("ɪ|ə", "ɪ_ə") for el in syls_ps_formatted]
+        syls_ps_corr=[[s.split('_') for s in w.split('|')] for w in syls_ps_formatted]
+        add_stress(syls_ps_corr, word_stress)
+
+        # if there is no stress found (happens in short words like "at, the, of, our"), also add the (None, 1) possibility.
+        # Because for e.g. "our", espeak outputs 2 syllables, although there are also 1 syllables alternatives that we want to keep
+        if word_stress[0] is None: add_stress(syls_ps_corr, (None, 1))
+
+        syls_ps_formatted_corr=['|'.join(['_'.join(s) for s in w]) for w in syls_ps_corr]
+        syls_ps_formatted_corr=[el.replace("ɪ1_ə1", "ɪ1_ə") for el in syls_ps_formatted_corr]
+
+    return syls_ps_formatted_corr
 
 def generate_syl_phonetics_alternatives_from_word(word="before"):
     """"Looks up in cmudict for phonetic alternatives, and apply SonoriPy on all alternatives
@@ -625,6 +658,10 @@ def prefill_for_sentence(
             'n_alternatives':n_alternatives
             }
     else:
+        
+
+        # p_0_special_chars=p_0_special_chars.replace("ɪ|ə", "ɪ_ə")
+
         record={'text':sent_brackets,
             'phonetics':p_0_special_chars,
             'segmented_text':segmented_text,
@@ -668,18 +705,16 @@ def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU', output_err
             err=internal_error()
             err["sentence"]=s
             error_records.append(err)
-
-            
         records.append(record)
     
     if output_errors:
         now=datetime.now()
         date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
         df_errors=pd.DataFrame.from_records(error_records)
-        df_errors.to_csv('prefill_content_errors_'+date_time+'.csv')
+        # df_errors.to_csv('prefill_content_errors_'+date_time+'.csv')
 
     df=pd.DataFrame.from_records(records)
-    return df
+    return df, df_errors
 
 
 def generate_prefill_csv(                            # path='data/phrases_speaking_activities.txt', 
@@ -698,7 +733,7 @@ def generate_prefill_csv(                            # path='data/phrases_speaki
         [type]: [description]
     """
     sentences=pd.read_csv(path, sep='/', header=None)
-    df=prefill_content(sentences.iloc[:,0].tolist(), syl_sep=syl_sep)
+    df,df_errors=prefill_content(sentences.iloc[:,0].tolist(), syl_sep=syl_sep)
     df.text=sentences
 
     print('syl mismatches')
@@ -719,10 +754,14 @@ def word_stress_from_cmu(phonetics=['K', 'AA1', 'F', 'IY0']):
 print_memory_usage('RAM - text_processing after all function declarations')
 
 def prefill_content_variations(sentences):
+
     
-    df_MFA_IPA_US=prefill_content(sentences, lang='en_US', mode='MFA_IPA', output_errors=True)
-    df_MFA_IPA_GB=prefill_content(sentences, lang='en_GB', mode='MFA_IPA', output_errors=True)
-    df_CMU=prefill_content(sentences, lang='en_US', mode='CMU', output_errors=True)
+    db=pd.read_csv('data/query_results-2023-02-21_102331.csv')
+    sentences=db.words.tolist()
+    
+    df_MFA_IPA_US,df_errors=prefill_content(sentences, lang='en_US', mode='MFA_IPA', output_errors=True)
+    df_MFA_IPA_GB,df_errors=prefill_content(sentences, lang='en_GB', mode='MFA_IPA', output_errors=True)
+    df_CMU,df_errors=prefill_content(sentences, lang='en_US', mode='CMU', output_errors=True)
 
     df_MFA_IPA_US.to_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
     df_MFA_IPA_GB.to_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
@@ -734,21 +773,43 @@ def prefill_content_variations(sentences):
 
     assert (df_MFA_IPA_GB.text==df_CMU.text).sum()==len(df_CMU)
 
-    (df_MFA_IPA_GB.segmented_text==df_CMU.segmented_text).sum()
+    (df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text).sum()
+    (df_MFA_IPA_US.segmented_text!=df_CMU.segmented_text).sum()
 
-    df_MFA_IPA_GB[df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text].segmented_text
-    df_CMU[df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text].segmented_text
+    # df_MFA_IPA_GB[df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text].segmented_text
+    # df_CMU[df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text].segmented_text
+
+    db.phonetics
 
 
     import ast
+    # mismatch syllables between text and phonetics, for each phonetics variation
     df_CMU[df_CMU.n_syl_mismatches!="[]"][["segmented_text","pronounciation_guide_hr"]]
-    df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches!="[]"][["segmented_text","phonetics"]]
-    df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches!="[]"].apply(lambda r: (r.segmented_text.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]],r.phonetics.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]]), axis=1)
+    df_MFA_IPA_GB_syl_mis=df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches!="[]"][["segmented_text","phonetics"]]
+    df_MFA_IPA_US_syl_mis=df_MFA_IPA_US[df_MFA_IPA_US.n_syl_mismatches!="[]"][["segmented_text","phonetics"]]
 
-    df_MFA_IPA_US[df_MFA_IPA_US.n_syl_mismatches!="[]"][["segmented_text","phonetics"]]
-    syl_inconsistencies_MFA_US_CMU=df_MFA_IPA_US[df_MFA_IPA_US.n_syl_mismatches!="[]"].apply(lambda r: (r.segmented_text.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]],r.phonetics.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]]), axis=1)
+    df_MFA_IPA_GB_syl_mis[df_MFA_IPA_GB_syl_mis.segmented_text.isin(df_MFA_IPA_US_syl_mis.segmented_text)]
+    df_MFA_IPA_GB_syl_mis[~df_MFA_IPA_GB_syl_mis.segmented_text.isin(df_MFA_IPA_US_syl_mis.segmented_text)]
 
-    for i in range(10): print(syl_inconsistencies_MFA_US_CMU[i:i+10])
+
+    # # check that there is no "ɪ|ə" in US
+    # mask=df_MFA_IPA_US["phonetics"].apply(lambda r: "ɪ|ə" in r[-1])
+    # df_MFA_IPA_US[mask]
+
+    # # check that this "ɪ|ə" exist only in a mismatch situation. Here when there is no mismatch, it does not exists
+    # mask=df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches=="[]"]["phonetics"].apply(lambda r: "ɪ|ə" in r[-1])
+    # df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches=="[]"][mask]
+
+    syl_inconsistencies_CMU=df_CMU[df_CMU.n_syl_mismatches!="[]"].apply(lambda r: (r.segmented_text.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]],r.phonetics.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]]), axis=1)
+    syl_inconsistencies_MFA_GB=df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches!="[]"].apply(lambda r: (r.segmented_text.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]],r.phonetics.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]]), axis=1)
+    syl_inconsistencies_MFA_US=df_MFA_IPA_US[df_MFA_IPA_US.n_syl_mismatches!="[]"].apply(lambda r: (r.segmented_text.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]],r.phonetics.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]]), axis=1)
+
+    for i in range(int(len(syl_inconsistencies_MFA_GB)/10)): print(syl_inconsistencies_MFA_GB[i*10:(i+1)*10])
+    for i in range(int(len(syl_inconsistencies_MFA_US)/10)): print(syl_inconsistencies_MFA_US[i*10:(i+1)*10])
+
+    syl_inconsistencies_MFA_GB[syl_inconsistencies_MFA_GB.apply(lambda r: "ɪ|ə" in r[-1])]
+    syl_inconsistencies_MFA_GB[syl_inconsistencies_MFA_GB.apply(lambda r: "ɪ|ə" not in r[-1])]
+
     
     df_CMU[df_CMU.n_stress_inconsistencies.apply(lambda r:len(r))==0]
     df_MFA_IPA_GB[df_MFA_IPA_GB.n_stress_inconsistencies.apply(lambda r:len(r))==0]
@@ -783,12 +844,19 @@ def use_tests():
     sentence="Amazing, would next Thursday the 16th at 2 PM work for you?"
     sentence="And it did. I'm sure they'll take the deal you offered."
 
+    sentence="I'm at UCLA too, *actually*."
+
     sentence="I bumped into your sister at the mall"
 
     sentence="solar powered"
     sentence="started"
     sentence="into"
     sentence="client"
+    sentence="circumstancial"
+    sentence="our"
+    sentence="every"
+    sentence="lawyer"
+    sentence="technically"
     lang="en_GB"
     syllables_df=syllables_dfs[lang]
     # r=prefill_for_sentence(sentence=sentence)
@@ -797,8 +865,9 @@ def use_tests():
                         syllables_df=syllables_df, 
                         lang=lang,
                         mode='MFA_IPA', word_dict=get_augmented_mfa_dict(lang))  # "CMU" or "MFA_IPA"
-    
-    sentence="recapitulated"
+    r
+
+    sentence="circumstancial"
     lang="en_US"
     syllables_df=syllables_dfs[lang]
     # r=prefill_for_sentence(sentence=sentence)
@@ -810,12 +879,12 @@ def use_tests():
     
     db=pd.read_csv('data/query_results-2023-02-21_102331.csv')
     sentences=db.words.tolist()
-    df=prefill_content(sentences, lang='en_US', mode='MFA_IPA', output_errors=True)
-    df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
-    df=prefill_content(sentences, lang='en_GB', mode='MFA_IPA', output_errors=True)
-    df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
-    df=prefill_content(sentences, lang='en_US', mode='CMU', output_errors=True)
+    df,df_errors=prefill_content(sentences, lang='en_US', mode='CMU', output_errors=True)
     df.to_csv('prefill_export_2023-02-21_CMU_en_US.csv')
+    df,df_errors=prefill_content(sentences, lang='en_US', mode='MFA_IPA', output_errors=True)
+    df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
+    df,df_errors=prefill_content(sentences, lang='en_GB', mode='MFA_IPA', output_errors=True)
+    df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
 
     df_MFA_IPA_US=pd.read_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
     df_MFA_IPA_GB=pd.read_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
@@ -858,7 +927,7 @@ def use_tests():
     df_phrases=df_phrases.loc[df_phrases.phrase_id.drop_duplicates().index]
     df_phrases=df_phrases.reset_index(drop=True)
     sentences=df_phrases.text.tolist()
-    df=prefill_content(sentences)
+    df,df_errors=prefill_content(sentences)
 
     df['phrase_id']=df_phrases['phrase_id']
 
@@ -888,9 +957,9 @@ def use_tests():
 
     # https://www.angmohdan.com/22-words-with-british-and-american-pronunciations-that-may-confuse-you/
     words="Advertisement,Bald,Clique,Either,Envelope,Esplanade,Leisure,Mobile,Missile,Neither,Niche,Often,Parliament,Privacy,Semi,Schedule,Scone,Stance,Tomato,Vase,Vitamin,Wrath".split(',')
-    df_us_mfa=prefill_content(words, lang="en_US", mode="MFA_IPA")
-    df_gb_mfa=prefill_content(words, lang="en_GB", mode="MFA_IPA")
-    df_us_cmu=prefill_content(words)
+    df_us_mfa,df_errors=prefill_content(words, lang="en_US", mode="MFA_IPA")
+    df_gb_mfa,df_errors=prefill_content(words, lang="en_GB", mode="MFA_IPA")
+    df_us_cmu,df_errors=prefill_content(words)
 
     # ' '.join(['|'.join(['_'.join([arpabet_to_2_char_ipa[unstress(p).lower()] for p in syl]) for syl in word]) for word in split_phonetics('AE0|D_V_ER1|T_AH0|Z_M_AH0_N_T')])
 
@@ -928,14 +997,14 @@ def use_tests():
 
 
 
-    df=prefill_content(sentences)
+    df,df_errors=prefill_content(sentences)
     
     df.iloc[:,-5:]
 
     from label_data_processing import get_data
     a=get_data()
     sentences=a.text.apply(lambda r: remove_special_characters(r)).tolist()
-    df=prefill_content(sentences)
+    df,df_errors=prefill_content(sentences)
     df.text=a.text
     df.to_csv('prefill_test.csv')
 
@@ -944,10 +1013,10 @@ def use_tests():
 
     sentences=pd.read_csv('data/phrases-for-noe.txt', sep='/', header=None)
     sentences=sentences.iloc[:,0].apply(lambda r: remove_special_characters(r)).tolist()
-    df=prefill_content(sentences)
+    df,df_errors=prefill_content(sentences)
 
     cmu_words=list(cmudict_dict.keys())
-    df=prefill_content(cmu_words)
+    df,df_errors=prefill_content(cmu_words)
 
     word=words[0]
     scores_p=[el[-1] for el in SonoriPy(str_to_list_of_char(word), mode='letters')[-1]]

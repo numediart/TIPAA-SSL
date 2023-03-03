@@ -28,9 +28,9 @@ def process(json_str):
     # Do something with the data
     # result = data['key']
     df=nested_dict_to_df(data)
-    all_sentences_df, linguistic_data=process_content(df)
+    all_sentences_df, linguistic_data, df_errors=process_content(df)
     
-    return df, all_sentences_df, linguistic_data
+    return df, all_sentences_df, linguistic_data, df_errors
 
 if check_password():
 
@@ -48,7 +48,7 @@ if check_password():
     json_str = st.text_area('Paste your JSON variable here:')
 
     if st.button('Process'):
-        df, all_sentences_df, linguistic_data = process(json_str)
+        df, all_sentences_df, linguistic_data, df_errors = process(json_str)
         
         # Display the DataFrame
         st.dataframe(linguistic_data)
@@ -72,4 +72,11 @@ if check_password():
         # saving a data frame to a buffer (same as with a regular file):
         df.to_csv(df_buf)
         d=st.download_button('Download master sheet data', df_buf, file_name="master_sheet.csv")#, on_click=on_click_download_zip)  # Defaults to 'application/octet-stream'
+
+        
+        # text buffer
+        df_errors_buf = io.BytesIO()
+        # saving a data frame to a buffer (same as with a regular file):
+        df_errors.to_csv(df_errors_buf)
+        d=st.download_button('Download potential errors data', df_errors_buf, file_name="errors.csv")#, on_click=on_click_download_zip)  # Defaults to 'application/octet-stream'
 
