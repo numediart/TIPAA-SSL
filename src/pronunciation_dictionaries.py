@@ -341,10 +341,11 @@ def generate_acronym_letter_mfa_dicts():
     with open('data/acronyms_fr_FR_mfa.dict','w') as f: f.write(json.dumps(acronym_dict_long))
 
 def process_diphtongs_r(mfa_us):
-    from syllabipy.sonoripy import define_categories
-    d=define_categories(mode="MFA_IPA")
     # Here it is explained that diphtong + r-colored schwa was replaced by diphtong + 'ɹ'. For consistency in syllables, I prefer put it back to r-colored one
     # https://mfa-models.readthedocs.io/en/latest/mfa_phone_set.html#:~:text=Diphthong%20%2B%20rhotic%20standardization%3A
+
+    from syllabipy.sonoripy import define_categories
+    d=define_categories(mode="MFA_IPA")
     mfa_diphtongs={'aw','aj','ej','ow','əw','oj', 'ɔj'}
     for k in mfa_us:
         # for words like powered
@@ -369,6 +370,9 @@ def process_diphtongs_r(mfa_us):
 
 
 def get_augmented_mfa_dict(lang='es_ES'):
+    from syllabipy.sonoripy import define_categories
+    vowels=define_categories(mode="MFA_IPA")['vowels']
+
     d=get_mfa_dict(path='data/'+lang_to_MFA_g2p_models[lang]+'.dict')
     with open('data/acronyms_'+lang+'_mfa.dict','r') as f: acronyms=json.loads(f.read())
     for k in acronyms: d[k]=acronyms[k]
@@ -379,8 +383,15 @@ def get_augmented_mfa_dict(lang='es_ES'):
 
         mfa_english_add_schwa_alternative(d)
 
+        # corrections={
+        # 'areas':[['EH1','R','IH0','AH0','Z']],
+        # 'live':[['L', 'IH1', 'V']],
+        # }
+        # for k in corrections: d[k]=corrections[k]
+
         if lang=="en_US":
             process_diphtongs_r(d)
+
         # "manual" corrections
         d["have"]=[['h', 'æ', 'v']]
         d["i'll"]=[['aj', 'ɫ'], ['ɑː', 'ɫ'], ['ɫ̩']]
@@ -393,10 +404,65 @@ def get_augmented_mfa_dict(lang='es_ES'):
             d["salesperson"]=[['s', 'ej', 'l', 'z', 'p', 'ɝ', 's', 'ə', 'n']]
             d["salespersons"]=[['s', 'ej', 'l', 'z', 'p', 'ɝ', 's', 'ə', 'n', 'z']]
             d["salesperson's"]=[['s', 'ej', 'l', 'z', 'p', 'ɝ', 's', 'ə', 'n', 'z']]
+            d["hypothetical"]=[['h', 'aj', 'p', 'ə', 'θ', 'ɛ', 'tʲ', 'ɪ', 'k', 'ɫ̩'], ['h', 'aj', 'p', 'ə', 'θ', 'ɛ', 'ɾʲ', 'ɪ', 'k', 'ɫ̩']]
+
+
+            # [k for k in mfa_us if (k.endswith('ior') and mfa_us[k][0][-2:]==mfa_us['superior'][0][-2:])]
+            # similar to process diphtong+r, it seems that 
+            for k in d:
+                if (k.endswith('ior') and d[k][0][-2:]==d['superior'][0][-2:]):
+                    d[k]=[alt[:-1]+['ɚ'] for alt in d[k]]
+
+
         if lang=="en_GB":
+            mfa_us=get_mfa_dict(path='data/'+lang_to_MFA_g2p_models["en_US"]+'.dict')
             d["salesperson"]=[['s', 'ej', 'l', 'z', 'p', 'ɜː', 's', 'ə', 'n']]
             d["salespersons"]=[['s', 'ej', 'l', 'z', 'p', 'ɜː', 's', 'ə', 'n', 'z']]
             d["salesperson's"]=[['s', 'ej', 'l', 'z', 'p', 'ɜː', 's', 'ə', 'n', 'z']]
+            d['assets']=[['ə', 's', 'ɛ', 't', 's']]
+            d['pie']=mfa_us['pie']
+
+
+            # for some, to correct easily, take the us version that was checked to be okay
+            # this group is generally a removed schwa
+            d['difference']=mfa_us['difference']
+            d['differences']=mfa_us['differences']
+            d['confidential']=mfa_us['confidential']
+            d['favourite']=mfa_us['favourite']
+            d['favorite']=mfa_us['favorite']
+            d['january']=mfa_us['january']
+            d['february']=mfa_us['february']
+
+            # these are kind of diphtongs separated into two syllables
+            d['against']=mfa_us['against']
+            d['proteins']=[alt+['z'] for alt in d['protein']]
+
+            d["hypothetical"]=[['h', 'aj', 'p', 'ə', 'θ', 'ɛ', 't', 'ɪ', 'k', 'ɫ̩']]
+
+            
+            
+            # [k for k in mfa_gb if (k.endswith('tion') and mfa_gb[k][0][-2:]==mfa_gb['immigration'][0][-2:])]
+            # [k for k in mfa_gb if (k.endswith('tial') and mfa_gb[k][0][-2:]==mfa_gb['confidential'][0][-2:])]
+            # [k for k in mfa_gb if (k.endswith('cal') and mfa_gb[k][0][-2:]==mfa_gb['hypothetical'][0][-2:])]
+            
+
+            # [k for k in mfa_gb if (k in mfa_us and mfa_us[k][0][-1]=='ɫ̩' and mfa_gb[k][0][-1]=='ɫ' and mfa_gb[k][0][-2] not in vowels)]
+            # [k for k in mfa_gb if (k in mfa_us and mfa_us[k][0][-1]=='m̩' and mfa_gb[k][0][-1]=='m' and mfa_gb[k][0][-2] not in vowels)]
+            # [k for k in mfa_gb if (k in mfa_us and mfa_us[k][0][-1]=='n̩' and mfa_gb[k][0][-1]=='n' and mfa_gb[k][0][-2] not in vowels)]
+            # [k for k in mfa_gb if (k in mfa_us and mfa_us[k][0][0]=='θ' and mfa_gb[k][0][0]=='f')]
+
+            # missing schwaed-l,  schwaed-n or schwaed-m, and weird
+            for k in d:
+                if (k in mfa_us and mfa_us[k][0][-1]=='ɫ̩' and d[k][0][-1]=='ɫ' and d[k][0][-2] not in vowels):
+                    d[k]=[alt[:-1]+['ɫ̩'] for alt in d[k]]
+                if (k in mfa_us and mfa_us[k][0][-1]=='m̩' and d[k][0][-1]=='m' and d[k][0][-2] not in vowels):
+                    d[k]=[alt[:-1]+['ɫ̩'] for alt in d[k]]
+                if (k in mfa_us and mfa_us[k][0][-1]=='n̩' and d[k][0][-1]=='n' and d[k][0][-2] not in vowels):
+                    d[k]=[alt[:-1]+['ɫ̩'] for alt in d[k]]
+                if (k in mfa_us and mfa_us[k][0][0]=='θ' and d[k][0][0]=='f'):
+                    d[k]=[['θ']+alt[1:] for alt in d[k]]
+
+
     return d
 
 
