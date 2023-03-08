@@ -26,7 +26,7 @@ drop_consecutive_duplicate_elements= lambda L: [key for key, _group in groupby(L
 split_phonetics = lambda phonetics: [[s.split('_') for s in w.split('|')] for w in phonetics.split(' ')]
 group_consecutive_duplicates= lambda L:[(k, sum(1 for i in g)) for k,g in groupby(L)]
 
-from src.pronunciation_dictionaries import unstress, remove_stress_annots
+from src.pronunciation_dictionaries import unstress, remove_stress_annots, differs_by_one_insertion
 
 
 print_memory_usage('RAM - text_processing after lambda functions')
@@ -263,17 +263,51 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
         # I thus put the stress pattern on the ɪ, and nothing on the scwha: fear -> f_ɪ1_ə
 
         # .replace("ɪ|ə", "ɪ_ə")
-
-        syls_ps_formatted=[el.replace("ɪ|ə", "ɪ_ə") for el in syls_ps_formatted]
-        syls_ps_corr=[[s.split('_') for s in w.split('|')] for w in syls_ps_formatted]
+        syls_ps_formatted2=[el.replace("ɪ|ə", "ɪ_ə").replace("i|ə", "i_ə") for el in syls_ps_formatted]
+        syls_ps_corr=[[s.split('_') for s in w.split('|')] for w in syls_ps_formatted2]
         add_stress(syls_ps_corr, word_stress)
+
+
+
+        # If the word_stress extracted by espeak does not contain a schwa, and there are alternatives that are just 1 more syllable and contain a schwa
+        # I want to add stress by keeping the correct index. For that, I need to know in which syllable is the schwa and either add 1 to the index if it is after the schwa
+        # or keep the index as is if it is before
+        if word_stress[0] is not None:
+            has_n_syls_idxs=[]
+            has_n_plus_one_syls_idxs=[]
+            for i,alt in enumerate(syls_ps_corr):
+                if len(alt)==word_stress[-1]:
+                    # print(alt)
+                    has_n_syls_idxs.append(i)
+                elif len(alt)==word_stress[-1]+1:
+                    has_n_plus_one_syls_idxs.append(i)
+            for n_plus_one_idx in has_n_plus_one_syls_idxs:
+                if 'ə' in ps[n_plus_one_idx]:
+                    for n_idx in has_n_syls_idxs:
+                        b,phone,insert_idx=differs_by_one_insertion(ps[n_plus_one_idx], ps[n_idx])
+                        if b:
+                            schwa_idx=['ə' in remove_stress_annots(syl) for syl in syls_ps_corr[n_plus_one_idx]].index(True)
+                            if word_stress[0]>=schwa_idx:
+                                add_stress(syls_ps_corr, (word_stress[0]+1, word_stress[1]+1))
+                            else:
+                                add_stress(syls_ps_corr, (word_stress[0], word_stress[1]+1))
+        
+
+        # words like "realize", "idea" also have and "ɪ|ə" for which we want to keep the alternative
+        # espeak will typically have 1 syllable less because it consider a diphtong while I don't (it's not in cmudict, nor in MFA). idea -> "aɪ_d_ˈiə"
+        syls_ps_ie=[[s.split('_') for s in w.split('|')] for w in syls_ps_formatted if "ɪ|ə" in w or "i|ə" in w]
+        syls_ps_corr+=syls_ps_ie
+        add_stress(syls_ps_corr, (word_stress[0],word_stress[1]+1))
+        # this won't overwrite previous because stressed vowels wouldn't be recognized as vowels, but will fill optional possibilities like for "media"
+        add_stress(syls_ps_corr, (word_stress[0],word_stress[1]))
+
 
         # if there is no stress found (happens in short words like "at, the, of, our"), also add the (None, 1) possibility.
         # Because for e.g. "our", espeak outputs 2 syllables, although there are also 1 syllables alternatives that we want to keep
         if word_stress[0] is None: add_stress(syls_ps_corr, (None, 1))
 
         syls_ps_formatted_corr=['|'.join(['_'.join(s) for s in w]) for w in syls_ps_corr]
-        syls_ps_formatted_corr=[el.replace("ɪ1_ə1", "ɪ1_ə") for el in syls_ps_formatted_corr]
+        syls_ps_formatted_corr=[el.replace("ɪ1_ə1", "ɪ1_ə").replace("ɪ0_ə0", "ɪ0_ə").replace("i1_ə1", "i1_ə").replace("i0_ə0", "i0_ə") for el in syls_ps_formatted_corr]
 
     return syls_ps_formatted_corr
 
@@ -677,7 +711,7 @@ def prefill_for_sentence(
 
 from src.code_utils import internal_error
 from datetime import datetime
-def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU', output_errors=False):
+def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
     """This function extract information of syllabified texts and phonetics using prefill_for_sentence on a list of sentences.
     The result is saved in a DataFrame.
 
@@ -707,11 +741,11 @@ def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU', output_err
             error_records.append(err)
         records.append(record)
     
-    if output_errors:
-        now=datetime.now()
-        date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
-        df_errors=pd.DataFrame.from_records(error_records)
-        # df_errors.to_csv('prefill_content_errors_'+date_time+'.csv')
+    # if output_errors:
+    now=datetime.now()
+    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    df_errors=pd.DataFrame.from_records(error_records)
+    df_errors.to_csv('prefill_content_errors_'+date_time+'.csv')
 
     df=pd.DataFrame.from_records(records)
     return df, df_errors
@@ -759,9 +793,9 @@ def prefill_content_variations(sentences):
     db=pd.read_csv('data/query_results-2023-02-21_102331.csv')
     sentences=db.words.tolist()
     
-    df_MFA_IPA_US,df_errors=prefill_content(sentences, lang='en_US', mode='MFA_IPA', output_errors=True)
-    df_MFA_IPA_GB,df_errors=prefill_content(sentences, lang='en_GB', mode='MFA_IPA', output_errors=True)
-    df_CMU,df_errors=prefill_content(sentences, lang='en_US', mode='CMU', output_errors=True)
+    df_MFA_IPA_US,df_errors=prefill_content(sentences, lang='en_US', mode='MFA_IPA')
+    df_MFA_IPA_GB,df_errors=prefill_content(sentences, lang='en_GB', mode='MFA_IPA')
+    df_CMU,df_errors=prefill_content(sentences, lang='en_US', mode='CMU')
 
     df_MFA_IPA_US.to_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
     df_MFA_IPA_GB.to_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
@@ -771,25 +805,35 @@ def prefill_content_variations(sentences):
     df_MFA_IPA_GB=pd.read_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
     df_CMU=pd.read_csv('prefill_export_2023-02-21_CMU_en_US.csv')
 
-    assert (df_MFA_IPA_GB.text==df_CMU.text).sum()==len(df_CMU)
+    # assert (df_MFA_IPA_GB.text==df_CMU.text).sum()==len(df_CMU)
+    assert (df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text).sum()==0
+    assert (df_MFA_IPA_US.segmented_text!=df_CMU.segmented_text).sum()==0
 
-    (df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text).sum()
-    (df_MFA_IPA_US.segmented_text!=df_CMU.segmented_text).sum()
+    n_syls_new=df_MFA_IPA_GB.segmented_text.str.lower().apply(lambda r: [w.count('|')+1 for w in r.split(' ')])
+    n_syls_db=db.syllables.str.lower().apply(lambda r: [w.count('|')+1 for w in r.split(' ')])
+
+    db[n_syls_new!=n_syls_db].syllables.str.lower()
+    df_MFA_IPA_GB[n_syls_new!=n_syls_db].segmented_text.str.lower()
+    syllable_comparison=pd.DataFrame()
+    syllable_comparison['DB']=db[n_syls_new!=n_syls_db].syllables
+    syllable_comparison['now']=df_MFA_IPA_GB[n_syls_new!=n_syls_db].segmented_text
+    syllable_comparison['id']=db.id[syllable_comparison.index]
+
+    syllable_comparison.to_csv('syllables_text_comparison.csv')
 
     # df_MFA_IPA_GB[df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text].segmented_text
     # df_CMU[df_MFA_IPA_GB.segmented_text!=df_CMU.segmented_text].segmented_text
 
-    db.phonetics
-
 
     import ast
     # mismatch syllables between text and phonetics, for each phonetics variation
-    df_CMU[df_CMU.n_syl_mismatches!="[]"][["segmented_text","pronounciation_guide_hr"]]
+    df_CMU_mis=df_CMU[df_CMU.n_syl_mismatches!="[]"][["segmented_text","phonetics"]]
     df_MFA_IPA_GB_syl_mis=df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches!="[]"][["segmented_text","phonetics"]]
     df_MFA_IPA_US_syl_mis=df_MFA_IPA_US[df_MFA_IPA_US.n_syl_mismatches!="[]"][["segmented_text","phonetics"]]
 
     df_MFA_IPA_GB_syl_mis[df_MFA_IPA_GB_syl_mis.segmented_text.isin(df_MFA_IPA_US_syl_mis.segmented_text)]
     df_MFA_IPA_GB_syl_mis[~df_MFA_IPA_GB_syl_mis.segmented_text.isin(df_MFA_IPA_US_syl_mis.segmented_text)]
+
 
 
     # # check that there is no "ɪ|ə" in US
@@ -804,19 +848,89 @@ def prefill_content_variations(sentences):
     syl_inconsistencies_MFA_GB=df_MFA_IPA_GB[df_MFA_IPA_GB.n_syl_mismatches!="[]"].apply(lambda r: (r.segmented_text.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]],r.phonetics.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]]), axis=1)
     syl_inconsistencies_MFA_US=df_MFA_IPA_US[df_MFA_IPA_US.n_syl_mismatches!="[]"].apply(lambda r: (r.segmented_text.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]],r.phonetics.split(' ')[ast.literal_eval(r.n_syl_mismatches)[0]]), axis=1)
 
+
+    df_CMU_mis["word_syl_mismatch"]=syl_inconsistencies_CMU
+    df_CMU_mis['id']=db.id[syl_inconsistencies_CMU.index]
+    df_MFA_IPA_GB_syl_mis["word_syl_mismatch"]=syl_inconsistencies_MFA_GB
+    df_MFA_IPA_GB_syl_mis['id']=db.id[syl_inconsistencies_MFA_GB.index]
+    df_MFA_IPA_US_syl_mis["word_syl_mismatch"]=syl_inconsistencies_MFA_US
+    df_MFA_IPA_US_syl_mis['id']=db.id[syl_inconsistencies_MFA_US.index]
+
+    df_CMU_mis.to_csv('syllables_CMU_comparison.csv')
+    df_MFA_IPA_GB_syl_mis.to_csv('syllables_IPA_GB_comparison.csv')
+    df_MFA_IPA_US_syl_mis.to_csv('syllables_IPA_US_comparison.csv')
+
+    for i in range(int(len(syl_inconsistencies_CMU)/10)): print(syl_inconsistencies_CMU[i*10:(i+1)*10])
     for i in range(int(len(syl_inconsistencies_MFA_GB)/10)): print(syl_inconsistencies_MFA_GB[i*10:(i+1)*10])
     for i in range(int(len(syl_inconsistencies_MFA_US)/10)): print(syl_inconsistencies_MFA_US[i*10:(i+1)*10])
+
+
+    
+    map_phonemes= lambda mapper, formatted_phonetics: ' '.join(['|'.join(['_'.join([mapper[unstress(p).lower()] for p in syl]) for syl in word]) for word in split_phonetics(formatted_phonetics)])
+
+    from src.pronunciation_dictionaries import arpabet_to_2_char_ipa, mfa_to_display_ipa
+
+
+    df_MFA_IPA_US_disp=df_MFA_IPA_US.phonetics.apply(lambda r:map_phonemes(mfa_to_display_ipa, r.replace('{','').replace('}','').replace('-',' ')))
+    df_MFA_IPA_GB_disp=df_MFA_IPA_GB.phonetics.apply(lambda r:map_phonemes(mfa_to_display_ipa, r.replace('{','').replace('}','').replace('-',' ')))
+
+    
+    db.phonetics
+    result_df=pd.DataFrame()
+    result_df['id']=db.id
+    result_df['syllables']=db.syllables
+    result_df['segmented_text']=df_CMU.segmented_text
+    result_df['CMU']=df_CMU.phonetics
+    result_df['IPA en_US']=df_MFA_IPA_US.phonetics
+    result_df['IPA en_GB']=df_MFA_IPA_GB.phonetics
+    result_df['simple IPA en_US']=df_MFA_IPA_US_disp.str.replace('_','').str.replace('|','‧')
+    result_df['simple IPA en_GB']=df_MFA_IPA_GB_disp.str.replace('_','').str.replace('|','‧')
+
+    result_df.to_csv('phonetization_export_21_02.csv')
+
 
     syl_inconsistencies_MFA_GB[syl_inconsistencies_MFA_GB.apply(lambda r: "ɪ|ə" in r[-1])]
     syl_inconsistencies_MFA_GB[syl_inconsistencies_MFA_GB.apply(lambda r: "ɪ|ə" not in r[-1])]
 
     
-    df_CMU[df_CMU.n_stress_inconsistencies.apply(lambda r:len(r))==0]
-    df_MFA_IPA_GB[df_MFA_IPA_GB.n_stress_inconsistencies.apply(lambda r:len(r))==0]
-    df_MFA_IPA_US[df_MFA_IPA_US.n_stress_inconsistencies.apply(lambda r:len(r))==0]
+    # df_CMU[df_CMU.n_stress_inconsistencies.apply(lambda r:len(r))==0]
+    # df_MFA_IPA_GB[df_MFA_IPA_GB.n_stress_inconsistencies.apply(lambda r:len(r))==0]
+    # df_MFA_IPA_US[df_MFA_IPA_US.n_stress_inconsistencies.apply(lambda r:len(r))==0]
+    
+    df_compare=pd.DataFrame()
+    df_compare['DB']=db[df_CMU.phonetics!=db.phonetics].phonetics
+    df_compare['now']=df_CMU[df_CMU.phonetics!=db.phonetics].phonetics
+    df_compare["word_syl_mismatch"]=df_compare.apply(lambda r: [el for el in zip(r.DB.split(' '),r.now.split(' ')) if el[0]!=el[1]], axis=1)
+    df_compare['id']=db.id[df_compare.index]
 
-    db=pd.read_csv('data/query_results-2023-02-21_102331.csv')
-    db[db.phonetics!=df_CMU.phonetics]
+    df_compare.to_csv('CMU_comparison.csv')
+
+    # import difflib
+    # diff_string = lambda case_a, case_b : [li for li in difflib.ndiff(case_a, case_b) if li[0] != ' ']
+    # df_compare.apply(lambda r: diff_string(r.db, r.prefill), axis=1)
+
+    # df_compare.apply(lambda r: [el for el in zip(r.db.split(' '),r.prefill.split(' ')) if el[0]!=el[1]], axis=1)
+
+    
+    diff_iz=df_compare.apply(lambda r: [el for el in zip(r.DB.split(' '),r.now.split(' ')) if (el[0]!=el[1] and el[1].endswith("_IH0_Z"))], axis=1)
+    diff_non_iz=df_compare.apply(lambda r: [el for el in zip(r.DB.split(' '),r.now.split(' ')) if el[0]!=el[1] and (not el[1].endswith("_IH0_Z"))], axis=1)
+
+    diff_non_iz=diff_non_iz[diff_non_iz.apply(lambda r:len(r))>0]
+    diff_iz=diff_iz[diff_iz.apply(lambda r:len(r))>0]
+
+    db.loc[diff_non_iz.index,:]
+    iz_modifs=db.loc[diff_iz.index,:]
+
+    iz_modifs['modification']=diff_iz
+
+    df_compare_non_iz_CMU=pd.DataFrame()
+    df_compare_non_iz_CMU['DB']=df_compare.DB[diff_non_iz.index]
+    df_compare_non_iz_CMU['now']=df_compare.now[diff_non_iz.index]
+    df_compare_non_iz_CMU['mismatch']=diff_non_iz
+    df_compare_non_iz_CMU['id']=db.id[diff_non_iz.index]
+
+    df_compare_non_iz_CMU.to_csv('CMU_comparison_non_iz.csv')
+
 
 
 
@@ -857,25 +971,22 @@ def use_tests():
     sentence="every"
     sentence="lawyer"
     sentence="technically"
-    lang="en_GB"
+    sentence="temperature"
+    sentence="idea"
+    sentence="hypothetically"
+    sentence="pie"
+    sentence="indya"
+    lang="en_US"
     syllables_df=syllables_dfs[lang]
     # r=prefill_for_sentence(sentence=sentence)
-    r=prefill_for_sentence(
-                        sentence=sentence,
-                        syllables_df=syllables_df, 
-                        lang=lang,
-                        mode='MFA_IPA', word_dict=get_augmented_mfa_dict(lang))  # "CMU" or "MFA_IPA"
+    r=prefill_for_sentence(sentence=sentence,syllables_df=syllables_df, lang=lang,mode='MFA_IPA', word_dict=get_augmented_mfa_dict(lang))  # "CMU" or "MFA_IPA"
     r
 
     sentence="circumstancial"
     lang="en_US"
     syllables_df=syllables_dfs[lang]
     # r=prefill_for_sentence(sentence=sentence)
-    r=prefill_for_sentence(
-                        sentence=sentence,
-                        syllables_df=syllables_df, 
-                        lang=lang,
-                        mode='CMU', word_dict=cmudict_dict)  # "CMU" or "MFA_IPA"
+    r=prefill_for_sentence(sentence=sentence,syllables_df=syllables_df, lang=lang,mode='CMU', word_dict=cmudict_dict)  # "CMU" or "MFA_IPA"
     
     db=pd.read_csv('data/query_results-2023-02-21_102331.csv')
     sentences=db.words.tolist()
