@@ -31,7 +31,7 @@ formatted_cmudict_df=get_formatted_cmudict()
 print_memory_usage('RAM - streamlit utils, after formatted_cmudict_df')
 
 
-@st.experimental_singleton
+@st.cache_resource
 def get_model(model_type):
     from transformers import Wav2Vec2ForCTC
     # Create a model of the specified type
