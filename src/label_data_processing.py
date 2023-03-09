@@ -400,7 +400,7 @@ def get_errors_examples():
 def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.csv"):
     df=pd.read_csv(path)
     df['path']=os.path.split(path)[0]+'/audios/'+df.soundfiles_name
-    content=prefill_content(df["Text with target"].tolist())
+    content,df_errors=prefill_content(df["Text with target"].tolist())
     df['cmu_phonetics']=content.cmu_phonetics
     content['path']=df.path
     content['text']=df["Text with target"]
