@@ -16,6 +16,7 @@ rhy|thms
 should|'ve
 cli|ent
 cli|ents
+cli|ent's
 ex|pe|ri|en|ces
 as|so|ci|ates
 ag|gra|va|ted
@@ -24,6 +25,7 @@ cons|ti|tu|ents
 theo|rem
 Sam|uel
 in|di|vi|du|als
+in|di|vi|du|al's
 fire|wall
 re|ac|tions
 re|ac|ted
@@ -33,7 +35,7 @@ al|go|ri|thm
 cir|cum|ference
 p|H
 re|cy|cled
-Tri|alled
+tri|alled
 Ed|in|bu|rgh
 re|ca|pi|tu|la|ted
 in|spi|red
@@ -41,3 +43,20 @@ ag|gra|va|ted
 de|con|tam|i|na|ted
 re|ra|ted
 in|gre|di|ents
+en|ti|tled
+pri|o|ri|tized
+state|ments
+em|be|zzled
+ne|go|ti|a|tions
+re|cy|c|ling
+a|re|as
+a|re|a
+a|re|a's
+move|ments
+you|tube
+sci|en|tists
+sci|en|tist
+sci|en|tist's
+in|i|tia|tive
+ap|pli|an|ces
+cre|ates
