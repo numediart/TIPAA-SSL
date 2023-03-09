@@ -108,7 +108,8 @@ def get_augmented_cmudict():
         'outside':[['AW0', 'T', 'S', 'AY1', 'D']],
         'trespasser':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0']],
         'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']],
-        'outdoors':[['AW1', 'T', 'D', 'AO2', 'R', 'Z']]
+        'outdoors':[['AW1', 'T', 'D', 'AO2', 'R', 'Z']],
+        'unreasonable':[['AH0', 'N', 'R', 'IY1', 'Z', 'AH0', 'N', 'AH0', 'B', 'AH0', 'L']]
 	}
     for k in corrections:
         cmudict_dict[k]=corrections[k]
