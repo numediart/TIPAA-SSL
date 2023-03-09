@@ -17,7 +17,8 @@ def report_function(i, title=""):
 
 st.title("Phonetization, syllabification ")
 
-@st.experimental_memo
+# @st.experimental_memo
+@st.cache_data
 def process(json_str):
     # Your processing function goes here
     # data = json.loads(json_str)

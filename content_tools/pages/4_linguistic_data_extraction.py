@@ -21,7 +21,8 @@ st.title("Linguistic data extraction")
 
 import json
 
-@st.experimental_memo
+# @st.experimental_memo
+@st.cache_data
 def process(json_str):
     # Your processing function goes here
     data = json.loads(json_str)

@@ -56,7 +56,8 @@ if check_password():
             help="To activate 'wide mode', go to the hamburger menu > Settings > turn on 'wide mode'",
         )
 
-        @st.experimental_memo
+        # @st.experimental_memo
+        @st.cache_data
         def launch_analysis(file_dict, results_dir):
             analyze_files_and_build_transcripts(model, file_dict, report_callback=report_function,results_dir=results_dir)
 
