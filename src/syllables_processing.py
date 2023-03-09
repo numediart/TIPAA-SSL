@@ -145,6 +145,11 @@ def syllables_data(syl_sep='|'):
     syllables_add=pd.read_csv('data/mhyph_add.txt', header=None)
     syllables=pd.concat([syllables,syllables_add])
 
+    # syllables.iloc[:,0].str.replace('|','').drop_duplicates()   
+    # syllables[syllables.iloc[:,0].str.replace('|','').duplicated()]
+
+    # syllables.dropna()[syllables.dropna().iloc[:,0].str.replace('|','').str.startswith('ingredien')]
+
     d=cmudict_dict
     syllables=syllables.dropna()  # there is one row that is nan... (maybe just a \n at the end of one of the files)
 
@@ -251,13 +256,22 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
         vowels,nasals,fricatives,affricates,stops=d['vowels'],d['nasals'],d['fricatives'],d['affricates'],d['stops']
 
         if lang=="en_GB" or lang=="en_US":
-            if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired":
+            if word[-2:]=="ed" and word[-3] not in ['t','d'] and word[-4:]!="ired" and word[-3:]!='led': #this last is treated hereafter because it dependes
                 word=word[:-2]+'d'
                 modified_ed=True
-            elif word[-2:]=="es" and word[-3] not in ['s','c','g','x'] and word[-4:]!='ches' and word[-4:]!='shes' and word[-3:]!='les': #this last is treated hereafter because it dependes
+            
+            # reduction for e.g. "smiled, filed" (vowel before l), but not for "angled, muscled, ..."
+            elif word[-3:]=="led" and word[-4] in vowels:
+                word=word[:-2]+'d'
+                modified_ed=True
+
+            # sounds before -es corresponding to sibilant sounds
+            elif word[-2:]=="es" and word[-3] not in ['s','c','g','x','z','j'] and word[-4:]!='ches' and word[-4:]!='shes' and word[-4:]!="ires" and word[-3:]!='les': #this last is treated hereafter because it dependes
                 word=word[:-2]+'s'
                 modified_es=True
-            elif word[-3:]=="les" and word[-4] not in stops: # do it for e.g. "smiles", but not gor "angles, muscles, articles, ..."
+            
+            # reduction for e.g. "smiles" (vowel before l), but not for "angles, muscles, articles, ...", and not for "alleles,angeles,anopheles,isosceles"
+            elif word[-3:]=="les" and word[-4] in vowels and word[-4]!='e':
                 word=word[:-2]+'s'
                 modified_es=True
             elif word[-1]=="e" and word[-2:]!='le': #this last one is treated hereafter because it depends
