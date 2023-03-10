@@ -37,7 +37,8 @@ if check_password():
             help="To activate 'wide mode', go to the hamburger menu > Settings > turn on 'wide mode'",
         )
 
-        @st.experimental_memo
+        # @st.experimental_memo
+        @st.cache_data
         def extract_subtitles(uploaded_file):
             if uploaded_file is not None:
                 file_container = st.expander("Check your uploaded .csv")                
