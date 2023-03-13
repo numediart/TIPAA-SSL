@@ -203,7 +203,6 @@ def generate_syl_phonetics_alternatives_from_word_ipa(word="teórico-práctico",
                 try: p_part=word_dict[unaccented_string]
                 except KeyError: p_part=mfa_g2p(w_part, model=g2p_model)[w_part]
             p_parts.append(p_part)
-
             word_stress_syls_parts.append(word_to_stressed_syl(w_part, lang=lang))
 
         # Here I generate all alternatives of combination of word parts
@@ -562,7 +561,7 @@ def text_normalization(
 
     n_syls_in_text=[len(word.split(syl_sep)) for word in syls_texts]
 
-    return lower_words, segmented_text, n_syls_in_text, acronym_idxs, special_chars_dict_start, special_chars_dict_end, used_method_syllables
+    return sentence, lower_words, segmented_text, n_syls_in_text, acronym_idxs, special_chars_dict_start, special_chars_dict_end, used_method_syllables
     
 
 # sentence="A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
@@ -587,7 +586,7 @@ def prefill_for_sentence(
     Returns:
         dict: see structure a the end of the function
     """
-    lower_words, segmented_text, n_syls_in_text, acronym_idxs, special_chars_dict_start, special_chars_dict_end, used_method_syllables= text_normalization(sentence=sentence, lang=lang, special_chars = special_chars, syllables_df=syllables_df, syl_sep=syl_sep)
+    sentence, lower_words, segmented_text, n_syls_in_text, acronym_idxs, special_chars_dict_start, special_chars_dict_end, used_method_syllables= text_normalization(sentence=sentence, lang=lang, special_chars = special_chars, syllables_df=syllables_df, syl_sep=syl_sep)
 
     # p -> phonetics
     # g -> gibberish
