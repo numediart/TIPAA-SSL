@@ -333,6 +333,7 @@ def generate_acronym_letter_mfa_dicts():
     acronym_dict_long['n']=[['ɛ', 'n']]
     acronym_dict_long['r']=[['ɛ', 'ʁ']]
     acronym_dict_long['t']=[['t', 'e']]
+    acronym_dict_long['k']=[['k', 'a']]
 
     acronym_dict_long['w']=[max(mfa_g2p('doublevé', lang_to_MFA_g2p_models[lang])['doublevé'], key=len)]
     acronym_dict_long['x']=[['i', 'k', 's']]
