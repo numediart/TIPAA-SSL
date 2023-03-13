@@ -23,6 +23,16 @@ print_memory_usage('RAM - phonemizer_utils after backend dict')
 
 # EspeakBackend(lang, with_stress=True)
 
+
+def phonetize(word, lang="en_GB"):
+    # initialize the espeak backend for English
+    backend = backend_dict[lang]
+
+    # separate phones by a space and ignoring words boundaries
+    separator = Separator(phone='_', word=None)
+    # the strip is weirdly, if you do this without the strip, it can sometimes start with an underscore:   phonetize('e',"fr_FR") -> "_ˈə"  phonetize('y',"fr_FR") -> "i_ɡ_ʁ_ˈɛ_k"
+    return backend.phonemize([word], separator=separator, strip=True)[0].strip('_')
+
 # lang="fr-fr"
 # lang="es"
 def word_to_stressed_syl(word, lang="en_US"):
@@ -36,16 +46,10 @@ def word_to_stressed_syl(word, lang="en_US"):
     Returns:
         (int, int):  stress index, n of syllables. If there is no stress symbol in phonetics, the stress index is set to None
     """
-    # initialize the espeak backend for English
-    backend = backend_dict[lang]
-    # separate phones by a space and ignoring words boundaries
-    separator = Separator(phone='_', word=None)
-
-    phonetize_word=lambda word: backend.phonemize([word], separator=separator, strip=True)[0]
     stress_symbol="ˈ"
     second_stress_symbol="ˌ"
 
-    p=phonetize_word(word)
+    p=phonetize(word, lang=lang)
     syl_p=SonoriPy(p.replace(stress_symbol,'').replace(second_stress_symbol,'').split('_'), mode="MFA_IPA")[0]
 
     # there can be no stress in little words like "at"
@@ -65,14 +69,6 @@ def word_to_stressed_syl(word, lang="en_US"):
     return stress_index, len(syl_p)
 
 
-def phonetize(word, lang="en_GB"):
-    # initialize the espeak backend for English
-    backend = backend_dict[lang]
-
-    # separate phones by a space and ignoring words boundaries
-    separator = Separator(phone='_', word=None)
-    # the strip is weirdly, if you do this without the strip, it can sometimes start with an underscore:   phonetize('e',"fr_FR") -> "_ˈə"  phonetize('y',"fr_FR") -> "i_ɡ_ʁ_ˈɛ_k"
-    return backend.phonemize([word], separator=separator, strip=True)[0].strip('_')
 
 
 def words_to_lexicon(words, lang="en"):
