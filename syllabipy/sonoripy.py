@@ -63,6 +63,9 @@ def define_categories(mode='CMU'):
         cats={}
         cats['vowels']=str_to_list_of_char('aeiouyàáâäæãåāèéêëēėęîïíīįìôöòóœøōõûüùúūůÿ')+str_to_list_of_char('ɝəaɔʌãeéẽɛøoõiu')
         cats['vowels']+=['ɐ', 'ɑ', 'ɑː', 'ɑ̃', 'ɒ', 'ɒː', 'ɚ', 'ɜ', 'ɜː','ʉ', 'ʉː','ʊ','ɪ','ɫ̩','m̩','n̩'] 
+        cats['vowels']+=["ᵻ"] # discovered this one for espeak in final -ed when uning en_US.
+        # Try :  from src.phonemizer_utils import phonetize;phonetize("started", "en_US")  -> "s_t_ˈɑːɹ_ɾ_ᵻ_d"
+
         # the last two have a little AH0 before the consonant, that's why I have to put them in vowels.
         # https://memcauliffe.com/bootstrapping-an-ipa-dictionary-for-english-using-montreal-forced-aligner-20.html
         # maybe a better solution would be to add a vowel before it. It was with a schwa in wikipron
