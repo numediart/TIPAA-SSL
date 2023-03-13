@@ -301,7 +301,7 @@ def test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.
 
     text="I would love to go to ireland"
     r={}
-    r['cmu_phonetics']=prefill_for_sentence(text)['cmu_phonetics']
+    r['cmu_phonetics']=prefill_for_sentence(text)['phonetics']
     r['text']=text
     r['audio_file_url']=path
     r['target_phoneme']=float('nan')
@@ -322,7 +322,7 @@ def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
 
     text="I would love to go to ireland"
     r={}
-    r['cmu_phonetics']=prefill_for_sentence(text)['cmu_phonetics']
+    r['cmu_phonetics']=prefill_for_sentence(text)['phonetics']
     r['text']=text
     r['audio_file_url']=path
     r['target_phoneme']=float('nan')
@@ -350,7 +350,7 @@ def test_edge_cases(base_url = 'http://localhost:8000', client=app.test_client()
     for p in paths:
         text="I'll have some tea thanks"
         r={}
-        r['cmu_phonetics']=prefill_for_sentence(text)['cmu_phonetics']
+        r['cmu_phonetics']=prefill_for_sentence(text)['phonetics']
         r['text']=text
         r['audio_file_url']=p
         r['target_phoneme']=float('nan')
