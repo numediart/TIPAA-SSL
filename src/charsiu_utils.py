@@ -293,12 +293,18 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
         return detailed_alignment_phones
 
+    def predict_with_timings(self, s, target_phonemes):
+        # this exist just for compatibility with the new pipeline and so that DL_speech_tech can call thisS
+        _, df_segmented, _ = self.align_phones(audio=s,phones=target_phonemes)
+
+        return df_segmented
+
     def predict_word(self, audio, phonetics, target_word_idx):
         """phonetics must be a list of list of phonemes, e.g.: phonetics=[['AY1'],['EH1', 'N', 'D', 'IH0', 'D']]
         """
         # merge lists
         phones=sum(phonetics,[])
-        alignment_phones, df_segmented, phonetic_content = self.align_phones(audio=audio,phones=phones)
+        _, df_segmented, _ = self.align_phones(audio=audio,phones=phones)
         
         if self.status!="success": return None
 
@@ -452,7 +458,7 @@ def use_tests():
     s,fs=librosa.load(path, sr=16000)
     split_phonetics=sum([p.replace('|','_').split('_') for p in phonetics.split(' ')],[])
     # phones=[[p] for p in  remove_stress_annots(split_phonetics)]
-    _, df_segmented, phonetic_content = charsiu.align_phones(audio=s,phones=split_phonetics)
+    _, df_segmented, _ = charsiu.align_phones(audio=s,phones=split_phonetics)
     df_segmented[df_segmented.phones!='[SIL]'].GT_proba.median()
     df_segmented[df_segmented.phones!='[SIL]'].GT_proba.mean()
 
