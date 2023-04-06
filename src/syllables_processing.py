@@ -12,7 +12,7 @@ def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0'], mode='CMU'):
     return len(SonoriPy(phonetics, mode=mode)[0])
 
 def syllables_data_fr(syl_sep='|'):
-    from src.pronunciation_dictionaries import mfa_dicts
+    # from src.pronunciation_dictionaries import mfa_dicts
     from src.pronunciation_dictionaries import get_augmented_mfa_dict, lang_to_MFA_g2p_models
     mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
@@ -83,7 +83,7 @@ def syllables_data_fr(syl_sep='|'):
 
     # mostly hiatus words
     df_bad_n_syl[(wrong_n_syl_in_text==df_bad_n_syl.nbsyll-1)]
-    n_syl_SonoriPy(mfa_dicts['fr_FR']['exagérément'][0], mode='MFA_IPA')
+    n_syl_SonoriPy(mfa_dicts['fr_FR']['évoluez'][0], mode='MFA_IPA')
 
     # SonoriPy(mfa_dicts['fr_FR']['exagérément'][0], mode='MFA_IPA')[0]
     # SonoriPy('exagérément', mode='letters')[0]
@@ -210,9 +210,50 @@ def syllables_data(syl_sep='|'):
 
     return syllables
 
-# syllables_data()
 
-def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), lang="en_GB"):
+
+# syllables_data()
+from src.phonemizer_utils import phonetize
+import librosa
+import numpy as np
+import pandas as pd
+def combined_sonoripy(word="dépendanc", orig_word="dépendance", lang="fr_FR"):
+    stress_symbol="ˈ"
+    second_stress_symbol="ˌ"
+    phonetics=phonetize(orig_word, lang=lang).replace(stress_symbol,"").replace(second_stress_symbol,"").split('_')
+
+    letter_by_syl, sonorities_letters = SonoriPy(str_to_list_of_char(word), mode='letters')
+    p_by_syl, sonorities_phonemes = SonoriPy(phonetics, mode='MFA_IPA')
+
+    x=[el[-1] for el in sonorities_letters]
+    y=[el[-1] for el in sonorities_phonemes]
+
+    D, wp = librosa.sequence.dtw(X=np.array(x), Y=np.array(y), metric='euclidean')
+
+    lens=[len(el) for el in p_by_syl]
+    syl_starts=[0]+[el for el in np.cumsum(lens)][:-1]
+
+    aligned_tokens=pd.DataFrame(wp)[::-1]
+    aligned_tokens.columns=["letters","phonemes"]
+
+    syl_starts_letters=[(aligned_tokens[aligned_tokens.phonemes==syl_start].letters.iloc[0]) for syl_start in syl_starts]
+
+
+    syls_letters=[]
+    letters=str_to_list_of_char(word)
+    syl_starts_letters.append(len(letters))
+
+    for i in range(len(syl_starts_letters)-1):
+        syls_letters.append(letters[syl_starts_letters[i]:syl_starts_letters[i+1]])
+
+    return syls_letters
+
+
+
+
+
+
+def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), lang="en_GB", combined_sonoripy_dtw=True):
     """Construct syllabified word from a word.
 
      text with syllable segmentation is done with several rules/steps:
@@ -231,6 +272,7 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
         [type]: [description]
     """
     # if phones!=[]:
+    orig_word=word
     if n==1:
         syls_text=word
         used_method='1 vowel = 1 syl'
@@ -285,11 +327,14 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
             if word[-2:]=="es":
                 word=word[:-2]+'s'
                 modified_es=True
-            elif word[-1]=="e": #this last one is treated hereafter because it depends
+            elif word[-1]=="e":
                 word=word[:-1]
                 trailing_e=True
         
-        letters_by_syl=SonoriPy(str_to_list_of_char(word), mode='letters')[0]
+        if combined_sonoripy_dtw:
+            letters_by_syl=combined_sonoripy(word, orig_word, lang=lang)
+        else:
+            letters_by_syl=SonoriPy(str_to_list_of_char(word), mode='letters')[0]
         syls_text='|'.join([''.join(syl) for syl in letters_by_syl])
 
         if modified_ed:
@@ -314,7 +359,6 @@ def syllabified_text(word, n, syllables_df=pd.read_csv('data/syllables.csv'), la
         return syls_text, used_method
     return syls_text, used_method
 
-from src.phonemizer_utils import phonetize
 
 def n_vowels(word="coffee", lang="en_GB"):
     """use phonemizer with espeak backend and count vowels
@@ -346,6 +390,7 @@ def n_vowels(word="coffee", lang="en_GB"):
     stress_symbol="ˈ"
     second_stress_symbol="ˌ"
     phonetics=phonetize(word, lang=lang).replace(stress_symbol,"").replace(second_stress_symbol,"").split('_')
+    
     n=0
     for el in phonetics:
         # if the first symbol of a phoneme corresponds to a vowel, I count it as a vowel.
