@@ -379,6 +379,11 @@ def get_augmented_mfa_dict(lang='es_ES'):
     with open('data/acronyms_'+lang+'_mfa.dict','r') as f: acronyms=json.loads(f.read())
     for k in acronyms: d[k]=acronyms[k]
 
+    
+    if lang.split('_')[0]=="fr":
+        with open('data/add_dict_'+lang+'.dict','r') as f: add_dict=json.loads(f.read())
+        for k in add_dict: d[k]=add_dict[k]
+
     if lang.split('_')[0]=="en":
         with open('data/add_dict_'+lang+'.dict','r') as f: add_dict=json.loads(f.read())
         for k in add_dict: d[k]=add_dict[k]
@@ -474,20 +479,75 @@ from collections import ChainMap
 def add_mfa_dicts():
     formatted_cmudict_df=get_formatted_cmudict()
     apostroph_s_words=formatted_cmudict_df[formatted_cmudict_df.text.str.endswith("'s")]
-    
+
+    apostroph_d_words=formatted_cmudict_df[formatted_cmudict_df.text.str.endswith("'d")]
+
+
     # to have all words ending in "'s" in mfa dicts in english, I select all such words from cmudict and look at the end for knowing if it's a "S" or "Z" sound, and take the word in correponding mfa_dict
     apostroph_s_words["apostroph_s_phone"]=apostroph_s_words.formatted_phonetics.str.split('_').apply(lambda r:r[-1].lower())
     lang="en_GB"
     mfa_d=get_augmented_mfa_dict(lang)
     new_words=apostroph_s_words.apply(lambda r: {r['text']:[el+[r['apostroph_s_phone']] for el in mfa_d[r['text'][:-2]]]} if r['text'][:-2] in mfa_d else float('nan'), axis=1).dropna()
     add_dict=dict(ChainMap(*new_words))
+
+    d_dict={}
+    for w in apostroph_d_words.text.tolist():
+        d_dict[w]=[el+["d"] for el in mfa_d[w.split("'")[0]]]
+    corr_d_dict={
+                "it'd": [['ɪ', 't','ɪ', 'd'], ['ɪ', 'ʔ','ɪ', 'd']],
+                "that'd": [['d̪', 'æ', 't','ɪ', 'd'],
+                            ['d̪', 'æ', 'ʔ','ɪ', 'd'],
+                            ['ð', 'æ', 't','ɪ', 'd'],
+                            ['ð', 'æ', 'ʔ','ɪ', 'd']],
+                "what'd": [['w', 'ɒ', 't','ɪ', 'd'], ['w', 'ɒ', 'ʔ','ɪ', 'd']],
+                }
+    
+    for k in corr_d_dict: d_dict[k]=corr_d_dict[k]
+    for k in d_dict: add_dict[k]=d_dict[k]
+
     with open('data/add_dict_en_GB.dict','w') as f: f.write(json.dumps(add_dict))
 
     lang="en_US"
     mfa_d=get_augmented_mfa_dict(lang)
     new_words=apostroph_s_words.apply(lambda r: {r['text']:[el+[r['apostroph_s_phone']] for el in mfa_d[r['text'][:-2]]]} if r['text'][:-2] in mfa_d else float('nan'), axis=1).dropna()
     add_dict=dict(ChainMap(*new_words))
+
+    
+    d_dict={}
+    for w in apostroph_d_words.text.tolist():
+        d_dict[w]=[el+["d"] for el in mfa_d[w.split("'")[0]]]
+    corr_d_dict={
+        "it'd": [['ɪ', 't','ɪ', 'd'], ['ɪ', 'ʔ','ɪ', 'd']],
+        "that'd": [['d̪', 'æ', 't','ɪ', 'd'],
+                    ['d̪', 'æ', 'ʔ','ɪ', 'd'],
+                    ['ð', 'æ', 't','ɪ', 'd'],
+                    ['ð', 'æ', 'ʔ','ɪ', 'd']],
+        "what'd": [['w', 'ɐ', 't','ɪ', 'd'], ['w', 'ɐ', 'ɾ','ɪ', 'd'], ['w', 'ɐ', 'ʔ','ɪ', 'd']],
+    }
+    
+    for k in corr_d_dict: d_dict[k]=corr_d_dict[k]
+    for k in d_dict: add_dict[k]=d_dict[k]
+
     with open('data/add_dict_en_US.dict','w') as f: f.write(json.dumps(add_dict))
+
+    # "l":"l",  "s":"s",  j'  m' "n":"n",  "d":"d",  "qu":"k",  "t":"t"  
+    
+    lang="fr_FR"
+    mfa_d=get_augmented_mfa_dict(lang)
+
+    # TODO: here this additional dict takes 28Mb which seems excessive when you know the original french_mfa dict takes only 5Mb ...
+    # but it avoids mfa_g2p be called all the time easily. Maybe it would be better to implement that in mfa_g2p function
+    from syllabipy.sonoripy import define_categories
+    d=define_categories(mode="MFA_IPA")
+    apostroph_letter_prefixes={"l":"l",  "s":"s",  "c":"s",  "j":"ʒ",  "m":"m", "n":"n",  "d":"d",  "qu":"k",  "t":"t"}
+    add_dict={}
+    for k in mfa_d: 
+        if mfa_d[k][0][0] in d['vowels']:
+            for letter in apostroph_letter_prefixes:
+                add_dict["'".join([letter,k])]=[[apostroph_letter_prefixes[letter]] + el for el in mfa_d[k]]
+
+    with open('data/add_dict_fr_FR.dict','w') as f: f.write(json.dumps(add_dict))
+
 
 
 
@@ -695,6 +755,8 @@ mfa_to_display_ipa['ej']='eɪ'
 mfa_to_display_ipa['ow']='oʊ'
 mfa_to_display_ipa['əw']='əʊ'
 mfa_to_display_ipa['oj']='ɔɪ'
+
+with open('data/mfa_to_display_ipa.json','w') as f: f.write(json.dumps(mfa_to_display_ipa))
 
 
 # the schwa+consonant ones
