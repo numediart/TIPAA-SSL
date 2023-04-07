@@ -39,7 +39,7 @@ def get_all_phone_with_timings(f='data/librispeech_alignments/dev-clean/8842/304
     # get phones and drop "sp", "sil" and empty strings
     phones=[[el.minTime, el.maxTime, el.mark] for el in tg[1] if el.mark not in ['sil','sp','','spn']]
     phones=pd.DataFrame(phones)
-    phones.columns=["start", "end", "phone"]
+    if len(phones)>0: phones.columns=["start", "end", "phone"]
     return phones
 
 def get_sentence(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
@@ -147,6 +147,7 @@ def libri_phonetics(
     for f in files:
         wav_path=os.path.join(audio_path,'/'.join(f.split('/')[-4:]).split('.')[0]+'.flac')
         phone_df=get_all_phone_with_timings(f)
+        if len(phone_df)==0: phone_df['phone']=[]
         text=get_sentence(f)
         d={'text':text, 'phones':' '.join(phone_df['phone'].tolist()), 'path':f, 'wav_path':wav_path}
         d_with_timings={'text':text, 'phone_df':phone_df, 'path':f, 'wav_path':wav_path}
@@ -160,6 +161,12 @@ def libri_phonetics(
     libri_phonetics_df.to_json('data/libri_text_ipa_'+data_set+'.json')
 
     return libri_phonetics_df_with_timings, libri_phonetics_df
+
+
+# libri_phonetics(data_set='train-clean-100')
+# libri_phonetics(data_set='train-clean-360')
+# libri_phonetics(data_set='train-other-500')
+
 
 def libri_phonetics_data(
         data_set='dev-clean',
