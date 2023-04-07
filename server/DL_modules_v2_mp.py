@@ -10,7 +10,7 @@ from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
 # from app_definition import app
-from server.utils import kwargs_def, check_schema, default_example, request_phoneme_contrast, request_syl_contrast, request_stress, request_stress_v2, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
+from server.utils import kwargs_def, check_schema, default_example, request_contrast, request_syl_contrast, request_stress_v2, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
 
 # bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
 
@@ -84,7 +84,7 @@ class dl_vowel_contrast_api_v2_mp(MethodView):
         err=check_schema(d, vowel_contrast_params)
         if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
         properties=["phonetics","audio","word_idx","target","syl_idx"]
-        return request_phoneme_contrast(d, properties, mode='bytes')
+        return request_contrast(d, properties, mode='bytes')
 
 
 example_consonant_contrast={"phonetics":d["phonetics"], "audio": d["audio"],"word_idx":d["consonant_w_idx"],"target":d["consonant_target"],"syl_idx":d["consonant_s_idx"], "target_occurence_idx":d["consonant_target_occurence_idx"]}
@@ -101,7 +101,7 @@ class dl_consonant_contrast_api_v2_mp(MethodView):
         if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
         properties=["phonetics","audio","word_idx","target","syl_idx", "target_occurence_idx"]
         target_occurence_idx=int(d['target_occurence_idx'])
-        return request_phoneme_contrast(d, properties, target_occurence_idx, alternatives=cmu_consonants, mode='bytes')
+        return request_contrast(d, properties, target_occurence_idx, alternatives=cmu_consonants, mode='bytes')
 
 
 example_termination_contrast={"phonetics":d["phonetics"], "audio": d["audio"],"target":d["termination_target"],"word_idx":d["termination_w_idx"]}
@@ -117,4 +117,21 @@ class dl_termination_contrast_api_v2_mp(MethodView):
         err=check_schema(d, termination_contrast_params)
         if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
         properties=["phonetics","audio","word_idx","target"]
-        return request_phoneme_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='bytes')
+        return request_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='bytes', target_type="termination")
+
+
+
+example_cluster_contrast={"phonetics":d["phonetics"], "audio": d["audio"],"target":d["cluster_target"],"basis":d["cluster_basis"],"word_idx":d["cluster_w_idx"],"syl_idx":d["cluster_s_idx"],"position":d["cluster_position"]}
+cluster_contrast_params=kwargs_def(example_cluster_contrast)
+@bp.route('/w2v/contrast/cluster', methods=['POST'])
+class dl_cluster_contrast_api_v2_mp(MethodView):
+    @bp.arguments(Schema.from_dict(cluster_contrast_params), location="files")
+    @bp.response(200, contrast_responseSchema)
+    def post(self, data):
+        d = request.values.to_dict()
+        d["audio"]=request.files['audio'].read()
+        global cluster_contrast_params
+        err=check_schema(d, cluster_contrast_params)
+        if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
+        properties=["phonetics","audio","target","basis","word_idx","syl_idx","position"]
+        return request_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='bytes', target_type="cluster")
