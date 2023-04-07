@@ -407,9 +407,9 @@ def vowels_confusions_user_recordings(n_user=10, n_ex_by_ex_type=10):
     return results
 
 
-if __name__ == '__main__':
+def use_tests():
 
-    from test_DL_api import *
+    # from test_DL_api import *
     base_url = 'http://localhost:8000'; route='/v2/w2v/stress/'; client=app.test_client(); n_ex_by_module=10; mode='v2'
     df=actor_recordings()
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
@@ -444,7 +444,7 @@ if __name__ == '__main__':
         # headers={'Content-Type': mp_encoder.content_type}
     )
 
-    from test_DL_api import *
+    # from test_DL_api import *
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
     test_stress_detection(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
 
@@ -485,7 +485,7 @@ if __name__ == '__main__':
     get_results(df_sentence_stress.iloc[3:4,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
     request_for_audio_file(df_sentence_stress.iloc[3,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
 
-    from test_DL_api import *;print(pContrast_for_user_data())
+    # from test_DL_api import *;print(pContrast_for_user_data())
 
     import time
     start=time.time()

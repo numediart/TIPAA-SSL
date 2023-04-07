@@ -104,7 +104,7 @@ def pick_phonetics_phones(ipa_targets=["ɔ", "ow"], phone_type="vowel", n_exerci
     return l
 
 
-if __name__=="__main__":
+def use_tests():
     # /æ/ (like in 'have') and /ɑ:/
 
     pick_phonetics_phones(ipa_targets=["ɔ", "ow"], n_exercises = 10, topic = 'biology')

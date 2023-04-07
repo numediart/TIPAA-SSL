@@ -126,8 +126,8 @@ def synthesize_voices():
         print(k)
         synthesize_words(root_folder=root_folder, voice_id=voice_id, spk_id=spk_id, words=words)
 
-if __name__ == "__main__":
-    from scripts.tts_aws import *
+def use_tests():
+    # from scripts.tts_aws import *
     # df=pd.read_csv('data/BE_PickStressedWord_1.csv')
     # col=df.iloc[:,1]
     # df=pd.read_csv('data/Business English-Vocabulary_all.csv')

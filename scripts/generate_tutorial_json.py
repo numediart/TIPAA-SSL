@@ -120,7 +120,7 @@ def validate_json(path="data/Tutorials 1.0/JSON Final -ED/page100/when_talking_a
     text=text.replace('uuidv4()', '"uuidv4()"').replace('new Date()','"new Date()"').replace('"text": ','')
     d=json.loads(text)
 
-if __name__=='__main__':
+def use_tests():
     sentence="Hello world, how are you?"
     len_words=len(sentence.split(' '))
     colors=["white"]*len_words

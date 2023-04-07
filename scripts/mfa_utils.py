@@ -578,7 +578,7 @@ def load_aligned_MAILABS(path="data/MAILABS", lang_code="en_US"):
     return df
 
 
-if __name__=='__main__':
+def use_tests():
 
     align_common_voice(root='data/cv-corpus-10.0-delta-2022-07-04/', lang='en', split='train', out_json='data/align_common_voice_en_train_mfa.json')
     align_common_voice(root='data/cv-corpus-10.0-delta-2022-07-04/', lang='en', split='dev', out_json='data/align_common_voice_en_dev_mfa.json')

@@ -1225,7 +1225,20 @@ def generate_exercise(exercise_type, pronunciation_aspect = 'VC1', n_exercises =
             return spokensentence_ws(n_exercises, topic)
 
 
-if __name__=="__main__":
+
+def syllabus_tree_exercise_generation(tree, topic="medical sciences"):
+    print(tree)
+
+    for module in tree:
+        for activity_set in tree[module]:
+            print(activity_set)
+            print(tree[module][activity_set])
+            print(len(tree[module][activity_set]))
+            # for activity in tree[module][activity_set]:
+
+
+
+def use_tests():
     generate_exercise('SpokenSentence', pronunciation_aspect = 'VC1', n_exercises = 10, topic = 'Business')
     generate_exercise('SpokenSentence', pronunciation_aspect = 'WS', n_exercises = 10, topic = 'biology')
     

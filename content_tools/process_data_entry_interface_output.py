@@ -131,7 +131,7 @@ def remove_duplicates(db_content, all_phrases_df):
     len(all_phrases_df_drop_db)
     return all_phrases_df_drop_db
 
-if __name__=="__main__":
+def use_tests():
 
     db_content=pd.read_csv('/mnt/c/Users/noe_t/Downloads/All content minus audio 2023-02-14 - Sheet1.csv')
     db_content.columns=['sentence','id']
@@ -176,7 +176,8 @@ if __name__=="__main__":
     
 
     import ast
-    df=pd.read_csv("scripts/PE_syllabus_tree_and_stress.csv")
+    df=pd.read_csv("content_tools/GE_S_syllabus_tree_03_09_2023_15_59_59.csv")
+    # df=pd.read_csv("scripts/PE_syllabus_tree_and_stress.csv")
     df.phrase_data=df.phrase_data.str.replace('…','...')
     df.phrase_data=df.phrase_data.apply(lambda r: ast.literal_eval(r))
 
@@ -196,14 +197,14 @@ if __name__=="__main__":
     df.loc[df.phrase_data.apply(lambda r: re.match("^\*[a-z]*\*$", r["target_content"]) if "target_content" in r else False).astype(bool), 'phrase_data']=df_star.phrase_data.apply(lambda r: {k:r[k].replace('*','') for k in r})
 
 
-    df.columns=['id', 'phrase_data', 'module_title', 'activity_set_title', 'activity_title', 'activity_type', 'exercise_type', 'pronunciation_aspect', 'stress_category']
+    df.columns=['id', 'phrase_data', 'module_title', 'activity_set_title', 'activity_title', 'activity_type', 'exercise_type', 'pronunciation_aspect']#, 'stress_category']
     df.activity_type=df.activity_type.apply(lambda r: r.strip())
     df.pronunciation_aspect=df.pronunciation_aspect.apply(lambda r: r.strip())
     df.exercise_type=df.exercise_type.apply(lambda r: r.lower().strip().replace(' ','_'))
 
     modules=df_to_nested_dict(df)
 
-    with open("scripts/PE_data_entry.json", 'w') as f: json.dump(modules, f, indent=2)
+    with open("scripts/GE_S_data_entry.json", 'w') as f: json.dump(modules, f, indent=2)
 
     with open("scripts/PE_data_entry_manually_corrected.json", 'r') as f: content=json.load(f)
 

@@ -49,7 +49,7 @@ def lemmatize_from_df(df):
     return lemmatized_words
 
 
-if __name__=='__main__':
+def use_tests():
 
 
     # remove duplicates to existing phrases from a new learning program
