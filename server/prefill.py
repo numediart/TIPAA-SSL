@@ -11,7 +11,7 @@ from flask.views import MethodView
 from marshmallow import Schema, fields
 # from flask_apispec import marshal_with, doc, use_kwargs
 
-from src.text_processing import generate_prefill_csv, prefill_for_sentence, syllables_df
+from src.text_processing import generate_prefill_csv, prefill_for_sentence, syllables_dfs
 from server.utils import kwargs_def, check_schema, debug_only, access_property_error
 
 # from server.upload import upload_path
@@ -79,14 +79,14 @@ def prefill_from_phrases():
 example_prefill={"phrase":"I paid a $3000 bill when visiting UCLA, it's an expensive hotel, for the 21st century!", "mode":"CMU", "lang":"en_US"}
 example_prefill_params=kwargs_def(example_prefill)
 record={'text':fields.Str(),
-        'cmu_phonetics':fields.Str(),
+        'phonetics':fields.Str(),
         'pronounciation_guide':fields.Str(),
         'pronounciation_guide_hr':fields.Str(),
         'syllable_parts':fields.Str(),
         'n_syl_mismatch':fields.Integer(),
         'n_syl_mismatches':fields.List(fields.Integer),
         'used_method_for_syl_text':fields.List(fields.Str()),
-        'cmu_phonetics_alt':fields.List(fields.List(fields.Str())),
+        'phonetics_alt':fields.List(fields.List(fields.Str())),
         'pronounciation_guide_alt':fields.List(fields.List(fields.Str())),
         'pronounciation_guide_hr_alt':fields.List(fields.List(fields.Str())),
         'n_alternatives':fields.List(fields.Integer)
@@ -115,7 +115,7 @@ class prefill_from_phrase(MethodView):
         mode=content['mode']
         d=prefill_for_sentence(
                             sentence=content['phrase'],
-                            syllables_df=syllables_df[lang], 
+                            syllables_df=syllables_dfs[lang], 
                             lang=lang,
                             mode=mode)  # "CMU" or "MFA_IPA"
         # print(d)
