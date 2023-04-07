@@ -112,7 +112,7 @@ def default_example():
     path="data/audio_recordings/M1_two-hundred-dollars-way-too-expensive.mp3"
     audio64=audio64_from_file(path)
     text="*Two* hundred *dollars*? That's *way* too expensive!"
-    p='T_UW1 HH_AH1_N|D_R_AH0_D D_AA1|L_ER0_Z DH_AE1_T_S W_EY1 T_UW1 IH0_K_S|P_EH1_N|S_IH0_V'
+    p='T_UW1 HH_AH1_N|D_R_IH0_D D_AA1|L_ER0_Z DH_AE1_T_S W_EY1 T_UW1 IH0_K_S|P_EH1_N|S_IH0_V'
     n_words_by_chunk=chunk_text(text)
     cumsum=0
     chunks_p=[]
@@ -131,8 +131,13 @@ def default_example():
         "consonant_target":"DH",
         "consonant_w_idx":3,
         "consonant_s_idx":0,
+        "cluster_target":"HH",
+        "cluster_basis":"HH",
+        "cluster_w_idx":1,
+        "cluster_s_idx":0,
+        "cluster_position":"start",
         "consonant_target_occurence_idx":0,
-        "termination_target":"AH0_D",
+        "termination_target":"IH0_D",
         "termination_w_idx":1,
         "API_KEY":"[FOWSPEECH_KEY]"
     }
@@ -156,7 +161,6 @@ def debug_only(f):
 #             args[prop]=fields.Str(required=required,example=d,default=d)
 #         else:
 #             args[prop]=fields.Str(required=required)
-
 #     return args
 
 def access_property_error(content, property):
@@ -167,7 +171,7 @@ def access_property_error(content, property):
         response='error: could not access "'+property+'" property of the request'
         return response
 
-
+# TODO: I think I should add "numpy" here, and in the default_example() function to put the waveform signal as numpy array. maybe I should get rid of the rID
 audio_property_dict={'file':'rID', 'base64':'audio64', 'bytes':'audio'}
 
 def check_request(d, properties):
@@ -184,7 +188,7 @@ def check_phonetics(phonetics):
         return err
 
 
-def check_target_access(d, target_occurence_idx=0, target_type='phone'):  # target_type='phone'  or  'termination'
+def check_target_access(d, target_occurence_idx=0, target_type='phone'):  # target_type='phone',  'termination' or 'cluster'
     split_phonetics_lists=split_phonetics(d['phonetics'])
 
     target_phone_list=d['target'].split('_')
@@ -217,22 +221,47 @@ def check_target_access(d, target_occurence_idx=0, target_type='phone'):  # targ
         err="error: word_idx >= n of words"
         return err
 
-def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_function=phonemeContrast_from_formatted_phonetics_audio, alternatives=cmu_vowels, mode='file'):
+def request_contrast(d, properties, target_occurence_idx=0, tech_function=phonemeContrast_from_formatted_phonetics_audio, alternatives=cmu_vowels, mode='file', target_type="phone"):
+    """
+    calls corresponding DL_speech_tech function with parameters
+
+    Args:
+        d (_type_): _description_
+        properties (_type_): _description_
+        target_occurence_idx (int, optional): _description_. Defaults to 0.
+        tech_function (_type_, optional): _description_. Defaults to phonemeContrast_from_formatted_phonetics_audio.
+        alternatives (_type_, optional): _description_. Defaults to cmu_vowels.
+        mode (str, optional): from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array . Defaults to 'file'.
+        target_type (str, optional): "phone", "termination" or "cluster". Defaults to "phone".
+
+    Returns:
+        _type_: _description_
+    """
     err=check_request(d, properties)
     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
     err=check_phonetics(d['phonetics'])
     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
 
     word_idx=int(d['word_idx'])
-    if tech_function==phonemeContrast_from_formatted_phonetics_audio:
+    # if tech_function==phonemeContrast_from_formatted_phonetics_audio:
+    if target_type=="phone":
         syl_idx=int(d['syl_idx'])
-        err=check_target_access(d, target_occurence_idx=target_occurence_idx, target_type='phone')
-        if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
-    else:
+        basis=None
+        position=None
+    elif target_type=="termination":
         syl_idx=None
-        err=check_target_access(d, target_occurence_idx=target_occurence_idx, target_type='termination')
-        if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
-    res=tech_function(d[audio_property_dict[mode]], d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, target_occurence_idx=target_occurence_idx, target_phones=d['target'], alternatives=alternatives, mode=mode)
+        basis=None
+        position="end"
+    elif target_type=="cluster":
+        syl_idx=int(d['syl_idx'])
+        basis=d['basis']
+        position=d['position']
+
+
+    err=check_target_access(d, target_occurence_idx=target_occurence_idx, target_type=target_type)
+    if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
+
+    res=tech_function(d[audio_property_dict[mode]], d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, target_occurence_idx=target_occurence_idx, target_phones=d['target'], basis=basis, position=position, alternatives=alternatives, mode=mode)
     
     if res['status'].split(':')[0]=='error':
         res['error']=True
@@ -247,7 +276,7 @@ def request_phoneme_contrast(d, properties, target_occurence_idx=0, tech_functio
 
 
 
-# TODO: refactor with "request_phoneme_contrast" by parametrizing the function call
+# TODO: refactor with "request_contrast" by parametrizing the function call
 def request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='file'):
     err=check_request(d, properties)
     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
@@ -311,18 +340,18 @@ def call_stress_fn(audio, p, module, n_words_by_chunk=[], mode='file', version='
         response=json.dumps(res)
         return Response(response,status=200,mimetype="application/json")
 
-def request_stress(d, properties, module, mode='file'):
-    err=check_request(d, properties)
-    if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
-    err=check_phonetics(d['phonetics'])
-    if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
+# def request_stress(d, properties, module, mode='file'):
+#     err=check_request(d, properties)
+#     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
+#     err=check_phonetics(d['phonetics'])
+#     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
 
-    p=d['phonetics']
-    n_words_by_chunk=chunk_text(d['text'])
+#     p=d['phonetics']
+#     n_words_by_chunk=chunk_text(d['text'])
 
-    audio=d[audio_property_dict[mode]]
+#     audio=d[audio_property_dict[mode]]
 
-    return call_stress_fn(audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode)
+#     return call_stress_fn(audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode)
 
 def request_stress_v2(d, properties, module, mode='file'):
     err=check_request(d, properties)
