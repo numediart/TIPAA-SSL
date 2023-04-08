@@ -2,16 +2,8 @@ import pandas as pd
 import numpy as np
 import pickle
 import os
-import matplotlib.pyplot as plt
 import torch
-import librosa
-import json
-import ast
-
-
 import numpy as np
-
-
 from sklearn.neighbors import KNeighborsClassifier
 
 from src.audio_processing import getIntonation, getIntensity, normalize
@@ -27,9 +19,7 @@ from transformers import Wav2Vec2Model, Wav2Vec2Processor
 from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_cmu_test_dataset
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
-
 from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer
-
 from src.text_processing import remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
 
 
@@ -57,6 +47,7 @@ class Wav2Vec2ForFramePrediction:
         self.status = 'success'
         self.pred_phones_audio = []
         self.fs = 16000
+        self.time_per_output=0.02
         
         if phone_type == 'cmu':
             self.alphabet = cmu_alphabet
@@ -168,18 +159,12 @@ class Wav2Vec2ForFramePrediction:
     # predict and get proba means per phoneme alignment and GT
     def predict_with_timings(self, s, target_phonemes):
         phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
-
         df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes, fs=self.fs)
-
-        # avg_vectors=[]
-        # for i,r in df_segmented.iterrows():
-        #     avg_vector=self.lhs.numpy()[0][r.start_idx:r.end_idx,:].mean(axis=0)
-        #     avg_vectors.append(avg_vector)
-        # df_segmented['average_vectors']=avg_vectors
-
         self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
 
         return df_segmented
+
+    ################### TO BE DEPRECATED
 
     # call predict_with_timings and reindex words and syllables on top of it
     def analyze_phonetic_content(self, audio, phonetics):
@@ -230,9 +215,11 @@ class Wav2Vec2ForFramePrediction:
         phones=sum(phonetics,[])
         df_segmented = self.predict_with_timings(s, phones)
         df_word=extract_word(df_segmented, phonetics, target_word_idx)
+
+        print(df_word)
         return df_word
 
-    # predict a specific word in a sample through its word index in phonetics and its syllable index in word
+    # predict a specific phone in a sample through its word index in phonetics and its syllable index in word
     def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
         """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
         """
@@ -245,11 +232,7 @@ class Wav2Vec2ForFramePrediction:
             syllables=[syl.split('_') for syl in word.split('|')]
             syllable=syllables[target_syllable_idx]
             syl=remove_stress_annots(syllable)
-
             idxs_of_target_occurences=[i for i,p in enumerate(syl) if unstress(target_phones) ==p]
-
-            # find the phoneme index:
-            # p_idx_local=syl.index(unstress(target_phones))
 
             if target_occurence_idx<len(idxs_of_target_occurences):
                 p_idx_local=idxs_of_target_occurences[target_occurence_idx]
@@ -264,11 +247,8 @@ class Wav2Vec2ForFramePrediction:
 
             phonetic_detection = df_word.iloc[p_idx_global].pred_phones_audio
 
-            # phoneme_set_ids=self.charsiu_processor.get_phone_ids(phoneme_set)[1:-1]
             phoneme_set_ids=self.forced_aligner.labelize_phonemes(phoneme_set)
             proba_means=df_word.iloc[p_idx_global].proba_means
-
-            # df_word['GT_proba'] = [df_word.proba_means[i][j] for i,j in zip(range(len(df_word)), self.forced_aligner.labelize_phonemes(df_word.phones))]
 
             # if GT_proba is beyond the threshold, we take it as prediction
             if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
@@ -276,11 +256,7 @@ class Wav2Vec2ForFramePrediction:
             else:
                 # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
                 filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
-                idx_mean_max=np.argmax(filtered_proba_means)
-
                 phonetic_detection=self.id_to_p[np.argmax(filtered_proba_means)]
-                # phonetic_detection = self.forced_aligner.label_encoder.inverse_transform([np.argmax(filtered_proba_means)])[0]
-                # phonetic_detection=self.charsiu_processor.mapping_id2phone(int(idx_mean_max))
             syl[p_idx_local]=phonetic_detection
             
         else:
@@ -289,7 +265,7 @@ class Wav2Vec2ForFramePrediction:
         return phonetic_detection, syl
 
     def compute_stress_score(self, audio, phonetics):
-        """Use textgridData to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
+        """Use df_segmented to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
         a value by vowel representing a stress intensity
 
         Args:
@@ -302,11 +278,10 @@ class Wav2Vec2ForFramePrediction:
         # phonetics=sum(phonetics,[])
         split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
         split_phonetics=sum(split_phonetics,[])
-        #_, textgridData, _ = self.align_phones(audio=audio,phones=split_phonetics)
-        with CodeTimer('whole phone prediction'): textgridData = self.predict_with_timings(audio, split_phonetics)
+        with CodeTimer('whole phone prediction'): df_segmented = self.predict_with_timings(audio, split_phonetics)
 
         # select vowels
-        filtered_df=textgridData[textgridData.phones.isin(cmu_vowels)]#.index.tolist()
+        filtered_df=df_segmented[df_segmented.phones.isin(cmu_vowels)]#.index.tolist()
 
         f0Samples=getIntonation(audio, self.fs)
         intensity=getIntensity(audio, self.fs)
