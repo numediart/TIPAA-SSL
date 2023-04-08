@@ -1,7 +1,10 @@
 # API docs for Flowspeech v2
 
 The source of truth for API endpoints (requests and responses) is swagger.
-https://sp.flowchase.app/swagger-ui/
+https://spt.flowchase.app/swagger-ui/
+
+Different endpoint on new version (now on dev)
+https://spdev.flowchase.app/docs/
 
 Requests and responses should be JSON.
 The audio is base64 encoded files from these format: ogg, caf. It can be others as long as (it is handled by libsndfile)[http://www.mega-nerd.com/libsndfile/]
