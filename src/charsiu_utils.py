@@ -10,6 +10,9 @@ from src.text_processing import group_consecutive_duplicates, remove_stress_anno
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 from src.audio_processing import getIntonation, getIntensity, normalize
 
+from src.dtw_forced_aligner import dtw_forced_aligner
+
+
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
 keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
 
@@ -47,9 +50,16 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         self.status="success"
         self.phonetic_content=None
         self.pred_phones_audio=[]
+        self.fs = 16000
+        self.time_per_output=0.01
 
         self.p_to_id=self.charsiu_processor.processor.tokenizer.encoder
         self.id_to_p=self.charsiu_processor.processor.tokenizer.decoder
+
+        self.forced_aligner = dtw_forced_aligner('cmu') 
+        self.forced_aligner.p_to_id=self.p_to_id
+        self.forced_aligner.id_to_p=self.id_to_p
+
     
     def predict_prob_matrix_and_phones(self, audio):
         
@@ -65,7 +75,25 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         pred_phones_audio = [self.charsiu_processor.mapping_id2phone(int(i)) for i in pred_ids_audio]
 
         return cost, pred_phones_audio
+    
+    def predict_phone_prob_matrix(self, s, fs):
+        # this exist just for compatibility with the new pipeline and so that DL_speech_tech can call this
+        cost, _ = self.predict_prob_matrix_and_phones(s)
+        return cost
 
+    # predict and get proba means per phoneme alignment and GT
+    def predict_with_timings(self, s, target_phonemes):
+        phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
+        df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes, fs=self.fs, time_per_output=0.01)
+        self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
+
+        return df_segmented
+
+
+    
+    ################### TO BE DEPRECATED
+
+    # TODO: this will be deprecated, replaced by the use of the dtw_forced_aligner in predict_with_timings function
     def align_phones(self, audio, phones, GT_alignment_proba_threshold=0.17):
         '''
         Perform forced alignment
@@ -293,12 +321,11 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
         return detailed_alignment_phones
 
-    def predict_with_timings(self, s, target_phonemes):
-        # this exist just for compatibility with the new pipeline and so that DL_speech_tech can call thisS
-        _, df_segmented, _ = self.align_phones(audio=s,phones=target_phonemes)
+    # def predict_with_timings(self, s, target_phonemes):
+    #     # this exist just for compatibility with the new pipeline and so that DL_speech_tech can call this
+    #     _, df_segmented, _ = self.align_phones(audio=s,phones=target_phonemes)
 
-        return df_segmented
-
+    #     return df_segmented
     def predict_word(self, audio, phonetics, target_word_idx):
         """phonetics must be a list of list of phonemes, e.g.: phonetics=[['AY1'],['EH1', 'N', 'D', 'IH0', 'D']]
         """
