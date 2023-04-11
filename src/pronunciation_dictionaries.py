@@ -758,6 +758,13 @@ mfa_to_display_ipa['oj']='ɔɪ'
 
 with open('data/mfa_to_display_ipa.json','w') as f: f.write(json.dumps(mfa_to_display_ipa))
 
+# keys=list(mfa_to_display_ipa.keys())
+# values=[mfa_to_display_ipa[k] for k in keys]
+
+# import pandas as pd
+# mfa_to_display_ipa_df=pd.DataFrame()
+# mfa_to_display_ipa_df['complex']=keys
+# mfa_to_display_ipa_df['simple']=values
 
 # the schwa+consonant ones
 for p in mfa_simplifier:
