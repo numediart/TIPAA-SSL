@@ -170,7 +170,7 @@ def SonoriPy(word, mode='CMU'):
     # The algorithm extract oscilating sonority values (assigned by categories), and basically cut syllables with locals minimas.
     # If there are two consecutive vowels, it wouldn't cut that in separate syllables because there is no local minimum between them.
     # Although there shouldn't be 2 vowels in 1 syllable. So what I do is insert an approximant just after each vowel (wich is the level just below vowels).
-    # That way, it I insert a local minimum there, but don't modify the rest of the trend for the rest. After cutting, I remove the inserted approximants to get the final result.
+    # That way, if I insert a local minimum there, but don't modify the rest of the trend for the rest. After cutting, I remove the inserted approximants to get the final result.
 
     # processing: insert an approximant after each vowel so that e.g. "going" can be in two syllables. "théorie"
     # this works well in phonetics, but in letters, there are too much exceptions. I have a better accuracy without it
