@@ -121,7 +121,8 @@ class dl_termination_contrast_api_v2_mp(MethodView):
 
 
 
-example_cluster_contrast={"phonetics":d["phonetics"], "audio": d["audio"],"target":d["cluster_target"],"basis":d["cluster_basis"],"word_idx":d["cluster_w_idx"],"syl_idx":d["cluster_s_idx"],"position":d["cluster_position"]}
+# example_cluster_contrast={"phonetics":d["phonetics"], "audio": d["audio"],"target":d["cluster_target"],"basis":d["cluster_basis"],"word_idx":d["cluster_w_idx"],"syl_idx":d["cluster_s_idx"],"position":d["cluster_position"]}
+example_cluster_contrast={"phonetics":d["phonetics"], "audio": d["audio"],"target":d["cluster_target"],"word_idx":d["cluster_w_idx"],"syl_idx":d["cluster_s_idx"],"position":d["cluster_position"]}
 cluster_contrast_params=kwargs_def(example_cluster_contrast)
 @bp.route('/w2v/contrast/cluster', methods=['POST'])
 class dl_cluster_contrast_api_v2_mp(MethodView):
@@ -133,5 +134,6 @@ class dl_cluster_contrast_api_v2_mp(MethodView):
         global cluster_contrast_params
         err=check_schema(d, cluster_contrast_params)
         if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-        properties=["phonetics","audio","target","basis","word_idx","syl_idx","position"]
+        # properties=["phonetics","audio","target","basis","word_idx","syl_idx","position"]
+        properties=["phonetics","audio","target","word_idx","syl_idx","position"]
         return request_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='bytes', target_type="cluster")

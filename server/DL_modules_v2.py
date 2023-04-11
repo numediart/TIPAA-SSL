@@ -12,8 +12,6 @@ from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 # from app_definition import app
 from server.utils import kwargs_def, check_schema, default_example, request_contrast, request_syl_contrast, request_stress_v2, contrast_responseSchema, syl_contrast_responseSchema, sentence_stress_responseSchema_v2, word_stress_responseSchema_v2
 
-# bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
-
 bp = Blueprint("DL_modules_v2", "DL_modules_v2", url_prefix="/", description="DL_modules_v2")
 
 
@@ -44,7 +42,6 @@ class dl_sentence_stress_api_v2(MethodView):
     @bp.arguments(Schema.from_dict(sentence_stress_params), location="json")
     @bp.response(200, sentence_stress_responseSchema_v2)
     def post(self, data):
-        # d = request.values.to_dict()
         try:
             d=json.loads(request.get_json())
         except TypeError:
@@ -66,7 +63,6 @@ class dl_word_stress_api_v2(MethodView):
     @bp.arguments(Schema.from_dict(word_stress_params), location="json")
     @bp.response(200, word_stress_responseSchema_v2)
     def post(self, data):
-        # d = request.values.to_dict()
         try:
             d=json.loads(request.get_json())
         except TypeError:
@@ -87,7 +83,6 @@ class dl_vowel_contrast_api_v2(MethodView):
     @bp.arguments(Schema.from_dict(vowel_contrast_params), location="json")
     @bp.response(200, contrast_responseSchema)
     def post(self, data):
-        # d = request.values.to_dict()
         try:
             d=json.loads(request.get_json())
         except TypeError:
@@ -109,7 +104,6 @@ class dl_consonant_contrast_api_v2(MethodView):
     @bp.arguments(Schema.from_dict(consonant_contrast_params), location="json")
     @bp.response(200, contrast_responseSchema)
     def post(self, data):
-        # d = request.values.to_dict()
         try:
             d=json.loads(request.get_json())
         except TypeError:
@@ -132,7 +126,6 @@ class dl_termination_contrast_api_v2(MethodView):
     @bp.arguments(Schema.from_dict(termination_contrast_params), location="json")
     @bp.response(200, contrast_responseSchema)
     def post(self, data):
-        # d = request.values.to_dict()
         try:
             d=json.loads(request.get_json())
         except TypeError:
@@ -145,14 +138,14 @@ class dl_termination_contrast_api_v2(MethodView):
 
 
 
-example_cluster_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"target":d["cluster_target"],"basis":d["cluster_basis"],"word_idx":d["cluster_w_idx"],"syl_idx":d["cluster_s_idx"],"position":d["cluster_position"]}
+# example_cluster_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"target":d["cluster_target"],"basis":d["cluster_basis"],"word_idx":d["cluster_w_idx"],"syl_idx":d["cluster_s_idx"],"position":d["cluster_position"]}
+example_cluster_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"target":d["cluster_target"],"word_idx":d["cluster_w_idx"],"syl_idx":d["cluster_s_idx"],"position":d["cluster_position"]}
 cluster_contrast_params=kwargs_def(example_cluster_contrast)
 @bp.route('/w2v/contrast/cluster', methods=['POST'])
 class dl_cluster_contrast_api_v2(MethodView):
     @bp.arguments(Schema.from_dict(cluster_contrast_params), location="json")
     @bp.response(200, contrast_responseSchema)
     def post(self, data):
-        # d = request.values.to_dict()
         try:
             d=json.loads(request.get_json())
         except TypeError:
@@ -160,7 +153,8 @@ class dl_cluster_contrast_api_v2(MethodView):
         global cluster_contrast_params
         err=check_schema(d, cluster_contrast_params)
         if err is not None: return Response(json.dumps({"status":"wrong payload:"+err, "error":True }),status=400,mimetype="application/json")
-        properties=["phonetics","audio64","target","basis","word_idx","syl_idx","position"]
+        # properties=["phonetics","audio64","target","basis","word_idx","syl_idx","position"]
+        properties=["phonetics","audio64","target","word_idx","syl_idx","position"]
         return request_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='base64', target_type="cluster")
 
 if False:
