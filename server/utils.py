@@ -254,7 +254,8 @@ def request_contrast(d, properties, target_occurence_idx=0, tech_function=phonem
         position="end"
     elif target_type=="cluster":
         syl_idx=int(d['syl_idx'])
-        basis=d['basis']
+        # basis=d['basis']
+        basis=None
         position=d['position']
 
 
