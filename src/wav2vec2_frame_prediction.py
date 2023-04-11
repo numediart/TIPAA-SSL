@@ -150,6 +150,8 @@ class Wav2Vec2ForFramePrediction:
         # we defined the silence as the last token, we remove it here. 
         # Silence will be deteted in the forced aligner by checking that the sum of the remaining probablities are not close to 1 (<0.2)
         phone_prob_matrix = phone_prob_matrix[:,:-1]
+
+        self.phone_prob_matrix=phone_prob_matrix
         
         print('times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba')
         print(self.timestamps)
