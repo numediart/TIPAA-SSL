@@ -440,22 +440,13 @@ def final_ed_confusions_for_actor_recordings():
     return predictions, results
 
 
-# target_to_basis={
-#     'D':'D_D',
-#     'IH0_D':'IH0_D',
-#     'T':'T_T',
-#     '':'IH0_Z',
-#     'S':'S_S',
-#     'Z':'Z_Z',
-#     'IH0_Z':'IH0_Z',
-# }
-
 
 target_to_basis={
+    'HH':'HH',
+    '':'HH',
     'D':'IH0_D',
     'IH0_D':'IH0_D',
     'T':'IH0_T',
-    '':'IH0_Z',
     'S':'IH0_S',
     'Z':'IH0_Z',
     'IH0_Z':'IH0_Z',
@@ -527,7 +518,7 @@ def syl_confusions_on_synth_words():
 
 # final_ed_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu_basis_it')
 # final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline_basis_it')
-def final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words'):
+def final_ed_confusions_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words'):
 
     df=synth_words_data()
 
@@ -554,17 +545,15 @@ def final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_syn
     plot_confusion_results(results, name=name)
 
 
-# final_s_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu_target_to_basis')
-# final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline_target_to_basis')
-def final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words'):
+# final_s_confusions_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu_target_to_basis')
+# final_s_confusions_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline_basis_it')
+def final_s_confusions_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words'):
 
-    df=synth_words_data()
+    df=synth_words_data().dropna()
 
     df['target_word_indexes']=0
     df['target_syllable_indexes']=-1
     df['fpath']=df['path']
-
-    df=df.dropna()
     
     df_iz=df[(df.phonetics.str.endswith('AH0_Z')|df.phonetics.str.endswith('IH0_Z'))&df.text.str.endswith('es')]
     df_s=df[(df.phonetics.str.endswith('_S'))&df.text.str.endswith('s')]
@@ -589,11 +578,161 @@ def final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth
 
     plot_confusion_results(results, name=name)
 
+def h_sound_confusions_on_synth_words(n=100, model=default_model, name='plots/start_end_synth_words'):
+
+    df=synth_words_data().dropna()
+
+    df['target_word_indexes']=0
+    df['target_syllable_indexes']=0
+    df['contrast']="start"
+    df['fpath']=df['path']
+
+    df_h=df[df.phonetics.str.startswith('HH')&df.text.str.startswith('h')]
+    df_no_h_sound=df[~df.phonetics.str.startswith('HH')&~df.phonetics.str.startswith('EY1_CH')&~df.phonetics.str.startswith('EY2_CH')&~df.phonetics.str.startswith('EY1|CH')&~df.phonetics.str.startswith('EY2\|CH')&df.text.str.startswith('h')]
+
+    df_h_in=df[df.phonetics.str.contains('\|HH')]
+    
+    words_no_h_candidates=list(df_h.text.str[1:])
+    df_no_h_letter_sound=df[df.text.isin(words_no_h_candidates)]
+
+    
+    selections={
+        # '':df_no_s.sample(frac=1, random_state=0)[:n],
+        'HH':df_h.sample(frac=1, random_state=0)[:n],
+        '':df_no_h_sound.sample(frac=1, random_state=0)[:n]
+    }    
+    results, result_dfs=compute_start_end_confusions_from_selections(selections, model=model)
+
+    # fake mistakes
+
+    # I remove the "HH" from ground truth phonetics to simumate a word not starting with "h" but with a "HH" sound in audio
+    df_fake_added_h=df_h.sample(frac=1, random_state=0)[:n]
+    df_fake_added_h.phonetics=df_fake_added_h.phonetics.str[3:]
+
+    # I take words without "h" sound, and add "HH" in the ground truth to simulate words with a missing "HH"
+    df_fake_missing_h=df_no_h_sound.sample(frac=1, random_state=0)[:n]
+    df_fake_missing_h.phonetics="HH_"+df_fake_missing_h.phonetics
+
+    selections={
+        'HH':df_fake_missing_h,
+        # '':df_fake_added_h
+    }    
+
+    results, result_dfs=compute_start_end_confusions_from_selections(selections, model=model)
+
+    # plot_confusion_results(results, name=name)
+
+
+def h_sound_artificial_data(model=default_model):
+    root_path='data/h_sound_test_examples/'
+    sheets_dict=pd.read_excel(root_path+'h_sound_annotations.xlsx', sheet_name=None)
+    df_correct=sheets_dict['target']
+    df_incorrect=sheets_dict['bad pron to train errors']
+    from src.text_processing import prefill_for_sentence, remove_special_characters
+
+    df_correct['fpath']='/'.join([root_path, "correct/",])+df_correct["audio_name"]
+    df_incorrect['fpath']='/'.join([root_path, "incorrect/",])+df_incorrect["audio_name"]
+
+    df_correct['contrast']="start"
+    df_incorrect['contrast']="start"
+    
+    from tqdm import tqdm
+    tqdm.pandas()
+    df_correct['phonetics']=df_correct.progress_apply(lambda r: prefill_for_sentence(r.text)['phonetics'], axis=1)
+    df_correct['target_word_idx']=df_correct.apply(lambda r: remove_special_characters(r.text.lower()).split(' ').index(r['target word'].lower().strip()), axis=1)
+    df_correct['target_word_indexes']=df_correct['target_word_idx']#.apply(lambda r: [r])
+
+    df_correct_h=df_correct[df_correct['rule']!="without the sound h at the beginning"]
+    df_correct_no_h=df_correct[df_correct['rule']=="without the sound h at the beginning"]
+
+    df_correct_no_h['target_syllable_idx']=0
+    df_correct_no_h['target_syllable_indexes']=0
+
+    df_correct_h['target_syllable_idx']=df_correct_h.apply(lambda r: ["HH" in el for el in r.phonetics.split(' ')[r.target_word_idx].split('|')].index(True), axis=1)
+    df_correct_h['target_syllable_indexes']=df_correct_h['target_syllable_idx']
+    df_correct_h.apply(lambda r: r.phonetics.split(' ')[r.target_word_idx].split('|'), axis=1)
+    
+    selections={
+        'HH':df_correct_h,
+        '':df_correct_no_h
+    }    
+    results, result_dfs=compute_start_end_confusions_from_selections(selections, model=model)
+
+    result_dfs['HH'][result_dfs['HH'].phonetic_detection!="HH"].index.tolist()
+    df_correct_h.index=result_dfs['HH'].index
+    df_correct_h.loc[result_dfs['HH'][result_dfs['HH'].phonetic_detection!="HH"].index.tolist(),:]
+
+    result_dfs[''][result_dfs[''].phonetic_detection=="HH"].index.tolist()
+
+    df_correct_no_h.index=result_dfs[''].index
+    df_correct_no_h.loc[result_dfs[''][result_dfs[''].phonetic_detection=="HH"].index.tolist(),:]
+
+    
+    df_correct_h['phonetic_detection']=result_dfs['HH']['phonetic_detection']
+    df_correct_h['gibberish_truth']=result_dfs['HH']['gibberish_truth']
+    df_correct_h['gibberish_detected']=result_dfs['HH']['gibberish_detected']
+
+    df_correct_h.to_csv(root_path+"/df_correct_h.csv")
+
+    
+    df_correct_no_h['phonetic_detection']=result_dfs['']['phonetic_detection']
+    df_correct_no_h['gibberish_truth']=result_dfs['']['gibberish_truth']
+    df_correct_no_h['gibberish_detected']=result_dfs['']['gibberish_detected']
+
+    df_correct_no_h.to_csv(root_path+"/df_correct_no_h.csv")
+
+
+    ###
+
+    
+    df_incorrect['phonetics']=df_incorrect.progress_apply(lambda r: prefill_for_sentence(r["expected text"])['phonetics'], axis=1)
+    df_incorrect['target_word_idx']=df_incorrect.apply(lambda r: remove_special_characters(r["expected text"].lower()).split(' ').index(r['target word'].lower().strip()), axis=1)
+    df_incorrect['target_word_indexes']=df_incorrect['target_word_idx']#.apply(lambda r: [r])
+
+    # df_correct_h=df_correct[df_correct['rule']!="without the sound h at the beginning"]
+    # df_correct_no_h=df_correct[df_correct['rule']=="without the sound h at the beginning"]
+
+    # df_correct_no_h['target_syllable_idx']=0
+    # df_correct_no_h['target_syllable_indexes']=0
+
+    df_incorrect['target_syllable_idx']=df_incorrect.apply(lambda r: ["HH" in el for el in r.phonetics.split(' ')[r.target_word_idx].split('|')].index(True), axis=1)
+
+    # df_incorrect[df_incorrect.apply(lambda r: True not in ["HH" in el for el in r.phonetics.split(' ')[r.target_word_idx].split('|')], axis=1)]
+    
+    df_incorrect['target_syllable_indexes']=df_incorrect['target_syllable_idx']
+    # df_correct_h.apply(lambda r: r.phonetics.split(' ')[r.target_word_idx].split('|'), axis=1)
+
+    
+    selections_incorrect={
+        'HH':df_incorrect,
+    }    
+
+    results_incorrect, result_dfs_incorrect=compute_start_end_confusions_from_selections(selections_incorrect, model=model)
+
+    compute_start_end_confusions_from_selections({'HH':df_incorrect.iloc[-1:]}, model=model)
+
+    
+    df_incorrect.index=result_dfs_incorrect['HH'].index
+    df_incorrect.loc[result_dfs_incorrect['HH'][result_dfs_incorrect['HH'].phonetic_detection=="HH"].index.tolist(),:]
+
+
+    df_incorrect['phonetic_detection']=result_dfs_incorrect['HH']['phonetic_detection']
+    df_incorrect['gibberish_truth']=result_dfs_incorrect['HH']['gibberish_truth']
+    df_incorrect['gibberish_detected']=result_dfs_incorrect['HH']['gibberish_detected']
+
+    df_incorrect.to_csv(root_path+"/df_incorrect.csv")
+
+
+
+
 def final_ed_s_confusions_on_synth_words():
-    final_ed_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu')
-    final_ed_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline_onnx')
-    final_s_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu')
-    final_s_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline_onnx')
+    from datetime import datetime
+    now=datetime.now()
+    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    final_ed_confusions_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_ed_synth_words_charsiu_'+date_time)
+    final_ed_confusions_on_synth_words(n=100, model=default_model, name='plots/final_ed_synth_words_pipeline_onnx_'+date_time)
+    final_s_confusions_on_synth_words(n=100, model=default_model_charsiu, name='plots/final_s_synth_words_charsiu_'+date_time)
+    final_s_confusions_on_synth_words(n=100, model=default_model, name='plots/final_s_synth_words_pipeline_onnx_'+date_time)
 
 def final_s_from_artificial_data(model=default_model):
     df=final_s_artificial_data()    
@@ -658,12 +797,12 @@ def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other', mode
     r=d[d.index!='HH'].sum()
 
     # start_end_phoneme_from_audiobook_data(phoneme='AA', n=10000, data_set=data_set)
-    _,_,d=start_end_phoneme_from_audiobook_data(phoneme='S',basis='S', contrast="end", n=n, data_set=data_set, model=model)
+    _,_,d=start_end_phoneme_from_audiobook_data(phoneme='S',basis='S', position="end", n=n, data_set=data_set, model=model)
     r=d.T['S']
-    _,_,d=start_end_phoneme_from_audiobook_data(phoneme='K',basis='S', contrast="end", n=n, data_set=data_set, model=model)
+    _,_,d=start_end_phoneme_from_audiobook_data(phoneme='K',basis='S', position="end", n=n, data_set=data_set, model=model)
     r=d[d.index!='S'].sum()
 
-    start_end_phoneme_from_audiobook_data(phoneme='Z',basis='Z', contrast="end", n=n, data_set=data_set, model=model)
+    start_end_phoneme_from_audiobook_data(phoneme='Z',basis='Z', position="end", n=n, data_set=data_set, model=model)
 
     _, results=vowels_consonants_confusions_from_audiobook_data(n=n, data_set=data_set, model=model)
 
@@ -806,18 +945,29 @@ def model_comparison():
 
 
 
-if __name__=='__main__':
-    from DL_accuracy_performance import *
-    pContrast_for_actor_recordings(target_phones='AO1')
+def use_tests():
 
+    final_ed_s_confusions_on_synth_words()
+    
+    from datetime import datetime
+    now=datetime.now()
+    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
 
+    
     _,results=phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100)
-    plot_confusion_results(results, name='plots/vowel_confusions_on_synth_words')
+    plot_confusion_results(results, name='plots/vowel_confusions_on_synth_words_'+date_time)
+
+
+    # from DL_accuracy_performance import *
+    pContrast_for_actor_recordings(target_phones='AO1')
+    pContrast_for_actor_recordings(target_phones='AO1', model=default_model_charsiu)
+
+
 
 
     start_end_phoneme_from_audiobook_data(phoneme='HH')
-    start_end_phoneme_from_audiobook_data(phoneme='S', basis='S', contrast="end")
-    start_end_phoneme_from_audiobook_data(phoneme='Z', basis='Z', contrast="end")
+    start_end_phoneme_from_audiobook_data(phoneme='S', basis='S', position="end")
+    start_end_phoneme_from_audiobook_data(phoneme='Z', basis='Z', position="end")
 
     r=final_ed_for_actor_recordings()
     r=final_ed_for_actor_recordings('T')
