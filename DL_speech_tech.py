@@ -46,6 +46,9 @@ print_memory_usage("RAM - DL_speech_tech after wav2vec2_frame_prediction")
 
 default_model = Wav2Vec2ForFramePrediction('cmu',w2v2_model_format="onnx")
 default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+# default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
+# default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
+
 
 # default_model.load(name='model_mailabs_pca_99_logistic_regression')
 # default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
@@ -108,6 +111,7 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
     """
     n_syllables_tot=sum([len(el.split('|')) for el in phonetics.split(' ')])
 
+    # TODO: change this by the use of src.audio_processing.read_audio_file
     if mode=='file':
         try:
             f=sf.SoundFile('./inputs/'+ audio+ '.wav')
@@ -123,6 +127,7 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
             s=s/32767
         except FileNotFoundError:
             return "error: audio file not found", None
+        
     elif (mode=='base64' or mode=='bytes' or mode=="numpy"):
         if mode=='base64': s, fs= read_audio_string(audio, fs=fs)
         elif mode=='bytes': s, fs= read_audio_bytes(audio, fs=fs)
@@ -134,7 +139,7 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
         if speech_rate>max_speech_rate: 
             return "success: audio is too short compared to the expected number of syllables", None
     else:
-        return "error: mode for audio_load_and_check() must be file or base64", None
+        return "error: mode for audio_load_and_check() must be file, base64, bytes or numpy", None
     
     if np.abs(s).sum()==0: return "success: no voiced sound detected (only 0's in waveform)", None
     
@@ -164,7 +169,6 @@ import math
 roundup=lambda n: math.ceil(n)
 
 def intensity_to_bin(score_by_word, n_max=2):
-
     bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
     
     if len(score_by_word)==1:
@@ -180,7 +184,7 @@ def intensity_to_bin(score_by_word, n_max=2):
 def predict_phone(forced_aligner, df_word, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
     """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
     """
-    phoneme_set=[p for p in remove_stress_annots(phoneme_set)]
+    phoneme_set=[p for p in remove_stress_annots(phoneme_set)]+["[SIL]"]
     # split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
     # df_word=self.predict_word(audio, split_phonetics, target_word_idx)
 
@@ -213,7 +217,10 @@ def predict_phone(forced_aligner, df_word, phonetics, target_word_idx, target_sy
         else:
             # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
             filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
-            phonetic_detection=forced_aligner.id_to_p[np.argmax(filtered_proba_means)]
+            # if everything is 0 in the filtered proba, then we keep the phonetic detection that was in the non-filtered proba. E.g., for the word "new", imagine we target the "Y" of "N_Y_UW", but it is pronounced the british way "N_UW"
+            # Then, there could be zero probability in consonants, and therefore, we keep the vowel that should be close to "UW"
+            if sum(filtered_proba_means)!=0:
+                phonetic_detection=forced_aligner.id_to_p[np.argmax(filtered_proba_means)]
         syl[p_idx_local]=phonetic_detection
         
     else:
@@ -284,10 +291,8 @@ def audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=8, mode="numpy"
 def phone_prob_matrix_segmentation(phone_prob_matrix, phonetics, model=default_model):
     phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
     with CodeTimer('DTW'): 
-        # df_segmented = model.predict_with_timings(s, split_phonetics)
         df_segmented=model.forced_aligner.probas_to_df_segmented(phone_prob_matrix, phoneme_list, fs=model.fs, time_per_output=model.time_per_output)
         model.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
-    
     return df_segmented
 
 def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
@@ -372,7 +377,9 @@ def phonemeContrast_from_df_segmented(df_segmented,phonetics='T_ER1_N_D ER0|AW1_
                             to_gibberish=cmu_to_gibberish,
                             **kwargs
                     ):
+
     g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+
     phones_by_words=[el.split('_') for el in phonetics.replace('|','_').split(' ')]
     df_word=extract_word(df_segmented, phones_by_words, target_word_idx)
     phonetic_detection, detected_syllable=predict_phone(model.forced_aligner, df_word, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx, phoneme_set=alternatives) #, GT_proba_threshold=0.2)
@@ -380,6 +387,9 @@ def phonemeContrast_from_df_segmented(df_segmented,phonetics='T_ER1_N_D ER0|AW1_
 
     # if it's nan
     if detected_syllable!=detected_syllable: 
+        return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
+    if 'SIL' in phonetic_detection: 
         return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
     g_d=[to_gibberish[unstress(p)] for p in detected_syllable]
@@ -411,7 +421,8 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
                             to_gibberish=cmu_to_gibberish,
                             **kwargs
                     ):
-
+    # phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
+    g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
     if audio_status!="success": 
         return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
@@ -423,7 +434,6 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
     if model.status!="success": 
         # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
         g_d=[to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in model.pred_phones_audio]
-        g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
         if g_d==[]:
             return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
         else:
@@ -559,7 +569,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
         elif unstress(basis) in vowels:
             phoneme_set=vowels
         
-        phoneme_set_ids=[model.p_to_id[el] for el in remove_stress_annots(phoneme_set)]
+        phoneme_set_ids=[model.p_to_id[el] for el in remove_stress_annots(phoneme_set)]+["[SIL]"]
 
         if len(df_syl)>0:
             proba_means=df_syl.iloc[p_idx].proba_means

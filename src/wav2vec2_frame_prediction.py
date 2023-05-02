@@ -16,7 +16,7 @@ from time import time
 from linetimer import CodeTimer
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
-from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_cmu_test_dataset
+from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_libri_dataset_audio_timings
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
 from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer
@@ -38,7 +38,6 @@ def extract_word(df_segmented, phonetics, target_word_idx):
     return df_word
 
 class Wav2Vec2ForFramePrediction:
-
     # phone_type = 'cmu' or 'ipa'
     def __init__(self, phone_type, w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", w2v2_model_format="torch", reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
         """
@@ -93,7 +92,6 @@ class Wav2Vec2ForFramePrediction:
         self.reducer=pd.read_pickle(path+"/reducer.p")
         self.frame_classifier=pd.read_pickle(path+"/frame_classifier.p")
         
-
     # get output from an audio sample in w2v2 feature extractor
     def get_last_hidden_state(self, s, fs):
         input_values = self.processor(torch.tensor(s), sampling_rate=fs, return_tensors="pt").input_values.to('cpu')
@@ -114,7 +112,6 @@ class Wav2Vec2ForFramePrediction:
         self.y_train_labels = y
         
         self.y_train=[self.p_to_id[el] for el in y]
-
         
         print('fit frame reducer...')
         self.reducer.fit(self.X_train)
@@ -131,11 +128,11 @@ class Wav2Vec2ForFramePrediction:
         self.timestamps.append(time()-start)
         
         start = time()
-        reduced_lhs = self.reduce_lhs_dimension(self.lhs)
+        self.reduced_lhs = self.reduce_lhs_dimension(self.lhs)
         self.timestamps.append(time()-start)
 
         start = time()
-        phone_prob_matrix = self.frame_classifier.predict_proba(reduced_lhs)
+        phone_prob_matrix = self.frame_classifier.predict_proba(self.reduced_lhs)
         self.timestamps.append(time()-start)
 
         # if during training, the classifier has not seen some of the labels, it won't be in the possible labels, and the proba matrix will have a reduced shape
@@ -143,19 +140,15 @@ class Wav2Vec2ForFramePrediction:
         ids_to_add=[el for el in range(len(self.id_to_p)) if el not in self.frame_classifier.classes_]
 
         for i in ids_to_add:
-            phone_prob_matrix=np.concatenate([phone_prob_matrix[:,:i] , np.zeros((phone_prob_matrix.shape[0],1)), phone_prob_matrix[:,i:]], axis=1)
-            # print(phone_prob_matrix.shape)
-
+            phone_prob_matrix=np.concatenate([phone_prob_matrix[:,:i], np.zeros((phone_prob_matrix.shape[0],1)), phone_prob_matrix[:,i:]], axis=1)
         
         # we defined the silence as the last token, we remove it here. 
         # Silence will be deteted in the forced aligner by checking that the sum of the remaining probablities are not close to 1 (<0.2)
-        phone_prob_matrix = phone_prob_matrix[:,:-1]
-
+        # phone_prob_matrix = phone_prob_matrix[:,:-1]
         self.phone_prob_matrix=phone_prob_matrix
         
         print('times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba')
         print(self.timestamps)
-
         return phone_prob_matrix
 
     # predict and get proba means per phoneme alignment and GT
@@ -166,174 +159,41 @@ class Wav2Vec2ForFramePrediction:
 
         return df_segmented
 
-    ################### TO BE DEPRECATED
-
-    # call predict_with_timings and reindex words and syllables on top of it
-    def analyze_phonetic_content(self, audio, phonetics):
-        """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
-        """
-        split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
-        phones=sum(split_phonetics,[])
-        # seq_p=[[p] for p in  remove_stress_annots(phones)]
-        df_segmented = self.predict_with_timings(audio,phones)
-
-        detailed_alignment_phones=df_segmented[df_segmented.phones != '[SIL]']
-
-        if len(detailed_alignment_phones)==0: return detailed_alignment_phones
-
-        phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
-
-        # here we align phonetics_indexed_df to the detailed_alignment_phones to be able to get an indexation on the "really pronounced phonetics"
-        # from part of audio that corresponded to specific phones in ground truth (according to forced-alignment)
-        orig_phones=remove_stress_annots(phones)
-        pred_phones=detailed_alignment_phones.phones.tolist()
-        assert orig_phones[0] == pred_phones[0], "The first phone of alignment pred and ground truth should be the same"
-        indx_in_phones=0
-        pred_phones_original_indices=[]
-        for i,p in enumerate(pred_phones):
-            if p == orig_phones[indx_in_phones]:
-                pred_phones_original_indices.append(indx_in_phones)
-            else:
-                indx_in_phones+=1
-                # Given it was not equal to the previous element, after going to the next element of ground truth, it should be the same"
-                # except if there was twice the same phoneme (because it was the end of last word and start of current word)
-                if p == orig_phones[indx_in_phones]:
-                    pred_phones_original_indices.append(indx_in_phones)
-                else:
-                    assert orig_phones[indx_in_phones]==orig_phones[indx_in_phones-1], "This should correspond to the case of two consecutive identical phonemes, because they are in two consecutive words"
-                    indx_in_phones+=1
-                    assert p == orig_phones[indx_in_phones], "This should correspond to the case of two consecutive identical phonemes, because they are in two consecutive words"
-                    pred_phones_original_indices.append(indx_in_phones)
-
-        # detailed_alignment_phones.loc[:,'p_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'p_idx'].tolist()
-        detailed_alignment_phones.loc[:,'word_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'word_idx'].tolist()
-        detailed_alignment_phones.loc[:,'syl_idx']=phonetics_indexed_df.loc[pred_phones_original_indices,'syl_idx'].tolist()
-        return detailed_alignment_phones
-
-    # predict a specific word in a sample through its index in phonetics
-    def predict_word(self, s, phonetics, target_word_idx):
-        """phonetics must be a list of list of phonemes, e.g.: phonetics=[['AY1'],['EH1', 'N', 'D', 'IH0', 'D']]
-        """
-        phones=sum(phonetics,[])
-        df_segmented = self.predict_with_timings(s, phones)
-        df_word=extract_word(df_segmented, phonetics, target_word_idx)
-
-        print(df_word)
-        return df_word
-
-    # predict a specific phone in a sample through its word index in phonetics and its syllable index in word
-    def predict_phone(self, audio, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
-        """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
-        """
-        phoneme_set=[p for p in remove_stress_annots(phoneme_set)]
-        split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
-        df_word=self.predict_word(audio, split_phonetics, target_word_idx)
-
-        if len(df_word)>0:
-            word=phonetics.split(' ')[target_word_idx]
-            syllables=[syl.split('_') for syl in word.split('|')]
-            syllable=syllables[target_syllable_idx]
-            syl=remove_stress_annots(syllable)
-            idxs_of_target_occurences=[i for i,p in enumerate(syl) if unstress(target_phones) ==p]
-
-            if target_occurence_idx<len(idxs_of_target_occurences):
-                p_idx_local=idxs_of_target_occurences[target_occurence_idx]
-            else:
-                self.status="error: target_occurence_idx is out of bounds"
-                phonetic_detection=float('nan')
-                syl=float('nan')
-                return phonetic_detection, syl
-
-            len_previous_syllables=sum([len(el) for el in syllables[:target_syllable_idx]])
-            p_idx_global=len_previous_syllables+p_idx_local
-
-            phonetic_detection = df_word.iloc[p_idx_global].pred_phones_audio
-
-            phoneme_set_ids=self.forced_aligner.labelize_phonemes(phoneme_set)
-            proba_means=df_word.iloc[p_idx_global].proba_means
-
-            # if GT_proba is beyond the threshold, we take it as prediction
-            if df_word.iloc[p_idx_global].GT_proba>GT_proba_threshold:
-                phonetic_detection=target_phones
-            else:
-                # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
-                filtered_proba_means=[0 if i not in phoneme_set_ids else el for i,el in enumerate(proba_means)]
-                phonetic_detection=self.id_to_p[np.argmax(filtered_proba_means)]
-            syl[p_idx_local]=phonetic_detection
-            
-        else:
-            phonetic_detection=float('nan')
-            syl=float('nan')
-        return phonetic_detection, syl
-
-    def compute_stress_score(self, audio, phonetics):
-        """Use df_segmented to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute 
-        a value by vowel representing a stress intensity
-
-        Args:
-            phonetics (str): formatted phonetics
-            audio (np array): audio signal
-        Returns:
-            weighted_score [type]: stress intensity score
-        """
-        
-        # phonetics=sum(phonetics,[])
-        split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
-        split_phonetics=sum(split_phonetics,[])
-        with CodeTimer('whole phone prediction'): df_segmented = self.predict_with_timings(audio, split_phonetics)
-
-        # select vowels
-        filtered_df=df_segmented[df_segmented.phones.isin(cmu_vowels)]#.index.tolist()
-
-        f0Samples=getIntonation(audio, self.fs)
-        intensity=getIntensity(audio, self.fs)
-
-        # extract features
-        # each word start and end position expressed in samples
-        startPositions_samples = (round(self.fs*filtered_df.loc[:,'start'])+1).astype(int).tolist()
-        stopPositions_samples = round(self.fs*filtered_df.loc[:,'end']).astype(int).tolist()
-
-        # to make sure we don t go beyond the end of the signal
-        assert stopPositions_samples[-1]<len(audio), "The end of the last phoneme should be inside the signal"
-
-        Imax,Imean,Fmax,Fmean,Dur=[],[],[],[],[]
-        # nVowels=len(indxVowels)
-        # sylType=np.zeros(len(filtered_df))
-        for i in range(len(filtered_df)):
-            range_vowel=range(startPositions_samples[i], stopPositions_samples[i])
-            Ivowel=intensity[range_vowel]
-            Fvowel=f0Samples[range_vowel]
-            
-            Imax.append(max(Ivowel))
-            Imean.append(np.mean(Ivowel))
-            Fmax.append(max(Fvowel))
-            Fmean.append(np.mean(Fvowel))
-
-            Dur.append(filtered_df['end'].iloc[i]-filtered_df['start'].iloc[i])
-            
-        # normalization of features (projection to [0 1] range)
-        zImax = normalize(Imax)
-        zImean = normalize(Imean)
-        zFmax = normalize(Fmax)
-        zFmean = normalize(Fmean)
-        zDur = normalize(Dur)
-
-        # combine the features
-        weighted_score = (zImax + 0.2*zImean + zFmax + 0.2*zFmean + 0.8*zDur)/3.2  # needs fine-tuning once enough user data are available - in the long term train a classifier with annotated user data
-
-        return weighted_score
-
-
 def train_Wav2Vec2ForFramePrediction_model():
     
 
-    from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis, LogisticRegression
+    from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis
+    from sklearn.linear_model import LogisticRegression
+
+    
+    df_all_instances_select_with_silences=pd.read_pickle('df_all_instances_select_with_silences.pkl')
+    X, y = df_all_frames_to_X_y(df_all_instances_select_with_silences)
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.fit(X, y)
+    model.save(name='model_mailabs_equilibrated_pca_95_knn_10_w')
+
+    
+    df_all_instances_select_with_silences=pd.read_pickle('df_all_instances_select_with_silences_no_CH_JH.pkl')
+    X, y = df_all_frames_to_X_y(df_all_instances_select_with_silences)
+    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model.fit(X, y)
+    model.save(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
+
     # Basis model Wav2Vec2ForFramePrediction, a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
     model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_0.95_knn_10_w')
+
+    
+    df_all_instances_select_with_silences=pd.read_pickle('df_all_instances_select_with_silences.pkl')
+    X, y = df_all_frames_to_X_y(df_all_instances_select_with_silences)
+    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.95, random_state=42), frame_classifier=LinearDiscriminantAnalysis())
+    model.fit(X, y)
+    model.save(name='model_mailabs_equilibrated_pca_99_lda')
+
+
 
     
     # Basis model Wav2Vec2ForFramePrediction, a 10-NN classifier weighted with distances
@@ -416,12 +276,22 @@ def train_Wav2Vec2ForFramePrediction_model():
 
 def inference_demo():
     
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    # default_model_cmu = Wav2Vec2ForFramePrediction('cmu')
+    model = Wav2Vec2ForFramePrediction('cmu',w2v2_model_format="onnx")
+    # model.load(name='model_mailabs_pca_0.95_knn_10_w')
+    model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
+
+
     # --------------- Inference demo --------------------
     
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
-    data = load_cmu_test_dataset(df_t_test)
+    data = load_libri_dataset_audio_timings(df_t_test)
+    # data = load_libri_dataset_audio_timings(df_t_train)
+
+    # data[data.apply(lambda r: "ZH" in r.cmu_phones, axis=1)]
     # data = load_test_dataset(df_t_test)
 
     # # phoneme predictions on a single audio sample with forced alignment
@@ -429,15 +299,44 @@ def inference_demo():
     # prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
     
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    # default_model_cmu = Wav2Vec2ForFramePrediction('cmu')
-    default_model_cmu = Wav2Vec2ForFramePrediction('cmu',w2v2_model_format="onnx")
-    default_model_cmu.load(name='model_mailabs_pca_0.95_knn_10_w')
+    # phoneme predictions on a single audio sample with forced alignment
+    df_segmented = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
+    prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+
+    # from src.label_data_processing import synth_words_data
+    from src.audio_processing import read_audio_file
+    from src.text_processing import prefill_for_sentence
+    
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import re
+
+    # df=synth_words_data()
+
+    word="sister"
+    phonetics=prefill_for_sentence(word)['phonetics']
+    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    s,fs=read_audio_file(path, fs=16000)
+
+    phone_list=re.sub("[0-9]","",phonetics).replace('|',"_").split('_')
+
 
     # phoneme predictions on a single audio sample with forced alignment
-    pred = default_model_cmu.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
-    prob_matrix = default_model_cmu.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    return pred, prob_matrix
+    df_segmented = model.predict_with_timings(s,phone_list)
+    prob_matrix = model.predict_phone_prob_matrix(s, 16000)
+
+    latentogram=model.reducer.transform(model.lhs[0])
+    df_segmented.start_idx.tolist()
+
+    # to have horizontal line in white in the heatmap at the phone starts, I put a 6
+    latentogram[df_segmented.start_idx.tolist(),:]=10
+
+    plt.clf()
+    sns.heatmap(latentogram)
+    plt.savefig('w2v_latentogram_reduced.png')
+
+
+    return df_segmented, prob_matrix
 
 def use_tests():
 

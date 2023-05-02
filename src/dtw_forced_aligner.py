@@ -36,7 +36,8 @@ class dtw_forced_aligner:
         phone_prob_matrix = [l for l in phone_prob_matrix]
 
         # the sum is 1, except if it's a silence, because the column corresponding to that token was removed
-        def condition(vect): return sum(vect)<0.2
+        # def condition(vect): return sum(vect)<0.2
+        def condition(vect): return vect[-1]>0.8
         a = np.array(phone_prob_matrix)
 
         silence_frames_idx = [idx for idx, element in enumerate(a) if condition(element)]
@@ -49,7 +50,18 @@ class dtw_forced_aligner:
         # target_phonemes = [x[0] for x in groupby(target_phonemes)]
         target_phonemes = remove_stress_annots(target_phonemes)
         target_labels = self.labelize_phonemes(target_phonemes)
+
+        # one_hot_matrix=np.zeros((len(self.id_to_p), len(target_phonemes)))
+        # for i in range(len(target_labels)):
+        #     one_hot_matrix[target_labels[i],i]=1
+        # (np.dot(phone_prob_matrix_nonsil,one_hot_matrix)==phone_prob_matrix_nonsil[:,list(target_labels)]).all()
+
         # Dynamic Time Warping
+        # with 39 phonemes + silence token, phone_prob_matrix_nonsil is of shape T x 40. let's call L the length of the phoneme sequence. 
+        # phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
+        # for each phoneme of the sequence, we extract a number for each time step that is a similarity measure between the frame proba and the phoneme, i.e. a dot product divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
+        # if it is a one-hot, a dot product is equivalent as just taking the element with that index from the prob vector.
+
         D, wp = librosa.sequence.dtw(C=-phone_prob_matrix_nonsil[:,list(target_labels)], step_sizes_sigma=np.array([[1, 1], [1, 0]]))
         # getting phonemes' labels from forced alignement
         aligned_phones_labels = []
