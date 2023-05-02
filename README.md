@@ -24,6 +24,10 @@ git lfs install
 python scripts/download_models.py
 ```
 
+These will clone necessary repositories and install git-lfs (lfs stand for large file storage) in order to download some open source deep learning models.
+
+At the root of the repository, create a folder named "models", and add what is inside this folder on [Flowchase's drive storage](https://drive.google.com/drive/folders/1drAmLjPOsl1QrfEuOybmiv-R-Sxd-yFC?usp=share_link)
+
 ### Install miniconda and python dependencies
 ```
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
@@ -36,7 +40,7 @@ conda create -n flowspeech python=3
 conda activate flowspeech
 ```
 
-Then basically follow the sme installation steps as in the Dockerfile
+Then basically follow the same installation commands described in the Dockerfile, but directly on your linux machine
 
 ## Data
 
