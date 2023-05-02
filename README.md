@@ -51,7 +51,7 @@ git clone https://github.com/flowchase/audio-with-analysis-ids
 cd ..
 ```
 
-You can use ```get_data()``` function.
+You can use ```get_data()``` function in "src/label_data_processing.py" now.
 
 ### Librispeech data:
 https://www.openslr.org/12/
@@ -79,6 +79,22 @@ unzip librispeech_alignments.zip
 rm librispeech_alignments.zip
 cd ..
 cd ..
+```
+
+### MAILABS dataset
+
+Download data archives from [MAILABS website](https://www.caito.de/2019/01/03/the-m-ailabs-speech-dataset/#:~:text=Statistics%20%26%20Download%20Links)
+Download the ones with the tags "en_UK", "en_US" in priority. (You can also download "es_ES" and "fr_FR" for experimenting later, but not necessary right now)
+
+Commands for doing it for "en_UK" if you are at the root of the repo:
+```
+cd data
+mkdir MAILABS
+cd MAILABS
+wget https://data.solak.de/data/Training/stt_tts/en_UK.tgz
+tar xvfz en_UK.tgz
+rm en_UK.tgz
+cd ../..
 ```
 
 ### Other sets of data
