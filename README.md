@@ -26,7 +26,10 @@ python scripts/download_models.py
 
 These will clone necessary repositories and install git-lfs (lfs stand for large file storage) in order to download some open source deep learning models.
 
-At the root of the repository, create a folder named "models", and add what is inside this folder on [Flowchase's drive storage](https://drive.google.com/drive/folders/1drAmLjPOsl1QrfEuOybmiv-R-Sxd-yFC?usp=share_link)
+At the root of the repository, create a folder named "models", and the folder "model_mailabs_pca_0.95_knn_10_w" that is in [Flowchase's drive storage](https://drive.google.com/drive/folders/1drAmLjPOsl1QrfEuOybmiv-R-Sxd-yFC?usp=share_link)
+
+After executing the `scripts/download_models.py` script, you should have a few pretrained models inside "hf_models" folder.
+The Flowchase drive folder above contains a file named `last_hidden_state.quant.onnx`. This is a compressed version of a pretrained huggingface model, and should go into the corresponding folder which is "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"
 
 ### Install miniconda and python dependencies
 ```
