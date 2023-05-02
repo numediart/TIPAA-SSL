@@ -42,16 +42,15 @@ conda activate flowspeech
 
 Then basically follow the same installation commands described in the Dockerfile, but directly on your linux machine
 
+
 ## Data
 
-### Data of actor recordings with sentenceID etc.
-```
-cd data
-git clone https://github.com/flowchase/audio-with-analysis-ids
-cd ..
-```
+### Data of actor recordings
 
-You can use ```get_data()``` function in "src/label_data_processing.py" now.
+Download the folder "audio-with-analysis-ids" in this [drive folder](https://drive.google.com/drive/folders/1-c34uCaNL8PvokYFPaqWYin6FGPXq-3t?usp=share_link)
+Paste it inside "data/" folder of this repo.
+
+You can now use ```get_data()``` function in "src/label_data_processing.py" now.
 
 ### Librispeech data:
 https://www.openslr.org/12/
