@@ -25,11 +25,11 @@ def build_df_all_frames(df_t, phone_type, number_of_examples=100, model_path="hf
     df_all_frames = instances_per_frame(df_t, processor, model, number_of_examples=number_of_examples, phone_type=phone_type)
     return df_all_frames
 
-def build_df_all_phoneme_instances(df_t_train, phone_type='phone', model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
+def build_df_all_phoneme_instances(df_t_train, phone_type='phone', number_of_examples=None, model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
     processor = Wav2Vec2Processor.from_pretrained(model_path)
     model = Wav2Vec2ForCTC.from_pretrained(model_path, output_hidden_states=True)
     df_t_train['phone_df']=df_t_train.phone_df.apply(lambda r: pd.DataFrame(r))
-    df_all_instances=instances_per_phoneme(df_t_train, processor, model, number_of_examples=None, time_per_output=0.02,  phone_type=phone_type)
+    df_all_instances=instances_per_phoneme(df_t_train, processor, model, number_of_examples=number_of_examples, time_per_output=0.02,  phone_type=phone_type)
     return df_all_instances
 
 
@@ -82,11 +82,13 @@ def load_dataset_MAILABS(lang_codes, path='./data/MAILABS', phone_set='CMU'):
 def load_libri_dataset():
     df_t_train, _=libri_phonetics_data(data_set='dev-clean')
     df_t_test, _=libri_phonetics_data(data_set='test-clean')
-    df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
+    df_t_train["phone_df"]=df_t_train.apply(lambda r: pd.DataFrame.from_records(r.phone_df), axis=1)
+    df_t_test["phone_df"]=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df), axis=1)
     return df_t_train, df_t_test
 
-def load_cmu_test_dataset(df_t_test, number_of_examples=100):
-    df_cmu_phones=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
+def load_libri_dataset_audio_timings(df_t_test, number_of_examples=100):
+    if "phone" in df_t_test.iloc[0].phone_df.columns:  df_cmu_phones=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).phone.tolist(), axis=1)
+    else:  df_cmu_phones=df_t_test.apply(lambda r: pd.DataFrame.from_records(r.phone_df).cmu_phone.tolist(), axis=1)
     test_examples=[]
     for N in range(number_of_examples):
         example=df_t_test.iloc[N]
@@ -124,9 +126,9 @@ def build_df_segmented(df_t, model, forced_aligner, mode): # mode = "CMU" or "MF
         s, fs = librosa.load(row.wav_path, sr=16000)
         target_phonemes = df.phones
         phone_prob_matrix = model.predict_phone_prob_matrix(s, fs)
-        cost_nonsil, _, _ = forced_aligner.get_cost_non_sil(phone_prob_matrix)
-        aligned_phones = forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
-        pred_phones_audio, probs_means = forced_aligner.predict(aligned_phones, cost_nonsil, target_phonemes)
+        phone_prob_matrix_nonsil, _, _ = forced_aligner.get_phone_prob_matrix_nonsil(phone_prob_matrix)
+        aligned_phones = forced_aligner.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
+        pred_phones_audio, probs_means = forced_aligner.predict(aligned_phones, phone_prob_matrix_nonsil, target_phonemes)
 
         df.pred_phones_audio = pred_phones_audio
 
@@ -155,9 +157,9 @@ def build_df_segmented_all(df_t, model, forced_aligner, mode, language_code): # 
         s, fs = librosa.load(ex.wav_path, sr=16000)
         target_phonemes = ex.target_phonemes
         phone_prob_matrix = model.predict_phone_prob_matrix(s, fs)
-        cost_nonsil, _, _ = forced_aligner.get_cost_non_sil(phone_prob_matrix)
-        aligned_phones = forced_aligner.get_forced_alignment(cost_nonsil, target_phonemes)
-        predicted_phones, probs_means = forced_aligner.predict(aligned_phones, cost_nonsil)
+        phone_prob_matrix_nonsil, _, _ = forced_aligner.get_phone_prob_matrix_nonsil(phone_prob_matrix)
+        aligned_phones = forced_aligner.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
+        predicted_phones, probs_means = forced_aligner.predict(aligned_phones, phone_prob_matrix_nonsil)
         predictions.append(predicted_phones)
 
     df_segmented.predicted_phones = predictions
@@ -168,6 +170,7 @@ def use_tests():
     
     df_t_train = load_dataset_MAILABS(['en_US', 'en_UK'], path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS')
     df_t_train=df_t_train.dropna()
+
     df_all_frames = build_df_all_frames(df_t_train, 'phone')
     X, y = df_all_frames_to_X_y(df_all_frames)
 
