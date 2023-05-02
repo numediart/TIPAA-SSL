@@ -73,7 +73,7 @@ def determine_start_end_vectors(df_segmented, time_per_output=0.02):
     df_segmented["start_vector"]=(df_segmented["start"]*(1/time_per_output)).astype(int)
     return df_segmented
 
-def phone_average_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state):
+def phone_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state):
     df_segmented=determine_start_end_vectors(df_segmented, time_per_output=time_per_output)
     
     #new dataframe to save results
@@ -81,18 +81,21 @@ def phone_average_vectors(s, fs, df_segmented, processor, model, time_per_output
     new_df['phoneme']=remove_stress_annots(df_segmented[phone_type])
 
     #compute logits or hidden states
-    hidden_vector=np.array(extractor_function(s, fs, processor, model))
+    hidden_vectors=np.array(extractor_function(s, fs, processor, model))
     
+    frames_list=[]
     average_vector_list=[]
     for _,row in df_segmented.iterrows():
-        target_vector=hidden_vector[0,row['start_vector']:row['end_vector']]
-        average_vector=np.mean(target_vector, axis=0)
+        target_vectors=hidden_vectors[0,row['start_vector']:row['end_vector']]
+        frames_list.append(target_vectors)
+        average_vector=np.mean(target_vectors, axis=0)
         average_vector_list.append(average_vector)
     new_df["average_vector"]=average_vector_list
+    new_df["vector_sequence"]=frames_list
     
     return new_df
 
-def phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state):
+def phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state):
     df_segmented=determine_start_end_vectors(df_segmented, time_per_output=time_per_output)
     #compute logits or hidden states
     hidden_vector=np.array(extractor_function(s, fs, processor, model))
@@ -113,7 +116,7 @@ def phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=
     return df_vectors
 
 # creates dataframe from an audio sample containing frames hidden vector and silence hidden vector
-def phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state):
+def phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state):
     df_segmented=determine_start_end_vectors(df_segmented, time_per_output=time_per_output)
     #compute logits or hidden states
     hidden_vector=np.array(extractor_function(s, fs, processor, model))
@@ -151,7 +154,7 @@ def instances_per_phoneme(df_t, processor, model, number_of_examples=100, time_p
         df_segmented=pd.DataFrame.from_records(df_t.iloc[i].phone_df)
         s,fs=librosa.load(df_t.iloc[i].wav_path, sr=16000)
 
-        new_df=phone_average_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
+        new_df=phone_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
         
         
         if 'language_code' in df_t.iloc[i].keys():new_df['language_code']=df_t.iloc[i]['language_code']
@@ -229,7 +232,6 @@ def use_tests():
     # load model and processor
     # I download first, do "from_pretrained(path)" instead to know easier where they are and access the vocabs, config etc.
     # Else models are in: "~/.cache/huggingface/transformers"
-    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
     processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft")
 
     base_model=Wav2Vec2Model.from_pretrained("facebook/wav2vec2-large-xlsr-53", output_hidden_states=True)
@@ -237,7 +239,7 @@ def use_tests():
     model = Wav2Vec2ForCTC.from_pretrained("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True)
 
     from src.libri_phonetization_data import libri_phonetics_data
-    df_t, df=libri_phonetics_data(data_set='dev-clean', data_path='/data/')
+    df_t, df=libri_phonetics_data(data_set='dev-clean')
 
     df_test=instances_per_phoneme(df_t, processor, model, number_of_examples=1, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state)
 
@@ -251,7 +253,7 @@ def use_tests():
     # Loas an audio file
     s,fs=librosa.load(path, sr=16000)
     df_segmented=pd.DataFrame.from_records(df_t.iloc[0].phone_df)
-    df_test=phone_average_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state)
+    df_test=phone_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phone', extractor_function=get_last_hidden_state)
 
 
     # # This is just to show that "feature_extractor" here is just a normalization with some ratio / filtering
