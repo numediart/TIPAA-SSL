@@ -110,7 +110,7 @@ def prefill_content_phrases(path="data/marie_program_all_phrases.csv", path_db_e
     return phonetics_data
 
 
-def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests, mode='v1'):
+def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/phonemeContrast', client=requests):
     """makes a request with metadata contained in "r" and makes the call to the endpoint. It works locally or with a server, and with
     either requests module or flask's app.test_client()
 
@@ -127,74 +127,42 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
     """
     url=base_url+endpoint
     print(r['audio_file_url'])
-    if mode=='v1':
-        
-        def send_audio_base64(path='data/audio_recordings/WS_111_toothpaste.wav', base_url = 'http://localhost:8000', client=requests):
-            # based on :
-            # https://stackoverflow.com/questions/50279380/how-to-decode-base64-string-directly-to-binary-audio-format
-            encode_string = base64.b64encode(open(path, "rb").read())
-            res = client.post(base_url+"/send_base64_audio", data={"audio64":encode_string, "API_KEY":"ThisIsTheFlowchaseSP-APIKey:MeaningOfLife=42"})
 
-            # This is for compatibility between requests module and flask's test_client
-            if client==requests: res.data=res._content
+    # so that it works with Stress and stress
+    # encode_string = base64.b64encode(open(r['audio_file_url'], "rb").read())
+    encode_string=audio64_from_file(r['audio_file_url'])
+    if 'tress' in endpoint:
+        n_words_by_chunk=chunk_text(r['text'])
+        p=r['cmu_phonetics']
 
-            return res
-        res=send_audio_base64(path=r['audio_file_url'], base_url = base_url, client=client)
-        print(res)
-        print(res.data)
-        assert res.status_code == 200
-        # This is for compatibility between requests module and flask's test_client
-        if client==requests: res.data=res._content
-        res=ast.literal_eval(res.data.decode('utf-8'))
-        assert res['status']=='success'
-        rID=res['rID']
-        print(res)
+        cumsum=0
+        chunks_p=[]
+        for n in n_words_by_chunk:
+            chunks_p.append(' '.join(p.split(' ')[cumsum:cumsum+n])); cumsum+=n
 
-        # so that it works with Stress and stress
-        if 'tress' in endpoint:
-            res = client.post(url, data={"phonetics":r['cmu_phonetics'],"text":r['text'], 'rID':rID, 
-                                        'target':r['target_phoneme']})
-        else:
-            res = client.post(url, data={"phonetics":r['cmu_phonetics'], 'rID':rID, 
-                                        'word_idx':str(ast.literal_eval(r['target_word_indexes'])[0]), 
-                                        'syl_idx':str(ast.literal_eval(r['target_syllable_indexes'])[0]), 
-                                        'target':r['target_phoneme']})
+        print(chunks_p)
+
+        # data={"phonetics":json.dumps(chunks_p), 'audio64':encode_string.decode('utf-8')}
+        data={"phonetics":chunks_p, 'audio64':encode_string.decode('utf-8')}
+        # post works as well with both clients
+        if client==requests: res = client.post(url,  json = json.dumps(data))
+        else: res = client.post(url, 
+                    data=json.dumps(data),
+                    content_type='application/json')
+        # if client==requests: res = client.post(url,  params = data)
+        # else: res = client.post(url,  query_string = data)
     else:
-        # so that it works with Stress and stress
-        # encode_string = base64.b64encode(open(r['audio_file_url'], "rb").read())
-        encode_string=audio64_from_file(r['audio_file_url'])
-        if 'tress' in endpoint:
-            n_words_by_chunk=chunk_text(r['text'])
-            p=r['cmu_phonetics']
-
-            cumsum=0
-            chunks_p=[]
-            for n in n_words_by_chunk:
-                chunks_p.append(' '.join(p.split(' ')[cumsum:cumsum+n])); cumsum+=n
-
-            print(chunks_p)
-
-            # data={"phonetics":json.dumps(chunks_p), 'audio64':encode_string.decode('utf-8')}
-            data={"phonetics":chunks_p, 'audio64':encode_string.decode('utf-8')}
-            # post works as well with both clients
-            if client==requests: res = client.post(url,  json = json.dumps(data))
-            else: res = client.post(url, 
-                       data=json.dumps(data),
-                       content_type='application/json')
-            # if client==requests: res = client.post(url,  params = data)
-            # else: res = client.post(url,  query_string = data)
-        else:
-            data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string.decode('utf-8'), 
-                                        'word_idx':int(ast.literal_eval(r['target_word_indexes'])[0]), 
-                                        'syl_idx':int(ast.literal_eval(r['target_syllable_indexes'])[0]), 
-                                        'target':r['target_phoneme']}
-            # post works as well with both clients
-            if client==requests: res = client.post(url,  json = json.dumps(data))
-            else: res = client.post(url, 
-                       data=json.dumps(data),
-                       content_type='application/json')
-            # if client==requests: res = client.post(url,  params = data)
-            # else: res = client.post(url,  query_string = data)
+        data={"phonetics":r['cmu_phonetics'], 'audio64':encode_string.decode('utf-8'), 
+                                    'word_idx':int(ast.literal_eval(r['target_word_indexes'])[0]), 
+                                    'syl_idx':int(ast.literal_eval(r['target_syllable_indexes'])[0]), 
+                                    'target':r['target_phoneme']}
+        # post works as well with both clients
+        if client==requests: res = client.post(url,  json = json.dumps(data))
+        else: res = client.post(url, 
+                    data=json.dumps(data),
+                    content_type='application/json')
+        # if client==requests: res = client.post(url,  params = data)
+        # else: res = client.post(url,  query_string = data)
 
     if client==requests: res.data=res._content
 
@@ -205,14 +173,14 @@ def request_for_audio_file(r, base_url = 'http://localhost:8000', endpoint='/pho
     return res
 
 
-def get_results(df, base_url = 'http://localhost:8000', endpoint='/v2/w2v/contrast/vowel', client=app.test_client(), mode='v2'):
+def get_results(df, base_url = 'http://localhost:8000', endpoint='/v2/w2v/contrast/vowel', client=app.test_client()):
     df.index=range(len(df))
     results_records=[]
     failures=[]
     # r=df_pContrast.iloc[4]
     print(len(df))
     for i,r in tqdm(df.iterrows()):
-        res=request_for_audio_file(r, base_url = base_url, endpoint=endpoint, client=client, mode=mode)
+        res=request_for_audio_file(r, base_url = base_url, endpoint=endpoint, client=client)
         assert res.status_code==200
         if 'success' in res.data.decode('utf-8'):
             # d=ast.literal_eval(res.data.decode('utf-8'))
@@ -227,7 +195,7 @@ def get_results(df, base_url = 'http://localhost:8000', endpoint='/v2/w2v/contra
     results_df=pd.DataFrame.from_records(results_records)
     return results_df, failures
 
-def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/contrast/', client=app.test_client(), n_ex_by_module=10, mode='v2'):
+def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/contrast/', client=app.test_client(), n_ex_by_module=10):
     df=actor_recordings()
 
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
@@ -241,9 +209,9 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
     df_ed=df_pContrast[df_pContrast.target_phoneme.isin(eds)]
 
     
-    results_v, failures_v=get_results(df_v.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'vowel', client=client, mode=mode)
-    # results_ed_s, failures_ed_s=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'syllable', client=client, mode=mode)
-    results_ed, failures_ed=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'termination', client=client, mode=mode)
+    results_v, failures_v=get_results(df_v.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'vowel', client=client)
+    # results_ed_s, failures_ed_s=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'syllable', client=client)
+    results_ed, failures_ed=get_results(df_ed.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'termination', client=client)
 
     assert failures_v==[]
     assert failures_ed==[]
@@ -272,7 +240,7 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
     
     # return results_v, results_ed#, results_ed_s
 
-def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/stress/', client=app.test_client(), n_ex_by_module=10, mode='v2'):
+def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/stress/', client=app.test_client(), n_ex_by_module=10):
     df=actor_recordings()
     len_t_seg=df.apply(lambda r: len(r.syllable_parts.split(' ')), axis=1)
     len_p=df.apply(lambda r: len(r.cmu_phonetics.split(' ')), axis=1)
@@ -282,13 +250,13 @@ def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/str
     df_sentence_stress=df.loc[df.stress_category.dropna().index]
     df_word_stress=df.drop(df_pContrast.index).drop(df_sentence_stress.index)
 
-    results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'sentence', client=client, mode=mode)
-    results_ws, failures_ws=get_results(df_word_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'word', client=client, mode=mode)
+    results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'sentence', client=client)
+    results_ws, failures_ws=get_results(df_word_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'word', client=client)
 
     df_test=df_word_stress[df_word_stress.text.str.contains("grandma")].iloc[-1:,:]
-    results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client, mode=mode)
+    results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client)
 
-    request_for_audio_file(df_test.iloc[0], base_url = base_url, endpoint=route+'word', client=client, mode=mode)
+    request_for_audio_file(df_test.iloc[0], base_url = base_url, endpoint=route+'word', client=client)
 
     assert failures_ss==[]
     assert failures_ws==[]
@@ -305,12 +273,9 @@ def test_audio64(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.
     r['text']=text
     r['audio_file_url']=path
     r['target_phoneme']=float('nan')
-    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client)
     print(res.data)
     assert res.status_code==200
-    # res=request_for_audio_file(r, endpoint='/w2v/stress/sentence', client=client, mode='v1')
-    # print(res.data)
-    # assert res.status_code==200
 
 def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
     
@@ -326,7 +291,7 @@ def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
     r['text']=text
     r['audio_file_url']=path
     r['target_phoneme']=float('nan')
-    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client)
     print(res.data)
     assert res.status_code==200
 
@@ -334,7 +299,7 @@ def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
     path='data/temp.ogg'
     sf.write(path,[],16000)
     r['audio_file_url']=path
-    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+    res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client)
     print(res.data)
     assert res.status_code==200
 
@@ -354,7 +319,7 @@ def test_edge_cases(base_url = 'http://localhost:8000', client=app.test_client()
         r['text']=text
         r['audio_file_url']=p
         r['target_phoneme']=float('nan')
-        res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client, mode='v2')
+        res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client)
         print(res.data)
         assert res.status_code==200
 
@@ -383,7 +348,7 @@ def pContrast_for_user_data( target_phones='AO1', n_user=10, n_ex_by_ex_type=10)
     df=pd.concat(selections)
 
     results_df, failures=get_results(df)
-    results_df, failures=get_results(df, endpoint='/v2/w2v/contrast/vowel', mode='v2')
+    results_df, failures=get_results(df, endpoint='/v2/w2v/contrast/vowel')
     
 
     df['phonetic_detection']=results_df['phonetic_detection']
@@ -410,16 +375,16 @@ def vowels_confusions_user_recordings(n_user=10, n_ex_by_ex_type=10):
 def use_tests():
 
     # from test_DL_api import *
-    base_url = 'http://localhost:8000'; route='/v2/w2v/stress/'; client=app.test_client(); n_ex_by_module=10; mode='v2'
+    base_url = 'http://localhost:8000'; route='/v2/w2v/stress/'; client=app.test_client(); n_ex_by_module=10
     df=actor_recordings()
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
     df_sentence_stress=df.loc[df.stress_category.dropna().index]
     df_word_stress=df.drop(df_pContrast.index).drop(df_sentence_stress.index)
     
-    results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'sentence', client=client, mode=mode)
+    results_ss, failures_ss=get_results(df_sentence_stress.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'sentence', client=client)
 
     df_test=df_word_stress[df_word_stress.text.str.contains("grandma")].iloc[-1:,:]
-    results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client, mode=mode)
+    results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client)
 
     
     # TODO: try multipart form data to send files with payload data
@@ -481,9 +446,8 @@ def use_tests():
     r=df_sentence_stress[l>50].iloc[0]
 
     route='/v2/w2v/stress/'
-    mode='v2'
-    get_results(df_sentence_stress.iloc[3:4,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
-    request_for_audio_file(df_sentence_stress.iloc[3,:], endpoint=route+'sentence', client=app.test_client(), mode=mode)
+    get_results(df_sentence_stress.iloc[3:4,:], endpoint=route+'sentence', client=app.test_client())
+    request_for_audio_file(df_sentence_stress.iloc[3,:], endpoint=route+'sentence', client=app.test_client())
 
     # from test_DL_api import *;print(pContrast_for_user_data())
 
