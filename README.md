@@ -17,7 +17,7 @@ Flowchase's speech tech
     - extract forced alignments, i.e. time-aligned phonetic transcriptions, thanks to "Montreal Forced Aligner" (MFA)
     - experiment different frame reduction and frame classifiers (where a frame is an output vector of the wav2vec2 model)
     - ...
-- content_tools contains simple web apps related exploring phonetic dictionaries, using linguistic data extraction (phonetization + syllabification in text and phonetics) and other related content processing tools
+- content_tools contains web apps related to exploring phonetic dictionaries, using linguistic data extraction (phonetization + syllabification in text and phonetics) and other related content processing tools
 
 
 
@@ -75,6 +75,8 @@ Paste it inside "data/" folder of this repo.
 You can now use ```get_data()``` function in "src/label_data_processing.py" now.
 - Create a folder called "synth_audio" in "data/" and drop the folder "cmu_words" in it after extracting the zip
 - Drop "flwc-phrase-audios" after extracting the zip
+
+For extracting a big zip, windows zip extractor might crash (although it was able to create it...). If that's the case "unzip" command on a WSL Ubunru (install with `sudo apt install unzip`) should work.
 
 
 ### Librispeech data
