@@ -11,7 +11,6 @@ from src.label_data_processing import actor_recordings
 from DL_accuracy_performance import count_values, plot_confusion_results
 
 from src.label_data_processing import build_user_data_df
-exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
 from src.audio_processing import audio64_from_file
 from src.text_processing import chunk_text
@@ -327,6 +326,8 @@ def test_edge_cases(base_url = 'http://localhost:8000', client=app.test_client()
 
 def pContrast_for_user_data( target_phones='AO1', n_user=10, n_ex_by_ex_type=10):
     user_data=build_user_data_df()
+    
+    exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
     # user_data['module_type']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].module_type.values[0], axis=1)
     user_data['target_phoneme']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].target_phoneme.values[0], axis=1)
     # user_data['cmu_phonetics']=user_data.apply(lambda r: exercise_data[exercise_data.exercise_id==r.exercise_id].cmu_phonetics.values[0], axis=1)
