@@ -120,7 +120,7 @@ def align_common_voice(root='data/cv-corpus-10.0-delta-2022-07-04/', lang='en', 
 
     return df
 
-def align_synth_speech(path='data/../scripts/synth_audio/speechocean762', mfa_path='mfa_data', mfa_result_path='mfa_result', fs=16000, out_json='data/align_synth_speech.json'):
+def align_synth_speech(path='data/synth_audio/speechocean762', mfa_path='mfa_data', mfa_result_path='mfa_result', fs=16000, out_json='data/align_synth_speech.json'):
     df=pd.read_csv(path+'data.csv')
     wav_paths=(df.filename+'.mp3').tolist()
     texts=df.text.tolist()
@@ -136,6 +136,25 @@ def align_synth_speech(path='data/../scripts/synth_audio/speechocean762', mfa_pa
 
     return df
 
+
+# def align_synth_words(path='data/synth_audio/speechocean762', mfa_path='mfa_data', mfa_result_path='mfa_result', fs=16000, out_json='data/align_synth_speech.json'):
+#     from src.label_data_processing import synth_words_data
+
+#     df=synth_words_data()
+
+#     wav_paths=(df.filename+'.mp3').tolist()
+#     texts=df.text.tolist()
+
+#     prepare_files(path, wav_paths=wav_paths, texts=texts, mfa_path=mfa_path, fs=fs)
+#     textgrids_df, failures=launch_mfa(mfa_path, mfa_result_path, dictionary='english_us_arpa', acoustic_model='english_us_arpa')
+
+#     # df['phone_df']=phone_dfs
+#     textgrids_df.to_json(out_json)
+    
+#     shutil.rmtree(mfa_path)
+#     shutil.rmtree(mfa_result_path)
+
+#     return df
 
 def speech_ocean_data(path='data/speechocean762'):
     """Aggregate score information at sentence level and word level as well as wav path and data set (train or test) in a single dataframe
@@ -520,7 +539,7 @@ def MAILABS_data(path="data/MAILABS", lang_code="en_US"):
     # os.chdir(working_dir)
     return metadatas_df
 
-def align_MAILABS(path="data/MAILABS", lang_code="en_US", phone_set='MFA_IPA', n=1000):
+def align_MAILABS(path="data/MAILABS", lang_code="en_US", phone_set='MFA_IPA', n=10000):
     print('Loading metadata')
     df=MAILABS_data(path=path, lang_code=lang_code)
     df=df.sample(frac=1, random_state=0)
@@ -543,6 +562,7 @@ def align_MAILABS(path="data/MAILABS", lang_code="en_US", phone_set='MFA_IPA', n
 
     print('Performing alignment')
     mfa_result_path='/'.join(['mfa_result', path.split("/")[-1], lang_code])
+    if not os.path.exists(mfa_result_path): os.makedirs(mfa_result_path)
     if phone_set=='MFA_IPA':
         mfa_model=MAILABS_lang_to_MFA_model[lang_code]
         mfa_dict=MAILABS_lang_to_MFA_dict[lang_code]
@@ -588,12 +608,16 @@ def use_tests():
     align_common_voice(root='data/cv-corpus-10.0-delta-2022-07-04/', lang='en', split='dev', mfa_model='english_us_arpa', out_json='data/align_common_voice_en_dev_cmu.json')
     align_common_voice(root='data/cv-corpus-10.0-delta-2022-07-04/', lang='en', split='test', mfa_model='english_us_arpa', out_json='data/align_common_voice_en_test_cmu.json')
     
-    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchasedatasets/MAILABS', lang_code="en_US", n=1000)
-    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchasedatasets/MAILABS', lang_code="en_UK", n=1000)
-    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchasedatasets/MAILABS', lang_code="fr_FR", n=1000)
-    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchasedatasets/MAILABS', lang_code="es_ES", n=1000)
+    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', lang_code="en_US", phone_set='CMU', n=None)
+    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', lang_code="en_UK", phone_set='CMU', n=None)
 
-    df=load_aligned_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchasedatasets/MAILABS', lang_code="es_ES")
+    
+    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', lang_code="en_US", n=1000)
+    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', lang_code="en_UK", n=1000)
+    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', lang_code="fr_FR", n=1000)
+    df, failures=align_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', lang_code="es_ES", n=1000)
+
+    df=load_aligned_MAILABS(path='/mnt/c/Users/noe_t/OneDrive - UMONS/flowchase/datasets/MAILABS', lang_code="es_ES")
 
 
     df=align_speech_ocean(path='data/speechocean762')

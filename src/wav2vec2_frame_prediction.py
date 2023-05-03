@@ -315,7 +315,7 @@ def inference_demo():
 
     word="sister"
     phonetics=prefill_for_sentence(word)['phonetics']
-    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
     s,fs=read_audio_file(path, fs=16000)
 
     phone_list=re.sub("[0-9]","",phonetics).replace('|',"_").split('_')

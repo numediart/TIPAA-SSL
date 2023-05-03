@@ -112,7 +112,7 @@ def synthesize_voices():
     from src.pronunciation_dictionaries import get_augmented_mfa_dict, lang_to_MFA_g2p_models
     mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
-    root_folder="scripts/synth_audio/mfa_words"
+    root_folder="data/synth_audio/mfa_words"
 
     words=list(mfa_dicts['fr_FR'])
     voices={"Lea":"F_FR", "Mathieu":"M_FR", "Celine":"F_FR"} # FR
@@ -143,8 +143,8 @@ def use_tests():
     df=df[['text']]
 
     # col=df.text
-    # root_folder="scripts/synth_audio/speechocean762"
-    root_folder="scripts/synth_audio/cmu_words"
+    # root_folder="data/synth_audio/speechocean762"
+    root_folder="data/synth_audio/cmu_words"
     synth_technique='neural' # "standard" or "neural"
     # tag=''
     # options=''

@@ -20,7 +20,7 @@ def a_test_termination_contrast():
     
 
 def test_DL_speech_tech_functions():
-    path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
+    path='data/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
     # encode_string = base64.b64encode(open(path, "rb").read())
     formatted_phonetics=prefill_for_sentence('ekk')['phonetics']
     s,fs=read_audio_file(path, fs=16000)
@@ -51,7 +51,7 @@ def test_DL_speech_tech_functions():
                             basis='IH0_D', mode="numpy"
                     )
     
-    path='scripts/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
+    path='data/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
     formatted_phonetics=prefill_for_sentence('hate')['phonetics']
     s,fs=read_audio_file(path, fs=16000)
     start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
