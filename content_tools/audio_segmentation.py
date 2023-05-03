@@ -9,6 +9,9 @@ import ctc_segmentation
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer
 
 import soundfile as sf
+import sys
+sys.path.append('./')
+from src.audio_processing import read_audio_file
 
 from tqdm import tqdm
 import json
@@ -148,7 +151,7 @@ def get_word_timestamps(
     processor : Wav2Vec2Processor = processor,
     tokenizer : Wav2Vec2CTCTokenizer = tokenizer,
     samplerate : int = SAMPLERATE
-):
+    ):
     assert audio.ndim == 1
     # Run prediction, get logits and probabilities
     inputs = processor(audio, return_tensors="pt", padding="longest")
@@ -197,8 +200,10 @@ def build_all_words_df(audio, model, report_callback=None):
         df_words[['start','end']]+=last_time
 
         dfs.append(df_words)
+        
         # to start from a word that was not cut in two, and have an overlap, take the ante previous of the last one
-        last_time=df_words.end.iloc[-3]
+        last_time=df_words.end.iloc[-min(len(df_words),3)]
+
         start=int(last_time*SAMPLERATE)
         end=start+n_samples_per_batch
 
@@ -207,7 +212,7 @@ def build_all_words_df(audio, model, report_callback=None):
         print("duration:",len(audio)/SAMPLERATE)
         if report_callback: report_callback(int(last_time/(len(audio)/SAMPLERATE)*100), 'Analyzing '+report_callback.file)
 
-    last_time=df_words.end.iloc[-3]
+    last_time=df_words.end.iloc[-min(len(df_words),3)]
     start=int(last_time*SAMPLERATE)
     df_words=pd.DataFrame.from_records(get_word_timestamps(audio[start:end], model=model))
     df_words[['start','end']]+=last_time
@@ -286,7 +291,7 @@ def extract_timings(df, audio_path, model, report_callback=None):
     # Run ASR to get words
     print('Loading audio')
     t=time()
-    audio,fs=librosa.load(audio_path, sr=SAMPLERATE)
+    audio,fs=read_audio_file(audio_path, fs=SAMPLERATE)
     print('finished loading, took ',time()-t,' seconds')
     if report_callback: report_callback(100, 'Finished loading, took '+str(round((time()-t),2))+' seconds')
     print('Speech recognition in audio')
@@ -299,7 +304,9 @@ def extract_timings(df, audio_path, model, report_callback=None):
     chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]'
     # from https://huggingface.co/blog/fine-tune-wav2vec2-english
 
-    transcripts=df.iloc[:,2].str.lower().tolist()
+    print(df)
+
+    transcripts=df.loc[:,'text'].str.lower().tolist()
     transcripts=[re.sub(chars_to_ignore_regex, '',el) for el in transcripts]
 
     # A = predicted
@@ -367,7 +374,8 @@ def extract_timings(df, audio_path, model, report_callback=None):
 def cutting(df, audio_path, phrases_dfs, out_folder):
     print('Reloading audio for cutting')
     t=time()
-    audio,fs=librosa.load(audio_path, sr=WRITING_SAMPLERATE)
+    # audio,fs=librosa.load(audio_path, sr=WRITING_SAMPLERATE)
+    audio,fs=read_audio_file(audio_path, fs=WRITING_SAMPLERATE)
     print('finished loading, took ',time()-t,' seconds')
 
     
@@ -482,19 +490,25 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
     
     print(file_dict)
 
+    audio_files=[el for el in file_dict if not el.endswith('.xlsx')]
+
     dir,_=os.path.split(xlsx_file)
     sheet_df_map = pd.read_excel(file_dict[xlsx_file], sheet_name=None)
 
     not_detecteds={}
     first_pass_dfs={}
-    for k in sheet_df_map:
+    # for k in sheet_df_map:
+    for file in audio_files:
+        k=file.split('.')[0]
         if report_callback:
             report_callback.file=k
             report_callback(0, 'Loading '+k)
         df=sheet_df_map[k]
 
-        audio_path=os.path.join(dir, k+'.wav')
+        audio_path=os.path.join(dir, file)
 
+        print('extract timings of ', file)
+        print(df)
         timings = extract_timings(df, file_dict[audio_path], model=model, report_callback=report_callback)
         # report_callback(100, 'Loading '+k)
         if report_callback: report_callback(0, 'Cutting '+k)
@@ -530,7 +544,7 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
 
     json_str = json.dumps(not_detecteds)
     with open("not_detected.txt", "w") as f:
-            f.write(json_str)
+        f.write(json_str)
 
     # all_second_pass_df.round(2).to_csv('data/andrew_second_pass.csv',index=False)
     # all_second_pass_df.round(2).to_excel('data/andrew_second_pass.xlsx',index=False)
@@ -540,13 +554,70 @@ def analyze_files_and_build_transcripts(model, file_dict, report_callback=None, 
     # all_ids_processed=set(all_first_pass_df.id).union(set(all_second_pass_df.id))
 
     all_ids=set().union(*[set(sheet_df_map[k].id) for k in sheet_df_map])
+    return all_first_pass_df
 
-    # not_processed_ids=all_ids-all_ids_processed
+def speech_tech_on_segmented_audio(segmentation_df, file_dict):    
+    from DL_speech_tech import stress_from_formatted_phonetics
+    from src.text_processing import prefill_for_sentence
+
+    audio_files=[el for el in file_dict if not el.endswith('.xlsx')]
+    xlsx_files=[el for el in file_dict if el.endswith('.xlsx')]
+    if len(xlsx_files)!=1: 
+        print('There should be exactly 1 xlsx file, but there is/are '+str(len(xlsx_files)))
+    else:
+        xlsx_file=xlsx_files[0]
+
+    dir,_=os.path.split(xlsx_file)
+    sheet_df_map = pd.read_excel(file_dict[xlsx_file], sheet_name=None)
+
+    for file in audio_files:
+        k=file.split('.')[0]
+        audio_path=os.path.join(dir, file)
+        file_dict[audio_path].seek(0)
+        s,fs=read_audio_file(file_dict[audio_path], fs=SAMPLERATE)
+
+        seg_df_file=segmentation_df[segmentation_df.audio_file==k]
+
+        stress_intensities=[]
+        stress_binaries=[]
+        for i,r in seg_df_file.iterrows():
+            formatted_phonetics=prefill_for_sentence(r.text)['phonetics']
+
+            if "SS" in r.id:
+                res=stress_from_formatted_phonetics(s[int(r.start*SAMPLERATE):int(r.end*SAMPLERATE)],phonetics=formatted_phonetics, 
+                                            level="sentence", 
+                                            # n_words_by_chunk=[7],
+                                            max_speech_rate=8, mode='numpy'
+                                            )
+            else:
+                res=stress_from_formatted_phonetics(s[int(r.start*SAMPLERATE):int(r.end*SAMPLERATE)],phonetics=formatted_phonetics, 
+                                            level="word", 
+                                            # n_words_by_chunk=[7],
+                                            max_speech_rate=8, mode='numpy'
+                                            )
+            stress_intensities.append(res['stress_intensities'])
+            stress_binaries.append(res['stress_binaries'])
+
+        segmentation_df.loc[segmentation_df.audio_file==k, 'stress_intensities']=stress_intensities
+        segmentation_df.loc[segmentation_df.audio_file==k, 'stress_binaries']=stress_binaries
+
+    segmentation_df.to_csv('results_marie_pretest/timed_transcriptions_and_stress_predictions.csv')
+    # segmentation_df.to_json('results_marie_pretest/timed_transcriptions_and_stress_predictions.json')
+
+    return segmentation_df
 
 
 
-if __name__=="__main__":
+def use_tests():
     model=Wav2Vec2ForCTC.from_pretrained(model_name)
+
+    with open('content_tools/marie_pre_test.zip', 'rb') as file:  file_dict=extract_zip_to_dict(file)
+    r_df=analyze_files_and_build_transcripts(model, file_dict, report_callback=None, results_dir='./results_marie_pretest/')
+
+    
+    with open('content_tools/sample_2.zip', 'rb') as file:  file_dict=extract_zip_to_dict(file)
+    analyze_files_and_build_transcripts(model, file_dict, report_callback=None, results_dir='./results_marie_pretest/')
+
 
     with open('content_tools/task1-GEA2.zip', 'rb') as file:  file_dict=extract_zip_to_dict(file)
     analyze_files_and_build_transcripts(model, file_dict, report_callback=None, results_dir='./results_task1_v2/')
@@ -557,7 +628,8 @@ if __name__=="__main__":
     # ------------- without trancscript
     filename="Y2Mate.is - C2W - Prof. Philippe Dubois, RectorPresident of UMONS-_1_dGs28JMQ-720p-1659731395421.mp4"
     audio_path="data/"+filename
-    audio,fs=librosa.load(audio_path, sr=SAMPLERATE)
+    # audio,fs=librosa.load(audio_path, sr=SAMPLERATE)
+    audio,fs=read_audio_file(audio_path, fs=SAMPLERATE)
     all_df_words=build_all_words_df(audio, model=model)
     phrases_df=group_words(all_df_words)
     create_srt(phrases_df, file="data/"+filename+".srt")
@@ -569,7 +641,6 @@ if __name__=="__main__":
     df=df[~df.iloc[:,2].isnull()]
 
     audio_path='data/Flowchase - Legal English - Task 1.wav'
-
     phrase_cutting_data_df = extract_timings(df, audio_path, model=model)
     cutting(df, audio_path, phrase_cutting_data_df, 'jessie')
 
@@ -580,4 +651,24 @@ if __name__=="__main__":
     # df[df.id.isin(not_detected)]
 
     # --------------------
+
+    audio_path="/mnt/c/Users/noe_t/OneDrive - UMONS/piano/results/dirtbag_youtube_louder.mp4"
+    filename="dirtbag_srt"
     
+    # audio,fs=librosa.load(audio_path, sr=SAMPLERATE)
+    audio,fs=read_audio_file(audio_path, fs=SAMPLERATE)
+    all_df_words=build_all_words_df(audio, model=model)
+    phrases_df=group_words(all_df_words)
+    create_srt(phrases_df, file="data/"+filename+".srt")
+    
+
+    # -----------------
+    import ast
+    pre_test_df=pd.read_csv('results_marie_pretest/timed_transcriptions_and_stress_predictions.csv')
+
+    pre_test_df_words=pre_test_df[pre_test_df.id.str.contains('WS')]
+
+    pre_test_df_words.apply(lambda r: ast.literal_eval(r.stress_binaries), axis=1)
+
+    pre_test_df_words[pre_test_df_words.apply(lambda r: len(ast.literal_eval(r.stress_binaries))==0, axis=1)]
+
