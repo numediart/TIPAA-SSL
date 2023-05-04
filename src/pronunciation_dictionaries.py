@@ -231,14 +231,16 @@ def mfa_g2p(word, model="english_us_mfa"):
     # <code>doit <(echo "hello") >(cat)  
     # e.g. mfa g2p french_mfa <(echo "salut")  >(cat)
 
-    cmd="mfa g2p "+model+" "+'<(echo "'+word+'")'+" >(cat)"
+    cmd="mfa g2p "+'<(echo "'+word+'") '+model+" >(cat)"
     cmd_list=['bash', '-c',cmd]
     p = subprocess.Popen(cmd_list, stdout=subprocess.PIPE)
     out, err = p.communicate()
 
     # the lines not being "INFO" messages correspond to the output that would have been written to the file
     data='\n'.join([el for el in out.decode('utf8').split('\n') if not 'INFO' in el])
+    data='\n'.join(data.split('\n')[1:])
     print("mfa g2p for ", word, ' :',data)
+
     df = pd.read_csv(StringIO(data), sep="\t", header=None, encoding='utf8')
     df.columns=['text', 'ipa']
     ipa=df.apply(lambda r: r.ipa.split(' '), axis=1)
