@@ -110,7 +110,7 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
         result_df=pd.DataFrame.from_records(records)
     else:
         print('Selection to compute_prediction is empty')
-        result_df=None
+        result_df=pd.DataFrame()
     
     print("errors that occured:")
     print(errors_data)
@@ -356,10 +356,14 @@ def pContrast_from_audiobook_data(data_set='test-other', target_phones='AO1', n=
         # same idea, but only for G/NG
         selection=libri_words_df[libri_words_df.phones.str.startswith(target_phones+' ')|libri_words_df.phones.str.contains(' '+target_phones)]
 
-
     selection=formatted_audiobook_data(selection, libri_words_df, target_phones=target_phones)
 
-    result_df=compute_predictions(selection, target_phones=target_phones, alternatives=alternatives, model=model)
+    selection['cmu_phonetics']=selection.apply(lambda r: r.cmu_phonetics.replace('CH','T_SH').replace('JH','D_ZH'), axis=1)
+    df=selection
+    df_words=df.apply(lambda r: r.cmu_phonetics.split(' ')[r.word_idx].replace('|','_'), axis=1)
+    df_target=df[(df_words.str.endswith('_'+target_phones)|df_words.str.startswith(target_phones+'_')|df_words.str.contains('_'+target_phones+'_'))]
+
+    result_df=compute_predictions(df_target, target_phones=target_phones, alternatives=alternatives, model=model)
     phonetic_detections=result_df.phonetic_detection
     
     d=count_values(phonetic_detections)
@@ -618,33 +622,38 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
 
     # ex for fr_FR, as in "rue" or "lu":
 
-    # df=synth_words_data(path="scripts/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
+    # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
     # target_phones='y'
     # from src.pronunciation_dictionaries import ipa_vowels
     # alternatives=ipa_vowels
     
-    df=synth_words_data()
+    df=synth_words_data().dropna()
     df=select_accent(df, accent=accent)
+
+    df['phonetics']=df.apply(lambda r: r.phonetics.replace('CH','T_SH').replace('JH','D_ZH'), axis=1)
 
     df['target_word_indexes']=0
     df['fpath']=df['path']
     df_target=df[(df.phonetics.str.endswith('_'+target_phones)|df.phonetics.str.startswith(target_phones+'_')|df.phonetics.str.contains('_'+target_phones+'_'))]
 
-    # just get the index of the first occurence of the target
+    # recompute syl_p, because I modified phonetics with CH and JH
+    df_target['syl_p']=df_target.phonetics.str.split('|').apply(lambda r: [syl.split('_') for syl in r])
+    # just get the index of the first occurence of the target    
     df_target['target_syllable_indexes']=df_target['syl_p'].apply(lambda r: [1 if target_phones in el else 0 for el in r].index(1))
 
     selection=df_target.sample(frac=1, random_state=0)[:n]
 
     # selection.progress_apply(lambda r: prefill_for_sentence(r.text, mode='MFA_IPA')['cmu_phonetics'], axis=1)
-
     # selection.text.progress_apply(lambda r: mfa_dicts['en_US'][r][0] if r in mfa_dicts['en_US'] else float('nan')).dropna()
-
+    
     selection['cmu_phonetics']=selection['phonetics']
     result_df=compute_predictions(selection, target_phones=target_phones, alternatives=alternatives, model=model)
-    phonetic_detections=result_df.phonetic_detection
-    
-    d=count_values(phonetic_detections)
-    d.columns=[target_phones]
+
+    if len(result_df)>0:
+        phonetic_detections=result_df.phonetic_detection
+        d=count_values(phonetic_detections)
+        d.columns=[target_phones]
+    else:d=pd.DataFrame([np.nan])
 
     return result_df, d
 
@@ -653,7 +662,7 @@ def syl_contrast_on_synth_words(syl_target='P_EH1', n=None, accent=None, model=d
 
     # ex for fr_FR, as in "rue" or "lu":
 
-    # df=synth_words_data(path="scripts/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
+    # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
     # target_phones='y'
     # from src.pronunciation_dictionaries import ipa_vowels
     # alternatives=ipa_vowels
@@ -864,11 +873,11 @@ def use_tests():
 
 
     
-    from src.load_data import load_libri_dataset, load_cmu_test_dataset
+    from src.load_data import load_libri_dataset, load_libri_dataset_audio_timings
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
-    data = load_cmu_test_dataset(df_t_test)
+    data = load_libri_dataset_audio_timings(df_t_test)
     # data = load_test_dataset(df_t_test)
     
     from tqdm import tqdm
