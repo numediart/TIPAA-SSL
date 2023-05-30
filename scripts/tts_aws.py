@@ -65,7 +65,11 @@ def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',
         os.system(cmd)
 
 
-def synthesize_list(df, voices, root_folder="synth_audio/user_texts"):
+def synthesize_list(df, voices, root_folder="synth_audio/user_texts", options='rate="70%" volume="+20dB"'):
+    
+    synth_technique='standard'
+    tag='prosody'
+
     if not os.path.exists(root_folder):os.makedirs(root_folder)
     records=[]
     print("n of iterations: ", len(df))
@@ -90,6 +94,7 @@ def synthesize_list(df, voices, root_folder="synth_audio/user_texts"):
 import cmudict
 from tqdm import tqdm
 def synthesize_words(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk_id="F_US", words=list(cmudict.dict().keys())):
+    
     synth_technique='standard'
     tag='prosody'
     audio_path='/'.join([root_folder, synth_technique, tag, voice_id])
@@ -161,9 +166,6 @@ def use_tests():
 
     voices={"Lea":"F_FR"} # FR
 
-    # voices={"Brian":"M_UK",  "Matthew":"M_US"}
-
-    # lang_dict={'US':'en-US', 'UK':'en-GB'}
 
     synthesize_list(df, voices, root_folder=root_folder)
 
@@ -172,10 +174,13 @@ def use_tests():
         voice_id=k
         spk_id=voices[k]
         print(k)
-        synthesize_cmu(root_folder=root_folder, voice_id=voice_id, spk_id=spk_id)
+        synthesize_words(root_folder=root_folder, voice_id=voice_id, spk_id=spk_id)
 
 
 
+    voices={"Brian":"M_UK",  "Matthew":"M_US"}
+
+    lang_dict={'US':'en-US', 'UK':'en-GB'}
     # --------------- synthesize program
     dest_folder="synth_audio/BE_english_DB_audio/"
     if not os.path.exists(dest_folder):os.makedirs(dest_folder)
