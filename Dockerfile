@@ -24,21 +24,38 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install
 
+# https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
+RUN mkdir -p /mfa
+RUN conda create -p /env -c conda-forge "montreal-forced-aligner>=2.2"
+
 # Python packages from conda
-# This is necessary so that librosa is able to read mp3 files
-RUN conda install ffmpeg && \
-# For using e.g. MelGAN or wav2vec2
+# ffmpeg is necessary to read mp3 files
+RUN . activate /env && conda install ffmpeg && conda install python=3.10 && \
+   # For using e.g. MelGAN or wav2vec2
    conda install pytorch torchaudio cpuonly -c pytorch && \
-#    conda install -c conda-forge tensorflow-cpu && \
-   conda install -c conda-forge montreal-forced-aligner>=2.2 && mfa server init &&\
-#    conda install tensorflow && \
-# clean unnecessary setup files 
+   # clean unnecessary setup files 
    conda clean --all -y
 
 
 COPY ./requirements.txt $HOME/requirements.txt
 # pip
-RUN pip install --upgrade pip && pip install pyworld==0.3 && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install pyworld==0.3.2 && pip install -r requirements.txt
 
+# As MFA cannot be ran from root, we have to create a new user and give him access to relevant folders
+# https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
+RUN useradd -ms /bin/bash mfauser
+RUN chown -R mfauser /mfa
+RUN chown -R mfauser /env
+RUN chown -R mfauser /root
+RUN chown -R mfauser /opt
+USER mfauser
+ENV MFA_ROOT_DIR=/mfa
+
+RUN echo "source activate /env && mfa server start" > ~/.bashrc
+ENV PATH /env/bin:$PATH
+
+RUN . activate /env && mfa server init
+
+# USER root
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000
