@@ -1,10 +1,14 @@
-from DL_accuracy_performance import *
-from performance_functions import *
-from DL_speech_tech import *
+from performance_functions import pContrast_on_synth_words, final_ed_from_audiobook_data, final_s_from_audiobook_data, stress_GE_performance_test
+from DL_speech_tech import default_model, stress_from_formatted_phonetics, phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, compute_stress_score
 
 from src.audio_processing import prepare_audio_file, read_audio_file
-from src.text_processing import *
-from src.label_data_processing import *
+from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text
+from src.label_data_processing import actor_recordings
+import base64
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
+from linetimer import CodeTimer
+
+import pandas as pd
 
 def a_test_pConstrast():
     # pContrast_for_actor_recordings(target_phones='AO1', n=10)
@@ -19,7 +23,7 @@ def a_test_termination_contrast():
     final_s_from_audiobook_data(n=100)
     
 
-def test_DL_speech_tech_functions():
+def a_test_DL_speech_tech_functions():
     path='data/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
     # encode_string = base64.b64encode(open(path, "rb").read())
     formatted_phonetics=prefill_for_sentence('ekk')['phonetics']
@@ -96,7 +100,6 @@ def test_particular_cases():
 def a_test_stress_detection():
     stress_GE_performance_test(level='word')
 
-from src.text_processing import *
 def test_prefill():
     prefill_for_sentence()
 
