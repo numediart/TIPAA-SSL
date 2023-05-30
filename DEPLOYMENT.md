@@ -76,6 +76,20 @@ Rebuild and launch right away:
 docker-compose up -d --no-deps --build flaskapp
 ```
 
+## github actions resources
+https://brew.sh/
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+run github actions locally
+https://github.com/nektos/act
+
+docker compose pytest actions:
+https://github.com/villekr/github-actions-dockercompose-pytest/blob/master/.github/workflows/actions.yaml
+
+
+
 # For content-tools
 
 Same for downloading code and models. 
