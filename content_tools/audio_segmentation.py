@@ -664,11 +664,45 @@ def use_tests():
 
     # -----------------
     import ast
+    
+    import numpy as np
+    def list_to_one_hot(l):
+        if len(l)==0: return []
+        one_hot=np.zeros(len(l)).astype(int)
+        one_hot[np.argmax(l)]=1
+        return list(one_hot)
+    
+
     pre_test_df=pd.read_csv('results_marie_pretest/timed_transcriptions_and_stress_predictions.csv')
+
+    pre_test_df.stress_intensities=pre_test_df.stress_intensities.apply(ast.literal_eval)
+    pre_test_df.stress_binaries=pre_test_df.stress_binaries.apply(ast.literal_eval)
+
+    # process get up as if it was a word, because in word stress...
+    pre_test_df.loc[pre_test_df.id.str.contains('WS3'),"stress_intensities"]=pre_test_df[pre_test_df.id.str.contains('WS3')].stress_intensities.apply(lambda r: [sum(r,[])])
+    pre_test_df.loc[pre_test_df.id.str.contains('WS3'),"stress_binaries"]=pre_test_df.loc[pre_test_df.id.str.contains('WS3'),"stress_intensities"].apply(lambda r: [list_to_one_hot(r[0])])
 
     pre_test_df_words=pre_test_df[pre_test_df.id.str.contains('WS')]
 
-    pre_test_df_words.apply(lambda r: ast.literal_eval(r.stress_binaries), axis=1)
+    # pre_test_df_words.apply(lambda r: ast.literal_eval(r.stress_binaries), axis=1)
 
-    pre_test_df_words[pre_test_df_words.apply(lambda r: len(ast.literal_eval(r.stress_binaries))==0, axis=1)]
+    pre_test_df_words[pre_test_df_words.apply(lambda r: len(r.stress_binaries)==0, axis=1)]
+
+    stress_binaries_dict={}
+    stress_human_index={}
+    for student in pre_test_df_words.audio_file.unique():
+        selection=pre_test_df_words[pre_test_df_words.audio_file==student]
+        stress_binaries_dict[student]=selection.stress_binaries.apply(lambda r:[] if len(r)==0 else r[0]).tolist()
+        stress_human_index[student]=[el.index(1)+1 if len(el)>0 else np.nan for el in stress_binaries_dict[student]]
+        # stress_human_index[student]=selection.stress_binaries.apply(lambda r:None if len(r)==0 else r[0].index(1)).tolist()
+
+    stress_binaries_df=pd.DataFrame(stress_binaries_dict)
+    stress_human_index_df=pd.DataFrame(stress_human_index)
+
+    WS_correct_human_indexes=[2,1,2,1,2,1,2,2,3,1]
+
+    WS_scores={}
+    for c in stress_human_index_df:
+        WS_scores[c]= sum(stress_human_index_df[c]==WS_correct_human_indexes)
+
 
