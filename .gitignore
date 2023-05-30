@@ -16,9 +16,11 @@ synth_audio\ -\ Copie/**
 performance_results/**
 dl_models/**
 results/**
+CMU_ARCTIC/**
 data/librispeech_alignments/**
 data/LibriSpeech/**
 data/MLS/**
+data/CMU_ARCTIC/**
 data/speechocean762/**
 data/flwc-recordings/**
 data/BE_english_audio_DB/**
@@ -37,10 +39,12 @@ non_v2/**
 *.png
 *.csv*
 *.txt
+*.p
 Documents/**
 .streamlit/**
 *.pkl
 *.bash
+*.onnx
 models/**
 content_tools/uploaded/**
 content_tools/exercise_generation/__pycache__/**
@@ -48,5 +52,12 @@ content_tools/*.json
 content_tools/*.zip
 content_tools/6_extract_subtitles.py
 cronjobs/**
+mfa_data/**
+mfa_result/**
 .gitconfig
 .bash_history
+content_tools/marie_pre_test/**
+scripts/*.json
+results_marie_pretest/**
+content_tools/*.xlsx
+v2_old/**
