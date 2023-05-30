@@ -34,7 +34,7 @@ def main(filters_df):
             - choose on what to apply a filter (text or formatted_phonetics)
             - if you want to include or exclude (because criterea is does/does not)
             - operation acn be: startswith, endswith, contains
-            - what is the string (letters or sequence oh phonemes)
+            - what is the string (letters or sequence of phonemes)
         
         Example: if you wand to select words that finish in "-ed" and for which the phonetics ends in "D" like in "cleaned" or "moved", but not like in "guided" or "started", you will need three filters:
         - text | does | endswith | ed
