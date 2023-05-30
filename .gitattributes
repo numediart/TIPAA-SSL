@@ -4,4 +4,4 @@
 *.caf binary
 *.wav binary
 *.m4a binary
-data/flwc-phrase-audios/ filter=lfs diff=lfs merge=lfs -text
+data/flwc-phrase-audios/** filter=lfs diff=lfs merge=lfs -text
