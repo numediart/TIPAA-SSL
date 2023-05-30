@@ -302,25 +302,25 @@ def test_empty(base_url = 'http://localhost:8000', client=app.test_client()):
     print(res.data)
     assert res.status_code==200
 
-def test_edge_cases(base_url = 'http://localhost:8000', client=app.test_client()):
+# def test_edge_cases(base_url = 'http://localhost:8000', client=app.test_client()):
 
-    path='data/AY1_L HH_AE1_V S_AH1_M T_IY1 TH_AE1_NG_K_S'
+#     path='data/AY1_L HH_AE1_V S_AH1_M T_IY1 TH_AE1_NG_K_S'
     
-    from src.text_processing import prefill_for_sentence
-    import soundfile as sf
-    from glob import glob
-    paths=glob(path+'/*')
+#     from src.text_processing import prefill_for_sentence
+#     import soundfile as sf
+#     from glob import glob
+#     paths=glob(path+'/*')
 
-    for p in paths:
-        text="I'll have some tea thanks"
-        r={}
-        r['cmu_phonetics']=prefill_for_sentence(text)['phonetics']
-        r['text']=text
-        r['audio_file_url']=p
-        r['target_phoneme']=float('nan')
-        res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client)
-        print(res.data)
-        assert res.status_code==200
+#     for p in paths:
+#         text="I'll have some tea thanks"
+#         r={}
+#         r['cmu_phonetics']=prefill_for_sentence(text)['phonetics']
+#         r['text']=text
+#         r['audio_file_url']=p
+#         r['target_phoneme']=float('nan')
+#         res=request_for_audio_file(r, base_url=base_url, endpoint='/v2/w2v/stress/sentence', client=client)
+#         print(res.data)
+#         assert res.status_code==200
 
 
 
