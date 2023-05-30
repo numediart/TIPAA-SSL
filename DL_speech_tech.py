@@ -45,9 +45,9 @@ print_memory_usage("RAM - DL_speech_tech after wav2vec2_frame_prediction")
 # default_model = Wav2Vec2ForFramePrediction('cmu')
 
 default_model = Wav2Vec2ForFramePrediction('cmu',w2v2_model_format="onnx")
-default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
+# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 # default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
-# default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
+default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
 
 
 # default_model.load(name='model_mailabs_pca_99_logistic_regression')
@@ -421,7 +421,7 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
                             to_gibberish=cmu_to_gibberish,
                             **kwargs
                     ):
-    # phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
+    phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
     g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
     if audio_status!="success": 
@@ -767,7 +767,7 @@ def use_tests():
 
     word="hundred"
     phonetics=prefill_for_sentence(word)['phonetics']
-    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
     audio,fs=read_audio_file(path, fs=16000)
     # default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     res=start_end_contrast_from_formatted_phonetics_audio(audio,phonetics=phonetics,target_word_idx=0,target_syllable_idx=0,target_phones='N',basis="N",position='start',mode='numpy',model=default_model)
@@ -775,7 +775,7 @@ def use_tests():
 
     word="orders"
     phonetics=prefill_for_sentence(word)['phonetics']
-    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
     audio,fs=read_audio_file(path, fs=16000)
     # default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     res=start_end_contrast_from_formatted_phonetics_audio(audio,phonetics=phonetics,target_word_idx=0,target_phones='Z',position='end',mode='numpy',model=default_model)
@@ -784,13 +784,13 @@ def use_tests():
     
     word="history"
     phonetics=prefill_for_sentence(word)['phonetics']
-    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
     s,fs=read_audio_file(path, fs=16000)
     # default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=phonetics,target_word_idx=0,target_phones='Z',position='end',mode='numpy',model=default_model)
 
 
-    path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
+    path='data/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
     formatted_phonetics=prefill_for_sentence('ekk')['phonetics']
     s,fs=read_audio_file(path, fs=16000)
     phonemeContrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
@@ -811,8 +811,8 @@ def use_tests():
                                     )
 
     
-    # path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_international.mp3'
-    path="scripts/synth_audio/cmu_words/test_Lea_french_accent/F_FR_annotation.mp3"
+    # path='data/synth_audio/cmu_words/standard/prosody/Brian/M_UK_international.mp3'
+    path="data/synth_audio/cmu_words/test_Lea_french_accent/F_FR_annotation.mp3"
     s,fs=read_audio_file(path, fs=16000)
     formatted_phonetics=prefill_for_sentence('annotation')['phonetics']
     stress_from_formatted_phonetics(s,phonetics=formatted_phonetics, 
@@ -821,7 +821,7 @@ def use_tests():
                                     max_speech_rate=8, mode='numpy'
                                     )
     
-    path='scripts/synth_audio/cmu_words/standard/prosody/Brian/M_UK_france.mp3'
+    path='data/synth_audio/cmu_words/standard/prosody/Brian/M_UK_france.mp3'
     s,fs=read_audio_file(path, fs=16000)
     formatted_phonetics=prefill_for_sentence('france')['phonetics']
     default_model.predict_with_timings(s, sum(sum(split_phonetics(formatted_phonetics),[]),[]))
@@ -845,21 +845,21 @@ def use_tests():
     
     word="listens"
     phonetics=prefill_for_sentence(word)['phonetics']
-    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
     s,fs=read_audio_file(path, fs=16000)
     # default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=phonetics,target_word_idx=0,target_phones='Z',position='end',mode='numpy',model=default_model)
 
     
     cmu_phonetics="L_IH1|S_AH0_N"
-    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_listen.mp3"
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_listen.mp3"
     s,fs=read_audio_file(path, fs=16000)
     default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=cmu_phonetics,target_word_idx=0,target_phones='Z',position='end',mode='numpy',model=default_model)
 
     
     cmu_phonetics="L_IH1|S_AH0_N_D"
-    path="scripts/synth_audio/cmu_words/standard/prosody/Joanna/F_US_listen.mp3"
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_listen.mp3"
     s,fs=read_audio_file(path, fs=16000)
     default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     # default_model_charsiu.align_phones(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
@@ -929,7 +929,7 @@ def use_tests():
     start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, target_word_idx=0, target_phones='D',model=default_model,mode='numpy')
     
     
-    path='scripts/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
+    path='data/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
     formatted_phonetics=prefill_for_sentence('hate')['phonetics']
     s,fs=read_audio_file(path, fs=16000)
     start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
@@ -938,7 +938,7 @@ def use_tests():
                             basis='HH', position="start", mode='numpy'
                     )
     
-    path='scripts/synth_audio/cmu_words/standard/prosody/Amy/F_UK_ate.mp3'
+    path='data/synth_audio/cmu_words/standard/prosody/Amy/F_UK_ate.mp3'
     formatted_phonetics=prefill_for_sentence('ate')['phonetics']
     s,fs=read_audio_file(path, fs=16000)
     default_model.predict_with_timings(s, sum(sum(split_phonetics(formatted_phonetics),[]),[]))
