@@ -367,8 +367,13 @@ def phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_sy
 
     return results
 
-def phoneme_confusion_experiments(label='w2v_pca_99_knn_5_cos_w'):
-    # from DL_accuracy_performance import *
+def phoneme_confusion_experiments(label='w2v_equilibrated_mailabs_pca_95_knn_10_w'):
+    
+    from datetime import datetime
+    now=datetime.now()
+    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    label+='_'+date_time
+
     phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100, accent='UK', name='plots/vowels_confusions_on_synth_words_'+label)
     phoneme_confusions(phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100, accent='US', name='plots/vowels_confusions_on_synth_words_'+label)
 
@@ -804,10 +809,21 @@ def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other', mode
 
     start_end_phoneme_from_audiobook_data(phoneme='Z',basis='Z', position="end", n=n, data_set=data_set, model=model)
 
-    _, results=vowels_consonants_confusions_from_audiobook_data(n=n, data_set=data_set, model=model)
+    
+    from datetime import datetime
+    now=datetime.now()
+    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    _, results=vowels_consonants_confusions_from_audiobook_data(n=n, data_set=data_set)
+
+    results_consonants={el:results[el] for el in results if el in cmu_consonants}
+    results_consonants = {el:results_consonants[el] for el in sorted(results_consonants)}
+    results_vowels={el:results[el] for el in results if el in cmu_vowels}
+    results_vowels = {el:results_vowels[el] for el in sorted(results_vowels)}
+
+    plot_confusion_results(results_vowels, name='plots/vowels_contrast_audiobook_w2v'+data_set+'_n_'+str(n)+'_'+date_time)
+    plot_confusion_results(results_consonants, name='plots/consonant_contrast_audiobook_w2v'+data_set+'_n_'+str(n)+'_'+date_time)
 
     with open('vowels_consonant_contrast_audiobook_w2v'+data_set+'_n_'+str(n)+'.pickle', 'wb') as handle:pickle.dump(results,handle)
-    plot_confusion_results(results, name='vowels_consonant_contrast_audiobook_w2v'+data_set+'_n_'+str(n))
 
 
 def model_comparison():
