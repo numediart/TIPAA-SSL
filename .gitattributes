@@ -6,3 +6,4 @@
 *.m4a binary
 data/flwc-phrase-audios/** filter=lfs diff=lfs merge=lfs -text
 models/** filter=lfs diff=lfs merge=lfs -text
+hf_models/last_hidden_state.quant.onnx filter=lfs diff=lfs merge=lfs -text

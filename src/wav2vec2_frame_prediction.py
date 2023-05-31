@@ -74,7 +74,7 @@ class Wav2Vec2ForFramePrediction:
         else:
             import onnxruntime as rt
             quantized_model_name = "last_hidden_state.quant.onnx"
-            quantized_model_path='/'.join([w2v2_model_path,quantized_model_name])
+            quantized_model_path='/'.join(["hf_models",quantized_model_name])
             sess_options = rt.SessionOptions()
             sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
             self.session = rt.InferenceSession(quantized_model_path, sess_options)
