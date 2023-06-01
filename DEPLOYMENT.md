@@ -12,7 +12,7 @@ cd flowspeech
 # git checkout v1.3.0
 ```
 
-Download models (charsiu and wav2vec2, you can see that in the download_models.py file what is being downloaded)
+Download models (charsiu and wav2vec2, you can see in the download_models.py file what is being downloaded)
 ```
 git clone https://github.com/noetits/charsiu
 sudo apt-get install git-lfs
