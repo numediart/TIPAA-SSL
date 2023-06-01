@@ -41,6 +41,8 @@ COPY ./requirements.txt $HOME/requirements.txt
 # pip
 RUN pip install --upgrade pip && pip install pyworld==0.3.2 && pip install -r requirements.txt
 
+RUN echo "import nltk;nltk.download('averaged_perceptron_tagger')" | python
+
 # As MFA cannot be ran from root, we have to create a new user and give him access to relevant folders
 # https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
 RUN useradd -ms /bin/bash mfauser
