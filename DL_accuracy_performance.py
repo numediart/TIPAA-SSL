@@ -8,8 +8,6 @@ from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stres
 
 
 
-from src.charsiu_utils import charsiu_phone_forced_aligner
-default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
 from src.label_data_processing import actor_recordings, final_s_artificial_data, synth_words_data
 from src.text_processing import *
@@ -731,6 +729,9 @@ def h_sound_artificial_data(model=default_model):
 
 
 def final_ed_s_confusions_on_synth_words():
+    
+    from src.charsiu_utils import charsiu_phone_forced_aligner
+    default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     from datetime import datetime
     now=datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
@@ -878,6 +879,9 @@ def model_comparison():
         }
         return stats
 
+    
+    from src.charsiu_utils import charsiu_phone_forced_aligner
+    default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     stats_prod=stats_pronunciation_aspects(default_model_charsiu)
     with open('stats_prod_target_to_basis','w') as f: f.write(stats_prod.__str__())
 
@@ -976,6 +980,9 @@ def use_tests():
 
     # from DL_accuracy_performance import *
     pContrast_for_actor_recordings(target_phones='AO1')
+    
+    from src.charsiu_utils import charsiu_phone_forced_aligner
+    default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     pContrast_for_actor_recordings(target_phones='AO1', model=default_model_charsiu)
 
 

@@ -12,8 +12,6 @@ from src.label_data_processing import build_user_data_df
 from DL_speech_tech import syllable_contrast_from_formatted_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model#, default_model_charsiu
 
 from src.audio_processing import read_audio_file
-from src.charsiu_utils import charsiu_phone_forced_aligner
-default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
 from src.audio_processing import prepare_audio_file
 
@@ -576,6 +574,10 @@ def final_ed_fake_mistakes(n=100):
 
     r=selection.iloc[0]
     s,fs=read_audio_file(r.path, fs=16000)
+
+    
+    from src.charsiu_utils import charsiu_phone_forced_aligner
+    default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=r.phonetics,target_word_idx=0,target_syllable_idx=-1,target_occurence_idx=0,target_phones='IH0_D',basis='D_D',contrast='end',mode='numpy',model=default_model_charsiu)
 
 
@@ -730,6 +732,9 @@ def use_tests():
         ds_actor_F1_prod.append(d)
     
     
+    
+    from src.charsiu_utils import charsiu_phone_forced_aligner
+    default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     final_ed_for_actor_recordings(target_phones='T', model=default_model_charsiu)
     final_ed_for_actor_recordings(target_phones='T', model=default_model)
 
