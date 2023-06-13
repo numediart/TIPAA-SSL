@@ -388,27 +388,27 @@ def use_tests():
     results_ws, failures_ws=get_results(df_test, base_url = base_url, endpoint=route+'word', client=client)
 
     
-    # TODO: try multipart form data to send files with payload data
-    # https://stackoverflow.com/questions/12385179/how-to-send-a-multipart-form-data-with-requests-in-python
-    from requests_toolbelt.multipart.encoder import MultipartEncoder
+    # # TODO: try multipart form data to send files with payload data
+    # # https://stackoverflow.com/questions/12385179/how-to-send-a-multipart-form-data-with-requests-in-python
+    # from requests_toolbelt.multipart.encoder import MultipartEncoder
 
-    mp_encoder = MultipartEncoder(
-        fields={
-            'phonetics': 'bar',
-            # plain file object, no filename or mime type produces a
-            # Content-Disposition header with just the part name
-            'audio64': ('temp.ogg', open('data/temp.ogg', 'wb'), 'audio/ogg'),
-        }
-    )
+    # mp_encoder = MultipartEncoder(
+    #     fields={
+    #         'phonetics': 'bar',
+    #         # plain file object, no filename or mime type produces a
+    #         # Content-Disposition header with just the part name
+    #         'audio64': ('temp.ogg', open('data/temp.ogg', 'wb'), 'audio/ogg'),
+    #     }
+    # )
 
-    client=requests
-    client=app.test_client()
-    r = client.post(
-        'http://localhost:8000/w2v/contrast/consonant',
-        data=mp_encoder,  # The MultipartEncoder is posted as data, don't use files=...!
-        # The MultipartEncoder provides the content-type header with the boundary:
-        # headers={'Content-Type': mp_encoder.content_type}
-    )
+    # client=requests
+    # client=app.test_client()
+    # r = client.post(
+    #     'http://localhost:8000/w2v/contrast/consonant',
+    #     data=mp_encoder,  # The MultipartEncoder is posted as data, don't use files=...!
+    #     # The MultipartEncoder provides the content-type header with the boundary:
+    #     # headers={'Content-Type': mp_encoder.content_type}
+    # )
 
     # from test_DL_api import *
     test_actor_recordings(base_url = 'http://localhost:8000', client=requests, n_ex_by_module=10)
