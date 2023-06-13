@@ -5,7 +5,7 @@ services:
     build: ./
     volumes:
       # Just specify a path and let the Engine create a volume
-      - ./:/root
+      - ./:/home/mambauser/code
     container_name: flaskapp
     # network_mode: host
     ports:

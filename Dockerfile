@@ -1,9 +1,7 @@
-FROM continuumio/miniconda3
+FROM mambaorg/micromamba
 ARG DEBIAN_FRONTEND=noninteractive
-# working directory
-ENV HOME /root
-WORKDIR $HOME
 
+USER root
 # packages list. The --no-install-recommends avoids installing recommended packages that are not necessary for a tiny docker image: https://phoenixnap.com/kb/docker-image-size
 RUN	apt-get update && apt-get install --no-install-recommends -y \
     libc6-dev-i386 \
@@ -24,40 +22,38 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install
 
-# https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
-RUN mkdir -p /mfa
-RUN conda create -p /env -c conda-forge "montreal-forced-aligner>=2.2"
-
-# Python packages from conda
-# ffmpeg is necessary to read mp3 files
-RUN . activate /env && conda install ffmpeg && conda install python=3.10 && \
-   # For using e.g. MelGAN or wav2vec2
-   conda install pytorch torchaudio cpuonly -c pytorch && \
-   # clean unnecessary setup files 
-   conda clean --all -y
 
 
-COPY ./requirements.txt $HOME/requirements.txt
-# pip
-RUN pip install --upgrade pip && pip install pyworld==0.3.2 && pip install -r requirements.txt
+
+
+USER mambauser
+
+ARG MAMBA_DOCKERFILE_ACTIVATE=1  # (otherwise python will not be found)
+
+COPY --chown=$MAMBA_USER:$MAMBA_USER env_mfa_base.yml /tmp/env_mfa_base.yml
+
+WORKDIR $HOME
+# Intall MFA from source (latest release), add a cpuonly in the yml just before pytorch dependency
+RUN git clone https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner && \
+    cd Montreal-Forced-Aligner && \
+    git checkout $(git describe --tags $(git rev-list --tags --max-count=1)) && \
+    micromamba install -y -n base -f /tmp/env_mfa_base.yml && \
+    micromamba clean --all --yes && \
+    pip install .
+
+COPY --chown=$MAMBA_USER:$MAMBA_USER env.yml /tmp/env.yml
+RUN micromamba install -y -n base -f /tmp/env.yml && \
+    micromamba clean --all --yes
 
 RUN echo "import nltk;nltk.download('averaged_perceptron_tagger')" | python
+RUN echo "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')" | python
 
-# As MFA cannot be ran from root, we have to create a new user and give him access to relevant folders
+# USER 
 # https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
-RUN useradd -ms /bin/bash mfauser
-RUN chown -R mfauser /mfa
-RUN chown -R mfauser /env
-RUN chown -R mfauser /root
-RUN chown -R mfauser /opt
-USER mfauser
-ENV MFA_ROOT_DIR=/mfa
+RUN mkdir -p /home/mambauser/mfa
+ENV MFA_ROOT_DIR=/home/mambauser/mfa
+RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
 
-RUN echo "source activate /env && mfa server start" > ~/.bashrc
-ENV PATH /env/bin:$PATH
-
-RUN . activate /env && mfa server init
-
-# USER root
+WORKDIR /home/mambauser/code
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000
