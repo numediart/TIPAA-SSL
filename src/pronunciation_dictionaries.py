@@ -229,7 +229,7 @@ def mfa_g2p(word, model="english_us_mfa"):
     #  use process substitution to avoid writing a text file for input and output
     # https://www.gnu.org/software/bash/manual/bash.html#Process-Substitution
     # <code>doit <(echo "hello") >(cat)  
-    # e.g. mfa g2p french_mfa <(echo "salut")  >(cat)
+    # e.g. mfa g2p <(echo "salut") french_mfa >(cat)
 
     cmd="mfa g2p "+'<(echo "'+word+'") '+model+" >(cat)"
     cmd_list=['bash', '-c',cmd]
