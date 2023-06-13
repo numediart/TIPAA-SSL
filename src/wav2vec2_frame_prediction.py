@@ -79,7 +79,7 @@ class Wav2Vec2ForFramePrediction:
             sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
             self.session = rt.InferenceSession(quantized_model_path, sess_options)
 
-        self.processor = Wav2Vec2Processor.from_pretrained(w2v2_model_path)    
+        self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")    
 
     def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
         path=os.path.join(out_path,name)
