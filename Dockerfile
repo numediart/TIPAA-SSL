@@ -8,6 +8,7 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     libx11-dev \
     gawk \
     curl \
+    sudo \
     git \
 	 make \
     cron \
@@ -23,8 +24,13 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     && git lfs install
 
 
-
-
+#  Add new user docker to sudo group
+RUN adduser mambauser sudo
+# Ensure sudo group users are not 
+# asked for a password when using 
+# sudo command by ammending sudoers file
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> \
+/etc/sudoers
 
 USER mambauser
 
