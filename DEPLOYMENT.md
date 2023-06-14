@@ -28,8 +28,8 @@ Or train a pipeline based on a phoneme frames dataset.
 
 Build docker containers then run them:
 ```
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 ```
 
 If neither `docker compose` or `docker-compose` work, install it: 
@@ -41,13 +41,13 @@ https://docs.docker.com/compose/install/
 
 Restart container:
 ```
-docker-compose restart flaskapp
+docker compose restart flaskapp
 ```
 
 or
 ```
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ## Process for updating code on server
@@ -73,7 +73,7 @@ git pull && docker compose restart flaskapp
 
 Rebuild and launch right away:
 ```
-docker-compose up -d --no-deps --build flaskapp
+docker compose up -d --no-deps --build flaskapp
 ```
 
 ## github actions resources
@@ -124,6 +124,6 @@ To show terminal output:
 ```
 docker logs flaskapp > docker_logs.txt # to get all history, too long if running for a while
 docker logs flaskapp --tail=100 # to print last history
-docker-compose logs --tail=20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
+docker compose logs --tail=20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
 ```
 
