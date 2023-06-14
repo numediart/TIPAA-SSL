@@ -194,7 +194,7 @@ def get_results(df, base_url = 'http://localhost:8000', endpoint='/v2/w2v/contra
     results_df=pd.DataFrame.from_records(results_records)
     return results_df, failures
 
-def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/contrast/', client=app.test_client(), n_ex_by_module=10):
+def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/contrast/', client=app.test_client(), n_ex_by_module=100):
     df=actor_recordings()
 
     df_pContrast=df.loc[df.target_phoneme.dropna().index]
@@ -204,8 +204,8 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
     vowels=['IH','IY','OW','AO','AA']
     eds=['T','D','IH0_D']
 
-    df_v=df_pContrast[~df_pContrast.target_phoneme.isin(eds)]
-    df_ed=df_pContrast[df_pContrast.target_phoneme.isin(eds)]
+    df_v=df_pContrast[~df_pContrast.target_phoneme.isin(eds)].sample(frac=1,random_state=0).drop_duplicates(['text'])
+    df_ed=df_pContrast[df_pContrast.target_phoneme.isin(eds)].sample(frac=1,random_state=0).drop_duplicates(['text'])
 
     
     results_v, failures_v=get_results(df_v.iloc[:n_ex_by_module,:], base_url = base_url, endpoint=route+'vowel', client=client)
