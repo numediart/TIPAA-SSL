@@ -39,13 +39,13 @@ non_v2/**
 *.png
 *.csv*
 *.txt
-*.p
+# *.p
 Documents/**
 .streamlit/**
 *.pkl
 *.bash
-*.onnx
-models/**
+# *.onnx
+# models/**
 content_tools/uploaded/**
 content_tools/exercise_generation/__pycache__/**
 content_tools/*.json
