@@ -1,7 +1,7 @@
 import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
 
 print_memory_usage("RAM - start of DL_speech_tech")
-from scipy.io.wavfile import  read
+from scipy.io.wavfile import read
 import numpy as np
 import pandas as pd
 import soundfile as sf
@@ -288,8 +288,7 @@ def audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=8, mode="numpy"
     else:
         return audio_status, s, None
 
-def phone_prob_matrix_segmentation(phone_prob_matrix, phonetics, model=default_model):
-    phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
+def phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=default_model):
     with CodeTimer('DTW'): 
         df_segmented=model.forced_aligner.probas_to_df_segmented(phone_prob_matrix, phoneme_list, fs=model.fs, time_per_output=model.time_per_output)
         model.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
@@ -305,7 +304,8 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
     audio_status, s, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
     if audio_status!="success": 
         return {"status": audio_status, "stress_intensities": [], "stress_binaries": []}
-    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phonetics, model=model)
+    phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
 
     print("model status", model.status)
     if model.status!="success":  return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
@@ -426,7 +426,8 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
     audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
     if audio_status!="success": 
         return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phonetics, model=model)
+    phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
 
     # if the probabilities were too low, 
     # maybe change this to empty if we want the other feedback "are you saying the right words", 
@@ -512,7 +513,6 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
     audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
     if audio_status!="success":
         return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phonetics, model=model)
 
     if position=="end": contrast_idx=-1
     elif position=="start": contrast_idx=0
@@ -527,6 +527,9 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
 
     if basis is None: basis=target_to_basis[target_phones]
     split_phonetics_by_words, syl_GT, GT, syl_idxs=phonetic_reference_processing(phonetics, target_word_idx, target_syllable_idx, target_phones, basis, position, contrast_idx)
+    
+    phoneme_list=sum(split_phonetics_by_words,[])
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
     df_word=extract_word(df_segmented, split_phonetics_by_words, target_word_idx)
     # g_t=[to_gibberish[unstress(p)] for p in GT]
 
@@ -772,6 +775,12 @@ def use_tests():
     # default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     res=start_end_contrast_from_formatted_phonetics_audio(audio,phonetics=phonetics,target_word_idx=0,target_syllable_idx=0,target_phones='N',basis="N",position='start',mode='numpy',model=default_model)
 
+    word="picked"
+    phonetics=prefill_for_sentence(word)['phonetics']
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    audio,fs=read_audio_file(path, fs=16000)
+    # default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
+    res=start_end_contrast_from_formatted_phonetics_audio(audio,phonetics=phonetics,target_word_idx=0,target_syllable_idx=0,target_phones='T',basis=target_to_basis['T'],position='end',mode='numpy',model=default_model)
 
     word="orders"
     phonetics=prefill_for_sentence(word)['phonetics']
