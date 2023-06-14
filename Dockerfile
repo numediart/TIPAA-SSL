@@ -33,6 +33,8 @@ ARG MAMBA_DOCKERFILE_ACTIVATE=1  # (otherwise python will not be found)
 COPY --chown=$MAMBA_USER:$MAMBA_USER env_mfa_base.yml /tmp/env_mfa_base.yml
 
 WORKDIR $HOME
+
+# https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
 # Intall MFA from source (latest release), add a cpuonly in the yml just before pytorch dependency
 RUN git clone https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner && \
     cd Montreal-Forced-Aligner && \
@@ -47,9 +49,8 @@ RUN micromamba install -y -n base -f /tmp/env.yml && \
 
 RUN echo "import nltk;nltk.download('averaged_perceptron_tagger')" | python
 RUN echo "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')" | python
+RUN mkdir /home/mambauser/hf_models && curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o /home/mambauser/hf_models/last_hidden_state.quant.onnx
 
-# USER 
-# https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
 RUN mkdir -p /home/mambauser/mfa
 ENV MFA_ROOT_DIR=/home/mambauser/mfa
 RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  

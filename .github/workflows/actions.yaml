@@ -23,5 +23,4 @@ jobs:
       run: |
             docker compose exec flaskapp /bin/bash -c -i "ls"
             docker compose exec flaskapp /bin/bash -c -i "ls -lh hf_models/"
-            docker compose exec flaskapp /bin/bash -c -i "curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o hf_models/last_hidden_state.quant.onnx"
             docker compose exec flaskapp /bin/bash -c -i "pytest test_DL_api.py test_DL_modules.py"
