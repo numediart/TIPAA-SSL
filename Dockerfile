@@ -24,6 +24,7 @@ RUN	apt-get update && apt-get install --no-install-recommends -y \
     && git lfs install
 
 
+# https://dev.to/emmanuelnk/using-sudo-without-password-prompt-as-non-root-docker-user-52bg
 #  Add new user docker to sudo group
 RUN adduser mambauser sudo
 # Ensure sudo group users are not 

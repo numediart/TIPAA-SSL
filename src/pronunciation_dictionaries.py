@@ -758,7 +758,7 @@ mfa_to_display_ipa['ow']='oʊ'
 mfa_to_display_ipa['əw']='əʊ'
 mfa_to_display_ipa['oj']='ɔɪ'
 
-with open('data/mfa_to_display_ipa.json','w') as f: f.write(json.dumps(mfa_to_display_ipa))
+# with open('data/mfa_to_display_ipa.json','w') as f: f.write(json.dumps(mfa_to_display_ipa))
 
 # keys=list(mfa_to_display_ipa.keys())
 # values=[mfa_to_display_ipa[k] for k in keys]
