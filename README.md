@@ -1,3 +1,4 @@
+[![.github/workflows/actions.yaml](https://github.com/flowchase/flowspeech/actions/workflows/actions.yaml/badge.svg)](https://github.com/flowchase/flowspeech/actions/workflows/actions.yaml)
 # Flowspeech
 
 Flowchase's speech tech
