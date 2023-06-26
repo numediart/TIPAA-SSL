@@ -426,7 +426,18 @@ def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.
 
 
 
-def synth_words_data(path="data/synth_audio/cmu_words/standard/prosody/", phonetic_dict=cmudict_dict, mode='CMU'):
+def select_accent(df, accent=None):
+    
+    if accent!=None:
+        if accent=='UK':
+            df=df[df.path.apply(lambda r: '_UK_' in r.split('/')[-1])]
+        elif accent=="US":
+            df=df[df.path.apply(lambda r: '_US_' in r.split('/')[-1])]
+        else:
+            raise "accent must be US or UK or None"
+    return df
+
+def synth_words_data(path="data/synth_audio/cmu_words/standard/prosody/", phonetic_dict=cmudict_dict, mode='CMU', accent=None):
     # path="data/synth_audio/mfa_words/standard/prosody/fr_FR"
     if not os.path.exists(path+'/linguistic_data.csv'):
         audios_path=path+"/*/*"
@@ -455,4 +466,13 @@ def synth_words_data(path="data/synth_audio/cmu_words/standard/prosody/", phonet
         df=pd.read_csv(path+'/linguistic_data.csv')
         # pd.read_csv()
         df['syl_p']=df['syl_p'].apply(ast.literal_eval)
+    
+    df=df.dropna()
+    df=select_accent(df, accent=accent)
+    df['phonetics']=df.apply(lambda r: r.phonetics.replace('CH','T_SH').replace('JH','D_ZH'), axis=1)
+    # recompute syl_p, because I modified phonetics with CH and JH
+    df['syl_p']=df.phonetics.str.split('|').apply(lambda r: [syl.split('_') for syl in r])
+    df['target_word_indexes']=0
+    df['fpath']=df['path']
+
     return df
