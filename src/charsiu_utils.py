@@ -7,7 +7,7 @@ import torch
 import numpy as np
 from charsiu.src.utils import seq2duration,forced_align
 from src.text_processing import group_consecutive_duplicates, remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_alphabet
 from src.audio_processing import getIntonation, getIntensity, normalize
 
 from src.dtw_forced_aligner import dtw_forced_aligner
@@ -56,7 +56,7 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         self.p_to_id=self.charsiu_processor.processor.tokenizer.encoder
         self.id_to_p=self.charsiu_processor.processor.tokenizer.decoder
 
-        self.forced_aligner = dtw_forced_aligner('cmu') 
+        self.forced_aligner=dtw_forced_aligner(cmu_alphabet)
         self.forced_aligner.p_to_id=self.p_to_id
         self.forced_aligner.id_to_p=self.id_to_p
 

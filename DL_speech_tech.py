@@ -16,7 +16,7 @@ print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
 
 from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
 print_memory_usage("RAM - DL_speech_tech after src.text_processing")
-from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish, cmu_diphtongs
+from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish, cmu_diphtongs, cmu_alphabet, ipa_alphabet
 from src.pronunciation_dictionaries import ipa_vowels, ipa_consonants, ipa_to_gibberish
 print_memory_usage("RAM - DL_speech_tech after src.pronunciation_dictionaries")
 
@@ -42,13 +42,16 @@ for k in cmu_consonants: phoneme_GT_proba_threshold_dict[k]=default_thresh
 from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction, extract_word
 print_memory_usage("RAM - DL_speech_tech after wav2vec2_frame_prediction")
 
-# default_model = Wav2Vec2ForFramePrediction('cmu')
+# default_model = Wav2Vec2ForFramePrediction(cmu_alphabet)
 
-default_model = Wav2Vec2ForFramePrediction('cmu',w2v2_model_format="onnx")
+default_model = Wav2Vec2ForFramePrediction(cmu_alphabet,w2v2_model_format="onnx")
 # default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
 # default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
 default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
 
+
+default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet,w2v2_model_format="onnx")
+default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
 
 # default_model.load(name='model_mailabs_pca_99_logistic_regression')
 # default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
@@ -168,18 +171,37 @@ def remove_downwards_trend(y):
 import math
 roundup=lambda n: math.ceil(n)
 
-def intensity_to_bin(score_by_word, n_max=2):
-    bin_score_by_word=np.zeros(len(score_by_word)).astype(int).tolist()
-    
-    if len(score_by_word)==1:
-        imax=np.argmax(score_by_word)
-        bin_score_by_word[imax]=1
+def intensity_to_bin(scores, n_max=2, threshold=60):
+    """Convert a list of scores to binaries according to a threshold and a maximum numbers of "1" authorized.
+    All elements are 0 except the ones that verify following conditions:
+    - be among the n_max highest elements
+    - be above threshold
+
+    Args:
+        scores (list of ints or floats): _description_
+        n_max (int, optional): _description_. Defaults to 2.
+        threshold (int, optional): _description_. Defaults to 60.
+
+    Returns:
+        list of ints of floats: _description_
+
+        Examples:
+        In [79]: intensity_to_bin([30,40,41,20,10,35,20], n_max=2, threshold=60)
+        Out[79]: [0, 0, 0, 0, 0, 0, 0]
+
+        In [75]: intensity_to_bin([30,70,61,10,65,20], n_max=2, threshold=60)
+        Out[75]: [0, 1, 0, 0, 1, 0]
+    """
+    bin_scores=np.zeros(len(scores)).astype(int).tolist()
+    if len(scores)==1:
+        imax=np.argmax(scores)
+        bin_scores[imax]=1
     else:
-        imaxes=[np.argmax(score_by_word)] if len(score_by_word)<n_max else np.argpartition(score_by_word, -n_max)[-n_max:]
+        imaxes=[np.argmax(scores)] if len(scores)<n_max else np.argpartition(scores, -n_max)[-n_max:]
         for imax in imaxes:
-            if score_by_word[imax]>60:
-                bin_score_by_word[imax]=1
-    return bin_score_by_word
+            if scores[imax]>=threshold:
+                bin_scores[imax]=1
+    return bin_scores
 
 def predict_phone(forced_aligner, df_word, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
     """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
@@ -294,21 +316,14 @@ def phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=defaul
         model.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
     return df_segmented
 
-def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
-                                    n_words_by_chunk=[7],
+
+def stress_from_df_segmented_audio(s, df_segmented, phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
+                                    n_words_by_chunk=[7], # this parameter is used only when level="sentence". When level="word", it is ignored. This could probably be implemented in a safer way.
                                     level="sentence", 
-                                    max_speech_rate=8, mode='file',
                                     model=default_model,
                                     vowels=cmu_vowels
                                     ):
-    audio_status, s, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
-    if audio_status!="success": 
-        return {"status": audio_status, "stress_intensities": [], "stress_binaries": []}
-    phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
-    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
 
-    print("model status", model.status)
-    if model.status!="success":  return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
 
     with CodeTimer('stress extraction'): ws=compute_stress_score(df_segmented, s, fs=model.fs)
     
@@ -367,6 +382,92 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
     else:
         return {"status": "error: "+level+"is not a valid level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.", "stress_intensities": [], "stress_binaries": []}
 
+
+def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
+                                    n_words_by_chunk=[7],
+                                    level="sentence", 
+                                    max_speech_rate=8, mode='file',
+                                    model=default_model,
+                                    vowels=cmu_vowels
+                                    ):
+    phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
+    audio_status, s, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
+    if audio_status!="success": 
+        return {"status": audio_status, "stress_intensities": [], "stress_binaries": []}
+    phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
+
+    
+    print("model status", model.status)
+    if model.status!="success":  return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
+
+    return stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, 
+                                    n_words_by_chunk=n_words_by_chunk,
+                                    level=level, 
+                                    model=model,
+                                    vowels=vowels
+                                    )
+
+    # print("model status", model.status)
+    # if model.status!="success":  return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
+
+    # with CodeTimer('stress extraction'): ws=compute_stress_score(df_segmented, s, fs=model.fs)
+    
+    # # TODO: I think I should check for voiceness, but I don't know if I should do it for all vowels
+    # if sum([el!=el for el in ws])==len(ws):
+    #     status = "success: no voiced sound detected inside supposed vowels (no pitch detected)"
+    #     return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
+    # phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
+    # is_vowel=phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
+    # vowels_indexed_df=phonetics_indexed_df[is_vowel]
+    # # print(vowels_indexed_df)
+
+    # # assert len(vowels_indexed_df) == len(ws), "n of vowels should be the same as length of vowel stresses"
+
+    # if len(vowels_indexed_df) != len(ws):
+    #     status = "error: n of vowels should be the same as length of vowel stresses"
+    #     print("n of vowels should be the same as length of vowel stresses")
+    #     return {"status": status, "stress_intensities": [], "stress_binaries": []}
+
+    # try:
+    #     vowels_indexed_df.loc[:,'stress_scores']=(100*ws).astype(int)
+    # except:
+    #     status = "error: n of vowels should be the same as length of vowel stresses"
+    #     print("n of vowels should be the same as length of vowel stresses")
+    #     return {"status": status, "stress_intensities": [], "stress_binaries": []}
+    #     # import pdb;pdb.set_trace()
+
+    # word_bins=[]
+    # word_intensities=[]
+    # for w_idx in vowels_indexed_df.word_idx.unique():
+    #     word=vowels_indexed_df[vowels_indexed_df.word_idx==w_idx]
+    #     bins=[0]*len(word)
+    #     bins[word.stress_scores.argmax()]=1
+    #     word_bins.append(bins)
+    #     word_intensities.append(word.stress_scores.tolist())
+
+    # if level=="word":
+    #     return {"status": "success", "stress_intensities": word_intensities, "stress_binaries": word_bins}
+    # elif level=="sentence":
+    #     max_word_intensities=[max(w) for w in word_intensities]
+    #     scores_grouped_by_chunk=[]
+    #     cumsum=0
+    #     for n in n_words_by_chunk:
+    #         scores_grouped_by_chunk.append(max_word_intensities[cumsum:cumsum+n])
+    #         cumsum+=n
+        
+    #     # I tried this on General English data, and in the end, it does not seem to improve
+    #     # scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
+
+    #     bins_by_chunk=[]
+    #     for chunk in scores_grouped_by_chunk:
+    #         bin=intensity_to_bin(chunk, n_max=roundup(len(chunk)/3))
+    #         bins_by_chunk.append(bin)
+    #     return {"status": "success", "stress_intensities": sum(scores_grouped_by_chunk,[]), "stress_binaries": sum(bins_by_chunk,[])}
+    # else:
+    #     return {"status": "error: "+level+"is not a valid level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.", "stress_intensities": [], "stress_binaries": []}
+
 def phonemeContrast_from_df_segmented(df_segmented,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
                             target_syllable_idx=0, 
@@ -423,7 +524,7 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
                     ):
     phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
     g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
-    audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
+    audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
     if audio_status!="success": 
         return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
     phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
@@ -444,6 +545,74 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
                 return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  '_'.join(g_d)}
         
     return phonemeContrast_from_df_segmented(df_segmented,phonetics=phonetics,target_word_idx=target_word_idx,target_syllable_idx=target_syllable_idx,target_occurence_idx=target_occurence_idx,target_phones=target_phones,alternatives=alternatives,model=model,to_gibberish=to_gibberish)
+
+
+
+def schwa_sound_from_formatted_phonetics_audio(audio,
+                                    phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
+                                    vowels=cmu_vowels,
+                                    target_word_idx=0, 
+                                    target_syllable_idx=0, 
+                                    target_occurence_idx=0, # will be 0  all the time for vowels, and most of the time for consonants
+                                    target_phones='AH0',
+                                    alternatives=cmu_vowels,
+                                    max_speech_rate=8, mode='file', 
+                                    model=default_model,
+                                    to_gibberish=cmu_to_gibberish,
+                                    **kwargs
+                    ):
+    phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
+    g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+    audio_status, s, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
+    if audio_status!="success": 
+        return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+    phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
+
+    # if the probabilities were too low, 
+    # maybe change this to empty if we want the other feedback "are you saying the right words", 
+    # or change null to "non-speech", nothing, nonsense or the pred_phones_audio
+    if model.status!="success": 
+        # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
+        g_d=[to_gibberish[unstress(p)] if not 'UNK' in p else 'uh' for p in model.pred_phones_audio]
+        if g_d==[]:
+            return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nothing'}
+        else:
+            if len(g_d)>10:
+                return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  'nonsense'}
+            else:
+                return {"status": model.status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  '_'.join(g_d)}
+            
+    stress_dict = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, level="word", model=model,vowels=vowels)
+    # {"status": "success", "stress_intensities": word_intensities, "stress_binaries": word_bins}
+    phoneme_contrast_dict = phonemeContrast_from_df_segmented(df_segmented,phonetics=phonetics,target_word_idx=target_word_idx,target_syllable_idx=target_syllable_idx,target_occurence_idx=target_occurence_idx,target_phones=target_phones,alternatives=alternatives,model=model,to_gibberish=to_gibberish)
+    # {"status": "success", "phonetic_detection": phonetic_detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
+
+    if stress_dict['status']!="success": return {"status": stress_dict['status']}
+    elif phoneme_contrast_dict['status']!="success": return {"status": phoneme_contrast_dict['status']}
+    else:
+        
+        stress_intensities_word=stress_dict['stress_intensities'][target_word_idx]
+
+        # find the least stressed vowels according to a ranking and threshold
+        # unstressed_bin=intensity_to_bin([100-el for el in stress_intensities_word], n_max=roundup(len(stress_intensities_word)/3))
+        
+        # if threshold=0, no contraint due to threshold, only ranking constraint
+        unstressed_bin_f = lambda stress_intensities_word: intensity_to_bin([100-el for el in stress_intensities_word], n_max=roundup(len(stress_intensities_word)/3), threshold=0)
+        unstressed_bin=unstressed_bin_f(stress_intensities_word)
+
+        # detected_target_stress=stress_dict['stress_intensities'][target_word_idx][target_syllable_idx]
+        
+        detected_target_vowel=phoneme_contrast_dict['phonetic_detection']
+
+        if (unstressed_bin[target_syllable_idx]==1 and detected_target_vowel==target_phones):
+            is_schwa=True
+        else:
+            is_schwa=False
+        return {"status":"success", "is_schwa":is_schwa, "unstressed_bin": unstressed_bin, "stress_intensities_word": stress_intensities_word, "target_vowel":detected_target_vowel}
+
+
+
 
 
 
@@ -510,7 +679,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                             to_gibberish=cmu_to_gibberish,
                             **kwargs
                     ):
-    audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=default_model)
+    audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
     if audio_status!="success":
         return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
@@ -656,6 +825,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
     return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
 
 
+
 def phonetic_content_analysis(s, phonetics, model=default_model,
                             vowels=cmu_vowels,
                             consonants=cmu_consonants):
@@ -768,6 +938,90 @@ def use_tests():
     from src.text_processing import prefill_for_sentence
     from src.label_data_processing import actor_recordings, synth_words_data
 
+
+    word="ability"
+    phonetics=prefill_for_sentence(word)['phonetics']
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    audio,fs=read_audio_file(path, fs=16000)
+    target_phones="AH0"
+    target_syllable_idx=[1 if target_phones in el else 0 for el in phonetics.split('|')].index(1)
+    schwa_sound_from_formatted_phonetics_audio(audio,phonetics=phonetics, min_stress=0,max_stress=20,vowels=cmu_vowels,target_word_idx=0, 
+                                               target_syllable_idx=target_syllable_idx, 
+                                    target_phones='AH0',alternatives=cmu_vowels,mode='numpy', 
+                                    model=default_model,
+                                    to_gibberish=cmu_to_gibberish
+                    )
+    
+    
+    from src.pronunciation_dictionaries import get_augmented_mfa_dict, mfa_to_display_ipa
+    mfa_gb=get_augmented_mfa_dict("en_GB")
+    mfa_us=get_augmented_mfa_dict("en_US")
+    word="history"
+    phonetics=prefill_for_sentence(word, lang="en_US", mode="MFA_IPA", word_dict=mfa_us)['phonetics']
+    path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
+    s,fs=read_audio_file(path, fs=16000)
+    phonemeContrast_from_formatted_phonetics_audio(s,phonetics=phonetics, 
+                                                        target_word_idx=0, 
+                                                        target_syllable_idx=1, 
+                                                        target_phones='ə0',
+                                                        alternatives=ipa_vowels, to_gibberish=mfa_to_display_ipa, mode='numpy', model=default_model_ipa)
+
+
+    # SBL-0001_Aback_48k_mono.mp3
+    regex= "SBL-[0-9]*_[A-Za-z]*_48k_mono.mp3"
+
+    from glob import glob
+    path="/mnt/c/Users/noe_t/Downloads/TTS - Native English Speakers/*/*"
+    paths=glob(path)
+    target_phones="AH0"
+
+    import re
+    import os
+    records=[]
+    for p in paths:
+        _,fn=os.path.split(p)
+        
+        if re.match(regex,fn):
+            word=fn
+            word=word.split('_')[1].lower()
+            phonetics=prefill_for_sentence(word)['phonetics']
+
+            # make sure there is actually a schwa in the word according to CMU, because apparently, these word were not selected by checking CMU phonemes
+            # but maybe some dictionary online like oxford or so
+            try:
+                target_syllable_idx=[1 if target_phones in el else 0 for el in phonetics.split('|')].index(1)
+            except: 
+                break
+            audio,fs=read_audio_file(p, fs=16000)
+            schwa_res=schwa_sound_from_formatted_phonetics_audio(audio,phonetics=phonetics, vowels=cmu_vowels,target_word_idx=0, 
+                                                    target_syllable_idx=target_syllable_idx, 
+                                                    target_phones='AH0',alternatives=cmu_vowels,mode='numpy', 
+                                                    model=default_model,
+                                                    to_gibberish=cmu_to_gibberish)
+            
+            # phonetics=prefill_for_sentence(word, lang="en_US", mode="MFA_IPA", word_dict=mfa_us)['phonetics']
+            phone_res=phonemeContrast_from_formatted_phonetics_audio(s,phonetics=prefill_for_sentence(word, lang="en_US", mode="MFA_IPA", word_dict=mfa_us)['phonetics'], 
+                                                                target_word_idx=0, 
+                                                                target_syllable_idx=target_syllable_idx,
+                                                                target_phones='ə0',
+                                                                alternatives=ipa_vowels, to_gibberish=mfa_to_display_ipa, mode='numpy', model=default_model_ipa)
+            # phone_res=phonemeContrast_from_formatted_phonetics_audio(audio,phonetics=phonetics, 
+            #                                                     target_word_idx=0, 
+            #                                                     target_syllable_idx=target_syllable_idx, 
+            #                                                     target_phones='AH0',
+            #                                                     alternatives=cmu_vowels, mode='numpy')
+            stress_res=stress_from_formatted_phonetics(audio,phonetics=phonetics, 
+                                            level="word", 
+                                            max_speech_rate=8, mode='numpy'
+                                            )
+            print(word)
+            print(phonetics)
+            print(schwa_res)
+            print(phone_res)
+            print(stress_res)
+            record={"word":word,"phonetics":phonetics,"schwa_res":schwa_res,"phone_res":phone_res,"stress_res":stress_res}
+            records.append(record)
+
     word="hundred"
     phonetics=prefill_for_sentence(word)['phonetics']
     path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
@@ -791,13 +1045,20 @@ def use_tests():
     # res=start_end_contrast_from_formatted_phonetics_audio(audio,phonetics=phonetics,target_word_idx=0,target_phones='Z',position='end',mode='numpy',model=default_model_charsiu)
 
     
-    word="history"
+    word="cleans"
     phonetics=prefill_for_sentence(word)['phonetics']
     path="data/synth_audio/cmu_words/standard/prosody/Joanna/F_US_"+word+".mp3"
     s,fs=read_audio_file(path, fs=16000)
     # default_model.predict_with_timings(s, sum(sum(split_phonetics(cmu_phonetics),[]),[]))
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=phonetics,target_word_idx=0,target_phones='Z',position='end',mode='numpy',model=default_model)
 
+    
+    
+
+    self=default_model_ipa
+    phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)    
+    phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=default_model_ipa)
 
     path='data/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
     formatted_phonetics=prefill_for_sentence('ekk')['phonetics']
@@ -914,7 +1175,7 @@ def use_tests():
     prefill_for_sentence('expected', mode='MFA_IPA')['cmu_phonetics']
 
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    model_ipa = Wav2Vec2ForFramePrediction('ipa')
+    model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet)
     model_ipa.load(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
 
     formatted_phonetics=prefill_for_sentence('turned around', mode='MFA_IPA')['cmu_phonetics']

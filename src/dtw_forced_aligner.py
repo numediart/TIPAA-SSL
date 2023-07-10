@@ -17,13 +17,8 @@ get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[co
 
 
 class dtw_forced_aligner:
-    def __init__(self, phone_type):
-        # self.label_encoder = LabelEncoder()
-        if phone_type == 'cmu':
-            self.alphabet = cmu_alphabet
-        elif phone_type == 'ipa':
-            self.alphabet = ipa_alphabet
-        # self.label_encoder.fit([phon for phon in self.alphabet])
+    def __init__(self, alphabet):
+        self.alphabet=alphabet
         self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
 

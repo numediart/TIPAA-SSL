@@ -5,9 +5,6 @@ import os
 import torch
 import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
-
-from src.audio_processing import getIntonation, getIntensity, normalize
-from src.text_processing import unstress, remove_stress_annots
 from sklearn.decomposition import PCA
 # from umap.umap_ import UMAP
 
@@ -20,7 +17,6 @@ from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_libri_d
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
 from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer
-from src.text_processing import remove_stress_annots, phonetics_indexed_df_from_formatted_phonetics, unstress, drop_consecutive_duplicate_elements, drop_consecutive_duplicates
 
 
 global cmu_vowels
@@ -38,8 +34,7 @@ def extract_word(df_segmented, phonetics, target_word_idx):
     return df_word
 
 class Wav2Vec2ForFramePrediction:
-    # phone_type = 'cmu' or 'ipa'
-    def __init__(self, phone_type, w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", w2v2_model_format="torch", reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
+    def __init__(self, alphabet, w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", w2v2_model_format="torch", reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
         """
         w2v_format: 'torch' or 'onnx'
         """
@@ -48,12 +43,8 @@ class Wav2Vec2ForFramePrediction:
         self.fs = 16000
         self.time_per_output=0.02
         
-        if phone_type == 'cmu':
-            self.alphabet = cmu_alphabet
-            self.forced_aligner = dtw_forced_aligner('cmu') 
-        elif phone_type == 'ipa':
-            self.alphabet = ipa_alphabet
-            self.forced_aligner = dtw_forced_aligner('ipa') 
+        self.alphabet=alphabet
+        self.forced_aligner=dtw_forced_aligner(alphabet)
         
         self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
@@ -61,11 +52,6 @@ class Wav2Vec2ForFramePrediction:
 
         self.reducer=reducer
         self.frame_classifier=frame_classifier
-
-        # self.phoneme_classifier=phoneme_classifier
-        # if self.phoneme_classifier is not None:
-        #     self.phoneme_reducer = PCA(n_components=target_dim, random_state=42)
-
 
         # import Wav2Vec2 feature extractor
         self.w2v2_model_format=w2v2_model_format
@@ -79,7 +65,9 @@ class Wav2Vec2ForFramePrediction:
             sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
             self.session = rt.InferenceSession(quantized_model_path, sess_options)
 
-        self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")    
+        # self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+        self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-base-960h")
+        
 
     def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
         path=os.path.join(out_path,name)
@@ -160,36 +148,32 @@ class Wav2Vec2ForFramePrediction:
         return df_segmented
 
 def train_Wav2Vec2ForFramePrediction_model():
-    
-
     from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis
     from sklearn.linear_model import LogisticRegression
-
-    
     df_all_instances_select_with_silences=pd.read_pickle('df_all_instances_select_with_silences.pkl')
     X, y = df_all_frames_to_X_y(df_all_instances_select_with_silences)
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_mailabs_equilibrated_pca_95_knn_10_w')
 
     
     df_all_instances_select_with_silences=pd.read_pickle('df_all_instances_select_with_silences_no_CH_JH.pkl')
     X, y = df_all_frames_to_X_y(df_all_instances_select_with_silences)
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
 
     # Basis model Wav2Vec2ForFramePrediction, a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_0.95_knn_10_w')
 
     
     df_all_instances_select_with_silences=pd.read_pickle('df_all_instances_select_with_silences.pkl')
     X, y = df_all_frames_to_X_y(df_all_instances_select_with_silences)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.95, random_state=42), frame_classifier=LinearDiscriminantAnalysis())
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=LinearDiscriminantAnalysis())
     model.fit(X, y)
     model.save(name='model_mailabs_equilibrated_pca_99_lda')
 
@@ -199,7 +183,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # Basis model Wav2Vec2ForFramePrediction, a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_ipa.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('ipa', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(ipa_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_95_knn_10_w_ipa')
 
@@ -207,7 +191,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # Basis model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(5, weights='distance', metric='cosine'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(5, weights='distance', metric='cosine'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_99_knn_5_cos_w')
 
@@ -215,7 +199,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # Basis model Wav2Vec2ForFramePrediction, COMMON VOICE DATA
     df_all_frames=pd.read_pickle('df_all_frames_commonvoice_en_dev.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LinearDiscriminantAnalysis())
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LinearDiscriminantAnalysis())
     model.fit(X, y)
     model.save(name='model_commonvoice_pca_99_lda')
 
@@ -223,7 +207,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # Basis model Wav2Vec2ForFramePrediction, COMMON VOICE DATA
     df_all_frames=pd.read_pickle('df_all_frames_commonvoice_en_dev.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
     model.fit(X, y)
     model.save(name='model_commonvoice_pca_99_knn')
 
@@ -231,7 +215,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # Basis model Wav2Vec2ForFramePrediction, COMMON VOICE DATA
     df_all_frames=pd.read_pickle('df_all_frames_commonvoice_en_dev_uk_us_ca_n_1000.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
     model.fit(X, y)
     model.save(name='model_commonvoice_pca_99_knn_uk_us_ca_n_1000')
 
@@ -239,7 +223,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # Basis model Wav2Vec2ForFramePrediction, COMMON VOICE DATA
     df_all_frames=pd.read_pickle('df_all_frames_commonvoice_en_dev_uk_us_ca_n_1000.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LinearDiscriminantAnalysis())
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LinearDiscriminantAnalysis())
     model.fit(X, y)
     model.save(name='model_commonvoice_pca_99_lda_uk_us_ca_n_1000')
 
@@ -247,7 +231,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances, UK US FR ES, IPA
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('ipa', frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
+    model = Wav2Vec2ForFramePrediction(ipa_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
 
@@ -255,7 +239,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # Basis model Wav2Vec2ForFramePrediction, PCA 99% variance, logistic regression
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LogisticRegression(max_iter=1000))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LogisticRegression(max_iter=1000))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_99_logistic_regression')
 
@@ -263,7 +247,7 @@ def train_Wav2Vec2ForFramePrediction_model():
     # model Wav2Vec2ForFramePrediction, PCA 99% variance, logistic regression, UK US FR ES, IPA
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('ipa', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LogisticRegression(max_iter=1000))
+    model = Wav2Vec2ForFramePrediction(ipa_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=LogisticRegression(max_iter=1000))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_99_logistic_regression_UK_US_FR_ES')
 
@@ -277,8 +261,8 @@ def train_Wav2Vec2ForFramePrediction_model():
 def inference_demo():
     
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    # default_model_cmu = Wav2Vec2ForFramePrediction('cmu')
-    model = Wav2Vec2ForFramePrediction('cmu',w2v2_model_format="onnx")
+    # default_model_cmu = Wav2Vec2ForFramePrediction(cmu_alphabet)
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet,w2v2_model_format="onnx")
     # model.load(name='model_mailabs_pca_0.95_knn_10_w')
     model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
 
@@ -367,6 +351,16 @@ def use_tests():
     from src.load_data import load_dataset_MAILABS, load_dataset_commonvoice, build_df_all_frames
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
+    from scripts.frame_classifiers_experiments import build_frame_dataset, build_frame_test_set
+    df_all_frames_select_stressed_no_CH_JH=build_frame_dataset()
+    df_all_frames_no_CH_JH=build_frame_test_set()
+
+    X, y = df_all_frames_to_X_y(df_all_frames_select_stressed_no_CH_JH)
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
+    model.fit(X, y)
+    model.save(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
+
+
     df_t=load_dataset_commonvoice(lang_codes=['en'], path='./data/cv-corpus-10.0-delta-2022-07-04', split="dev", phone_set='CMU')
     df_t.accents.unique()
     accents=['United States English']
@@ -379,7 +373,7 @@ def use_tests():
     # df_all_frames=pd.read_pickle('df_all_frames_commonvoice_en_dev_uk.pkl')
 
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.99, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
     model.fit(X, y)
     model.save(name='model_commonvoice_pca_99_knn_us')
 
@@ -472,28 +466,28 @@ def use_tests():
     # Basis model Wav2Vec2ForFramePrediction, 10-NN classifier weighted with distances, US frames
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_US_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_0.95_knn_10_w_US')
 
     # Basis model Wav2Vec2ForFramePrediction, but a 10-NN classifier weighted with distances
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_mailabs_pca_0.95_knn_10_w')
 
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.load(name='model_mailabs_pca_0.95_knn_10_w')
     
     # Basis model Wav2Vec2ForFramePrediction with 10-NN classifier weighted with distances, with w2v2 base model instead of wlsr espeak ft
     df_all_frames=pd.read_pickle('df_all_frames_MAILABS_train_w2v_base.pkl')
     X, y = df_all_frames_to_X_y(df_all_frames)
-    model = Wav2Vec2ForFramePrediction('cmu', w2v2_model_path="hf_models/facebook/wav2vec2-base-960h",  frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_path="hf_models/facebook/wav2vec2-base-960h",  frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     model.save(name='model_w2v_base_mailabs_pca_0.95_knn_10_w')
 
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.load(name='model_w2v_base_mailabs_pca_0.95_knn_10_w')
 
 
@@ -514,8 +508,8 @@ def use_tests():
 
 
     
-    # default_model_ipa = Wav2Vec2ForFramePrediction('ipa')
-    # default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
+    default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet)
+    default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
 
     # # phoneme predictions on a single audio sample with forced alignment
     # pred = default_model_ipa.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
@@ -542,7 +536,7 @@ def use_tests():
     ('QDA', QuadraticDiscriminantAnalysis())]
     eclf = VotingClassifier(estimators=estimators,
                         voting='soft', weights=[1 for _ in estimators])
-    model = Wav2Vec2ForFramePrediction('cmu',frame_classifier=eclf)
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet,frame_classifier=eclf)
     model.fit(X, y)
 
     # pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_linear_svm_qda.pkl','wb'))
@@ -550,7 +544,7 @@ def use_tests():
 
     ###
     
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.fit(X, y)
     # model.fit_phoneme(X_train, y_train)
     # pickle.dump(model,open('model_mailabs_pca_0.95_eclf_knn_10_weighted_dist.pkl','wb'))

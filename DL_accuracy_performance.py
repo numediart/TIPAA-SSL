@@ -830,8 +830,9 @@ def pronunciation_aspects_from_audiobook_data(n=100, data_set='test-other', mode
 def model_comparison():
     
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    # model = Wav2Vec2ForFramePrediction('cmu')
-    model = Wav2Vec2ForFramePrediction('cmu', w2v2_model_format='onnx')
+    from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format='onnx')
+    
 
 
     models=[

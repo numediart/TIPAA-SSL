@@ -9,7 +9,7 @@ from collections import Counter
 from src.label_data_processing import build_user_data_df
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from DL_speech_tech import syllable_contrast_from_formatted_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model#, default_model_charsiu
+from DL_speech_tech import schwa_sound_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model#, default_model_charsiu
 
 from src.audio_processing import read_audio_file
 
@@ -18,7 +18,7 @@ from src.audio_processing import prepare_audio_file
 from src.label_data_processing import get_data_new_content, actor_recordings, synth_words_data
 from src.text_processing import *
 from src.text_processing import word_stress_from_cmu
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_phones
+from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_phones, cmu_alphabet, ipa_alphabet
 
 from src.libri_phonetization_data import *
 
@@ -546,21 +546,11 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_mode
     # return phonetic_detections, phonetic_detections_s, d, d_s
 
 
-def select_accent(df, accent=None):
-    
-    if accent!=None:
-        if accent=='UK':
-            df=df[df.path.apply(lambda r: '_UK_' in r.split('/')[-1])]
-        elif accent=="US":
-            df=df[df.path.apply(lambda r: '_US_' in r.split('/')[-1])]
-        else:
-            raise "accent must be US or UK or None"
-    return df
 
 def final_ed_fake_mistakes(n=100):
     df=synth_words_data()
-    # df=select_accent(df, accent=accent)
-    df=df.dropna()
+    df['phonetics']=df.apply(lambda r: r.phonetics.replace('CH','T_SH').replace('JH','D_ZH'), axis=1)
+
 
     df['target_word_indexes']=0
     df['fpath']=df['path']
@@ -592,16 +582,42 @@ def final_ed_fake_mistakes(n=100):
     return result_df, d
 
 
+
+
+# def schwa_sound_from_formatted_phonetics_audio(audio,
+#                                     phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
+#                                     min_stress=0,
+#                                     max_stress=20,
+#                                     vowels=cmu_vowels,
+#                                     target_word_idx=0, 
+#                                     target_syllable_idx=0, 
+#                                     target_occurence_idx=0, # will be 0  all the time for vowels, and most of the time for consonants
+#                                     target_phones='AH0',
+#                                     alternatives=cmu_vowels,
+#                                     max_speech_rate=8, mode='file', 
+#                                     model=default_model,
+#                                     to_gibberish=cmu_to_gibberish,
+
+def schwa_sound_on_synth_words(target_phones='AH0', n=None, accent=None, model=default_model):
+    df=synth_words_data(accent=accent)
+
+    df_target=df[(df.phonetics.str.endswith('_'+target_phones)|df.phonetics.str.startswith(target_phones+'_')|df.phonetics.str.contains('_'+target_phones+'_'))]
+    # just get the index of the first occurence of the target    
+    df_target['target_syllable_indexes']=df_target['syl_p'].apply(lambda r: [1 if target_phones in el else 0 for el in r].index(1))
+    selection=df_target.sample(frac=1, random_state=0)[:n]
+    selection['cmu_phonetics']=selection['phonetics']
+
+    result_df=compute_predictions(selection, target_phones=target_phones, tech_function=schwa_sound_from_formatted_phonetics_audio, model=model)
+    phonetic_detections=result_df.phonetic_detection
+    
+    d=count_values(phonetic_detections)
+    d.columns=[target_phones]
+
+    return result_df, d
+
 def final_ed_on_synth_words(target_phones='IH0_D', n=None, accent=None, model=default_model):
-    df=synth_words_data()
-    df=select_accent(df, accent=accent)
+    df=synth_words_data(accent=accent)
 
-    df['target_word_indexes']=0
-    df['fpath']=df['path']
-
-    df[(df.phonetics.str.endswith('_'+"IH0_D"))&~(df.text.str.endswith('ed'))].text
-
-    df=df.dropna()
     df_target=df[(df.phonetics.str.endswith('_'+target_phones))&(df.text.str.endswith('ed'))]
     # just get the index of the first occurence of the target
     df_target['target_syllable_indexes']=-1
@@ -629,20 +645,11 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
     # from src.pronunciation_dictionaries import ipa_vowels
     # alternatives=ipa_vowels
     
-    df=synth_words_data().dropna()
-    df=select_accent(df, accent=accent)
+    df=synth_words_data(accent=accent)
 
-    df['phonetics']=df.apply(lambda r: r.phonetics.replace('CH','T_SH').replace('JH','D_ZH'), axis=1)
-
-    df['target_word_indexes']=0
-    df['fpath']=df['path']
     df_target=df[(df.phonetics.str.endswith('_'+target_phones)|df.phonetics.str.startswith(target_phones+'_')|df.phonetics.str.contains('_'+target_phones+'_'))]
-
-    # recompute syl_p, because I modified phonetics with CH and JH
-    df_target['syl_p']=df_target.phonetics.str.split('|').apply(lambda r: [syl.split('_') for syl in r])
     # just get the index of the first occurence of the target    
     df_target['target_syllable_indexes']=df_target['syl_p'].apply(lambda r: [1 if target_phones in el else 0 for el in r].index(1))
-
     selection=df_target.sample(frac=1, random_state=0)[:n]
 
     # selection.progress_apply(lambda r: prefill_for_sentence(r.text, mode='MFA_IPA')['cmu_phonetics'], axis=1)
@@ -669,12 +676,8 @@ def syl_contrast_on_synth_words(syl_target='P_EH1', n=None, accent=None, model=d
     # from src.pronunciation_dictionaries import ipa_vowels
     # alternatives=ipa_vowels
     
-    df=synth_words_data()
+    df=synth_words_data(accent=accent)
     df=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)]
-    df=select_accent(df, accent=accent)
-
-    df['target_word_indexes']=0
-    df['fpath']=df['path']
 
     selection=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)].sample(frac=1, random_state=0)[:n]
 
@@ -694,7 +697,7 @@ def use_tests():
 
     
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    default_model_ipa = Wav2Vec2ForFramePrediction('ipa')
+    default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet)
     default_model_ipa.load(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
 
 
@@ -745,10 +748,10 @@ def use_tests():
     final_ed_for_user_data( target_phones='D', n=100, model=default_model)
 
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    model_cv_lda = Wav2Vec2ForFramePrediction('cmu')
+    model_cv_lda = Wav2Vec2ForFramePrediction(cmu_alphabet)
     model_cv_lda.load(name='model_commonvoice_pca_99_lda')
 
-    model_cv_knn = Wav2Vec2ForFramePrediction('cmu')
+    model_cv_knn = Wav2Vec2ForFramePrediction(cmu_alphabet)
     model_cv_knn.load(name='model_commonvoice_pca_99_knn_uk_us_ca_n_1000')
     
 
@@ -830,7 +833,7 @@ def use_tests():
 
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
     from sklearn.neighbors import KNeighborsClassifier
-    model = Wav2Vec2ForFramePrediction('cmu', frame_classifier=KNeighborsClassifier(10, weights='distance'))
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
     model.load(name='model_mailabs_pca_0.95_knn_10_w')
     # results_df2, d2 = pContrast_on_synth_words(n=100, model=model)
     ds2=[]
