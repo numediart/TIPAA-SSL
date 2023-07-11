@@ -16,7 +16,7 @@ print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
 
 from src.text_processing import unstress, split_phonetics, remove_stress_annots, drop_consecutive_duplicates, drop_consecutive_duplicate_elements, phonetics_indexed_df_from_formatted_phonetics
 print_memory_usage("RAM - DL_speech_tech after src.text_processing")
-from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish, cmu_diphtongs, cmu_alphabet, ipa_alphabet
+from src.pronunciation_dictionaries import cmu_vowels, cmu_stressed_vowels, cmu_consonants, cmu_to_gibberish, cmu_diphtongs, cmu_alphabet, ipa_alphabet, cmu_stressed_alphabet
 from src.pronunciation_dictionaries import ipa_vowels, ipa_consonants, ipa_to_gibberish
 print_memory_usage("RAM - DL_speech_tech after src.pronunciation_dictionaries")
 
@@ -206,7 +206,9 @@ def intensity_to_bin(scores, n_max=2, threshold=60):
 def predict_phone(forced_aligner, df_word, phonetics, target_word_idx, target_syllable_idx, target_phones, target_occurence_idx=0, phoneme_set=cmu_vowels, GT_proba_threshold=0.2):
     """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'
     """
-    phoneme_set=[p for p in remove_stress_annots(phoneme_set)]+["[SIL]"]
+    # phoneme_set=[p for p in remove_stress_annots(phoneme_set)]+["[SIL]"]
+    phoneme_set=[p for p in phoneme_set]+["[SIL]"]
+    
     # split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
     # df_word=self.predict_word(audio, split_phonetics, target_word_idx)
 
@@ -312,7 +314,7 @@ def audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=8, mode="numpy"
 
 def phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=default_model):
     with CodeTimer('DTW'): 
-        df_segmented=model.forced_aligner.probas_to_df_segmented(phone_prob_matrix, phoneme_list, fs=model.fs, time_per_output=model.time_per_output)
+        df_segmented=model.forced_aligner.probas_to_df_segmented(phone_prob_matrix, remove_stress_annots(phoneme_list), fs=model.fs, time_per_output=model.time_per_output)
         model.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
     return df_segmented
 

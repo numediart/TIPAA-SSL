@@ -7,8 +7,6 @@ import json
 from operator import itemgetter
 from src.text_processing import remove_stress_annots, group_consecutive_duplicates
 
-from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet
-
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
 keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
 
@@ -42,28 +40,34 @@ class dtw_forced_aligner:
 
     # from cost_non_sil and target_phonemes, get the most likely path (forced alignment)
     def get_forced_alignment(self, phone_prob_matrix_nonsil, target_phonemes):
-        # target_phonemes = [x[0] for x in groupby(target_phonemes)]
-        target_phonemes = remove_stress_annots(target_phonemes)
-        target_labels = self.labelize_phonemes(target_phonemes)
+        """
+        Dynamic Time Warping
+        with N phonemes + silence token, phone_prob_matrix_nonsil is of shape T x (N+1). let's call L the length of the phoneme sequence. 
+        phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
+        for each phoneme of the sequence, we extract a number for each time step that is a similarity measure between the frame proba and the phoneme, i.e. a dot product divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
+        if it is a one-hot, a dot product is equivalent as just taking the element with that index from the prob vector.
+
+        Args:
+            phone_prob_matrix_nonsil (_type_): _description_
+            target_phonemes (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
 
         # one_hot_matrix=np.zeros((len(self.id_to_p), len(target_phonemes)))
         # for i in range(len(target_labels)):
         #     one_hot_matrix[target_labels[i],i]=1
         # (np.dot(phone_prob_matrix_nonsil,one_hot_matrix)==phone_prob_matrix_nonsil[:,list(target_labels)]).all()
 
-        # Dynamic Time Warping
-        # with 39 phonemes + silence token, phone_prob_matrix_nonsil is of shape T x 40. let's call L the length of the phoneme sequence. 
-        # phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
-        # for each phoneme of the sequence, we extract a number for each time step that is a similarity measure between the frame proba and the phoneme, i.e. a dot product divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
-        # if it is a one-hot, a dot product is equivalent as just taking the element with that index from the prob vector.
 
+        target_labels = self.labelize_phonemes(target_phonemes)
         D, wp = librosa.sequence.dtw(C=-phone_prob_matrix_nonsil[:,list(target_labels)], step_sizes_sigma=np.array([[1, 1], [1, 0]]))
         # getting phonemes' labels from forced alignement
         aligned_phones_labels = []
         for index in [i[1] for i in wp]:
             aligned_phones_labels.insert(0, target_labels[index])
         # using the label encoder to find the phoneme
-        # aligned_phones = list(self.label_encoder.inverse_transform(aligned_phones_labels))
         aligned_phones = [self.id_to_p[el] for el in aligned_phones_labels]
         
         return aligned_phones
@@ -92,9 +96,6 @@ class dtw_forced_aligner:
         proba_means = []
         for phon in grouped_aligned_preds:
             proba_means.append(np.mean([l[1] for l in phon], axis=0))
-            # proba_means.append(np.median([l[1] for l in phon], axis=0))
-
-        # predicted_phones = [self.label_encoder.inverse_transform([np.argmax(i)])[0] for i in proba_means]
         predicted_phones = [self.id_to_p[np.argmax(i)] for i in proba_means]
         
         return predicted_phones, proba_means
@@ -123,9 +124,6 @@ class dtw_forced_aligner:
         df_segmented[['phones', 'start_idx', 'end_idx']]=timings_df
         df_segmented['pred_phones_audio'] = predicted_phones
         df_segmented['proba_means'] = proba_means
-        
-        # df_segmented['GT_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.phones)], axis=1)
-        # df_segmented['pred_proba']=df_segmented.apply(lambda r: r.proba_means[p_to_id(r.pred_phones_audio)], axis=1)
         df_segmented['GT_proba'] = [df_segmented.proba_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones))]
         df_segmented['pred_proba'] = [df_segmented.proba_means[i][j] for i,j in zip(range(len(df_segmented)), self.labelize_phonemes(df_segmented.pred_phones_audio))]
         df_segmented['start']=df_segmented['start_idx']*time_per_output
