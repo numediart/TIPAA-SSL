@@ -16,7 +16,7 @@ from transformers import Wav2Vec2Model, Wav2Vec2Processor
 from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_libri_dataset_audio_timings
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
-from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer
+from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer, cmu_stressed_alphabet
 
 
 global cmu_vowels
@@ -261,12 +261,6 @@ def train_Wav2Vec2ForFramePrediction_model():
 def inference_demo():
     
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    # default_model_cmu = Wav2Vec2ForFramePrediction(cmu_alphabet)
-    model = Wav2Vec2ForFramePrediction(cmu_alphabet,w2v2_model_format="onnx")
-    # model.load(name='model_mailabs_pca_0.95_knn_10_w')
-    model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
-
-
     # --------------- Inference demo --------------------
     
     # phoneme predictions on a train dataset with forced alignment
@@ -283,9 +277,19 @@ def inference_demo():
     # prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
 
     
+    # default_model_cmu = Wav2Vec2ForFramePrediction(cmu_alphabet)
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet,w2v2_model_format="onnx")
+    # model.load(name='model_mailabs_pca_0.95_knn_10_w')
+    model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
+
     # phoneme predictions on a single audio sample with forced alignment
     df_segmented = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
     prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+
+    model = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'),w2v2_model_format="onnx")
+    model.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
+    prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    df_segmented = model.predict_with_timings(data.s.iloc[0], data.phone_df.iloc[0].phone.tolist())
 
     # from src.label_data_processing import synth_words_data
     from src.audio_processing import read_audio_file
@@ -356,7 +360,7 @@ def use_tests():
     df_all_frames_no_CH_JH=build_frame_test_set()
 
     X, y = df_all_frames_to_X_y(df_all_frames_select_stressed_no_CH_JH)
-    model = Wav2Vec2ForFramePrediction(cmu_alphabet, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
+    model = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'))
     model.fit(X, y)
     model.save(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
 
