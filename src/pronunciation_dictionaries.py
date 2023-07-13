@@ -217,7 +217,7 @@ def get_mfa_df(path='data/english_us_mfa.dict'):
     df=pd.read_csv(path, sep='\t', header=None, encoding='utf8').dropna()
     df.columns=['text', 'ipa']
     df=df[~df.text.str.contains(']')]
-    df=df[~df.text.str.contains('<')]    
+    df=df[~df.text.str.contains('<')]
 
     ipa=df.apply(lambda r: r.ipa.split(' '), axis=1)
     df['ipa']=ipa
@@ -694,6 +694,8 @@ cmu_diphtongs=[p[0] for p in cmu_phones_info if (p[1][0]=='vowel' and p[0][-1] i
 
 
 cmu_stressed_vowels=set(cmudict.symbols())-cmu_phones
+
+cmu_stressed_alphabet=sorted(list(cmu_stressed_vowels)+list(cmu_consonants))
 
 # CMU is a subset of arpabet
 cmu_1_char={}
