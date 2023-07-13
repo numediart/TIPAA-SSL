@@ -12,7 +12,7 @@ def df_all_frames_to_X_y(df_all_frames):
     y = df_all_frames['phoneme'].tolist()
     return X, y
 
-def build_df_all_frames(df_t, phone_type, number_of_examples=100, model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
+def build_df_all_frames(df_t, phone_type, number_of_examples=100, model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", unstressed=True):
     try:
         processor = Wav2Vec2Processor.from_pretrained(model_path)
     except OSError:
@@ -22,14 +22,14 @@ def build_df_all_frames(df_t, phone_type, number_of_examples=100, model_path="hf
 
     # Here I have to shuffle. Because if there are several languages sorted and I select only some examples, it might take only examples from one language
     df_t=df_t.sample(frac=1, random_state=1)
-    df_all_frames = instances_per_frame(df_t, processor, model, number_of_examples=number_of_examples, phone_type=phone_type)
+    df_all_frames = instances_per_frame(df_t, processor, model, number_of_examples=number_of_examples, phone_type=phone_type, unstressed=unstressed)
     return df_all_frames
 
-def build_df_all_phoneme_instances(df_t_train, phone_type='phone', number_of_examples=None, model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"):
+def build_df_all_phoneme_instances(df_t_train, phone_type='phone', number_of_examples=None, model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", unstressed=True):
     processor = Wav2Vec2Processor.from_pretrained(model_path)
     model = Wav2Vec2ForCTC.from_pretrained(model_path, output_hidden_states=True)
     df_t_train['phone_df']=df_t_train.phone_df.apply(lambda r: pd.DataFrame(r))
-    df_all_instances=instances_per_phoneme(df_t_train, processor, model, number_of_examples=number_of_examples, time_per_output=0.02,  phone_type=phone_type)
+    df_all_instances=instances_per_phoneme(df_t_train, processor, model, number_of_examples=number_of_examples, time_per_output=0.02,  phone_type=phone_type, unstressed=unstressed)
     return df_all_instances
 
 
@@ -191,3 +191,4 @@ def use_tests():
     df_t_test=load_dataset_commonvoice(lang_codes=['en'], path='./data/cv-corpus-10.0-delta-2022-07-04', split="test", phone_set='CMU')
     df_all_frames = build_df_all_frames(df_t_test.sample(frac=1, random_state=0), 'phone')
     df_all_frames.to_pickle('df_all_frames_commonvoice_en_test.pkl')
+    

@@ -73,12 +73,15 @@ def determine_start_end_vectors(df_segmented, time_per_output=0.02):
     df_segmented["start_vector"]=(df_segmented["start"]*(1/time_per_output)).astype(int)
     return df_segmented
 
-def phone_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state):
+def phone_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state, unstressed=True):
     df_segmented=determine_start_end_vectors(df_segmented, time_per_output=time_per_output)
     
     #new dataframe to save results
     new_df= pd.DataFrame()
-    new_df['phoneme']=remove_stress_annots(df_segmented[phone_type])
+    if unstressed:
+        new_df['phoneme']=remove_stress_annots(df_segmented[phone_type])
+    else:
+        new_df['phoneme']=df_segmented[phone_type]
 
     #compute logits or hidden states
     hidden_vectors=np.array(extractor_function(s, fs, processor, model))
@@ -95,28 +98,31 @@ def phone_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, p
     
     return new_df
 
-def phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state):
-    df_segmented=determine_start_end_vectors(df_segmented, time_per_output=time_per_output)
-    #compute logits or hidden states
-    hidden_vector=np.array(extractor_function(s, fs, processor, model))
-    df_vector_list=[]
-    for _,row in df_segmented.iterrows():
-        target_vector=hidden_vector[0,row['start_vector']:row['end_vector']]
-        N=target_vector.shape[0]
+# def phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state, unstressed=True):
+#     df_segmented=determine_start_end_vectors(df_segmented, time_per_output=time_per_output)
+#     #compute logits or hidden states
+#     hidden_vector=np.array(extractor_function(s, fs, processor, model))
+#     df_vector_list=[]
+#     for _,row in df_segmented.iterrows():
+#         target_vector=hidden_vector[0,row['start_vector']:row['end_vector']]
+#         N=target_vector.shape[0]
         
-        #new dataframe to save results
-        new_df= pd.DataFrame()
-        new_df['phoneme']=remove_stress_annots([row[phone_type]]*N)
-        new_df['vector']=list(target_vector)
-        df_vector_list.append(new_df)
+#         #new dataframe to save results
+#         new_df= pd.DataFrame()
+#         if unstressed:
+#             new_df['phoneme']=remove_stress_annots([row[phone_type]]*N)
+#         else:
+#             new_df['phoneme']=[row[phone_type]]*N
+#         new_df['vector']=list(target_vector)
+#         df_vector_list.append(new_df)
     
-    df_vectors=pd.concat(df_vector_list)
-    df_vectors.reset_index(drop=True)
+#     df_vectors=pd.concat(df_vector_list)
+#     df_vectors.reset_index(drop=True)
     
-    return df_vectors
+#     return df_vectors
 
 # creates dataframe from an audio sample containing frames hidden vector and silence hidden vector
-def phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state):
+def phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, time_per_output=0.02, phone_type='phones', extractor_function=get_last_hidden_state, unstressed=True):
     df_segmented=determine_start_end_vectors(df_segmented, time_per_output=time_per_output)
     #compute logits or hidden states
     hidden_vector=np.array(extractor_function(s, fs, processor, model))
@@ -136,7 +142,10 @@ def phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, tim
         
         #new dataframe to save results
         new_df= pd.DataFrame()
-        new_df['phoneme']=remove_stress_annots([row[phone_type]]*N)
+        if unstressed:
+            new_df['phoneme']=remove_stress_annots([row[phone_type]]*N)
+        else:
+            new_df['phoneme']=[row[phone_type]]*N
         new_df['vector']=list(target_vector)
         df_vector_list.append(new_df)
     
@@ -145,7 +154,7 @@ def phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, tim
     
     return df_vectors
     
-def instances_per_phoneme(df_t, processor, model, number_of_examples=100, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state):
+def instances_per_phoneme(df_t, processor, model, number_of_examples=100, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state, unstressed=True):
     average_vectors=[]
     if number_of_examples==None: number_of_examples=len(df_t)
 
@@ -154,7 +163,7 @@ def instances_per_phoneme(df_t, processor, model, number_of_examples=100, time_p
         df_segmented=pd.DataFrame.from_records(df_t.iloc[i].phone_df)
         s,fs=librosa.load(df_t.iloc[i].wav_path, sr=16000)
 
-        new_df=phone_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
+        new_df=phone_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function, unstressed=unstressed)
         
         
         if 'language_code' in df_t.iloc[i].keys():new_df['language_code']=df_t.iloc[i]['language_code']
@@ -165,7 +174,7 @@ def instances_per_phoneme(df_t, processor, model, number_of_examples=100, time_p
     df_all_instances=pd.concat(average_vectors)
     return df_all_instances
 
-def instances_per_frame(df_t, processor, model, number_of_examples=100, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state):
+def instances_per_frame(df_t, processor, model, number_of_examples=100, time_per_output=0.02, phone_type='cmu_phone', extractor_function=get_last_hidden_state, unstressed=True):
     vectors=[]
     if number_of_examples==None: number_of_examples=len(df_t)
 
@@ -175,7 +184,7 @@ def instances_per_frame(df_t, processor, model, number_of_examples=100, time_per
         s,fs=librosa.load(df_t.iloc[i].wav_path, sr=16000)
 
         #new_df=phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
-        new_df=phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
+        new_df=phone_concat_vectors_with_silence(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function, unstressed=unstressed)
         
         
         if 'language_code' in df_t.iloc[i].keys():new_df['language_code']=df_t.iloc[i]['language_code']
