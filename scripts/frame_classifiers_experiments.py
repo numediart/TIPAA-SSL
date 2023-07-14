@@ -54,7 +54,8 @@ def build_frame_dataset(unstressed=False, outname='df_all_frames_MAILABS_train_n
 
         # extract the latent frames with wav2vec xlsr
         # I added an "unstress" parameter to keep the stress until here. We can add a column without it anyway, so better keep it to be able to train classifiers using that information
-        df_all_instances = build_df_all_frames(df_t_train, 'phone', unstressed=unstressed, number_of_examples=1000)
+        # it is better to do the computation without removing the stress, and we remove it hereafter as a post-processing
+        df_all_instances = build_df_all_frames(df_t_train, 'phone', unstressed=False, number_of_examples=1000)
 
         unstressed_phonemes=remove_stress_annots(df_all_instances.phoneme.tolist())
         df_all_instances['unstressed_phoneme']=unstressed_phonemes
@@ -88,17 +89,21 @@ def build_frame_dataset(unstressed=False, outname='df_all_frames_MAILABS_train_n
 
 
 def build_frame_test_set(unstressed=False, outpath='df_all_frames_commonvoice_en_test_stressed_100.pkl'):
-    
     if os.path.exists(outpath):
         df_all_frames=pd.read_pickle(outpath)
     else:
         df_t_test=load_dataset_commonvoice(lang_codes=['en'], path='./data/cv-corpus-10.0-delta-2022-07-04', split="test", phone_set='CMU')
-        df_all_frames = build_df_all_frames(df_t_test.sample(frac=1, random_state=0), 'phone', unstressed=unstressed, number_of_examples=100)
+        # it is better to do the computation without removing the stress, and we remove it here as a post-processing
+        df_all_frames = build_df_all_frames(df_t_test.sample(frac=1, random_state=0), 'phone', unstressed=False, number_of_examples=100)
         df_all_frames.to_pickle(outpath)
     df_all_frames_no_CH_JH=df_all_frames[(df_all_frames.phoneme!="CH")&(df_all_frames.phoneme!="JH")]
+    if unstressed:
+        df_all_frames_no_CH_JH.phoneme=remove_stress_annots(df_all_frames_no_CH_JH.phoneme.tolist())
+        return df_all_frames_no_CH_JH
+    else:
+        return df_all_frames_no_CH_JH
 
-    return df_all_frames_no_CH_JH
-
+### This functions depends on something pre-computed
 def build_frames_from_all_phoneme_instances():
     # df_all_phoneme_instances = build_df_all_phoneme_instances(df_t_train, 'phone', number_of_examples=None)
 
@@ -284,10 +289,14 @@ def fit_and_score_classifiers(df_all_instances_train, df_all_instances_test):
 
 def use_tests():
 
-    df_all_frames_select_stressed_no_CH_JH=build_frame_dataset()
-    df_all_frames_no_CH_JH=build_frame_test_set()
+    df_all_frames_select_no_CH_JH=build_frame_dataset(unstressed=True)
+    df_all_frames_test_no_CH_JH=build_frame_test_set(unstressed=True)
+    fit_and_score_classifiers(df_all_frames_select_no_CH_JH, df_all_frames_test_no_CH_JH)
+
+    df_all_frames_select_stressed_no_CH_JH=build_frame_dataset(unstressed=False)
+    df_all_frames_stressed_no_CH_JH=build_frame_test_set(unstressed=False)
     # fit_and_score_classifiers(df_all_instances_select_no_CH_JH, df_all_instances_test)
-    fit_and_score_classifiers(df_all_frames_select_stressed_no_CH_JH, df_all_frames_no_CH_JH)
+    fit_and_score_classifiers(df_all_frames_select_stressed_no_CH_JH, df_all_frames_stressed_no_CH_JH)
 
 
 if False:
