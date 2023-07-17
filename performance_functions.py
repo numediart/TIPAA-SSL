@@ -15,7 +15,7 @@ from src.audio_processing import read_audio_file
 
 from src.audio_processing import prepare_audio_file
 
-from src.label_data_processing import get_data_new_content, actor_recordings, synth_words_data
+from src.label_data_processing import get_data_stressed_content, actor_recordings, synth_words_data
 from src.text_processing import *
 from src.text_processing import word_stress_from_cmu
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants, cmu_phones, cmu_alphabet, ipa_alphabet
@@ -118,20 +118,19 @@ def compute_predictions(selection, target_phones='AO1', tech_function=phonemeCon
 
 
 def stress_GE_performance_test(level='sentence'):
-    df=get_data_new_content()
+    df=get_data_stressed_content()
     stress_intensities=[]
     stress_binaries=[]
 
-    df['cmu_phonetics']=df.text.apply(lambda r: prefill_for_sentence(r)['cmu_phonetics'])
-    df=df[~df['cmu_phonetics'].str.contains('{')]
+    df['phonetics']=df.text.apply(lambda r: prefill_for_sentence(r)['phonetics'])
+    df=df[~df['phonetics'].str.contains('{')]
 
     print('n rows:',len(df))
     for i,row in tqdm(df.iterrows()):
-        # formatted_phonetics=prefill_for_sentence(row.text)['cmu_phonetics']
         s,fs=read_audio_file(row.audio_path, fs=16000)
         
         n_words_by_chunk=chunk_text(text=row.text)
-        res=stress_from_formatted_phonetics(s,phonetics=row.cmu_phonetics, n_words_by_chunk=n_words_by_chunk, level=level, mode="numpy")
+        res=stress_from_formatted_phonetics(s,phonetics=row.phonetics, n_words_by_chunk=n_words_by_chunk, level=level, mode="numpy")
         print(res)
         stress_intensities.append(res['stress_intensities'])
         stress_binaries.append(res['stress_binaries'])
@@ -194,8 +193,7 @@ def stress_GE_performance_test(level='sentence'):
 
 
         df.index=range(len(df))
-        # word_stress_binaries=df.text.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(prefill_for_sentence(r)['cmu_phonetics'])])
-        word_stress_binaries=df.cmu_phonetics.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(r)])
+        word_stress_binaries=df.phonetics.apply(lambda r: [word_stress_from_cmu(p) for p in split_phonetics(r)])
 
         # I realized some words have all "syllables" stressed (even though they are > 1 syl). In fact, it corresponds to acronyms
         # here I remove them
@@ -232,7 +230,7 @@ def stress_GE_performance_test(level='sentence'):
         # # When I don't exclude compound words (containing "{" and "}"), this will show the problematic of empty and non-consistent number of words
         # word_stress_binaries[word_stress_binaries.apply(lambda r: [] in  r)]
         # df.text[word_stress_binaries.apply(lambda r: [] in  r)]
-        # df.cmu_phonetics[word_stress_binaries.apply(lambda r: [] in  r)]
+        # df.phonetics[word_stress_binaries.apply(lambda r: [] in  r)]
 
         GT_by_len=select_by_len(word_stress_binaries)
         preds_by_len=select_by_len(df['stress_binaries'])
@@ -581,22 +579,6 @@ def final_ed_fake_mistakes(n=100):
 
     return result_df, d
 
-
-
-
-# def schwa_sound_from_formatted_phonetics_audio(audio,
-#                                     phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
-#                                     min_stress=0,
-#                                     max_stress=20,
-#                                     vowels=cmu_vowels,
-#                                     target_word_idx=0, 
-#                                     target_syllable_idx=0, 
-#                                     target_occurence_idx=0, # will be 0  all the time for vowels, and most of the time for consonants
-#                                     target_phones='AH0',
-#                                     alternatives=cmu_vowels,
-#                                     max_speech_rate=8, mode='file', 
-#                                     model=default_model,
-#                                     to_gibberish=cmu_to_gibberish,
 
 def schwa_sound_on_synth_words(target_phones='AH0', n=None, accent=None, model=default_model):
     df=synth_words_data(accent=accent)
