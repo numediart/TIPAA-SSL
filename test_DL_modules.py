@@ -2,7 +2,7 @@ from performance_functions import pContrast_on_synth_words, final_ed_from_audiob
 from DL_speech_tech import default_model, stress_from_formatted_phonetics, phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, compute_stress_score
 
 from src.audio_processing import prepare_audio_file, read_audio_file
-from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text
+from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text, remove_stress_annots
 from src.label_data_processing import actor_recordings
 import base64
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
@@ -89,7 +89,7 @@ def test_particular_cases():
     
     split_phonetics=[p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')]
     split_phonetics=sum(split_phonetics,[])
-    with CodeTimer('whole phone prediction'): df_segmented = default_model.predict_with_timings(s, split_phonetics)
+    with CodeTimer('whole phone prediction'): df_segmented = default_model.predict_with_timings(s, remove_stress_annots(split_phonetics))
 
     # with CodeTimer('stress extraction'): ws=model.compute_stress_score(s,phonetics)
     with CodeTimer('stress extraction'): ws=compute_stress_score(df_segmented, s, fs=default_model.fs)
