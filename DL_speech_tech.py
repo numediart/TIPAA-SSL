@@ -55,8 +55,8 @@ default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
 # default_model_stressed = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet,w2v2_model_format="onnx")
 # default_model_stressed.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
 
-default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet,w2v2_model_format="onnx")
-default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
+# default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet,w2v2_model_format="onnx")
+# default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
 
 # default_model.load(name='model_mailabs_pca_99_logistic_regression')
 # default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
