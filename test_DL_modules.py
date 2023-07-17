@@ -23,46 +23,47 @@ def a_test_termination_contrast():
     final_s_from_audiobook_data(n=100)
     
 
-def a_test_DL_speech_tech_functions():
-    path='data/synth_audio/cmu_words/standard/prosody/Brian/M_UK_ekk.mp3'
-    # encode_string = base64.b64encode(open(path, "rb").read())
-    formatted_phonetics=prefill_for_sentence('ekk')['phonetics']
-    s,fs=read_audio_file(path, fs=16000)
-    phonemeContrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
-                                                        target_word_idx=0, 
-                                                        target_syllable_idx=1, 
-                                                        target_phones='EY1',
-                                                        alternatives=cmu_vowels, mode='numpy')
+def test_DL_speech_tech_functions():
+    from src.label_data_processing import actor_recordings
+
+    df=actor_recordings()
 
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
     # path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'
     # path='data/audio_recordings/turned_around.mp3'
     encode_string = base64.b64encode(open(path, "rb").read())
     formatted_phonetics=prefill_for_sentence('I would love to go to ireland')['phonetics']
-    stress_from_formatted_phonetics(encode_string,phonetics=formatted_phonetics, 
+    res=stress_from_formatted_phonetics(encode_string,phonetics=formatted_phonetics, 
                                     level="sentence", 
                                     n_words_by_chunk=[7],
                                     max_speech_rate=8, mode='base64'
                                     )
+    assert res['stress_binaries'][2]==1, "Stress detection failed"
 
+    df[df.text=='One *hundred* percent.'].text
+    row=df[df.text=='One *hundred* percent.'].iloc[0]
+    s,fs=read_audio_file(row.audio_file_url, fs=16000)
 
-    formatted_phonetics=prefill_for_sentence('turned around')['phonetics']
-    path='data/audio_recordings/turnEED_around.mp3'
-    s,fs=read_audio_file(path, fs=16000)
-    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
-                            target_word_idx=0, 
+    res=stress_from_formatted_phonetics(s,phonetics=row.cmu_phonetics, 
+                                    level="sentence", 
+                                    n_words_by_chunk=[3],
+                                    max_speech_rate=8, mode='numpy'
+                                    )
+    assert res['stress_binaries'][1]==1, "Stress detection failed"
+    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=row.cmu_phonetics, 
+                            target_word_idx=1, 
                             target_phones='D',
                             basis='IH0_D', mode="numpy"
                     )
-    
-    path='data/synth_audio/cmu_words/standard/prosody/Amy/F_UK_hate.mp3'
-    formatted_phonetics=prefill_for_sentence('hate')['phonetics']
-    s,fs=read_audio_file(path, fs=16000)
-    start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
-                            target_word_idx=0, 
+    assert res['phonetic_detection']=="IH_D", "final -ed detection failed"
+    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=row.cmu_phonetics, 
+                            target_word_idx=1,
+                            target_syllable_idx=0,
                             target_phones='HH',
-                            basis='HH', contrast="start", mode="numpy"
+                            basis='HH', position="start", mode="numpy"
                     )
+    assert res['phonetic_detection']=="HH", "/h/ sound detection failed"
+
 
 def test_particular_cases():
     df=actor_recordings()
@@ -85,10 +86,6 @@ def test_particular_cases():
     # model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
     s,fs=read_audio_file(row.audio_file_url, fs=16000)
     split_phonetics=sum([p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')], [])
-    # _, p_df, _ = model.align_phones(audio=s,phones=split_phonetics)
-
-    # ws = default_model.compute_stress_score(audio=s,phonetics=row.cmu_phonetics)
-
     
     split_phonetics=[p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')]
     split_phonetics=sum(split_phonetics,[])
