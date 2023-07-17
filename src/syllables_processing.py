@@ -409,4 +409,48 @@ def use_tests():
     nv=n_vowels(word, lang="fr_FR")
     syllabified_text(word, nv, syllables_df=pd.read_csv('data/syllables_fr_FR.csv'), lang="fr_FR")
 
-    syllabified_text('dépendance', pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
+    syllabified_text(word, nv, pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
+
+    word="sentence"
+    nv=n_vowels(word, lang="en_US")
+    syllabified_text(word, nv, pd.DataFrame(columns=['n_syls', 'n_syls_SonoriPy', 'normalized_text', 'syllables']))[0]
+
+
+
+    import matplotlib.pyplot as plt
+    from dtaidistance import dtw
+    from dtaidistance import dtw_visualisation as dtwvis
+    import numpy as np
+
+    words=["psychiatrist","rhythm","tourism","hierarchy","sentence", "leaves","oceanic"]
+
+    def plot_SSP_DTW(word):
+        letter_by_syl, sonorities_letters = SonoriPy(str_to_list_of_char(word), mode='letters')
+        p_by_syl, sonorities_phonemes = SonoriPy(cmudict_dict[word][0], mode='CMU')
+        result = []
+        for i, item in enumerate(sonorities_phonemes):
+            result.append(item)
+            if item[1] == 5:
+                result.append((item[0]+'_2', 4))
+
+        s1 = np.array([el[1] for el in result])
+        s2 = np.array([el[1] for el in sonorities_letters])
+        path = dtw.warping_path(s1, s2)
+        fig, axs=dtwvis.plot_warping(s1, s2, path, warping_line_options= {'linewidth': 0.5, 'color': 'red', 'alpha': 0.8})
+        
+        ax2 = axs[0].secondary_xaxis('top')
+        ax2.set_xticks(list(range(len([el[0] for el in result]))))
+        ax2.set_xticklabels([el[0] for el in result])
+        axs[1].set_xticks(list(range(len(str_to_list_of_char(word)))))
+        axs[1].set_xticklabels(str_to_list_of_char(word))
+
+        
+        for ax in axs:
+            ax.axhline(y=4.5, color='red', linestyle='--', linewidth=0.5, alpha=0.8)
+        # axs[0].set_ylabel('Sonorities')
+        # axs[1].set_ylabel('Sonorities')
+        fig.set_size_inches(6, 2)
+        plt.tight_layout()
+        plt.savefig("warp_"+word+".png")
+
+    for word in words:    plot_SSP_DTW(word)
