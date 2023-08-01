@@ -1,5 +1,5 @@
 from performance_functions import pContrast_on_synth_words, final_ed_from_audiobook_data, final_s_from_audiobook_data, stress_GE_performance_test
-from DL_speech_tech import default_model, stress_from_formatted_phonetics, phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, compute_stress_score
+from DL_speech_tech import default_model, stress_from_formatted_phonetics, phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, compute_stress_score, multiple_aspect_from_formatted_phonetics_audio
 
 from src.audio_processing import prepare_audio_file, read_audio_file
 from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text, remove_stress_annots
@@ -40,6 +40,12 @@ def test_DL_speech_tech_functions():
                                     )
     assert res['stress_binaries'][2]==1, "Stress detection failed"
 
+    detection_df=multiple_aspect_from_formatted_phonetics_audio(encode_string,
+                                    phonetics=formatted_phonetics, 
+                                    max_speech_rate=8, mode='base64'
+                                    )
+    assert sum(detection_df.phones!=detection_df.detection)/len(detection_df) < 0.2, "Test example has a too high phoneme error rate"
+    
     df[df.text=='One *hundred* percent.'].text
     row=df[df.text=='One *hundred* percent.'].iloc[0]
     s,fs=read_audio_file(row.audio_file_url, fs=16000)
