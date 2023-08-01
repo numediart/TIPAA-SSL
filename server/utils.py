@@ -4,7 +4,7 @@ from flask import current_app, abort
 from marshmallow import Schema, fields
 import json
 import ast
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, syllable_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics
 from src.text_processing import check_phonemes, chunk_text, split_phonetics
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 from flask import Response
@@ -277,37 +277,6 @@ def request_contrast(d, properties, target_occurence_idx=0, tech_function=phonem
 
 
 
-# TODO: refactor with "request_contrast" by parametrizing the function call
-def request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='file'):
-    err=check_request(d, properties)
-    if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
-    err=check_phonetics(d['phonetics'])
-    if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
-
-    word_idx=int(d['word_idx'])
-    syl_idx=int(d['syl_idx'])
-
-    if word_idx>=len(d['phonetics'].split(' ')):
-        res={"status": "error: word_idx >= n of words"}
-        res['error']=True
-        # res['detected']=define_detected_flag(res['status'])
-        response=json.dumps(res)
-        return Response(response,status=400,mimetype="application/json")    
-    res=tech_function(d['audio64'],phonetics=d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, mode=mode)
-    
-    if res['status'].split(':')[0]=='error':
-        res['error']=True
-        # res['detected']=define_detected_flag(res['status'])
-        response=json.dumps(res)
-        return Response(response,status=500,mimetype="application/json")
-    else:
-        res['error']=False
-        res['detected']=define_detected_flag(res['status'])
-        response=json.dumps(res)
-        return Response(response,status=200,mimetype="application/json")
-
-
-
 def group_by_chunk(scores, n_words_by_chunk):
     scores_grouped_by_chunk=[]
     cumsum=0
@@ -370,4 +339,37 @@ def request_stress_v2(d, properties, module, mode='file'):
         return call_stress_fn(audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode, version='v2')
     else:
         return call_stress_fn(audio, p, module, mode=mode, version='v2')
+
+
+# to be removed
+if False:
+    from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, syllable_contrast_from_formatted_phonetics_audio
+
+    def request_syl_contrast(d, properties, tech_function=syllable_contrast_from_formatted_phonetics_audio, mode='file'):
+        err=check_request(d, properties)
+        if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
+        err=check_phonetics(d['phonetics'])
+        if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
+
+        word_idx=int(d['word_idx'])
+        syl_idx=int(d['syl_idx'])
+
+        if word_idx>=len(d['phonetics'].split(' ')):
+            res={"status": "error: word_idx >= n of words"}
+            res['error']=True
+            # res['detected']=define_detected_flag(res['status'])
+            response=json.dumps(res)
+            return Response(response,status=400,mimetype="application/json")    
+        res=tech_function(d['audio64'],phonetics=d['phonetics'], target_word_idx=word_idx, target_syllable_idx=syl_idx, mode=mode)
+        
+        if res['status'].split(':')[0]=='error':
+            res['error']=True
+            # res['detected']=define_detected_flag(res['status'])
+            response=json.dumps(res)
+            return Response(response,status=500,mimetype="application/json")
+        else:
+            res['error']=False
+            res['detected']=define_detected_flag(res['status'])
+            response=json.dumps(res)
+            return Response(response,status=200,mimetype="application/json")
 

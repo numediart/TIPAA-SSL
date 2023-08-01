@@ -6,7 +6,7 @@ from flask.views import MethodView
 from marshmallow import fields, Schema, EXCLUDE
 
 import json
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
 # from app_definition import app
@@ -158,6 +158,8 @@ class dl_cluster_contrast_api_v2(MethodView):
         return request_contrast(d, properties, tech_function=start_end_contrast_from_formatted_phonetics_audio, mode='base64', target_type="cluster")
 
 if False:
+    from DL_speech_tech import syllable_contrast_from_formatted_phonetics_audio
+
     example_syllable_contrast={"phonetics":d["phonetics"], "audio64": d["audio64"],"word_idx":d["termination_w_idx"],"syl_idx":1}
     syllable_contrast_params=kwargs_def(example_syllable_contrast)
     @doc(description='Syllable contrast', tags=['w2v_v2'])

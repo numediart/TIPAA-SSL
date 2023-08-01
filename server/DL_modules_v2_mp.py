@@ -6,7 +6,7 @@ from flask.views import MethodView
 from marshmallow import fields, Schema, EXCLUDE
 
 import json
-from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio
+from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio
 from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 
 # from app_definition import app
