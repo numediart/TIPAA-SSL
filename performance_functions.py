@@ -9,7 +9,7 @@ from collections import Counter
 from src.label_data_processing import build_user_data_df
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
-from DL_speech_tech import schwa_sound_from_formatted_phonetics_audio, syllable_contrast_from_formatted_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model#, default_model_charsiu
+from DL_speech_tech import schwa_sound_from_formatted_phonetics_audio, phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, start_end_contrast_from_formatted_phonetics_audio, default_model#, default_model_charsiu
 
 from src.audio_processing import read_audio_file
 
@@ -649,29 +649,32 @@ def pContrast_on_synth_words(target_phones='AO1', n=None, alternatives=cmu_vowel
     return result_df, d
 
 
-def syl_contrast_on_synth_words(syl_target='P_EH1', n=None, accent=None, model=default_model):
+# to be removed
+if False:
+    def syl_contrast_on_synth_words(syl_target='P_EH1', n=None, accent=None, model=default_model):
+        from DL_speech_tech import syllable_contrast_from_formatted_phonetics_audio
 
-    # ex for fr_FR, as in "rue" or "lu":
+        # ex for fr_FR, as in "rue" or "lu":
 
-    # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
-    # target_phones='y'
-    # from src.pronunciation_dictionaries import ipa_vowels
-    # alternatives=ipa_vowels
-    
-    df=synth_words_data(accent=accent)
-    df=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)]
+        # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
+        # target_phones='y'
+        # from src.pronunciation_dictionaries import ipa_vowels
+        # alternatives=ipa_vowels
+        
+        df=synth_words_data(accent=accent)
+        df=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)]
 
-    selection=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)].sample(frac=1, random_state=0)[:n]
+        selection=df[df.apply(lambda r: syl_target.split('_') in r.syl_p, axis=1)].sample(frac=1, random_state=0)[:n]
 
-    selection['target_syllable_indexes']=selection.syl_p.apply(lambda r: r.index(syl_target.split('_')))
-    selection['cmu_phonetics']=selection['phonetics']
-    result_df=compute_predictions(selection, model=model, tech_function=syllable_contrast_from_formatted_phonetics_audio)
-    phonetic_detections=result_df.phonetic_detection.str.join('_')
-    
-    d=count_values(phonetic_detections)
-    d.columns=[syl_target]
+        selection['target_syllable_indexes']=selection.syl_p.apply(lambda r: r.index(syl_target.split('_')))
+        selection['cmu_phonetics']=selection['phonetics']
+        result_df=compute_predictions(selection, model=model, tech_function=syllable_contrast_from_formatted_phonetics_audio)
+        phonetic_detections=result_df.phonetic_detection.str.join('_')
+        
+        d=count_values(phonetic_detections)
+        d.columns=[syl_target]
 
-    return result_df, d
+        return result_df, d
 
 
 
