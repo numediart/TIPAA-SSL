@@ -60,7 +60,8 @@ def main(filters_df):
                 new_row['Operation'] = st.selectbox(f'Operation (row {i+1})', ['startswith', 'endswith', 'contains'])
             with d:
                 new_row['Value'] = st.text_input(f'Value (row {i+1})')
-            filters_df = filters_df.append(new_row, ignore_index=True)
+            filters_df = pd.concat([filters_df, pd.DataFrame([new_row])], ignore_index=True)
+
 
         
         st.header('Filters')
