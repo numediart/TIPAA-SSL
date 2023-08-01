@@ -25,4 +25,4 @@ jobs:
       run: |
             docker compose exec flaskapp /bin/bash -c -i "ls"
             docker compose exec flaskapp /bin/bash -c -i "ls -lh hf_models/"
-            docker compose exec flaskapp /bin/bash -c -i "pytest test_DL_api.py test_DL_modules.py"
+            docker compose exec flaskapp /bin/bash -c -i "pytest test_DL_api.py test_DL_modules.py test_models.py"
