@@ -1,0 +1,47 @@
+from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_libri_dataset_audio_timings
+from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer, cmu_stressed_alphabet
+import pandas as pd
+import numpy as np
+import pickle
+import os
+import torch
+import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.decomposition import PCA
+# from umap.umap_ import UMAP
+
+
+from src.audio_processing import prepare_audio_file, read_audio_file
+from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text, remove_stress_annots
+
+def test_wav2vec2_frame_prediction(n=10):
+    
+    from src.label_data_processing import actor_recordings
+    df=actor_recordings()
+
+    df_sample=df.sample(n,random_state=0)
+
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    # --------------- Inference demo --------------------
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet,w2v2_model_format="onnx")
+    model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
+
+    
+    model_stressed = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet,w2v2_model_format="onnx")
+    model_stressed.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
+    
+    row=df_sample.iloc[0]
+
+    for i,row in df_sample.iterrows():
+        s,fs=read_audio_file(row.audio_file_url, fs=16000)
+        split_phonetics=sum([p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')], [])
+        split_phonetics=[p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')]
+        split_phonetics=sum(split_phonetics,[])
+
+        prob_matrix = model.predict_phone_prob_matrix(s, 16000)
+        df_segmented = model.predict_with_timings(s, remove_stress_annots(split_phonetics))
+        print('model without stress', df_segmented)
+
+        prob_matrix = model_stressed.predict_phone_prob_matrix(s, 16000)
+        df_segmented = model_stressed.predict_with_timings(s, split_phonetics)
+        print('model with stress', df_segmented)
