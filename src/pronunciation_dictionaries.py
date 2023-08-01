@@ -7,7 +7,7 @@ import json
 from tqdm import tqdm
 from syllabipy.sonoripy import SonoriPy
 
-unstress = lambda el: el[:-1] if el[-1] in ['0','1','2'] else el
+unstress = lambda el: el[:-1] if (len(el)>0 and el[-1]) in ['0','1','2'] else el
 def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):     return [unstress(el) for el in transcription]
 
 
