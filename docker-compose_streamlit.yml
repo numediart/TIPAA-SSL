@@ -1,28 +1,25 @@
 version: '3'
 
 services:
-  streamlitapp:
-    build: 
-      context: ./
-      dockerfile: ./content_tools/Dockerfile
+  flaskapp:
+    build: ./
     volumes:
       # Just specify a path and let the Engine create a volume
-      - ./:/root
-    container_name: streamlitapp
-    network_mode: host
+      - ./:/home/mambauser/code
+    container_name: flaskapp
+    # network_mode: host
     ports:
-      - "8501:8501"
+      - "8000:8000"
     restart: on-failure
+    command: ["bash", "content_tools/run_content_tools.sh"]
 
   nginx:
-    build:
-      context: ./nginx
-      dockerfile: ./Dockerfile_streamlit
+    build: ./nginx
     container_name: nginx
     environment:
       - SERVER_NAME=0.0.0.0
     restart: always
-    network_mode: host
+    # network_mode: host
     ports:
       - "80:80"
       - "443:443"
