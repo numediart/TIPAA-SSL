@@ -1,3 +1,8 @@
+"""_summary_: This function loads different speech datasets
+
+    Returns:
+        _type_: _description_: Dataframe of different speech datasets 
+"""
 import pandas as pd
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from src.text_processing import remove_stress_annots
