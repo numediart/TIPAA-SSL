@@ -536,6 +536,7 @@ def phonemeContrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER
     phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
     g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
     audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
+    
     if audio_status!="success": 
         return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
     phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
@@ -675,7 +676,7 @@ def phonetic_reference_processing(phonetics, target_word_idx, target_syllable_id
     return split_phonetics_words, syl_GT, GT, syl_idxs
 
 
-def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
+def start_end_contrast_from_prob_matrix(phone_prob_matrix,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
                             target_syllable_idx=None, 
                             target_phones='D',
@@ -690,19 +691,7 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
                             **kwargs
                     ):
     
-    # by default we apply the logic at the word level. End of word means last syllable, start of word means first syllable
-    if target_syllable_idx is None:
-        if position=="end": target_syllable_idx=-1
-        elif position=="start": target_syllable_idx=0
-        else:
-            print("position should be start or end")
-    
-
     g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
-    audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
-    if audio_status!="success":
-        return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-    
     if position=="end": contrast_idx=-1
     elif position=="start": contrast_idx=0
     else: print("contrast should be start or end")
@@ -835,6 +824,46 @@ def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D
     print('detection', detection)
     return {"status": "success", "phonetic_detection": detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
 
+def start_end_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
+                            target_word_idx=0, 
+                            target_syllable_idx=None, 
+                            target_phones='D',
+                            # basis='[UNK]_D',
+                            basis=None,
+                            max_speech_rate=8, mode='file', 
+                            position="end", 
+                            model=default_model,
+                            vowels=cmu_vowels,
+                            consonants=cmu_consonants,
+                            to_gibberish=cmu_to_gibberish,
+                            **kwargs
+                    ):
+    
+    # by default we apply the logic at the word level. End of word means last syllable, start of word means first syllable
+    if target_syllable_idx is None:
+        if position=="end": target_syllable_idx=-1
+        elif position=="start": target_syllable_idx=0
+        else:
+            print("position should be start or end")
+    
+
+    g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+    audio_status, _, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
+    if audio_status!="success":
+        return {"status": audio_status, "phonetic_detection": "null", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
+    return start_end_contrast_from_prob_matrix(phone_prob_matrix,phonetics=phonetics, 
+                            target_word_idx=target_word_idx, 
+                            target_syllable_idx=target_syllable_idx, 
+                            target_phones=target_phones,
+                            basis=basis,
+                            max_speech_rate=max_speech_rate, mode=mode, 
+                            position=position, 
+                            model=model,
+                            vowels=vowels,
+                            consonants=consonants,
+                            to_gibberish=to_gibberish
+                    )
 
 
 def phonetic_content_analysis(s, phonetics, model=default_model,
@@ -893,33 +922,8 @@ def phonetic_content_analysis(s, phonetics, model=default_model,
     phonetic_content=phonetic_content.loc[drop_consecutive_duplicates(phonetic_content[['phones','pred_phones_audio']]).index,:]
     return phonetic_content
 
-def syllable_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
-                            target_word_idx=0, 
-                            target_syllable_idx=0,
-                            max_speech_rate=8, mode='file',
-                            to_gibberish=cmu_to_gibberish,
-                            model=default_model,
-                            **kwargs
-                    ):
-    phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
-    audio_status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
-    g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
 
-    if audio_status!="success":
-        return {"status": audio_status,  "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
 
-    phonetic_content=phonetic_content_analysis(s, phonetics)
-    if model.status!="success": return {"status": model.status, "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-
-    if len(phonetic_content)==0: return {"status": "phonetic_content is empty", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
-
-    syllable_content=phonetic_content[phonetic_content.word_idx==target_word_idx][phonetic_content.syl_idx==target_syllable_idx]
-    detected_syllable=syllable_content.pred_phones_audio.tolist()
-    g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in detected_syllable])
-
-    g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in detected_syllable])
-    return {"status": "success", "phonetic_detection":detected_syllable,  "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
-    
 def analyze_start_end_for_synth_word(word, words_selected_df, target_word_idx=0,target_syllable_idx=-1,target_phones='Z',basis=None,position='end',model=default_model):
     from src.audio_processing import read_audio_file
     from src.text_processing import prefill_for_sentence
@@ -947,12 +951,12 @@ def multiple_aspect_from_formatted_phonetics_audio(audio,
                                     **kwargs
                     ):
     phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
-
     audio_status, s, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
-
     phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
     df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
+
     stress_dict = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, level="word", model=model, vowels=vowels)
+    stress_dict_sentence = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, level="sentence", model=model, vowels=vowels)
 
     phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
     is_vowel=phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
@@ -979,15 +983,62 @@ def multiple_aspect_from_formatted_phonetics_audio(audio,
     vowel_detections_df=pd.DataFrame(vowel_detections)
     vowels_indexed_df['detection']=vowel_detections_df.phonetic_detection.tolist()
 
-    # for i,r in clusters_df.iterrows():
-    #     start_end_contrast_from_formatted_phonetics_audio(audio,phonetics=phonetics,target_word_idx=0,target_syllable_idx=0,target_phones='T',basis=target_to_basis['T'],position='end',mode='numpy',model=default_model)
+    cluster_detections=[]
+    for i,r in clusters_df.iterrows():
+        # target_phones = r.cluster if r.cluster != '' else 'P'
+        # basis = r.cluster if r.cluster != '' else 'P'
+        if r.cluster != '':
+            res=start_end_contrast_from_prob_matrix(phone_prob_matrix,phonetics=phonetics,target_word_idx=r.word_idx,target_syllable_idx=r.syl_idx,target_phones=r.cluster,basis=r.cluster,position=r.position,mode=mode,model=model)
+            cluster_detections.append(res)
+    cluster_detections_df=pd.DataFrame(cluster_detections)
 
+    clusters_df=clusters_df[clusters_df.cluster!='']
+    clusters_df['detection']=cluster_detections_df.phonetic_detection.tolist()
+
+    vowels_indexed_df=vowels_indexed_df[["phones","word_idx","syl_idx","detection"]]
+    vowels_indexed_df['position']="middle"
+    vowels_indexed_df=vowels_indexed_df[["phones","word_idx","syl_idx","position","detection"]]
+    
+    vowels_indexed_df['stress_intensities'] = sum(stress_dict['stress_intensities'],[])
+    vowels_indexed_df['stress_binaries_word'] = sum(stress_dict['stress_binaries'],[])
+    clusters_df.columns=["phones","word_idx","syl_idx","position","detection"]
+
+
+    merged_results=pd.concat([vowels_indexed_df, clusters_df])
+    
+    syl_dfs=[]
+    for w_i,w_df in merged_results.groupby('word_idx'):
+        w_df['stress_binaries_sentence'] = stress_dict_sentence['stress_binaries'][w_i]
+        for s_i, s_df in w_df.groupby('syl_idx'):
+            map_to_i={'start':0,'middle':1,'end':2}
+            s_df['position_idx']=s_df['position'].apply(lambda r: map_to_i[r])
+            # repeat the vallue of the nucleus on the whole syllable, not to have nans
+            s_df['stress_intensities']=s_df['stress_intensities'].dropna().values[0]
+            s_df['stress_binaries_word']=s_df['stress_binaries_word'].dropna().values[0]
+
+            syl_dfs.append(s_df.sort_values('position_idx'))
+    final_merged_results=pd.concat(syl_dfs)
+
+    final_merged_results[["word_idx","syl_idx","phones","detection","stress_intensities","stress_binaries_word","stress_binaries_sentence"]].T
+
+    return final_merged_results
 
 
 
 
 def use_tests():
     # from DL_speech_tech import *
+    
+    from src.audio_processing import read_audio_file
+    from src.text_processing import prefill_for_sentence
+    from src.label_data_processing import actor_recordings, synth_words_data
+
+    
+    default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet,w2v2_model_format="onnx")
+    default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
+    default_model_stressed = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet,w2v2_model_format="onnx")
+    default_model_stressed.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
+
     from src.label_data_processing import actor_recordings, final_s_artificial_data, synth_words_data
     df_words=synth_words_data().dropna()
 
@@ -995,9 +1046,6 @@ def use_tests():
     words_selected_df=df_words[df_words.text==word]
     analyze_start_end_for_synth_word(word, words_selected_df, target_word_idx=0,target_syllable_idx=1,target_phones='HH',position='start',model=default_model)
 
-    from src.audio_processing import read_audio_file
-    from src.text_processing import prefill_for_sentence
-    from src.label_data_processing import actor_recordings, synth_words_data
 
 
     word="ability"
@@ -1226,16 +1274,17 @@ def use_tests():
     default_model.predict_phone_prob_matrix(s,fs).shape
     default_model.predict_with_timings(s, sum(sum(split_phonetics(formatted_phonetics),[]),[]))
     default_model.analyze_phonetic_content(s, formatted_phonetics)
+
     phonetic_content=phonetic_content_analysis(s, formatted_phonetics)
     phonetic_content[['phones', 'start_idx', 'end_idx', 'pred_phones_audio','proba_means', 'GT_proba', 'start', 'end', 'n_times']]
     
-    syllable_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
-                            target_word_idx=1, 
-                            target_syllable_idx=0,
-                            max_speech_rate=8, mode='numpy',
-                            to_gibberish=cmu_to_gibberish,
-                            model=default_model
-                    )
+    # syllable_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
+    #                         target_word_idx=1, 
+    #                         target_syllable_idx=0,
+    #                         max_speech_rate=8, mode='numpy',
+    #                         to_gibberish=cmu_to_gibberish,
+    #                         model=default_model
+    #                 )
     
 
     prefill_for_sentence('expected', mode='MFA_IPA')['cmu_phonetics']
@@ -1294,3 +1343,36 @@ def use_tests():
                             target_phones=target_phones,
                             basis='IH0_D', mode='numpy'
                     )
+
+
+# To be removed
+if False:
+    
+    # former attemps for a general analysis on a whole sentence. They did not work well enough
+    def syllable_contrast_from_formatted_phonetics_audio(audio,phonetics='T_ER1_N_D ER0|AW1_N_D', 
+                                target_word_idx=0, 
+                                target_syllable_idx=0,
+                                max_speech_rate=8, mode='file',
+                                to_gibberish=cmu_to_gibberish,
+                                model=default_model,
+                                **kwargs
+                        ):
+        phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
+        audio_status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
+        g_t=[to_gibberish[unstress(p)] for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]]
+
+        if audio_status!="success":
+            return {"status": audio_status,  "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
+        phonetic_content=phonetic_content_analysis(s, phonetics)
+        if model.status!="success": return {"status": model.status, "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
+        if len(phonetic_content)==0: return {"status": "phonetic_content is empty", "gibberish_truth":  '_'.join(g_t), "gibberish_detected":  "null"}
+
+        syllable_content=phonetic_content[phonetic_content.word_idx==target_word_idx][phonetic_content.syl_idx==target_syllable_idx]
+        detected_syllable=syllable_content.pred_phones_audio.tolist()
+        g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in detected_syllable])
+
+        g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in detected_syllable])
+        return {"status": "success", "phonetic_detection":detected_syllable,  "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
+    
