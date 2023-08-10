@@ -41,26 +41,31 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER env_mfa_base.yml /tmp/env_mfa_base.yml
 
 WORKDIR $HOME
 
-# https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
-# Intall MFA from source (latest release), add a cpuonly in the yml just before pytorch dependency
-RUN git clone https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner && \
-    cd Montreal-Forced-Aligner && \
-    git checkout $(git describe --tags $(git rev-list --tags --max-count=1)) && \
-    micromamba install -y -n base -f /tmp/env_mfa_base.yml && \
-    micromamba clean --all --yes && \
-    pip install .
+# # https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html
+# # Intall MFA from source (latest release), add a cpuonly in the yml just before pytorch dependency
+# RUN git clone https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner && \
+#     cd Montreal-Forced-Aligner && \
+#     git checkout $(git describe --tags $(git rev-list --tags --max-count=1)) && \
+#     micromamba install -y -n base -f /tmp/env_mfa_base.yml && \
+#     micromamba clean --all --yes && \
+#     pip install .
+
+RUN micromamba install -y -n base -f /tmp/env_mfa_base.yml && micromamba clean --all --yes && pip install montreal-forced-aligner
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER env.yml /tmp/env.yml
 RUN micromamba install -y -n base -f /tmp/env.yml && \
     micromamba clean --all --yes
 
-RUN echo "import nltk;nltk.download('averaged_perceptron_tagger')" | python
+RUN echo "import nltk;nltk.download('averaged_perceptron_tagger');nltk.download('cmudict')" | python
 RUN echo "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')" | python
 RUN mkdir /home/mambauser/hf_models && curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o /home/mambauser/hf_models/last_hidden_state.quant.onnx
 
 RUN mkdir -p /home/mambauser/mfa
 ENV MFA_ROOT_DIR=/home/mambauser/mfa
-RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
+RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa && mfa model download g2p english_us_arpa
+RUN mfa model download dictionary french_mfa && mfa model download dictionary spanish_spain_mfa && mfa model download dictionary spanish_latin_america_mfa && mfa model download dictionary english_uk_mfa && mfa model download dictionary english_us_mfa && mfa model download dictionary english_us_arpa
+# # RUN mfa model download acoustic french_mfa && mfa model download acoustic spanish_spain_mfa && mfa model download acoustic spanish_latin_america_mfa && mfa model download acoustic english_uk_mfa && mfa model download acoustic english_us_mfa  
+# RUN mfa model download acoustic english_us_arpa
 
 WORKDIR /home/mambauser/code
 CMD ["bash", "run_server.sh"]

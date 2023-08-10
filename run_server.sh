@@ -8,6 +8,7 @@
 
 # cron
 # mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
+mfa model download acoustic english_us_arpa
 ls /home/mambauser/hf_models/
 sudo mkdir hf_models/
 sudo cp /home/mambauser/hf_models/last_hidden_state.quant.onnx ./hf_models/last_hidden_state.quant.onnx
