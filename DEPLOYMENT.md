@@ -35,6 +35,8 @@ docker compose up -d
 If neither `docker compose` or `docker-compose` work, install it: 
 https://docs.docker.com/engine/install/debian/
 
+https://computingforgeeks.com/how-to-install-docker-on-debian-12-bookworm/?expand_article=1&expand_article=1
+
 `sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin`
 
 https://docs.docker.com/compose/install/
