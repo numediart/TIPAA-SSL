@@ -47,6 +47,8 @@ Documents/**
 # *.onnx
 # models/**
 content_tools/uploaded/**
+content_tools/st_audiorec/**
+content_tools/streamlit_audio_recorder/**
 content_tools/exercise_generation/__pycache__/**
 content_tools/*.json
 content_tools/*.zip
