@@ -96,7 +96,14 @@ https://github.com/villekr/github-actions-dockercompose-pytest/blob/master/.gith
 
 Same for downloading code and models. 
 
-But `docker compose -f docker-compose_streamlit.yml build` then up
+But `docker compose -f docker-compose_streamlit.yml build`
+
+Then, install extra dependency for recording audio (if demo speech tech is present):
+```
+cd content_tools && (git clone https://github.com/stefanrmmr/streamlit_audio_recorder  2> /dev/null || (cd "streamlit_audio_recorder" && git pull && cd ..)) && cp -rvn streamlit_audio_recorder/st_audiorec . && cp -vn streamlit_audio_recorder/st_custom_components.py . && cd ..
+```
+Then `docker compose -f docker-compose_streamlit.yml up -d`
+
 
 # Additional notes: 
 
