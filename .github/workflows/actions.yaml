@@ -9,6 +9,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    # caching docker layers: https://www.hyperdx.io/blog/docker-buildx-cache-with-github-actions
+    - name: Expose GitHub Runtime
+      uses: crazy-max/ghaction-github-runtime@v2
+    
+    - name: Build images
+      run: |
+        docker buildx create --use --driver=docker-container
+        docker buildx bake --set *.cache-to="type=gha,mode=max" --set *.cache-from="type=gha" --load
+ 
     - name: docker compose up
       env:
         COMPOSE_INTERACTIVE_NO_CLI: 1
