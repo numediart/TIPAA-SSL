@@ -102,6 +102,9 @@ Then, install extra dependency for recording audio (if demo speech tech is prese
 ```
 cd content_tools && (git clone https://github.com/stefanrmmr/streamlit_audio_recorder  2> /dev/null || (cd "streamlit_audio_recorder" && git pull && cd ..)) && cp -rvn streamlit_audio_recorder/st_audiorec . && cp -vn streamlit_audio_recorder/st_custom_components.py . && cd ..
 ```
+
+Add a `.streamlit/secrets.toml` file containing `password=...`. The password is stored on 1password.
+
 Then `docker compose -f docker-compose_streamlit.yml up -d`
 
 
