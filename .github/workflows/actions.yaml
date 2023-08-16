@@ -7,6 +7,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v3
     # caching docker layers: https://www.hyperdx.io/blog/docker-buildx-cache-with-github-actions
