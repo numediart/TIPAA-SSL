@@ -30,6 +30,15 @@ jobs:
       run: docker compose logs flaskapp
     # - name: Download hf models
     #   run: docker compose exec flaskapp python scripts/download_models.py
+    - name: Set User and Group IDs
+      run: |
+        export USER_ID=$(id -u)
+        export GROUP_ID=$(id -g)
+    - name: Set Group Permissions
+      run: |
+        chmod 777 ./
+        chown -R ${USER_ID}:${GROUP_ID} ./
+
     - name: Test with pytest
       env:
         COMPOSE_INTERACTIVE_NO_CLI: 1
