@@ -32,7 +32,7 @@ def run():
 
     st.write("# Welcome to content-tools! 👋")
 
-    st.sidebar.success("Select a tool above.")
+    # st.sidebar.success("Select a tool above.")
 
     st.markdown(
         """
