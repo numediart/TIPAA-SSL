@@ -14,7 +14,9 @@ services:
     command: ["bash", "content_tools/run_content_tools.sh"]
 
   nginx:
-    build: ./nginx
+    build: #./nginx
+      context: ./nginx
+      dockerfile: ./Dockerfile_streamlit
     container_name: nginx
     environment:
       - SERVER_NAME=0.0.0.0

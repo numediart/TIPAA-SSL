@@ -1,3 +1,10 @@
 # this gets the audio recorder component and puts it at the root of content_tools. If already cloned, we go in it and pull, then out of it. We copy only if not already existing
 # cd content_tools && (git clone https://github.com/stefanrmmr/streamlit_audio_recorder  2> /dev/null || (cd "streamlit_audio_recorder" && git pull && cd ..)) && cp -rvn streamlit_audio_recorder/st_audiorec . && cp -vn streamlit_audio_recorder/st_custom_components.py . && cd ..
+
+ls /home/mambauser/hf_models/
+sudo mkdir hf_models/
+sudo cp /home/mambauser/hf_models/last_hidden_state.quant.onnx ./hf_models/last_hidden_state.quant.onnx
+
+echo "from scripts import download_models" | sudo env "PATH=$PATH" python
+
 streamlit run content_tools/Hello.py --server.port 8000 --server.enableCORS=false --server.enableXsrfProtection=false

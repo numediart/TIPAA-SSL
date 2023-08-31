@@ -1,4 +1,4 @@
-FROM mambaorg/micromamba:1.4.5
+FROM mambaorg/micromamba
 ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
@@ -67,8 +67,8 @@ RUN mkdir -p /home/mambauser/mfa
 ENV MFA_ROOT_DIR=/home/mambauser/mfa
 RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
 
-COPY --chown=$MAMBA_USER:$MAMBA_USER scripts/download_models.py download_models.py
-RUN echo "import download_models" | python
+# COPY --chown=$MAMBA_USER:$MAMBA_USER scripts/download_models.py download_models.py
+# RUN mkdir /home/mambauser/hf_models/facebook && echo "import download_models" | python
 
 WORKDIR /home/mambauser/code
 CMD ["bash", "run_server.sh"]

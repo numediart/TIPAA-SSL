@@ -750,11 +750,11 @@ def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
             error_records.append(err)
         records.append(record)
     
-    # if output_errors:
-    now=datetime.now()
-    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    
     df_errors=pd.DataFrame.from_records(error_records)
-    df_errors.to_csv('prefill_content_errors_'+date_time+'.csv')
+    # now=datetime.now()
+    # date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    # df_errors.to_csv('prefill_content_errors_'+date_time+'.csv')
 
     df=pd.DataFrame.from_records(records)
     return df, df_errors
