@@ -51,8 +51,8 @@ At the root of the "flowspeech" repository, create a folder named "models", and 
 After executing the `scripts/download_models.py` script, you should have a few pretrained models inside "hf_models" folder.
 The Flowchase drive folder above contains a file named `last_hidden_state.quant.onnx`. This is a compressed version of a pretrained huggingface model, and should go into the corresponding folder which is "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"
 
-### Install miniconda and python dependencies
-```
+### Install micromamba and python dependencies
+<!-- ```
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh
 ```
@@ -61,9 +61,34 @@ Then follow instructions and open a new terminal, conda will be activated
 ```
 conda create -n flowspeech python=3
 conda activate flowspeech
+``` -->
+
+<!-- Basically follow the same installation commands described in the Dockerfile, but directly on your linux machine -->
+
+First install all necessary apt packages listed in ./Dockerfile
+
+To setup the micromamba environment, you first have to install it.
+Install micromamba:
+https://mamba.readthedocs.io/en/latest/micromamba-installation.html
+
+```
+"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
 ```
 
-Then basically follow the same installation commands described in the Dockerfile, but directly on your linux machine
+```
+micromamba create -n flowspeech_mm
+micromamba activate flowspeech_mm
+```
+
+Then you can proceed to install dependencies. It is easier to install the conda package of montreal-forced-aligner rather than pursuing the same commands as in the Dockerfile. But it takes more space on your disk (which is not a big deal for a local installation but it is of the dicker image).
+
+Once MFA is installed you can install the rest of this repository dependencies.
+
+```
+micromamba install -y -n flowspeech_mm -f env.yml
+```
+
+
 
 
 ## Data
