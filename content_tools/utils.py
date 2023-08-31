@@ -22,13 +22,17 @@ import textwrap
 import sys
 sys.path.append('./')
 print_memory_usage('RAM - streamlit utils, before loading')
-from src.text_processing import prefill_content
+from src.text_processing import prefill_content, prefill_for_sentence
 print_memory_usage('RAM - streamlit utils, after loading text_processing')
 from src.pronunciation_dictionaries import cmu_reducer, get_formatted_cmudict
 print_memory_usage('RAM - streamlit utils, after loading pronunciation_dictionaries')
 
 formatted_cmudict_df=get_formatted_cmudict()
 print_memory_usage('RAM - streamlit utils, after formatted_cmudict_df')
+
+from DL_speech_tech import multiple_aspect_from_formatted_phonetics_audio
+
+print_memory_usage('RAM - streamlit utils, after DL_speech_tech.multiple_aspect_from_formatted_phonetics_audio')
 
 
 @st.cache_resource
