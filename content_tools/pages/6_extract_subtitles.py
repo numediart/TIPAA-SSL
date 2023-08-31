@@ -4,7 +4,7 @@ import pandas as pd
 from audio_segmentation import SAMPLERATE, build_all_words_df, group_words, create_srt
 import librosa
 import io
-from utils import check_password, get_model
+from utils import check_password, get_model, read_audio_file
 model_name="hf_models/facebook/wav2vec2-base-960h"
 
 
@@ -57,7 +57,8 @@ if check_password():
                     """
             )
         
-            audio,fs=librosa.load(uploaded_file, sr=SAMPLERATE)
+            # audio,fs=librosa.load(uploaded_file, sr=SAMPLERATE)
+            audio,fs=read_audio_file(uploaded_file, fs=SAMPLERATE)
             all_df_words=build_all_words_df(audio, model=model)
             phrases_df=group_words(all_df_words)
 

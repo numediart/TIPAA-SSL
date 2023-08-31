@@ -27,6 +27,8 @@ print_memory_usage('RAM - streamlit utils, after loading text_processing')
 from src.pronunciation_dictionaries import cmu_reducer, get_formatted_cmudict
 print_memory_usage('RAM - streamlit utils, after loading pronunciation_dictionaries')
 
+from src.audio_processing import read_audio_file
+
 formatted_cmudict_df=get_formatted_cmudict()
 print_memory_usage('RAM - streamlit utils, after formatted_cmudict_df')
 
