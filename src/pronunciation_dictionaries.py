@@ -109,7 +109,14 @@ def get_augmented_cmudict():
         'trespasser':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0']],
         'trespassers':[['T', 'R', 'EH0', 'S', 'P', 'AE1', 'S', 'ER0', 'Z']],
         'outdoors':[['AW1', 'T', 'D', 'AO2', 'R', 'Z']],
-        'unreasonable':[['AH0', 'N', 'R', 'IY1', 'Z', 'AH0', 'N', 'AH0', 'B', 'AH0', 'L']]
+        'unreasonable':[['AH0', 'N', 'R', 'IY1', 'Z', 'AH0', 'N', 'AH0', 'B', 'AH0', 'L']],
+        'coworker':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0']],
+        'coworkers':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0', 'Z']],
+
+        'hm':cmudict_dict['hum'],
+        'hmm':cmudict_dict['hum'],
+        'mmh':cmudict_dict['hum']
+
 	}
     for k in corrections:
         cmudict_dict[k]=corrections[k]

@@ -13,7 +13,7 @@ from DL_accuracy_performance import count_values, plot_confusion_results
 from src.label_data_processing import build_user_data_df
 
 from src.audio_processing import audio64_from_file
-from src.text_processing import chunk_text
+from src.text_processing import chunk_text, prefill_for_sentence
 
 import base64
 
@@ -52,7 +52,7 @@ def a_test_prefill(base_url = 'http://localhost:8000', client=app.test_client())
     return d
 
 # 'data/marie_program_all_phrases.csv'
-def prefill_content_phrases(path="data/marie_program_all_phrases.csv", path_db_export="data/query_results-2022-10-26_75652.csv"):
+def prefill_content_phrases(path="data/ST_content_all_phrases_08_02_2023_12_07_13.csv", path_db_export="data/query_results-2022-10-26_75652.csv"):
     all_sentences=pd.read_csv(path)
     db_export=pd.read_csv(path_db_export)
 
@@ -69,13 +69,13 @@ def prefill_content_phrases(path="data/marie_program_all_phrases.csv", path_db_e
 
     # call_prefill_for_sentence()
     print('n of sentences:', len(all_sentences))
-    from tqdm import tqdm
     # base_url="http://135.125.247.39/"
     records=[]
     empty_sentences=[]
     for i,r in tqdm(all_sentences.iterrows()):
         if r.sentence!='' and r.sentence!=' ':
-            records.append(call_prefill_for_sentence(r.sentence.strip()))
+            # records.append(call_prefill_for_sentence(r.sentence.strip()))
+            records.append(prefill_for_sentence(r.sentence.strip()))
         else:
             empty_sentences.append(r.id)
             records.append('')
@@ -101,7 +101,7 @@ def prefill_content_phrases(path="data/marie_program_all_phrases.csv", path_db_e
     if len(syl_errors_df)>0: pd.DataFrame([syl_errors_text, syl_errors_phonetics, syl_errors_methods]).T
 
     print('List of inconsistencies in stress:')
-    phonetics_data[phonetics_data.apply(lambda r: len(r.n_stress_inconsistencies)>0, axis=1)].apply(lambda r: [r.cmu_phonetics.split(' ')[i] for i in r.n_stress_inconsistencies], axis=1)
+    phonetics_data[phonetics_data.apply(lambda r: len(r.n_stress_inconsistencies)>0, axis=1)].apply(lambda r: [r.phonetics.split(' ')[i] for i in r.n_stress_inconsistencies], axis=1)
 
     prefill_path=path.split('.')[0]+'_prefill.csv'
     phonetics_data.to_csv(prefill_path)

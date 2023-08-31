@@ -7,7 +7,6 @@
 # uwsgi --http 127.0.0.1:5000 --module flask_server:app
 
 # cron
-# mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
 ls /home/mambauser/hf_models/
 sudo mkdir hf_models/
 sudo cp /home/mambauser/hf_models/last_hidden_state.quant.onnx ./hf_models/last_hidden_state.quant.onnx

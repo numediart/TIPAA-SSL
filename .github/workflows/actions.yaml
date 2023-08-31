@@ -7,8 +7,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v3
+    # caching docker layers: https://www.hyperdx.io/blog/docker-buildx-cache-with-github-actions
+    - name: Expose GitHub Runtime
+      uses: crazy-max/ghaction-github-runtime@v2
+    
+    - name: Build images
+      run: |
+        docker buildx create --use --driver=docker-container
+        docker buildx bake --set *.cache-to="type=gha,mode=max" --set *.cache-from="type=gha" --load
+ 
     - name: docker compose up
       env:
         COMPOSE_INTERACTIVE_NO_CLI: 1
@@ -19,10 +30,22 @@ jobs:
       run: docker compose logs flaskapp
     # - name: Download hf models
     #   run: docker compose exec flaskapp python scripts/download_models.py
+    - name: Set User and Group IDs
+      run: |
+        export USER_ID=$(id -u)
+        export GROUP_ID=$(id -g)
+    - name: Set Group Permissions
+      run: |
+        chmod 777 ./
+        chown -R ${USER_ID}:${GROUP_ID} ./
+
     - name: Test with pytest
       env:
         COMPOSE_INTERACTIVE_NO_CLI: 1
       run: |
-            docker compose exec flaskapp /bin/bash -c -i "ls"
+            ls -lh
+            ls -lh ..
+            docker compose exec flaskapp /bin/bash -c -i "ls -lh"
+            docker compose exec flaskapp /bin/bash -c -i "ls -lh .."
             docker compose exec flaskapp /bin/bash -c -i "ls -lh hf_models/"
-            docker compose exec flaskapp /bin/bash -c -i "pytest test_DL_api.py test_DL_modules.py test_models.py"
+            docker compose exec flaskapp /bin/bash -c -i "pytest -p no:cacheprovider test_DL_api.py test_DL_modules.py test_models.py"

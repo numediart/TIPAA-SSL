@@ -69,5 +69,6 @@ Depending of the nature of the target, the way of locating this target is differ
 - Termination: This type of target is not necessarily a single phoneme. It can be used to analyze ending of words, for example final -ed words (IH0_D, D, T), or final -s (IH0_Z, Z, S) words. We also need a word index, and the target itslef. However we do not need the syllable index, as we assume it is always in the last syllable since it is a termination.
 - Cluster: As for termination, this type of target is not necessarily a single phoneme. It is a generalization of "termination", so that it can be either at the sart or the end, and it is at the syllable level instead of the word level. Therefore it means that we can target any group of phoneme at the start or end of any syllable.
 The information needed for identifying the target are therefore word index, syllable index, position (start or end), target
+
 This endpoint will be used for /h/ sound pronunciation aspect, and probably consonant clusters afterwards. 
 As this feature is quite general it might be used for other things.
