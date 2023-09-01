@@ -63,7 +63,8 @@ expand_dict={
     'dr':'docteur',
     'Mr':'Mister',
     'Mrs':'Misses',
-    'Dr':'Docteur'
+    'Dr':'Docteur',
+    'etc': 'etcetera'
 }
 def remove_special_characters(sentence="Where's the best place to have coffee?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\¡\;\:\"\*\{\}]'):
     """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
@@ -137,7 +138,7 @@ def check_phonemes(phonemes):
     ps=remove_stress_annots(phonemes)
     for p in ps:
         if p not in cmu_phones: return p
-        
+
 
 
 
