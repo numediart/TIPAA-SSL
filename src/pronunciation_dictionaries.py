@@ -112,10 +112,13 @@ def get_augmented_cmudict():
         'unreasonable':[['AH0', 'N', 'R', 'IY1', 'Z', 'AH0', 'N', 'AH0', 'B', 'AH0', 'L']],
         'coworker':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0']],
         'coworkers':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0', 'Z']],
+        'multitasker':[['M', 'AH1', 'L', 'T', 'IY0', 'T', 'AE2', 'S', 'K', 'ER0']],
+        'domestically':[['D', 'AH0', 'M', 'EH1', 'S', 'T', 'IH0', 'K', 'AH0', 'L', 'IY0']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],
-        'mmh':cmudict_dict['hum']
+        'mmh':cmudict_dict['hum'],
+        'ok':cmudict_dict['okay']
 
 	}
     for k in corrections:
