@@ -66,3 +66,5 @@ fi|re
 P|h|D
 en|thu|si|as|m
 val|ua|ble
+i|de|as
+au|di|en|ces
