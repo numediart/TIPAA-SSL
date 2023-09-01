@@ -114,6 +114,8 @@ def get_augmented_cmudict():
         'coworkers':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0', 'Z']],
         'solely':[['S', 'OW1', 'L', 'IY0']],
         'unrealistic':[['AH0', 'N', 'R', 'IY2', 'AH0', 'L', 'IH1', 'S', 'T', 'IH0', 'K']],
+        'requirement':[['R', 'IH0', 'K', 'W', 'AY1', 'ER0', 'M', 'AH0', 'N', 'T']],
+        'requirements':[['R', 'IH0', 'K', 'W', 'AY1', 'ER0', 'M', 'AH0', 'N', 'T', 'S']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],

@@ -68,3 +68,4 @@ en|thu|si|as|m
 val|ua|ble
 i|de|as
 au|di|en|ces
+re|qui|re|ments
