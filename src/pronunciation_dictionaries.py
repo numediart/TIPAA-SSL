@@ -112,6 +112,8 @@ def get_augmented_cmudict():
         'unreasonable':[['AH0', 'N', 'R', 'IY1', 'Z', 'AH0', 'N', 'AH0', 'B', 'AH0', 'L']],
         'coworker':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0']],
         'coworkers':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0', 'Z']],
+        'solely':[['S', 'OW1', 'L', 'IY0']],
+        'unrealistic':[['AH0', 'N', 'R', 'IY2', 'AH0', 'L', 'IH1', 'S', 'T', 'IH0', 'K']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],
