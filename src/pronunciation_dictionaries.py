@@ -116,12 +116,16 @@ def get_augmented_cmudict():
         'domestically':[['D', 'AH0', 'M', 'EH1', 'S', 'T', 'IH0', 'K', 'AH0', 'L', 'IY0']],
         'solely':[['S', 'OW1', 'L', 'IY0']],
         'unrealistic':[['AH0', 'N', 'R', 'IY2', 'AH0', 'L', 'IH1', 'S', 'T', 'IH0', 'K']],
+        'downtown':[['D', 'AW1', 'N', 'T', 'AW0', 'N']],
+        'everyday':[['EH1', 'V', 'R', 'IY0', 'D', 'EY1']],
+        'phd':[['P', 'IY0', 'EY2', 'CH', 'D', 'IY1']],
+        'requirement':[['R', 'IH0', 'K', 'W', 'AY1', 'ER0', 'M', 'AH0', 'N', 'T']],
+        'requirements':[['R', 'IH0', 'K', 'W', 'AY1', 'ER0', 'M', 'AH0', 'N', 'T', 'S']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],
         'mmh':cmudict_dict['hum'],
         'ok':cmudict_dict['okay']
-
 	}
     for k in corrections:
         cmudict_dict[k]=corrections[k]
