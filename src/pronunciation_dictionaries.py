@@ -114,6 +114,8 @@ def get_augmented_cmudict():
         'coworkers':[['K', 'OW1', 'W', 'ER0', 'K', 'ER0', 'Z']],
         'multitasker':[['M', 'AH1', 'L', 'T', 'IY0', 'T', 'AE2', 'S', 'K', 'ER0']],
         'domestically':[['D', 'AH0', 'M', 'EH1', 'S', 'T', 'IH0', 'K', 'AH0', 'L', 'IY0']],
+        'solely':[['S', 'OW1', 'L', 'IY0']],
+        'unrealistic':[['AH0', 'N', 'R', 'IY2', 'AH0', 'L', 'IH1', 'S', 'T', 'IH0', 'K']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],
