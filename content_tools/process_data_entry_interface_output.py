@@ -116,7 +116,9 @@ def process_content(df):
     all_sentences_df=pd.DataFrame([ids, all_sentences]).T
 
     all_sentences_df.columns=['id','sentence']
-    linguistic_data,df_errors=prefill_content(all_sentences)
+    # filter out empty fields in the JSON
+    all_sentences_df=all_sentences_df[all_sentences_df.sentence!='']
+    linguistic_data,df_errors=prefill_content(all_sentences_df.sentence.tolist())
 
 
     return all_sentences_df, linguistic_data, df_errors
