@@ -121,6 +121,10 @@ def get_augmented_cmudict():
         'phd':[['P', 'IY0', 'EY2', 'CH', 'D', 'IY1']],
         'requirement':[['R', 'IH0', 'K', 'W', 'AY1', 'ER0', 'M', 'AH0', 'N', 'T']],
         'requirements':[['R', 'IH0', 'K', 'W', 'AY1', 'ER0', 'M', 'AH0', 'N', 'T', 'S']],
+        'attendees':[['AH0', 'T', 'EH0', 'N', 'D', 'IY1', 'Z']],
+        'attendee':[['AH0', 'T', 'EH0', 'N', 'D', 'IY1']],
+        'victoria':[['V', 'IH0', 'K', 'T', 'AO1', 'R', 'Y', 'AH0']],
+        'livania':[['L', 'IY0', 'V', 'AA1', 'N', 'Y', 'AH0']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],
