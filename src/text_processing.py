@@ -7,7 +7,8 @@ import pandas as pd
 import numpy as np
 import itertools
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
-from g2p_en.expand import normalize_numbers
+from src.numbers_processing import normalize_numbers
+# from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
 from itertools import groupby
 from num2words import num2words
