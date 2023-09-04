@@ -125,6 +125,10 @@ def get_augmented_cmudict():
         'attendee':[['AH0', 'T', 'EH0', 'N', 'D', 'IY1']],
         'victoria':[['V', 'IH0', 'K', 'T', 'AO1', 'R', 'Y', 'AH0']],
         'livania':[['L', 'IY0', 'V', 'AA1', 'N', 'Y', 'AH0']],
+        'timezone':[['T', 'AY1', 'M', 'Z', 'OW0', 'N']],
+        'meninges':[['M', 'AH0', 'N', 'IH1', 'N', 'JH', 'IH0', 'Z']],
+        'gloucestershire':[['G', 'L', 'AW1', 'S', 'T', 'ER0', 'SH', 'EH0', 'R']],
+        'psychoanalyzing':[['S', 'AY0', 'K', 'OW0', 'AE1', 'N', 'AH0', 'L', 'AY2', 'Z', 'IH0', 'NG']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],
