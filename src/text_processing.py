@@ -489,6 +489,9 @@ def text_normalization(
         if c not in ['¡', '*', '"']:  # these punctuation mark can be at the beginning of a word (spanish exception, and our asterisk mark for target words)
             sentence=sentence.replace(' '+c, c)
     
+    # handle multiple space by removing empty strings (none) after splitting with space, and rejoining
+    sentence=' '.join(list(filter(None, sentence.split(' '))))
+
     norm_sent, c=normalize_sentence_numbers(sentence, lang=lang)
     special_chars_dict_start, special_chars_dict_end=extract_special_chars(norm_sent, special_chars)
     words=remove_special_characters(norm_sent, lowercase=False, chars_to_ignore_regex = '['+'\\'.join(special_chars)+']').split(' ')
