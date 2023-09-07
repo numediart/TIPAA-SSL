@@ -27,7 +27,7 @@
 25,aa|ron|i|cal,aaronical,4,
 26,ab in|i|ti|o,ab initio,4,
 27,ab o|vo,ab ovo,2,
-28,fi|re|wall,firewall,3,2.0
+28,fi|re|wall,firewall,3,3.0
 29,abbe|vill|i|an,abbevillian,4,
 30,abbe|vil|e|an,abbevilean,4,
 31,abbr,abbr,1,
@@ -39128,7 +39128,7 @@
 39126,de|bruised,debruised,2,
 39127,de|bruis|ing,debruising,3,
 39128,de|bug,debug,2,2.0
-39129,de|bugged,debugged,2,
+39129,de|bugged,debugged,2,2.0
 39130,de|bug|ging,debugging,3,3.0
 39131,de|bunk,debunk,2,2.0
 39132,de|bunk|er,debunker,3,
@@ -44898,7 +44898,7 @@
 44896,do|mes|tic fowl,domestic fowl,3,
 44897,do|mes|tic sci|ence,domestic science,4,
 44898,do|mes|tic|i|ty,domesticity,5,5.0
-44899,do|mes|ti|cal|ly,domestically,5,4.0
+44899,do|mes|ti|cal|ly,domestically,5,5.0
 44900,do|mes|ti|cate,domesticate,4,4.0
 44901,do|mes|ti|cat|ed,domesticated,5,5.0
 44902,do|mes|ti|cat|ing,domesticating,5,5.0
@@ -47176,7 +47176,7 @@
 47174,ein|stein's law,einstein's law,2,
 47175,ein|stein|i|an,einsteinian,4,
 47176,ein|stein|i|um,einsteinium,4,
-47177,eir|e,eire,2,
+47177,eir|e,eire,2,2.0
 47178,eisk,eisk,1,
 47179,eis|e|ge|sis,eisegesis,4,
 47180,eis|tedd|fod,eisteddfod,3,
@@ -62394,7 +62394,7 @@
 62392,glot|to|gon|ic,glottogonic,4,
 62393,glot|to|log|ic,glottologic,4,
 62394,glouces|ter,gloucester,2,2.0
-62395,glouces|ter|shi|re,gloucestershire,4,
+62395,glouces|ter|shi|re,gloucestershire,4,3.0
 62396,glove,glove,1,1.0
 62397,glove com|part|ment,glove compartment,3,
 62398,glove pup|pet,glove puppet,2,
@@ -92674,7 +92674,7 @@
 92672,ma|hua,mahua,2,
 92673,ma|h|n,mahn,3,1.0
 92674,ma|ia,maia,2,2.0
-92675,ma|ieu|tic,maieutic,3,
+92675,ma|ieu|tic,maieutic,3,3.0
 92676,ma|ieu|ti|cal,maieutical,4,
 92677,ma|iol|i|ca,maiolica,4,
 92678,ma|jes|ta,majesta,3,3.0
@@ -94654,7 +94654,7 @@
 94652,me|nes|thi|us,menesthius,4,
 94653,me|ne|ptah,meneptah,3,
 94654,me|ninx,meninx,2,
-94655,me|nin|ges,meninges,3,
+94655,me|nin|ges,meninges,3,3.0
 94656,me|nin|ge|al,meningeal,4,
 94657,me|nin|go|cele,meningocele,4,
 94658,me|nin|go|coc|cal,meningococcal,5,
@@ -136772,7 +136772,7 @@
 136772,re|quick|en,requicken,3,
 136773,re|qui|re,require,3,3.0
 136774,re|qui|red,required,3,3.0
-136775,re|qui|re|ment,requirement,4,3.0
+136775,re|qui|re|ment,requirement,4,4.0
 136776,re|quir|ing,requiring,3,4.0
 136777,re|quite,requite,2,
 136778,re|quite|ment,requitement,3,
@@ -149592,7 +149592,7 @@
 149592,sold,sold,1,1.0
 149593,sole,sole,1,1.0
 149594,sole|less,soleless,2,
-149595,sole|ly,solely,2,3.0
+149595,sole|ly,solely,2,2.0
 149596,sole|piece,solepiece,2,
 149597,sole|plate,soleplate,2,
 149598,solve,solve,1,1.0
@@ -150165,7 +150165,7 @@
 150165,sou|they,southey,2,
 150166,sou|tine,soutine,2,
 150167,sou|ve|nir,souvenir,3,3.0
-150168,sov|er|eign,sovereign,3,2.0
+150168,sov|er|eign,sovereign,3,3.0
 150169,sov|er|eign|ly,sovereignly,4,
 150170,sov|er|eign|ty,sovereignty,4,3.0
 150171,sov|khoz,sovkhoz,2,
@@ -153573,7 +153573,7 @@
 153573,stone|less,stoneless,2,
 153574,stone|less|ness,stonelessness,3,
 153575,stone|like,stonelike,2,
-153576,stone|ma|son,stonemason,3,
+153576,stone|ma|son,stonemason,3,3.0
 153577,stone|ma|son|ry,stonemasonry,4,
 153578,stone|roll|er,stoneroller,3,
 153579,stone|wall,stonewall,2,2.0
@@ -172904,7 +172904,7 @@
 172904,un|in|spir|ing,uninspiring,4,4.0
 172905,un|in|spir|it|ed,uninspirited,5,
 172906,un|in|spis|sat|ed,uninspissated,5,
-172907,un|in|stalled,uninstalled,3,
+172907,un|in|stalled,uninstalled,3,3.0
 172908,un|in|stanced,uninstanced,3,
 172909,un|in|stat|ed,uninstated,4,
 172910,un|in|stilled,uninstilled,3,
@@ -175614,7 +175614,7 @@
 175614,un|re|al|ise,unrealise,4,
 175615,un|re|al|ised,unrealised,4,
 175616,un|re|al|is|ing,unrealising,5,
-175617,un|re|al|is|tic,unrealistic,5,4.0
+175617,un|re|al|is|tic,unrealistic,5,5.0
 175618,un|re|al|is|ti|cal|ly,unrealistically,7,6.0
 175619,un|re|al|ize,unrealize,4,
 175620,un|re|al|ized,unrealized,4,4.0
@@ -180848,8 +180848,8 @@
 180848,vic|to|rien,victorien,3,
 180849,vic|to|rine,victorine,3,4.0
 180850,vic|to|rine,victorine,3,4.0
-180851,vic|to|ri|a,victoria,4,4.0
-180852,vic|to|ri|a,victoria,4,4.0
+180851,vic|to|ri|a,victoria,4,3.0
+180852,vic|to|ri|a,victoria,4,3.0
 180853,vic|to|ri|a cross,victoria cross,4,
 180854,vic|to|ri|a day,victoria day,4,
 180855,vic|to|ri|a des|ert,victoria desert,5,
@@ -185077,7 +185077,7 @@
 185077,wi|re|draw|ing,wiredrawing,4,
 185078,wi|re|drew,wiredrew,3,
 185079,wi|re|hair,wirehair,3,
-185080,wi|re|less,wireless,3,2.0
+185080,wi|re|less,wireless,3,3.0
 185081,wi|re|less tel|e|phone,wireless telephone,5,
 185082,wi|re|less te|leg|ra|phy,wireless telegraphy,6,
 185083,wi|re|less|ly,wirelessly,4,
@@ -187200,7 +187200,7 @@
 25,sam|uel,samuel,2,2.0
 26,in|di|vi|du|als,individuals,5,5.0
 27,in|di|vi|du|al's,individual's,5,5.0
-28,fi|re|wall,firewall,3,2.0
+28,fi|re|wall,firewall,3,3.0
 29,re|ac|tions,reactions,3,3.0
 30,re|ac|ted,reacted,3,3.0
 31,i|deal,ideal,2,2.0
@@ -187240,6 +187240,25 @@
 65,p|h|d,phd,3,3.0
 66,en|thu|si|as|m,enthusiasm,5,5.0
 67,val|ua|ble,valuable,3,3.0
-68,i|de|as,ideas,3,3.0
-69,au|di|en|ces,audiences,4,4.0
-70,re|qui|re|ments,requirements,4,3.0
+68,val|ua|ble's,valuable's,3,
+69,val|ua|bles,valuables,3,3.0
+70,in|val|ua|ble,invaluable,4,4.0
+71,i|de|as,ideas,3,3.0
+72,au|di|en|ces,audiences,4,4.0
+73,re|qui|re|ments,requirements,4,4.0
+74,le|o|nar|do,leonardo,4,4.0
+75,hie|ro|glyph,hieroglyph,3,3.0
+76,hie|ro|glyphs,hieroglyphs,3,3.0
+77,o|ce|an|ia,oceania,4,4.0
+78,mi|lle|ni|um,millenium,4,
+79,mi|lle|ni|um's,millenium's,4,
+80,mi|lle|ni|ums,milleniums,4,
+81,mi|lle|ni|a's,millenia's,4,
+82,mi|lle|ni|a,millenia,4,
+83,me|die|val,medieval,3,3.0
+84,mai|eu|tics,maieutics,3,3.0
+85,mai|eu|tic,maieutic,3,3.0
+86,mai|eu|tic's,maieutic's,3,
+87,dif|fi|cul|ties,difficulties,4,4.0
+88,vege|ta|ble,vegetable,3,3.0
+89,choco|late,chocolate,2,2.0
