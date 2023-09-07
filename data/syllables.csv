@@ -99502,7 +99502,7 @@
 99500,my|o|e|de|ma,myoedema,5,
 99501,my|o|gen|ic,myogenic,4,
 99502,my|o|ge|nic|i|ty,myogenicity,6,
-99503,my|o|glo|bin,myoglobin,4,
+99503,my|o|glo|bin,myoglobin,4,4.0
 99504,my|o|graph,myograph,3,
 99505,my|o|graph|ic,myographic,4,
 99506,my|o|graph|i|cal|ly,myographically,6,
@@ -107276,7 +107276,7 @@
 107275,nor|dic,nordic,2,2.0
 107276,nor|dic|i|ty,nordicity,4,
 107277,nor|di|ca,nordica,3,3.0
-107278,nor|ep|i|neph|rine,norepinephrine,5,
+107278,nor|ep|i|neph|rine,norepinephrine,5,5.0
 107279,nor|folk,norfolk,2,2.0
 107280,nor|folk is|land,norfolk island,3,
 107281,nor|folk jack|et,norfolk jacket,3,
@@ -109691,7 +109691,7 @@
 109691,or|tho|graph|i|cal|ly,orthographically,6,
 109692,or|tho|hy|dro|gen,orthohydrogen,5,
 109693,or|tho|mor|phic,orthomorphic,4,
-109694,or|tho|pae|dic,orthopaedic,4,
+109694,or|tho|pae|dic,orthopaedic,4,4.0
 109695,or|tho|pae|dics,orthopaedics,4,
 109696,or|tho|pae|dist,orthopaedist,4,
 109697,or|tho|pae|di|cal|ly,orthopaedically,6,
@@ -154113,7 +154113,7 @@
 154113,strix,strix,1,
 154114,stri|a,stria,2,
 154115,stri|ate,striate,2,
-154116,stri|at|ed,striated,3,
+154116,stri|at|ed,striated,3,3.0
 154117,stri|at|ing,striating,3,
 154118,stri|a|tion,striation,3,
 154119,stri|dence,stridence,2,
@@ -187262,3 +187262,7 @@
 87,dif|fi|cul|ties,difficulties,4,4.0
 88,vege|ta|ble,vegetable,3,3.0
 89,choco|late,chocolate,2,2.0
+90,cy|to|pla|sm,cytoplasm,4,4.0
+91,mi|to|chon|dri|a,mitochondria,5,5.0
+92,quad|ruped,quadruped,2,
+93,fi|bro|my|al|gi|a,fibromyalgia,6,

@@ -145,6 +145,12 @@ def get_augmented_cmudict():
         'maieutic':[['M', 'EY0', 'UW1', 'T', 'IH0', 'K']],
         'stonemason':[['S', 'T', 'OW1', 'N', 'M', 'EY0', 'S', 'AH0', 'N']],
         'archbishop':[['AA1', 'R', 'CH', 'B', 'IH1', 'SH', 'AH0', 'P']],
+        'striated':[['S', 'T', 'R', 'AY0', 'EY1', 'T', 'IH0', 'D']],
+        'myoglobin':[['M', 'AY2', 'AH0', 'G', 'L', 'OW1', 'B', 'IH0', 'N']],
+        'orthopaedic':[['AO2', 'R', 'TH', 'AH0', 'P', 'IY1', 'D', 'IH0', 'K']],
+        'hypocalcemic':[['HH', 'AY2', 'P', 'OW0', 'K', 'AE0', 'L', 'S', 'EH1', 'M', 'IH0', 'K']],
+        'hyperpolarize':[['HH', 'AY2', 'P', 'ER0', 'P', 'OW1', 'L', 'ER0', 'AY2', 'Z']],
+        'norepinephrine':[['N', 'AO2', 'R', 'AH0', 'P', 'AH0', 'N', 'EH1', 'F', 'R', 'IH0', 'N']],
 
         'hm':cmudict_dict['hum'],
         'hmm':cmudict_dict['hum'],
