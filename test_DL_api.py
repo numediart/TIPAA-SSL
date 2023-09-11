@@ -223,21 +223,24 @@ def test_actor_recordings(base_url = 'http://localhost:8000', route='/v2/w2v/con
     success_rate(results_ed)
     success_rate(results_v)
 
+    assert success_rate(results_ed) > 0.9
+    assert success_rate(results_v) > 0.7
+
+    success_rates_vowels={}
     for v in vowels:
         res=results_v[results_v.target_phoneme.str.contains(v)]
         print(count_values(res[res.phonetic_detection!=res.target_phoneme].phonetic_detection))
         print('success rate for '+v, success_rate(res))
+        success_rates_vowels[v]=success_rate(res)
+
+    success_rates_terminations={}
     for t in eds:
         res=results_ed[results_ed.target_phoneme.str.contains(t)]
         print(count_values(res[res.phonetic_detection!=res.target_phoneme].phonetic_detection))
         print('success rate for '+t, success_rate(res))
-    # for t in eds:
-    #     res=results_ed_s[results_ed_s.target_phoneme.str.contains(t)]
-    #     print(count_values(res[res.gibberish_detected!=res.gibberish_truth].gibberish_detected))
-    #     success_rate = lambda df : len(df[df.gibberish_truth==df.gibberish_detected])/len(df) if len(df)>0 else float('nan')
-    #     print('success rate for '+t, success_rate(res))
+        success_rates_terminations[t]=success_rate(res)
     
-    # return results_v, results_ed#, results_ed_s
+
 
 def test_stress_detection(base_url = 'http://localhost:8000', route='/v2/w2v/stress/', client=app.test_client(), n_ex_by_module=10):
     df=actor_recordings()
