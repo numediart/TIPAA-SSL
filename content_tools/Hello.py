@@ -23,12 +23,29 @@ from utils import check_password
 # from audio_segmentation import *
 # from process_data_entry_interface_output import *
 
+from pathlib import Path
+
+import streamlit as st
+
+# with st.echo("below"):
+from st_pages import Page, add_page_title, show_pages
+
 
 def run():
-    st.set_page_config(
-        page_title="Content tools",
-        page_icon="👋",
+    show_pages(
+        [
+            Page("content_tools/Hello.py", "Content tools", "🏠"),
+            Page("content_tools/pages/4_linguistic_data_extraction.py", "Linguistic Data Extraction", ":books:"),
+            Page("content_tools/pages/4_phonetizer.py", "Phonetizer", "✏️"),
+            Page("content_tools/pages/7_CMUDict_explorer.py", "CMU Dict Explorer", "📖"),
+            Page("content_tools/pages/7_Speech_Tech_demo.py", "Speech Tech Demo", ":microphone:")
+        ]
     )
+
+    # st.set_page_config(
+    #     page_title="Content tools",
+    #     page_icon="👋",
+    # )
 
     st.write("# Welcome to content-tools! 👋")
 
