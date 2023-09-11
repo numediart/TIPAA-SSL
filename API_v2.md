@@ -72,3 +72,38 @@ The information needed for identifying the target are therefore word index, syll
 
 This endpoint will be used for /h/ sound pronunciation aspect, and probably consonant clusters afterwards. 
 As this feature is quite general it might be used for other things.
+
+### How cluster actually works
+
+First, as intro, in the phonological structure of words, I consider that:
+
+a word is constituted of a sequence of syllables (minimum 1)
+every syllable contain exactly 1 vowel (the nucleus) (a diphthong is labeled as 1 vowel)
+there can be consonants before and after that vowel (respectively onset and coda), but not necessarily
+Vowel and consonant contrasts target only 1 phoneme and assumes its presence and only does a classification, i.e. output the most likely phoneme pronounced by the speaker.
+
+I wanted a way to target several phonemes inside a syllable, because it is what happens for final -ed, final -s, h initial, initial/final consonant clusters, …
+
+Cluster contrasts can target more than 1 phoneme, but also do not assume its presence (i.e., it can output that the phoneme was absent). It is basically a part of a syllable, it can contain onset, onset+nucleus, …
+
+But to be able to locate it, this cluster is either at “start” or at “end” of the syllable. It cannot be a couple phonemes inside the syllable.
+
+#### Examples
+
+crisps → K_R_IH1_S_P_S
+
+possible start clusters: K, K_R, K_R_IH1, …
+
+possible end clusters: S, P_S, S_P_S, …
+
+However, these are not possible: R_IH1, R_IH1_S, IH1_S, IH1_S_P, …
+
+#### How to find it from content info
+
+There is a way to look based on the pronunciation aspect. For vowel contrasts, we defined rules based on a set of possible targets. We have to do something similar.
+
+For h_initial, if I understood and remember correctly what was done:
+
+target in CMU is HH
+always in the first syllable
+always “start” or this syllable
