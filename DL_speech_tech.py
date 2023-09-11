@@ -333,6 +333,13 @@ def stress_from_df_segmented_audio(s, df_segmented, phonetics="AY1 W_UH1_D L_AH1
                                     ):
 
 
+    vowels_df=df_segmented[df_segmented.phones.isin(cmu_vowels)]
+    if len(vowels_df)==1:
+        if level=="sentence":
+            return {"status": "success", "stress_intensities": [100], "stress_binaries": [1]}
+        if level=="word":
+            return {"status": "success", "stress_intensities": [[100]], "stress_binaries": [[1]]}
+
     with CodeTimer('stress extraction'): ws=compute_stress_score(df_segmented, s, fs=model.fs)
     
     # TODO: I think I should check for voiceness, but I don't know if I should do it for all vowels
@@ -403,7 +410,7 @@ def stress_from_formatted_phonetics(audio,phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G
     if audio_status!="success": 
         return {"status": audio_status, "stress_intensities": [], "stress_binaries": []}
     
-    # this operation is done in audio_to_phone_prob_matrix, but I have to do it againn here then for consistency
+    # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
     phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
     df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
@@ -942,7 +949,7 @@ def analyze_start_end_for_synth_word(word, words_selected_df, target_word_idx=0,
 
 
 
-def multiple_aspect_from_formatted_phonetics_audio(audio,
+def multiple_aspect_from_prob_matrix(phone_prob_matrix, s,
                                     phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
                                     vowels=cmu_vowels,
                                     max_speech_rate=8, mode='file', 
@@ -950,19 +957,21 @@ def multiple_aspect_from_formatted_phonetics_audio(audio,
                                     to_gibberish=cmu_to_gibberish,
                                     **kwargs
                     ):
-    phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
-    audio_status, s, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
     phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
     df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=model)
+    print('multi_aspect: df_segmented computed')
 
     stress_dict = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, level="word", model=model, vowels=vowels)
+    print('multi_aspect: stress_dict word computed')
+
     stress_dict_sentence = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, level="sentence", model=model, vowels=vowels)
+    print('multi_aspect: stress_dict_sentence computed')
 
     phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
     is_vowel=phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
     phonetics_indexed_df['is_vowel']=is_vowel
     vowels_indexed_df=phonetics_indexed_df[is_vowel]
-
+    print('multi_aspect: indexes computed')
 
     clusters=[]
     for w_i,w_df in phonetics_indexed_df.groupby('word_idx'):
@@ -972,6 +981,7 @@ def multiple_aspect_from_formatted_phonetics_audio(audio,
             clusters.append({ 'cluster':'_'.join(initial_cluster.phones.tolist()), 'word_idx':w_i, 'syl_idx':s_i, 'position':'start'})
             clusters.append({ 'cluster':'_'.join(final_cluster.phones.tolist()), 'word_idx':w_i, 'syl_idx':s_i, 'position':'end'})
     clusters_df=pd.DataFrame(clusters)
+    print('multi_aspect: clusters_df computed')
 
 
     # performing vowel contrasts based on the vowels_indexed_df
@@ -982,6 +992,7 @@ def multiple_aspect_from_formatted_phonetics_audio(audio,
         # {"status": "success", "phonetic_detection": phonetic_detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     vowel_detections_df=pd.DataFrame(vowel_detections)
     vowels_indexed_df['detection']=vowel_detections_df.phonetic_detection.tolist()
+    print('multi_aspect: vowels_indexed_df computed')
 
     cluster_detections=[]
     for i,r in clusters_df.iterrows():
@@ -991,6 +1002,7 @@ def multiple_aspect_from_formatted_phonetics_audio(audio,
             res=start_end_contrast_from_prob_matrix(phone_prob_matrix,phonetics=phonetics,target_word_idx=r.word_idx,target_syllable_idx=r.syl_idx,target_phones=r.cluster,basis=r.cluster,position=r.position,mode=mode,model=model)
             cluster_detections.append(res)
     cluster_detections_df=pd.DataFrame(cluster_detections)
+    print('multi_aspect: vowels_indexed_df computed')
 
     clusters_df=clusters_df[clusters_df.cluster!='']
     clusters_df['detection']=cluster_detections_df.phonetic_detection.tolist()
@@ -1023,8 +1035,29 @@ def multiple_aspect_from_formatted_phonetics_audio(audio,
 
     return final_merged_results
 
+def multiple_aspect_from_formatted_phonetics_audio(audio,
+                                    phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D", 
+                                    vowels=cmu_vowels,
+                                    max_speech_rate=8, mode='file', 
+                                    model=default_model,
+                                    to_gibberish=cmu_to_gibberish,
+                                    **kwargs
+                    ):
+    
+    phonetics=phonetics.replace('CH', 'T_SH').replace('JH','D_ZH')
+    audio_status, s, phone_prob_matrix = audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, model=model)
 
+    
+    # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
+    phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
 
+    return multiple_aspect_from_prob_matrix(phone_prob_matrix, s,
+                                    phonetics=phonetics, 
+                                    vowels=vowels,
+                                    max_speech_rate=max_speech_rate, mode=mode, 
+                                    model=model,
+                                    to_gibberish=to_gibberish
+                    )
 
 def use_tests():
     # from DL_speech_tech import *
@@ -1167,10 +1200,17 @@ def use_tests():
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=phonetics,target_word_idx=0,target_phones='Z',position='end',mode='numpy',model=default_model)
 
     
-    
+    path='data/it.wav'
+    audio,fs=read_audio_file(path, fs=16000)
+    phone_prob_matrix = default_model.predict_phone_prob_matrix(s, default_model.fs)    
+    phoneme_list='IH1_T'.replace(' ','_').replace('|','_').split('_')
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=default_model)
+
+    phone_prob_df=pd.DataFrame(phone_prob_matrix)
+    phone_prob_df.columns=default_model.alphabet+["[SIL]"]
 
     self=default_model_ipa
-    phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)    
+    phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
     phoneme_list=phonetics.replace(' ','_').replace('|','_').split('_')
     df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list, model=default_model_ipa)
 
