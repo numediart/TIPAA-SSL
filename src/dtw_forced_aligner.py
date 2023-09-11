@@ -28,9 +28,9 @@ class dtw_forced_aligner:
     def get_phone_prob_matrix_nonsil(self, phone_prob_matrix):
         phone_prob_matrix = [l for l in phone_prob_matrix]
 
-        # the sum is 1, except if it's a silence, because the column corresponding to that token was removed
-        # def condition(vect): return sum(vect)<0.2
-        def condition(vect): return vect[-1]>0.8
+        # Here we want to detect silence frames. The silence token is at the last index. Either we can threshold it, or maybe better: check if it's the max posterior probability
+        # def condition(vect): return vect[-1]>0.8
+        def condition(vect): return vect[-1]==max(vect)
         a = np.array(phone_prob_matrix)
 
         silence_frames_idx = [idx for idx, element in enumerate(a) if condition(element)]
