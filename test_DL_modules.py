@@ -46,18 +46,31 @@ def test_DL_speech_tech_functions():
                                     )
     assert sum(detection_df.phones!=detection_df.detection)/len(detection_df) < 0.2, "Test example has a too high phoneme error rate"
     
+    # try with nonsense phonetics
+    # df.text[df.text.str.split(' ').apply(len)==1]
+
+    row=df[df.text=='it'].iloc[0]
+    s,fs=read_audio_file(row.audio_file_url, fs=16000)
+    formatted_phonetics=row.cmu_phonetics
+    detection_df=multiple_aspect_from_formatted_phonetics_audio(s,
+                                    phonetics=formatted_phonetics, 
+                                    max_speech_rate=8, mode='numpy'
+                                    )
+    assert sum(detection_df.phones!=detection_df.detection)/len(detection_df) == 0, "Test example has a too high phoneme error rate.The audio contains a native pronunciation of 'IH1_T'"
+
     df[df.text=='One *hundred* percent.'].text
     row=df[df.text=='One *hundred* percent.'].iloc[0]
     s,fs=read_audio_file(row.audio_file_url, fs=16000)
 
-    res=stress_from_formatted_phonetics(s,phonetics=row.cmu_phonetics, 
+    formatted_phonetics=row.cmu_phonetics
+    res=stress_from_formatted_phonetics(s,phonetics=formatted_phonetics, 
                                     level="sentence", 
                                     n_words_by_chunk=[3],
                                     max_speech_rate=8, mode='numpy'
                                     )
     assert res['stress_binaries'][1]==1, "Stress detection failed"
-    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=row.cmu_phonetics, 
-                            target_word_idx=1, 
+    res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
+                            target_word_idx=1,
                             target_phones='D',
                             basis='IH0_D', mode="numpy"
                     )
