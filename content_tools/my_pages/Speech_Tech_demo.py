@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(page_icon="✂️", page_title="Phonetization, syllabification in text and phonetics as well as text processing for numbers, acronyms, etc.")
+st.set_page_config(page_icon="✂️", page_title="Speech Tech Demo")
 import pandas as pd
 from streamlit import download_button
 from glob import glob
