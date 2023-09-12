@@ -332,6 +332,8 @@ def stress_from_df_segmented_audio(s, df_segmented, phonetics="AY1 W_UH1_D L_AH1
                                     vowels=cmu_vowels
                                     ):
 
+    if level=="sentence":
+        assert sum(n_words_by_chunk) == len(phonetics.split(' ')), 'The total number of words by chunk does not correspond to the number of words in phonetics'
 
     vowels_df=df_segmented[df_segmented.phones.isin(cmu_vowels)]
     if len(vowels_df)==1:
@@ -964,7 +966,11 @@ def multiple_aspect_from_prob_matrix(phone_prob_matrix, s,
     stress_dict = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, level="word", model=model, vowels=vowels)
     print('multi_aspect: stress_dict word computed')
 
-    stress_dict_sentence = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, level="sentence", model=model, vowels=vowels)
+    # in the speech tech through API, the phonetics is sent by chunk (list of strings) at flask level, 
+    # and I build the n_words_by_chunk and re-join the phonetics as 1 string
+    # Here I always assume a single chunk for now. I could use punctuation in text to compute n_words_by_chunk as well
+    n_words_by_chunk=[len(phonetics.split(' '))]
+    stress_dict_sentence = stress_from_df_segmented_audio(s, df_segmented, phonetics=phonetics, n_words_by_chunk=n_words_by_chunk, level="sentence", model=model, vowels=vowels)
     print('multi_aspect: stress_dict_sentence computed')
 
     phonetics_indexed_df=phonetics_indexed_df_from_formatted_phonetics(phonetics)
