@@ -39,7 +39,7 @@ def process(json_str):
 if check_password():
 
     st.markdown("""
-    Enter a sentence you want to practice and have your speech analyzed, then record yourself. Click on "Process" to analyze and see the results.
+    Enter a sentence you want to practice and have your speech analyzed, then record yourself. Click on "Run Analysis" to analyze and see the results.
     """)
 
     sentence = st.text_input(f'Sentence')
