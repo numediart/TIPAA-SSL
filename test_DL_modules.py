@@ -1,3 +1,5 @@
+import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+
 from performance_functions import pContrast_on_synth_words, final_ed_from_audiobook_data, final_s_from_audiobook_data, stress_GE_performance_test
 from DL_speech_tech import default_model, stress_from_formatted_phonetics, phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, compute_stress_score, multiple_aspect_from_formatted_phonetics_audio
 
@@ -9,6 +11,12 @@ from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
 from linetimer import CodeTimer
 
 import pandas as pd
+
+
+# initialize model
+from src.charsiu_utils import charsiu_phone_forced_aligner
+default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+print_memory_usage("RAM - test_DL_modules after loading default_model_charsiu")
 
 def a_test_pConstrast():
     # pContrast_for_actor_recordings(target_phones='AO1', n=10)
@@ -23,7 +31,7 @@ def a_test_termination_contrast():
     final_s_from_audiobook_data(n=100)
     
 
-def test_DL_speech_tech_functions():
+def DL_speech_tech_functions(model=default_model):
     from src.label_data_processing import actor_recordings
 
     df=actor_recordings()
@@ -36,7 +44,7 @@ def test_DL_speech_tech_functions():
     res=stress_from_formatted_phonetics(encode_string,phonetics=formatted_phonetics, 
                                     level="sentence", 
                                     n_words_by_chunk=[7],
-                                    max_speech_rate=8, mode='base64'
+                                    max_speech_rate=8, mode='base64', model=model
                                     )
     assert res['stress_binaries'][2]==1, "Stress detection failed"
 
@@ -47,7 +55,7 @@ def test_DL_speech_tech_functions():
 
     detection_df=multiple_aspect_from_formatted_phonetics_audio(encode_string,
                                     phonetics=formatted_phonetics, 
-                                    max_speech_rate=8, mode='base64'
+                                    max_speech_rate=8, mode='base64', model=model
                                     )
     assert sum(detection_df.phones!=detection_df.detection)/len(detection_df) < 0.2, "Test example has a too high phoneme error rate"
     
@@ -59,9 +67,12 @@ def test_DL_speech_tech_functions():
     formatted_phonetics=row.cmu_phonetics
     detection_df=multiple_aspect_from_formatted_phonetics_audio(s,
                                     phonetics=formatted_phonetics, 
-                                    max_speech_rate=8, mode='numpy'
+                                    max_speech_rate=8, mode='numpy', model=model
                                     )
-    assert sum(detection_df.phones!=detection_df.detection)/len(detection_df) == 0, "Test example has a too high phoneme error rate.The audio contains a native pronunciation of 'IH1_T'"
+    
+    # charsiu model was too bad for this. Our pipeline works on that!
+    if model!=default_model_charsiu:
+        assert sum(detection_df.phones!=detection_df.detection)/len(detection_df) == 0, "Test example has a too high phoneme error rate.The audio contains a native pronunciation of 'IH1_T'"
 
     df[df.text=='One *hundred* percent.'].text
     row=df[df.text=='One *hundred* percent.'].iloc[0]
@@ -71,23 +82,33 @@ def test_DL_speech_tech_functions():
     res=stress_from_formatted_phonetics(s,phonetics=formatted_phonetics, 
                                     level="sentence", 
                                     n_words_by_chunk=[3],
-                                    max_speech_rate=8, mode='numpy'
+                                    max_speech_rate=8, mode='numpy', model=model
                                     )
     assert res['stress_binaries'][1]==1, "Stress detection failed"
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics, 
                             target_word_idx=1,
                             target_phones='D',
-                            basis='IH0_D', mode="numpy"
+                            basis='IH0_D', mode="numpy", model=model
                     )
-    assert res['phonetic_detection']=="IH_D", "final -ed detection failed"
+    
+    
+    # charsiu model was too bad for this. Our pipeline works on that!
+    if model!=default_model_charsiu:
+        assert res['phonetic_detection']=="IH_D", "final -ed detection failed"
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=row.cmu_phonetics, 
                             target_word_idx=1,
                             target_syllable_idx=0,
                             target_phones='HH',
-                            basis='HH', position="start", mode="numpy"
+                            basis='HH', position="start", mode="numpy", model=model
                     )
     assert res['phonetic_detection']=="HH", "/h/ sound detection failed"
 
+def test_DL_speech_tech_functions_pipeline():
+    DL_speech_tech_functions(model=default_model)
+
+
+def test_DL_speech_tech_functions_charsiu():
+    DL_speech_tech_functions(model=default_model_charsiu)
 
 def test_particular_cases():
     df=actor_recordings()

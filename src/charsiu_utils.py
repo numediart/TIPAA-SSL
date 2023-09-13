@@ -12,6 +12,7 @@ from src.audio_processing import getIntonation, getIntensity, normalize
 
 from src.dtw_forced_aligner import dtw_forced_aligner
 
+from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
 keep_first_last=lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
@@ -59,7 +60,6 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         self.forced_aligner=dtw_forced_aligner(cmu_alphabet)
         self.forced_aligner.p_to_id=self.p_to_id
         self.forced_aligner.id_to_p=self.id_to_p
-
     
     def predict_prob_matrix_and_phones(self, audio):
         
@@ -91,8 +91,10 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 
             return df_segmented
 
+# To keep a compatibility with charsiu, in order to keep the possibility to quickly make comparisons, add these methods
+charsiu_phone_forced_aligner.audio_to_phone_prob_matrix = Wav2Vec2ForFramePrediction.audio_to_phone_prob_matrix
+charsiu_phone_forced_aligner.phone_prob_matrix_segmentation = Wav2Vec2ForFramePrediction.phone_prob_matrix_segmentation
 
-    
 
 def use_tests():
     # from src.charsiu_utils import *
