@@ -22,9 +22,63 @@ global cmu_vowels
 cmu_vowels=[p[0] for p in cmu_phones_info if p[1][0]=='vowel']
 cmu_consonants=[p[0] for p in cmu_phones_info if p[1][0]!='vowel']
 
+import soundfile as sf
+from scipy.io.wavfile import read
+from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
+from linetimer import CodeTimer
+
+
+def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
+    """Load audio with modes: from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array
+    Then check duration to see if it's plausible
+    
+    I first detect if the audio is too short to have a realistic speech rate
+        https://www.science.org/doi/10.1126/sciadv.aaw2594
+    https://www.reddit.com/r/languagelearning/comments/f5o1om/distribution_of_syllable_rate_sr_in_syllables_per/
+    Speech rate is always between 5 and 8 syl/second
+    """
+    n_syllables_tot=sum([len(el.split('|')) for el in phonetics.split(' ')])
+
+    # TODO: change this by the use of src.audio_processing.read_audio_file
+    if mode=='file':
+        try:
+            f=sf.SoundFile('./inputs/'+ audio+ '.wav')
+        except FileNotFoundError:
+            return "error: audio file not found", None
+        if f.frames==0:  return "success: audio is empty (has zero sample)", None
+        duration=f.frames / f.samplerate
+        speech_rate=n_syllables_tot/duration
+        if speech_rate>max_speech_rate: 
+            return "success: audio is too short compared to the expected number of syllables", None
+        try:
+            fs,s=read('./inputs/'+ audio+ '.wav')
+            s=s/32767
+        except FileNotFoundError:
+            return "error: audio file not found", None
+        
+    elif (mode=='base64' or mode=='bytes' or mode=="numpy"):
+        if mode=='base64': s, fs= read_audio_string(audio, fs=fs)
+        elif mode=='bytes': s, fs= read_audio_bytes(audio, fs=fs)
+        elif mode=="numpy": s=audio
+
+        if len(s)==0:  return "success: audio is empty (has zero sample)", None
+        duration=len(s) / fs
+        speech_rate=n_syllables_tot/duration
+        if speech_rate>max_speech_rate: 
+            return "success: audio is too short compared to the expected number of syllables", None
+    else:
+        return "error: mode for audio_load_and_check() must be file, base64, bytes or numpy", None
+    
+    if np.abs(s).sum()==0: return "success: no voiced sound detected (only 0's in waveform)", None
+    
+    f0Samples=getIntonation(s, fs)
+    if sum([el!=el for el in f0Samples])==len(f0Samples):
+        return "success: no voiced sound detected (no pitch detected)", None
+    return "success", s
+
+
 
 # processing functions of df_segmented, which is the output of prediction and forced alignment
-
 def extract_word(df_segmented, phonetics, target_word_idx):
     start_idx=sum([len(p) for p in phonetics][:target_word_idx])
     end_idx=sum([len(p) for p in phonetics][:target_word_idx+1])
@@ -65,7 +119,6 @@ class Wav2Vec2ForFramePrediction:
 
         self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
         # self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-base-960h")
-        
 
     def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
         path=os.path.join(out_path,name)
@@ -136,6 +189,46 @@ class Wav2Vec2ForFramePrediction:
         print('times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba')
         print(self.timestamps)
         return phone_prob_matrix
+
+    def audio_to_phone_prob_matrix(self, audio, phonetics, max_speech_rate=8, mode="numpy"):
+        phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
+        with CodeTimer('load audio'): audio_status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
+        if audio_status=="success": 
+            with CodeTimer('phone_prob_matrix prediction'): phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
+            return audio_status, s, phone_prob_matrix
+        else:
+            return audio_status, s, None
+
+    def audio_to_phone_prob_df(self, audio, phonetics, max_speech_rate=8, mode="numpy"):
+        audio_status, s, phone_prob_matrix=self.audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
+        if audio_status=="success": 
+            phone_prob_df=pd.DataFrame(phone_prob_matrix)
+            phone_prob_df.columns=self.alphabet+["[SIL]"]
+            return audio_status, s, phone_prob_df
+        else:
+            return audio_status, s, None
+
+    def max_posterior_phone_df(self, phone_prob_df, proba_thresh=0.7):
+        phone_prob_df.max(axis=1)
+        max_idxs=np.argmax(phone_prob_df,axis=1)
+        phone_prob_df.argmax(axis=1)
+
+        alphabet=self.alphabet+['[SIL]']
+        
+        max_posterior_df=pd.DataFrame()
+        max_posterior_df['phone']=[alphabet[i] for i in max_idxs]
+        max_posterior_df['proba']=phone_prob_df.max(axis=1)
+        max_posterior_df_filtered=max_posterior_df[max_posterior_df.proba>proba_thresh][max_posterior_df.phone!="[SIL]"]
+        max_posterior_df_filtered_collapsed=max_posterior_df_filtered.sort_values('proba', ascending=False).drop_duplicates('phone').sort_index()
+
+        return max_posterior_df, max_posterior_df_filtered_collapsed
+
+    def phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list):
+        with CodeTimer('DTW'): 
+            df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output)
+            self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
+        return df_segmented
+
 
 
     if False:

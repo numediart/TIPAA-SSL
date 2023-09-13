@@ -10,8 +10,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.decomposition import PCA
 # from umap.umap_ import UMAP
 
-from DL_speech_tech import phone_prob_matrix_segmentation
-
 from src.audio_processing import prepare_audio_file, read_audio_file
 from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text, remove_stress_annots
 
@@ -40,12 +38,12 @@ def test_wav2vec2_frame_prediction(n=10):
         split_phonetics=sum(split_phonetics,[])
 
         phone_prob_matrix = model.predict_phone_prob_matrix(s, 16000)
-        df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, remove_stress_annots(split_phonetics), model=model)
+        df_segmented=model.phone_prob_matrix_segmentation(phone_prob_matrix, remove_stress_annots(split_phonetics))
         # df_segmented = model.predict_with_timings(s, remove_stress_annots(split_phonetics))
         print('model without stress', df_segmented)
 
         phone_prob_matrix = model_stressed.predict_phone_prob_matrix(s, 16000)
-        df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, split_phonetics, model=model_stressed)
+        df_segmented=model_stressed.phone_prob_matrix_segmentation(phone_prob_matrix, split_phonetics)
         # df_segmented = model_stressed.predict_with_timings(s, split_phonetics)
         print('model with stress', df_segmented)
 
