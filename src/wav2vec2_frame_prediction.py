@@ -371,17 +371,15 @@ def inference_demo():
     # model.load(name='model_mailabs_pca_0.95_knn_10_w')
     model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
 
-    from DL_speech_tech import phone_prob_matrix_segmentation
     from src.text_processing import remove_stress_annots
     # phoneme predictions on a single audio sample with forced alignment
     phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix,data.cmu_phones.iloc[0], model=model)
+    df_segmented=model.phone_prob_matrix_segmentation(phone_prob_matrix,data.cmu_phones.iloc[0])
 
     model = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'),w2v2_model_format="onnx")
     model.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
     phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix,data.phone_df.iloc[0].phone.tolist(), model=model)
-
+    df_segmented=model.phone_prob_matrix_segmentation(phone_prob_matrix,data.phone_df.iloc[0].phone.tolist())
 
     # from src.label_data_processing import synth_words_data
     from src.audio_processing import read_audio_file
