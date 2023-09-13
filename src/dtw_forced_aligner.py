@@ -100,7 +100,7 @@ class dtw_forced_aligner:
         
         return predicted_phones, proba_means
 
-    def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, proba_means, fs=16000, time_per_output=0.02):
+    def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, proba_means, time_per_output=0.02):
 
         start_idx = []
         end_idx = []
@@ -118,7 +118,6 @@ class dtw_forced_aligner:
 
         timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
         timings_df=pd.DataFrame(timings)
-        # df_segmented['phones'] = remove_stress_annots(phones)
 
         df_segmented = pd.DataFrame()
         df_segmented[['phones', 'start_idx', 'end_idx']]=timings_df
@@ -177,7 +176,7 @@ class dtw_forced_aligner:
 
         return df_segmented
     
-    def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, fs=16000, time_per_output=0.02):
+    def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, time_per_output=0.02):
         phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx = self.get_phone_prob_matrix_nonsil(phone_prob_matrix)
         aligned_phones = self.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
         if silence_frames_idx:
@@ -185,6 +184,6 @@ class dtw_forced_aligner:
         else:
             alignment_with_silence = aligned_phones
         predicted_phones, proba_means = self.predict(aligned_phones, phone_prob_matrix_nonsil, target_phonemes)
-        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, proba_means, fs=fs, time_per_output=time_per_output)
+        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, proba_means, time_per_output=time_per_output)
 
         return df_segmented
