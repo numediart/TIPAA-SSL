@@ -10,10 +10,8 @@ from sklearn.decomposition import PCA
 
 
 from time import time
-from linetimer import CodeTimer
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
-from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_libri_dataset_audio_timings
 # from src.metrics import compute_PER, plot_cf_matrix
 from src.dtw_forced_aligner import dtw_forced_aligner
 from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer, cmu_stressed_alphabet
@@ -139,17 +137,22 @@ class Wav2Vec2ForFramePrediction:
         print(self.timestamps)
         return phone_prob_matrix
 
-    # predict and get proba means per phoneme alignment and GT
-    def predict_with_timings(self, s, target_phonemes):
-        phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
-        df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes, fs=self.fs)
-        self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
 
-        return df_segmented
+    if False:
+        # DEPRECATED: we use phone_prob_matrix_segmentation from DL_speech_tech
+        # predict and get proba means per phoneme alignment and GT
+        def predict_with_timings(self, s, target_phonemes):
+            phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
+            df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes)
+            self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
+
+            return df_segmented
 
 def train_Wav2Vec2ForFramePrediction_model():
     from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis
     from sklearn.linear_model import LogisticRegression
+    from src.load_data import df_all_frames_to_X_y
+
     df_all_instances_select_with_silences=pd.read_pickle('df_all_instances_select_with_silences.pkl')
     X, y = df_all_frames_to_X_y(df_all_instances_select_with_silences)
     model = Wav2Vec2ForFramePrediction(cmu_alphabet, frame_classifier=KNeighborsClassifier(10, weights='distance'))
@@ -261,35 +264,31 @@ def train_Wav2Vec2ForFramePrediction_model():
 def inference_demo():
     
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from src.load_data import load_libri_dataset, load_libri_dataset_audio_timings
+
     # --------------- Inference demo --------------------
     
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
     data = load_libri_dataset_audio_timings(df_t_test)
-    # data = load_libri_dataset_audio_timings(df_t_train)
-
-    # data[data.apply(lambda r: "ZH" in r.cmu_phones, axis=1)]
-    # data = load_test_dataset(df_t_test)
-
-    # # phoneme predictions on a single audio sample with forced alignment
-    # pred = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
-    # prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-
     
     # default_model_cmu = Wav2Vec2ForFramePrediction(cmu_alphabet)
     model = Wav2Vec2ForFramePrediction(cmu_alphabet,w2v2_model_format="onnx")
     # model.load(name='model_mailabs_pca_0.95_knn_10_w')
     model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
 
+    from DL_speech_tech import phone_prob_matrix_segmentation
+    from src.text_processing import remove_stress_annots
     # phoneme predictions on a single audio sample with forced alignment
-    df_segmented = model.predict_with_timings(data.s.iloc[0], data.cmu_phones.iloc[0])
-    prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix,data.cmu_phones.iloc[0], model=model)
 
     model = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet, reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10, weights='distance', metric='cosine'),w2v2_model_format="onnx")
     model.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
-    prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    df_segmented = model.predict_with_timings(data.s.iloc[0], data.phone_df.iloc[0].phone.tolist())
+    phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
+    df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix,data.phone_df.iloc[0].phone.tolist(), model=model)
+
 
     # from src.label_data_processing import synth_words_data
     from src.audio_processing import read_audio_file
@@ -310,7 +309,6 @@ def inference_demo():
 
 
     # phoneme predictions on a single audio sample with forced alignment
-    df_segmented = model.predict_with_timings(s,phone_list)
     prob_matrix = model.predict_phone_prob_matrix(s, 16000)
 
     latentogram=model.reducer.transform(model.lhs[0])
@@ -352,7 +350,7 @@ def use_tests():
     # elif reducer == "pca":
     #     self.reducer = PCA(n_components=target_dim, random_state=42)
 
-    from src.load_data import load_dataset_MAILABS, load_dataset_commonvoice, build_df_all_frames
+    from src.load_data import load_dataset_MAILABS, load_dataset_commonvoice, build_df_all_frames, df_all_frames_to_X_y
     from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     from scripts.frame_classifiers_experiments import build_frame_dataset, build_frame_test_set
@@ -514,23 +512,6 @@ def use_tests():
     
     default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet)
     default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
-
-    # # phoneme predictions on a single audio sample with forced alignment
-    # pred = default_model_ipa.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
-    # prob_matrix = default_model_ipa.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-
-    
-    # # phoneme predictions on a single audio sample with forced alignment
-    # pred2 = model2.predict_with_timings(data.s.iloc[0], data.phones.iloc[0])
-    # prob_matrix2 = model2.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-
-    # from tqdm import tqdm
-    # preds=[model.predict_with_timings(r.s, r.phones) for i,r in tqdm(data.iterrows())]
-    # preds2=[model2.predict_with_timings(r.s, r.phones) for i,r in tqdm(data.iterrows())]
-    # preds_df=pd.concat(preds)
-    # preds_df2=pd.concat(preds2)
-    # sum(preds_df.pred_phones_audio==preds_df2.pred_phones_audio)/len(preds_df)
-
 
     # https://scikit-learn.org/stable/modules/ensemble.html#weighted-average-probabilities-soft-voting
     from sklearn.ensemble import VotingClassifier

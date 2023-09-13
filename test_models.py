@@ -10,6 +10,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.decomposition import PCA
 # from umap.umap_ import UMAP
 
+from DL_speech_tech import phone_prob_matrix_segmentation
 
 from src.audio_processing import prepare_audio_file, read_audio_file
 from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text, remove_stress_annots
@@ -38,16 +39,18 @@ def test_wav2vec2_frame_prediction(n=10):
         split_phonetics=[p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')]
         split_phonetics=sum(split_phonetics,[])
 
-        prob_matrix = model.predict_phone_prob_matrix(s, 16000)
-        df_segmented = model.predict_with_timings(s, remove_stress_annots(split_phonetics))
+        phone_prob_matrix = model.predict_phone_prob_matrix(s, 16000)
+        df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, remove_stress_annots(split_phonetics), model=model)
+        # df_segmented = model.predict_with_timings(s, remove_stress_annots(split_phonetics))
         print('model without stress', df_segmented)
 
-        prob_matrix = model_stressed.predict_phone_prob_matrix(s, 16000)
-        df_segmented = model_stressed.predict_with_timings(s, split_phonetics)
+        phone_prob_matrix = model_stressed.predict_phone_prob_matrix(s, 16000)
+        df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, split_phonetics, model=model_stressed)
+        # df_segmented = model_stressed.predict_with_timings(s, split_phonetics)
         print('model with stress', df_segmented)
 
 
-# For now, it works locally but not on the hithub actions server because of a write permission issue
+# For now, it works locally but not on the github actions server because of a write permission issue
 def a_test_mfa_align(n=10, mfa_model='english_us_arpa', mfa_path='mfa_data', mfa_result_path='mfa_result', fs=16000, out_json='data/align_test.json'):
     from src.label_data_processing import actor_recordings
     from scripts.mfa_utils import prepare_files, launch_mfa

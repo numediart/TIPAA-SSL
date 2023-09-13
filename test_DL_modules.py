@@ -1,5 +1,5 @@
 from performance_functions import pContrast_on_synth_words, final_ed_from_audiobook_data, final_s_from_audiobook_data, stress_GE_performance_test
-from DL_speech_tech import default_model, stress_from_formatted_phonetics, phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, compute_stress_score, multiple_aspect_from_formatted_phonetics_audio
+from DL_speech_tech import default_model, phone_prob_matrix_segmentation, stress_from_formatted_phonetics, phonemeContrast_from_formatted_phonetics_audio, start_end_contrast_from_formatted_phonetics_audio, compute_stress_score, multiple_aspect_from_formatted_phonetics_audio
 
 from src.audio_processing import prepare_audio_file, read_audio_file
 from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text, remove_stress_annots
@@ -39,6 +39,11 @@ def test_DL_speech_tech_functions():
                                     max_speech_rate=8, mode='base64'
                                     )
     assert res['stress_binaries'][2]==1, "Stress detection failed"
+
+    
+    # path='data/During the nineteen sixties Gregory became active in civil rights.wav'
+    # encode_string = base64.b64encode(open(path, "rb").read())
+    # formatted_phonetics=prefill_for_sentence('During the nineteen sixties Gregory became active in civil rights')['phonetics']
 
     detection_df=multiple_aspect_from_formatted_phonetics_audio(encode_string,
                                     phonetics=formatted_phonetics, 
@@ -108,7 +113,10 @@ def test_particular_cases():
     
     split_phonetics=[p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')]
     split_phonetics=sum(split_phonetics,[])
-    with CodeTimer('whole phone prediction'): df_segmented = default_model.predict_with_timings(s, remove_stress_annots(split_phonetics))
+    with CodeTimer('whole phone prediction'):
+        # df_segmented = default_model.predict_with_timings(s, remove_stress_annots(split_phonetics))
+        phone_prob_matrix = default_model.predict_phone_prob_matrix(s, default_model.fs)    
+        df_segmented=phone_prob_matrix_segmentation(phone_prob_matrix, remove_stress_annots(split_phonetics), model=default_model)
 
     # with CodeTimer('stress extraction'): ws=model.compute_stress_score(s,phonetics)
     with CodeTimer('stress extraction'): ws=compute_stress_score(df_segmented, s, fs=default_model.fs)

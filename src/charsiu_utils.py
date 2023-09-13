@@ -81,13 +81,15 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
         cost, _ = self.predict_prob_matrix_and_phones(s)
         return cost
 
-    # predict and get proba means per phoneme alignment and GT
-    def predict_with_timings(self, s, target_phonemes):
-        phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
-        df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes, fs=self.fs, time_per_output=0.01)
-        self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
+    if False:
+        # DEPRECATED: we use phone_prob_matrix_segmentation frol DL_speech_tech
+        # predict and get proba means per phoneme alignment and GT
+        def predict_with_timings(self, s, target_phonemes):
+            phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
+            df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes, time_per_output=0.01)
+            self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
 
-        return df_segmented
+            return df_segmented
 
 
     
