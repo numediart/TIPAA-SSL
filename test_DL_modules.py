@@ -66,7 +66,7 @@ def DL_speech_tech_functions(model=default_model):
                                     )
     
     # charsiu model was too bad for this. Our pipeline works on that!
-    if model!=default_model_charsiu:
+    if model==default_model:
         assert sum(detection_df.phones!=detection_df.detection)/len(detection_df) == 0, "Test example has a too high phoneme error rate.The audio contains a native pronunciation of 'IH1_T'"
 
     df[df.text=='One *hundred* percent.'].text
@@ -88,7 +88,7 @@ def DL_speech_tech_functions(model=default_model):
     
     
     # charsiu model was too bad for this. Our pipeline works on that!
-    if model!=default_model_charsiu:
+    if model==default_model:
         assert res['phonetic_detection']=="IH_D", "final -ed detection failed"
     res=start_end_contrast_from_formatted_phonetics_audio(s,phonetics=row.cmu_phonetics, 
                             target_word_idx=1,
