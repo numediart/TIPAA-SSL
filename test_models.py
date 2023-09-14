@@ -43,26 +43,26 @@ def test_wav2vec2_frame_prediction(n=10):
         print('model without stress', df_segmented)
 
         phone_prob_matrix = model_stressed.predict_phone_prob_matrix(s, 16000)
+        # _,_,phone_prob_df = model_stressed.audio_to_phone_prob_df(s,row.cmu_phonetics)
         df_segmented=model_stressed.phone_prob_matrix_segmentation(phone_prob_matrix, split_phonetics)
+        max_posterior_df, max_posterior_df_filtered_collapsed=model_stressed.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.8)
         # df_segmented = model_stressed.predict_with_timings(s, split_phonetics)
         print('model with stress', df_segmented)
 
 
 # For now, it works locally but not on the github actions server because of a write permission issue
-def a_test_mfa_align(n=10, mfa_model='english_us_arpa', mfa_path='mfa_data', mfa_result_path='mfa_result', fs=16000, out_json='data/align_test.json'):
+def test_mfa_align(n=10, mfa_model='english_us_arpa', mfa_path=os.path.expanduser('~')+'/mfa_data', mfa_result_path=os.path.expanduser('~')+'/mfa_result', fs=16000, out_json='data/align_test.json'):
     from src.label_data_processing import actor_recordings
     from scripts.mfa_utils import prepare_files, launch_mfa
     import shutil
     df=actor_recordings()
     df_sample=df.sample(n,random_state=0)
 
-    
     if os.path.exists(mfa_path):
         shutil.rmtree(mfa_path)
     if os.path.exists(mfa_result_path):
         shutil.rmtree(mfa_result_path)
-    
-    
+        
     prepare_files("./", wav_paths=df.audio_file_url.tolist(), texts=df_sample.text.tolist(), mfa_path=mfa_path, fs=fs)
     textgrids_df, failures=launch_mfa(mfa_path, mfa_result_path, dictionary=mfa_model, acoustic_model=mfa_model)
 
@@ -77,8 +77,7 @@ def a_test_mfa_align(n=10, mfa_model='english_us_arpa', mfa_path='mfa_data', mfa
     # that could actually change but would not necessarily mean that it does not work anymore but rather that the predictions are actually better
     # therefore, if that happens in the future, just update this test by running the following line to save the new predictions supposedly better
     # textgrids_df.to_json(out_json)
-
-    ast.literal_eval(textgrids_df.to_json())==data
+    assert ast.literal_eval(textgrids_df.to_json())==data, "TextGrid generated not the same as was expected. Check if it's just a change of acoustic model, or an error"
 
     
     shutil.rmtree(mfa_path)

@@ -13,11 +13,6 @@ from linetimer import CodeTimer
 import pandas as pd
 
 
-# initialize model
-from src.charsiu_utils import charsiu_phone_forced_aligner
-default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
-print_memory_usage("RAM - test_DL_modules after loading default_model_charsiu")
-
 def a_test_pConstrast():
     # pContrast_for_actor_recordings(target_phones='AO1', n=10)
     # phoneme_confusions(n=10, performance_function=pContrast_on_synth_words)
@@ -106,8 +101,12 @@ def DL_speech_tech_functions(model=default_model):
 def test_DL_speech_tech_functions_pipeline():
     DL_speech_tech_functions(model=default_model)
 
-
-def test_DL_speech_tech_functions_charsiu():
+# does not work if not charsiu model and/or repo not cloned (therfore, not working on gihub action)
+def a_test_DL_speech_tech_functions_charsiu():
+    # initialize model
+    from src.charsiu_utils import charsiu_phone_forced_aligner
+    default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
+    print_memory_usage("RAM - test_DL_modules after loading default_model_charsiu")
     DL_speech_tech_functions(model=default_model_charsiu)
 
 def test_particular_cases():
