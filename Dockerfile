@@ -72,7 +72,8 @@ RUN mfa model download acoustic english_us_arpa && mfa model download dictionary
 
 WORKDIR /home/mambauser/code
 
-RUN git clone https://github.com/noetits/charsiu
+# Would be necessary for running charsiu and corresponding unit tests, but I only do that locally, not on server and neither on github action
+# RUN git clone https://github.com/noetits/charsiu
 
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000
