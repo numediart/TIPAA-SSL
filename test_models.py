@@ -1,17 +1,9 @@
-from src.load_data import load_libri_dataset, df_all_frames_to_X_y, load_libri_dataset_audio_timings
-from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet, cmu_phones_info, cmu_reducer, cmu_stressed_alphabet
-import pandas as pd
-import numpy as np
-import pickle
+from src.pronunciation_dictionaries import cmu_alphabet, cmu_stressed_alphabet
 import os
-import torch
 import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.decomposition import PCA
-# from umap.umap_ import UMAP
 
-from src.audio_processing import prepare_audio_file, read_audio_file
-from src.text_processing import prefill_for_sentence, get_augmented_mfa_dict, chunk_text, remove_stress_annots
+from src.audio_processing import read_audio_file
+from src.text_processing import remove_stress_annots
 
 def test_wav2vec2_frame_prediction(n=10):
     
@@ -55,6 +47,7 @@ def test_mfa_align(n=10, mfa_model='english_us_arpa', mfa_path=os.path.expanduse
     from src.label_data_processing import actor_recordings
     from scripts.mfa_utils import prepare_files, launch_mfa
     import shutil
+    import ast
     df=actor_recordings()
     df_sample=df.sample(n,random_state=0)
 
@@ -63,22 +56,27 @@ def test_mfa_align(n=10, mfa_model='english_us_arpa', mfa_path=os.path.expanduse
     if os.path.exists(mfa_result_path):
         shutil.rmtree(mfa_result_path)
         
-    prepare_files("./", wav_paths=df.audio_file_url.tolist(), texts=df_sample.text.tolist(), mfa_path=mfa_path, fs=fs)
+    prepare_files("./", wav_paths=df_sample.audio_file_url.tolist(), texts=df_sample.text.tolist(), mfa_path=mfa_path, fs=fs)
     textgrids_df, failures=launch_mfa(mfa_path, mfa_result_path, dictionary=mfa_model, acoustic_model=mfa_model)
 
     import json
     data = json.load(open(out_json))
 
     # df['phone_df']=phone_dfs
-    
 
-    import ast
+    # as we don't know the order with which MFA will process the files, I build a dictionary from the filenames 
+    # for which entried will be the segmented dataframe as a dictionary, to be jsonable
+    d={}
+    for f in textgrids_df.filename:
+        # using "to_json()" and converting to dict with ast is necessary because python accept keys as any type where JS does not
+        # so the comparison below would not work 
+        d[f]=ast.literal_eval(textgrids_df[textgrids_df.filename==f].phone_df.iloc[0].to_json())
+
     # This tests that the predictions of the forced aligner are exactly the same for a set a 10 samples. If the acoustic model change, 
     # that could actually change but would not necessarily mean that it does not work anymore but rather that the predictions are actually better
     # therefore, if that happens in the future, just update this test by running the following line to save the new predictions supposedly better
-    # textgrids_df.to_json(out_json)
-    assert ast.literal_eval(textgrids_df.to_json())==data, "TextGrid generated not the same as was expected. Check if it's just a change of acoustic model, or an error"
-
+    #   json.dump(d, open(out_json, "w"))
+    assert d==data, "TextGrid generated not the same as was expected. Check if it's just a change of acoustic model, or an error"
     
     shutil.rmtree(mfa_path)
     shutil.rmtree(mfa_result_path)
