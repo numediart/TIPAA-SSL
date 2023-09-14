@@ -40,7 +40,7 @@ WORKDIR $HOME
 
 # micromamba install was stuck, I applied this:
 # https://stackoverflow.com/questions/76778360/micromamba-install-gets-stuck-when-run-in-docker-container-on-arm-mac
-RUN micromamba config set extract_threads 1 # <---- This is the added line that fixes it
+RUN micromamba config set extract_threads 1
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER env_mfa_base.yml /tmp/env_mfa_base.yml
 RUN micromamba install -y -n base -f /tmp/env_mfa_base.yml && \
@@ -65,11 +65,14 @@ RUN mkdir /home/mambauser/hf_models && curl https://flwc-public-assets.s3.fr-par
 
 RUN mkdir -p /home/mambauser/mfa
 ENV MFA_ROOT_DIR=/home/mambauser/mfa
-RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
+RUN mfa model download acoustic english_us_arpa && mfa model download dictionary english_us_arpa && mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa && mfa model download g2p spanish_latin_america_mfa && mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
 
 # COPY --chown=$MAMBA_USER:$MAMBA_USER scripts/download_models.py download_models.py
 # RUN mkdir /home/mambauser/hf_models/facebook && echo "import download_models" | python
 
 WORKDIR /home/mambauser/code
+
+RUN git clone https://github.com/noetits/charsiu
+
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000
