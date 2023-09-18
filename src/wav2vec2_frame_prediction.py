@@ -86,7 +86,7 @@ def extract_word(df_segmented, phonetics, target_word_idx):
     return df_word
 
 class Wav2Vec2ForFramePrediction:
-    def __init__(self, alphabet, w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", w2v2_model_format="torch", reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
+    def __init__(self, alphabet, collapse_method='mean', w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", w2v2_model_format="torch", reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
         """
         w2v_format: 'torch' or 'onnx'
         """
@@ -96,7 +96,8 @@ class Wav2Vec2ForFramePrediction:
         self.time_per_output=0.02
         
         self.alphabet=alphabet
-        self.forced_aligner=dtw_forced_aligner(alphabet)
+        self.collapse_method=collapse_method
+        self.forced_aligner=dtw_forced_aligner(alphabet, collapse_method=collapse_method)
         
         self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
@@ -228,8 +229,6 @@ class Wav2Vec2ForFramePrediction:
             df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output)
             self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
         return df_segmented
-
-
 
     if False:
         # DEPRECATED: we use phone_prob_matrix_segmentation from DL_speech_tech
@@ -488,6 +487,8 @@ def use_tests():
     plot_reduction(df_all_frames_all.sample(frac=1, random_state=1), reduction_technique='umap', base_name='plots/w2v_xlsr_ft_space_speaker', legend_label='speaker')
     plot_reduction(df_all_frames_all.sample(frac=1, random_state=1), reduction_technique='umap', base_name='plots/w2v_xlsr_ft_space_language_code', legend_label='language_code')
 
+    df_all_frames_select_stressed_no_CH_JH['average_vector']=df_all_frames_select_stressed_no_CH_JH['vector']
+    plot_reduction(df_all_frames_select_stressed_no_CH_JH.sample(frac=1, random_state=1), reduction_technique='umap', base_name='plots/w2v_xlsr_ft_space_phoneme_selected_CMU_stressed', legend_label='phoneme')
 
 
     # load UK US in MFA_IPA

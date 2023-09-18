@@ -3,7 +3,6 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 import librosa
 import itertools
-import json
 from operator import itemgetter
 from src.text_processing import remove_stress_annots, group_consecutive_duplicates
 
@@ -15,30 +14,17 @@ get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[co
 
 
 class dtw_forced_aligner:
-    def __init__(self, alphabet):
+    def __init__(self, alphabet, collapse_method='mean'):
         self.alphabet=alphabet
         self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
+        self.collapse_method=collapse_method
 
     def labelize_phonemes(self, phonemes):
         # return np.array(self.label_encoder.transform([phon for phon in phonemes]))
         return np.array([self.p_to_id[el] for el in phonemes])
 
-    # get the columns from the probability matrix which correspond to non-silent frames
-    def get_phone_prob_matrix_nonsil(self, phone_prob_matrix):
-        phone_prob_matrix = [l for l in phone_prob_matrix]
-
-        # Here we want to detect silence frames. The silence token is at the last index. Either we can threshold it, or maybe better: check if it's the max posterior probability
-        # def condition(vect): return vect[-1]>0.8
-        def condition(vect): return vect[-1]==max(vect)
-        a = np.array(phone_prob_matrix)
-
-        silence_frames_idx = [idx for idx, element in enumerate(a) if condition(element)]
-        non_silence_frames_idx = [idx for idx, element in enumerate(a) if not condition(element)]
-        phone_prob_matrix_nonsil = a[non_silence_frames_idx]
-        return phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx
-
-    # from cost_non_sil and target_phonemes, get the most likely path (forced alignment)
+    # from phone_prob_matrix_nonsil and target_phonemes, get the most likely path (forced alignment)
     def get_forced_alignment(self, phone_prob_matrix_nonsil, target_phonemes):
         """
         Dynamic Time Warping
@@ -79,8 +65,9 @@ class dtw_forced_aligner:
         alignment_with_silence[non_silence_frames_idx] = aligned_phones
         return alignment_with_silence
 
+    # compute a collapsed proba vector of every phoneme alignment
     def predict(self, aligned_phones, phone_prob_matrix_nonsil, target_phonemes):
-        # compute the mean of every phoneme alignment
+        # collapse_method is 'mean' or 'max'. It means we either use mean pooling or max pooling across time to have a probability vector
         aligned_preds = list(zip(aligned_phones, phone_prob_matrix_nonsil))
         grouped_aligned_preds = [list(v) for _,v in itertools.groupby(aligned_preds,itemgetter(0))]
 
@@ -93,12 +80,17 @@ class dtw_forced_aligner:
                     grouped_aligned_preds[i] = x_2
                     grouped_aligned_preds.insert(i, x_1)
 
-        proba_means = []
+        collapsed_proba_vectors = []
         for phon in grouped_aligned_preds:
-            proba_means.append(np.mean([l[1] for l in phon], axis=0))
-        predicted_phones = [self.id_to_p[np.argmax(i)] for i in proba_means]
+            if self.collapse_method=='mean':
+                collapsed_proba_vectors.append(np.mean([l[1] for l in phon], axis=0))
+            elif self.collapse_method=='max':
+                collapsed_proba_vectors.append(np.max([l[1] for l in phon], axis=0))
+            else:
+                raise Exception("collapse_method in src.dtw_forced_aligner.predict() should be 'mean' or 'max'")
+        predicted_phones = [self.id_to_p[np.argmax(i)] for i in collapsed_proba_vectors]
         
-        return predicted_phones, proba_means
+        return predicted_phones, collapsed_proba_vectors
 
     def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, proba_means, time_per_output=0.02):
 
@@ -175,6 +167,20 @@ class dtw_forced_aligner:
             df_segmented=divide_consecutive_duplicates(df_segmented2, remove_stress_annots(phones))
 
         return df_segmented
+
+    # get the columns from the probability matrix which correspond to non-silent frames
+    def get_phone_prob_matrix_nonsil(self, phone_prob_matrix):
+        phone_prob_matrix = [l for l in phone_prob_matrix]
+
+        # Here we want to detect silence frames. The silence token is at the last index. Either we can threshold it, or maybe better: check if it's the max posterior probability
+        # def condition(vect): return vect[-1]>0.8
+        def condition(vect): return vect[-1]==max(vect)
+        a = np.array(phone_prob_matrix)
+
+        silence_frames_idx = [idx for idx, element in enumerate(a) if condition(element)]
+        non_silence_frames_idx = [idx for idx, element in enumerate(a) if not condition(element)]
+        phone_prob_matrix_nonsil = a[non_silence_frames_idx]
+        return phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx
     
     def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, time_per_output=0.02):
         phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx = self.get_phone_prob_matrix_nonsil(phone_prob_matrix)
