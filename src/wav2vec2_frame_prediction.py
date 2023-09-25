@@ -116,7 +116,7 @@ class Wav2Vec2ForFramePrediction:
             quantized_model_path='/'.join(["hf_models",quantized_model_name])
             sess_options = rt.SessionOptions()
             sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
-            self.session = rt.InferenceSession(quantized_model_path, sess_options)
+            self.session = rt.InferenceSession(quantized_model_path, sess_options, providers=['CPUExecutionProvider'])
 
         self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
         # self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-base-960h")
