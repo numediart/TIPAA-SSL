@@ -65,7 +65,9 @@ conda activate flowspeech
 
 <!-- Basically follow the same installation commands described in the Dockerfile, but directly on your linux machine -->
 
-First install all necessary apt packages listed in ./Dockerfile
+First install all necessary apt packages listed in [./Dockerfile](/Dockerfile#L6)
+
+(Last time I tried, on a WSL Ubuntu, I just needed to apt install g++ festival espeak-ng)
 
 To setup the micromamba environment, you first have to install it.
 Install micromamba:
@@ -80,12 +82,25 @@ micromamba create -n flowspeech_mm
 micromamba activate flowspeech_mm
 ```
 
-Then you can proceed to install dependencies. It is easier to install the conda package of montreal-forced-aligner rather than pursuing the same commands as in the Dockerfile. But it takes more space on your disk (which is not a big deal for a local installation but it is of the dicker image).
+Then you can proceed to install dependencies. It is easier to install the conda package of montreal-forced-aligner rather than pursuing the same commands as in the Dockerfile. But it takes more space on your disk (which is not a big deal for a local installation but it is of the docker image).
+
+```
+micromamba install kaldi=*=*cpu* montreal-forced-aligner
+```
 
 Once MFA is installed you can install the rest of this repository dependencies.
 
 ```
 micromamba install -y -n flowspeech_mm -f env.yml
+```
+
+## Test modules
+
+The unit tests should work after these step
+```
+pytest test_DL_modules.py
+pytest test_DL_api.py
+pytest test_models.py
 ```
 
 
@@ -153,9 +168,3 @@ cd ../..
 
 There are other useful sets of data, we don't have a place for them online yet. Ask Noé
 
-## Test modules
-
-```
-pytest test_DL_modules.py
-pytest test_DL_api.py
-```
