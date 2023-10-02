@@ -21,28 +21,31 @@ def test_wav2vec2_frame_prediction(n=10):
     model_stressed = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet,w2v2_model_format="onnx")
     model_stressed.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
     
-    row=df_sample.iloc[0]
+    row=df_sample.iloc[6]
 
     for i,row in df_sample.iterrows():
         s,fs=read_audio_file(row.audio_file_url, fs=16000)
-        split_phonetics=sum([p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')], [])
+        # split_phonetics=sum([p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')], [])
         split_phonetics=[p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')]
         split_phonetics=sum(split_phonetics,[])
 
         phone_prob_matrix = model.predict_phone_prob_matrix(s, 16000)
         df_segmented=model.phone_prob_matrix_segmentation(phone_prob_matrix, remove_stress_annots(split_phonetics))
+        max_posterior_df, max_posterior_df_filtered_processed, max_posterior_df_filtered_processed_threshed=model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.7)
         # df_segmented = model.predict_with_timings(s, remove_stress_annots(split_phonetics))
-        print('model without stress', df_segmented)
+        print('model without stress df_segmented', df_segmented)
+        print('model without stress max_posterior_df',max_posterior_df)
+        print('model without stress max_posterior_df_filtered_processed_threshed',max_posterior_df_filtered_processed_threshed)
 
         phone_prob_matrix = model_stressed.predict_phone_prob_matrix(s, 16000)
         # _,_,phone_prob_df = model_stressed.audio_to_phone_prob_df(s,row.cmu_phonetics)
         df_segmented=model_stressed.phone_prob_matrix_segmentation(phone_prob_matrix, split_phonetics)
-        max_posterior_df, max_posterior_df_filtered_collapsed=model_stressed.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.8)
+        max_posterior_df, max_posterior_df_filtered_processed, max_posterior_df_filtered_processed_threshed=model_stressed.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.7)
         # df_segmented = model_stressed.predict_with_timings(s, split_phonetics)
         print('model with stress', df_segmented)
+        print('model without stress max_posterior_df_filtered_processed_threshed',max_posterior_df_filtered_processed_threshed)
 
 
-# For now, it works locally but not on the github actions server because of a write permission issue
 def test_mfa_align(n=10, mfa_model='english_us_arpa', mfa_path=os.path.expanduser('~')+'/mfa_data', mfa_result_path=os.path.expanduser('~')+'/mfa_result', fs=16000, out_json='data/align_test.json'):
     from src.label_data_processing import actor_recordings
     from scripts.mfa_utils import prepare_files, launch_mfa
