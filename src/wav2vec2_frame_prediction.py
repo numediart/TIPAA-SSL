@@ -251,18 +251,13 @@ class Wav2Vec2ForFramePrediction:
     def phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list):
         with CodeTimer('DTW'): 
             df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output)
-            self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
+            if len(df_segmented)>0:
+                self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
+            else:
+                self.pred_phones_audio=[]
+                # TODO: declare model.status to be that nothing expected was detected and use that in calls of this function, among other things in pronunciation aspect functions
         return df_segmented
 
-    if False:
-        # DEPRECATED: we use phone_prob_matrix_segmentation from DL_speech_tech
-        # predict and get proba means per phoneme alignment and GT
-        def predict_with_timings(self, s, target_phonemes):
-            phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
-            df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, target_phonemes)
-            self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
-
-            return df_segmented
 
 def train_Wav2Vec2ForFramePrediction_model():
     from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis
