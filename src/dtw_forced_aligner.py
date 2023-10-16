@@ -46,17 +46,24 @@ class dtw_forced_aligner:
         #     one_hot_matrix[target_labels[i],i]=1
         # (np.dot(phone_prob_matrix_nonsil,one_hot_matrix)==phone_prob_matrix_nonsil[:,list(target_labels)]).all()
 
+        from librosa.util.exceptions import ParameterError
 
         target_labels = self.labelize_phonemes(target_phonemes)
-        D, wp = librosa.sequence.dtw(C=-phone_prob_matrix_nonsil[:,list(target_labels)], step_sizes_sigma=np.array([[1, 1], [1, 0]]))
-        # getting phonemes' labels from forced alignement
-        aligned_phones_labels = []
-        for index in [i[1] for i in wp]:
-            aligned_phones_labels.insert(0, target_labels[index])
-        # using the label encoder to find the phoneme
-        aligned_phones = [self.id_to_p[el] for el in aligned_phones_labels]
+        try:
+            D, wp = librosa.sequence.dtw(C=-phone_prob_matrix_nonsil[:,list(target_labels)], step_sizes_sigma=np.array([[1, 1], [1, 0]]))
+
+            # getting phonemes' labels from forced alignement
+            aligned_phones_labels = []
+            for index in [i[1] for i in wp]:
+                aligned_phones_labels.insert(0, target_labels[index])
+            # using the label encoder to find the phoneme
+            aligned_phones = [self.id_to_p[el] for el in aligned_phones_labels]
+            return True, aligned_phones
+        except ParameterError:
+            print('DTW failed, most probably the audio is too far from what is expected.')
+            aligned_phones = ["[SIL]"]*len(phone_prob_matrix_nonsil)
         
-        return aligned_phones
+            return False,aligned_phones
 
     # forced alignment but with all the audio sample's frames
     def get_alignment_with_silence(self, aligned_phones, silence_frames_idx, non_silence_frames_idx):
@@ -94,6 +101,9 @@ class dtw_forced_aligner:
 
     def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, proba_means, time_per_output=0.02):
 
+        print(alignment_with_silence)
+        print(phones)
+
         start_idx = []
         end_idx = []
         for i in range(len(alignment_with_silence)):
@@ -111,7 +121,10 @@ class dtw_forced_aligner:
         timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
         timings_df=pd.DataFrame(timings)
 
-        df_segmented = pd.DataFrame()
+        print(timings_df)
+
+        df_segmented = pd.DataFrame(columns=['phones', 'start_idx', 'end_idx'])
+
         df_segmented[['phones', 'start_idx', 'end_idx']]=timings_df
         df_segmented['pred_phones_audio'] = predicted_phones
         df_segmented['proba_means'] = proba_means
@@ -184,12 +197,18 @@ class dtw_forced_aligner:
     
     def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, time_per_output=0.02):
         phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx = self.get_phone_prob_matrix_nonsil(phone_prob_matrix)
-        aligned_phones = self.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
-        if silence_frames_idx:
-            alignment_with_silence = self.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
+
+        status, aligned_phones = self.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
+
+        if status:
+
+            if silence_frames_idx:
+                alignment_with_silence = self.get_alignment_with_silence(aligned_phones, silence_frames_idx, non_silence_frames_idx)
+            else:
+                alignment_with_silence = aligned_phones
+            predicted_phones, proba_means = self.predict(aligned_phones, phone_prob_matrix_nonsil, target_phonemes)
+            df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, proba_means, time_per_output=time_per_output)
         else:
-            alignment_with_silence = aligned_phones
-        predicted_phones, proba_means = self.predict(aligned_phones, phone_prob_matrix_nonsil, target_phonemes)
-        df_segmented = self.get_df_segmented(alignment_with_silence, predicted_phones, target_phonemes, proba_means, time_per_output=time_per_output)
+            df_segmented=pd.DataFrame()
 
         return df_segmented
