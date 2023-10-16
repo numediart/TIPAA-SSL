@@ -6,7 +6,7 @@ import librosa
 
 from DL_speech_tech import phonemeContrast_from_formatted_phonetics_audio, stress_from_formatted_phonetics, phonetic_content_analysis, start_end_contrast_from_formatted_phonetics_audio, default_model
 
-
+from src.wav2vec2_frame_prediction import audio_load_and_check
 
 
 from src.label_data_processing import actor_recordings, final_s_artificial_data, synth_words_data
@@ -135,6 +135,89 @@ def GT_proba_distribution_analysis(model=default_model, basename='probas_actors_
     for v in cmu_vowels:
         plot_vowel_distributions(v, all_phones_df, basename=basename)
         print(np.histogram(all_phones_df[all_phones_df.phones==v].GT_proba))
+
+def error_rate_match_mismatch_distribution_analysis(n=100):
+    """This function studies the false acceptances of audio containing a completely different content than what is expected
+    """
+    from src.label_data_processing import actor_recordings
+    from src.audio_processing import read_audio_file
+    from src.text_processing import remove_stress_annots
+    from DL_speech_tech import post_analysis
+    df=actor_recordings()
+
+    df_sample=df.sample(n,random_state=0)
+
+    from src.pronunciation_dictionaries import cmu_alphabet, cmu_stressed_alphabet
+    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    # --------------- Inference demo --------------------
+    model = Wav2Vec2ForFramePrediction(cmu_alphabet,w2v2_model_format="onnx")
+    model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
+
+    row=df_sample[df_sample.phrase_id=="jqjxmugqnq"].iloc[0]
+
+    error_rates_match=[]
+    error_rates_mismatch=[]
+    random_phonetics_list=[]
+    true_phonetics_list=[]
+    audio_status=[]
+    for i,row in df_sample.iterrows():
+        s,fs=read_audio_file(row.audio_file_url, fs=16000)
+        
+
+        # split_phonetics=sum([p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')], [])
+        split_phonetics=[p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')]
+        split_phonetics=sum(split_phonetics,[])
+
+        phone_prob_matrix = model.predict_phone_prob_matrix(s, 16000)
+        df_segmented=model.phone_prob_matrix_segmentation(phone_prob_matrix, remove_stress_annots(split_phonetics))
+        max_posterior_df, max_posterior_df_filtered_processed, max_posterior_df_filtered_processed_threshed=model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.7)
+        # df_segmented = model.predict_with_timings(s, remove_stress_annots(split_phonetics))
+        print('model without stress df_segmented', df_segmented)
+        print('model without stress max_posterior_df',max_posterior_df)
+        print('model without stress max_posterior_df_filtered_processed_threshed',max_posterior_df_filtered_processed_threshed)
+
+        df_segmented_full, error_rate=post_analysis(phone_prob_matrix,phonetics=row.cmu_phonetics,model=model)
+
+        # take a random phrase's phonetics, that is not the original one
+        random_phonetics=df_sample[df_sample.cmu_phonetics!=row.cmu_phonetics].sample(n=1).cmu_phonetics.values[0]
+        # This is a test
+        # random_phonetics=df_sample[df_sample.cmu_phonetics.str.startswith('AA1_R Y_UW1 P_EY1|IH0_NG W_IH1_DH')].cmu_phonetics.values[0]
+
+        status, s=audio_load_and_check(s, random_phonetics, max_speech_rate=8, mode='numpy', fs=fs)
+
+        df_segmented_full_mismatch, error_rate_mismatch=post_analysis(phone_prob_matrix,phonetics=random_phonetics,model=model)
+
+        audio_status.append(status)
+
+        error_rates_match.append(error_rate)
+        error_rates_mismatch.append(error_rate_mismatch)
+
+        true_phonetics_list.append(row.cmu_phonetics)
+        random_phonetics_list.append(random_phonetics)
+
+
+    data=pd.DataFrame([error_rates_match,error_rates_mismatch,true_phonetics_list,random_phonetics_list,audio_status]).T
+    data.columns=['match','mismatch','true_phonetics_list','random_phonetics_list','audio_status']
+
+    # Here I filter out examples that would already be rejected thanks to the check of audio length compared to
+    data=data[~data.audio_status.str.contains('too short')]
+
+    data.match
+    data_to_plot=pd.DataFrame(columns=['label','error'])
+    data_to_plot['error']=data.match.tolist() + data.mismatch.tolist()
+    data_to_plot['label']=['match']*len(data) + ['mismatch']*len(data)
+
+
+    sns.histplot(data=data_to_plot, x="error", hue="label", multiple="stack")
+    plt.savefig('plots/match_mismatch_distribution.png')
+
+
+    
+
+
+
+
+
 
 
 
