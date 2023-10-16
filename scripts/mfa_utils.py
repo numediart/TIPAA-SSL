@@ -17,13 +17,6 @@ from Bio import pairwise2
 
 def get_all_phone_with_timings(f='data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'):
     """get all phonemes of a sentence located in tg[1], and filter silence and empty parts, then convert to DataFrame
-
-    Args:
-        f (str, optional): [description]. Defaults to 'data/librispeech_alignments/dev-clean/8842/304647/8842-304647-0013.TextGrid'.
-        word_idx (int, optional): [description]. Defaults to 8.
-
-    Returns:
-        [type]: [description]
     """
     tg = textgrid.TextGrid.fromFile(f)
     # get phones and drop "sp", "sil" and empty strings
