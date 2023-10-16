@@ -547,6 +547,61 @@ def phonetic_reference_processing(phonetics, target_word_idx, target_syllable_id
     
     return split_phonetics_words, syl_GT, GT, syl_idxs
 
+from Bio import pairwise2
+from scripts.mfa_utils import words_to_unicode_chars, unicode_chars_to_words
+
+def list_pairwise_alignment(LISTA, LISTB):
+    """maps list elements to unicode characters to be able to use the character base pariwise alignment from bipython, 
+    then map back results to list elements
+
+    source: https://www.biostars.org/p/246408/
+    """
+    
+    LISTA__, LISTB__, LATtoHAN, HANtoLAT = words_to_unicode_chars(LISTA,LISTB)
+    alignments=pairwise2.align.globalxx(LISTA__,LISTB__)
+    RESA, RESB=unicode_chars_to_words(alignments[0].seqA, alignments[0].seqB, LATtoHAN, HANtoLAT)
+    return RESA, RESB
+
+
+def post_analysis(phone_prob_matrix,phonetics='T_ER1_N_D ER0|AW1_N_D',model=default_model):
+    split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
+    phoneme_list=remove_stress_annots(sum(split_phonetics,[]))
+
+    max_posterior_df, max_posterior_df_filtered_processed, max_posterior_df_filtered_processed_threshed=model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.5)
+
+    
+    # the phonetics come from 2 different sources, they are hopefully similar but probably not identical
+    # because of that, I have to do pairwise alignment to retrieve the index in the mfa phonetics
+    RESA, RESB = list_pairwise_alignment(max_posterior_df_filtered_processed_threshed.phone.tolist(), phoneme_list)
+
+    pairwise_align_df=pd.DataFrame([RESB,RESA])
+    pairwise_align_df.index=['expected','predicted']
+
+    if '-' in pairwise_align_df.T.expected.tolist():
+        error_rate=pairwise_align_df.T.expected.value_counts()['-']/len(phoneme_list)
+    else:
+        error_rate=0
+
+
+    df_segmented=model.phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list)
+    
+    if len(df_segmented)==0:
+        return None, error_rate
+
+    df_segmented['n_frames']=df_segmented.end_idx-df_segmented.start_idx
+    # insert a row at the dashes position by using float indexing
+    dash_indexes=pairwise_align_df.T[pairwise_align_df.T.expected=='-'].index.tolist()
+    for dash_idx in dash_indexes:
+        df_segmented.loc[dash_idx-0.5]=np.nan
+        df_segmented = df_segmented.sort_index()
+        df_segmented=df_segmented.reset_index(drop=True)
+
+    df_segmented['predicted_phones']=pairwise_align_df.T.predicted
+
+    return df_segmented, error_rate
+
+
+    
 
 def start_end_contrast_from_prob_matrix(phone_prob_matrix,phonetics='T_ER1_N_D ER0|AW1_N_D', 
                             target_word_idx=0, 
