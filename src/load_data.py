@@ -132,7 +132,7 @@ def build_df_segmented(df_t, model, forced_aligner, mode): # mode = "CMU" or "MF
         target_phonemes = df.phones
         phone_prob_matrix = model.predict_phone_prob_matrix(s, fs)
         phone_prob_matrix_nonsil, _, _ = forced_aligner.get_phone_prob_matrix_nonsil(phone_prob_matrix)
-        aligned_phones = forced_aligner.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
+        status, aligned_phones = forced_aligner.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
         pred_phones_audio, probs_means = forced_aligner.predict(aligned_phones, phone_prob_matrix_nonsil, target_phonemes)
 
         df.pred_phones_audio = pred_phones_audio
@@ -163,7 +163,7 @@ def build_df_segmented_all(df_t, model, forced_aligner, mode, language_code): # 
         target_phonemes = ex.target_phonemes
         phone_prob_matrix = model.predict_phone_prob_matrix(s, fs)
         phone_prob_matrix_nonsil, _, _ = forced_aligner.get_phone_prob_matrix_nonsil(phone_prob_matrix)
-        aligned_phones = forced_aligner.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
+        status, aligned_phones = forced_aligner.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
         predicted_phones, probs_means = forced_aligner.predict(aligned_phones, phone_prob_matrix_nonsil)
         predictions.append(predicted_phones)
 
