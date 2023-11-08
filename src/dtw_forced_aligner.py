@@ -14,31 +14,59 @@ get_blocks = lambda a,cols: a.loc[(a[cols].shift() == a[cols]).any(axis=1)|(a[co
 
 
 class dtw_forced_aligner:
+    """
+    The `dtw_forced_aligner` class is designed to perform forced alignment using Dynamic Time Warping (DTW) to align phoneme sequences 
+    with corresponding probability matrices. 
+    It provides methods for various tasks including converting phonemes to their corresponding ids, 
+    getting the most likely alignment path, aligning frames with silence, predicting phonemes from aligned frames, 
+    converting the alignment information into a segmented DataFrame, retrieving the phone probability matrix for non-silent frames, 
+    and converting probability matrices to segmented DataFrames. 
+    The class offers flexibility by allowing the user to specify an alphabet of phonemes and choose between mean or max pooling for collapsing probability vectors. 
+    Overall, the `dtw_forced_aligner` class provides a comprehensive set of tools for performing forced alignment and analyzing the results.
+    """
     def __init__(self, alphabet, collapse_method='mean'):
+        """
+        Initialize the dtw_forced_aligner class.
+
+        Args:
+            alphabet (list): The list of phonemes in the alphabet.
+            collapse_method (str, optional): The method used to collapse probability vectors. Defaults to 'mean'.
+        """
         self.alphabet=alphabet
         self.id_to_p={i:p for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.p_to_id={p:i for i,p in enumerate(self.alphabet+['[SIL]'])}
         self.collapse_method=collapse_method
 
     def labelize_phonemes(self, phonemes):
+        """
+        Convert a list of phonemes to their corresponding ids.
+
+        Args:
+            phonemes (list): The list of phonemes.
+
+        Returns:
+            np.array[int]: The array of phoneme ids.
+        """
         # return np.array(self.label_encoder.transform([phon for phon in phonemes]))
         return np.array([self.p_to_id[el] for el in phonemes])
 
     # from phone_prob_matrix_nonsil and target_phonemes, get the most likely path (forced alignment)
     def get_forced_alignment(self, phone_prob_matrix_nonsil, target_phonemes):
         """
-        Dynamic Time Warping
+        Perform forced alignment to get the most likely path using Dynamic Time Warping.
+        
         with N phonemes + silence token, phone_prob_matrix_nonsil is of shape T x (N+1). let's call L the length of the phoneme sequence. 
         phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
         for each phoneme of the sequence, we extract a number for each time step that is a similarity measure between the frame proba and the phoneme, i.e. a dot product divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
         if it is a one-hot, a dot product is equivalent as just taking the element with that index from the prob vector.
 
         Args:
-            phone_prob_matrix_nonsil (_type_): _description_
-            target_phonemes (_type_): _description_
+            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for non-silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+            target_phonemes (list): The list of target phonemes.
 
         Returns:
-            _type_: _description_
+            Tuple[bool, List[str]]: A tuple containing a boolean indicating the success of forced alignment and the list of aligned phonemes.
+
         """
 
         # one_hot_matrix=np.zeros((len(self.id_to_p), len(target_phonemes)))
@@ -67,6 +95,17 @@ class dtw_forced_aligner:
 
     # forced alignment but with all the audio sample's frames
     def get_alignment_with_silence(self, aligned_phones, silence_frames_idx, non_silence_frames_idx):
+        """
+        Get the alignment with silence frames.
+
+        Args:
+            aligned_phones (list): The list of aligned phonemes.
+            silence_frames_idx (list): The list of indices of silence frames.
+            non_silence_frames_idx (list): The list of indices of non-silence frames.
+
+        Returns:
+            np.array[str]: The alignment with silence frames.
+        """
         alignment_with_silence=np.array(["     "]*(len(silence_frames_idx)+len(non_silence_frames_idx)))
         alignment_with_silence[silence_frames_idx] = "[SIL]"
         alignment_with_silence[non_silence_frames_idx] = aligned_phones
@@ -74,7 +113,20 @@ class dtw_forced_aligner:
 
     # compute a collapsed proba vector of every phoneme alignment
     def predict(self, aligned_phones, phone_prob_matrix_nonsil, target_phonemes):
-        # collapse_method is 'mean' or 'max'. It means we either use mean pooling or max pooling across time to have a probability vector
+        """
+        Compute the collapsed probability vector of every phoneme alignment.
+
+        collapse_method is 'mean' or 'max'. It means we either use mean pooling or max pooling across time to have a probability vector
+
+        Args:
+            aligned_phones (list): The list of aligned phonemes.
+            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for non-silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+            target_phonemes (list): The list of target phonemes.
+
+
+        Returns:
+            Tuple[List[str], List[np.array[float]]]: A tuple containing the list of predicted phones and the list of collapsed probability vectors.
+        """
         aligned_preds = list(zip(aligned_phones, phone_prob_matrix_nonsil))
         grouped_aligned_preds = [list(v) for _,v in itertools.groupby(aligned_preds,itemgetter(0))]
 
@@ -100,6 +152,19 @@ class dtw_forced_aligner:
         return predicted_phones, collapsed_proba_vectors
 
     def get_df_segmented(self, alignment_with_silence, predicted_phones, phones, proba_means, time_per_output=0.02):
+        """
+        Convert the alignment information into a segmented DataFrame.
+
+        Args:
+            alignment_with_silence (np.array[str]): The alignment with silence frames.
+            predicted_phones (list): The list of predicted phones.
+            phones (list): The list of target phones.
+            proba_means (list): The list of probability means.
+            time_per_output (float, optional): The time per output. Defaults to 0.02.
+
+        Returns:
+            pd.DataFrame: The segmented DataFrame.
+        """
 
         print(alignment_with_silence)
         print(phones)
@@ -181,8 +246,16 @@ class dtw_forced_aligner:
 
         return df_segmented
 
-    # get the columns from the probability matrix which correspond to non-silent frames
     def get_phone_prob_matrix_nonsil(self, phone_prob_matrix):
+        """
+        Get the columns from the probability matrix which correspond to silent and non-silent frames.
+
+        Args:
+            phone_prob_matrix (np.array[float]): The phone probability matrix possibly contanining silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+
+        Returns:
+            Tuple[np.array[float], list, list]: A tuple containing the phone probability matrix of non-silent frames, the list of indices of silence frames, and the list of indices of non-silence frames.
+        """
         phone_prob_matrix = [l for l in phone_prob_matrix]
 
         # Here we want to detect silence frames. The silence token is at the last index. Either we can threshold it, or maybe better: check if it's the max posterior probability
@@ -196,6 +269,17 @@ class dtw_forced_aligner:
         return phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx
     
     def probas_to_df_segmented(self, phone_prob_matrix, target_phonemes, time_per_output=0.02):
+        """
+        Convert probability matrix to a segmented DataFrame.
+
+        Args:
+            phone_prob_matrix (np.array[float]): The phone probability matrix possibly contanining silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+            target_phonemes (list): The list of target phonemes.
+            time_per_output (float, optional): The time per output. Defaults to 0.02.
+
+        Returns:
+            pd.DataFrame: The segmented DataFrame.
+        """
         phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx = self.get_phone_prob_matrix_nonsil(phone_prob_matrix)
 
         status, aligned_phones = self.get_forced_alignment(phone_prob_matrix_nonsil, target_phonemes)
