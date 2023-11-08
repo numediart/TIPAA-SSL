@@ -87,9 +87,43 @@ def extract_word(df_segmented, phonetics, target_word_idx):
     return df_word
 
 class Wav2Vec2ForFramePrediction:
+    """
+    A class for predicting phonemes from audio using the Wav2Vec2 model for frame prediction.
+
+    Attributes:
+    - alphabet (list): A list of phoneme labels. Typically, the CMU phone set, or the MFA IPA phone set (derived from a dataset, so its completeness can depend on the languages used)
+    - collapse_method (str): The method used to collapse repeated phoneme probability vectors. (mean, i.e. averaging them is used)
+    - w2v2_model_path (str): The file path of the Wav2Vec2 model.
+    - w2v2_model_format (str): The format of the Wav2Vec2 model ("torch" or "onnx"). ONNX is a tool for compressing models, and maing them faster. I used the quantization on the basis model.
+    - reducer (PCA): A PCA dimensionality reduction model. I tried also UMAP, but slower and I couldn't achieve better results
+    - frame_classifier (KNeighborsClassifier): A K-nearest neighbors classifier for frame classification. It could be any other sklearn classifier, I chose this one, but others could lead to better performance.
+    - status (str): The status of the model. "success", or "success: ..." when a special case was found, or "error: ..." when an error in the code occurred.
+
+    Methods:
+    - __init__(self, alphabet, collapse_method, w2v2_model_path, w2v2_model_format, reducer, frame_classifier): 
+        Initializes the Wav2Vec2ForFramePrediction object with the specified attributes.
+    - save(self, out_path, name): Saves the model to disk.
+    - load(self, out_path, name): Loads a saved model from disk.
+    - get_last_hidden_state(self, s, fs): Returns the last hidden state output of the Wav2Vec2 model given an audio sample.
+    - reduce_lhs_dimension(self, lhs): Reduces the dimensionality of the last hidden state output using PCA.
+    - fit(self, X, y): Trains the dimensionality reduction model and frame classifier using the given training data.
+    - predict_phone_prob_matrix(self, s, fs): Computes the probability matrix of each frame corresponding to every phoneme for an audio sample.
+    - audio_to_phone_prob_matrix(self, audio, phonetics, max_speech_rate, mode): Converts an audio sample to a probability matrix of phonemes.
+    - audio_to_phone_prob_df(self, audio, phonetics, max_speech_rate, mode): Converts an audio sample to a DataFrame of phoneme probabilities.
+    - max_posterior_phone_df(self, phone_prob_df, proba_thresh): Computes the maximum posterior probability of each phoneme from a DataFrame of phoneme probabilities.
+    - phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list): Performs forced alignment segmentation on a probability matrix of phonemes.
+    """
     def __init__(self, alphabet, collapse_method='mean', w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", w2v2_model_format="torch", reducer=PCA(n_components=0.95, random_state=42), frame_classifier=KNeighborsClassifier(10)):#, phoneme_classifier=None):
         """
-        w2v_format: 'torch' or 'onnx'
+        Initializes the Wav2Vec2ForFramePrediction object with the specified attributes.
+
+        Args:
+        - alphabet (list): A list of phoneme labels.
+        - collapse_method (str): The method used to collapse repeated phoneme labels.
+        - w2v2_model_path (str): The file path of the Wav2Vec2 model.
+        - w2v2_model_format (str): The format of the Wav2Vec2 model ("torch" or "onnx").
+        - reducer (PCA): A PCA dimensionality reduction model, could be another sklearn reduction model.
+        - frame_classifier (KNeighborsClassifier): By default, a K-nearest neighbors classifier for frame classification. It sould be any other sklearn mclassifier.
         """
         self.status = 'success'
         self.pred_phones_audio = []
@@ -123,18 +157,42 @@ class Wav2Vec2ForFramePrediction:
         # self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-base-960h")
 
     def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
+        """
+        Saves the model to disk.
+
+        Args:
+        - out_path (str): The output directory path.
+        - name (str): The name of the saved model.
+        """
         path=os.path.join(out_path,name)
         if not os.path.exists(path): os.makedirs(path)
         pickle.dump(self.reducer, open( path+"/reducer.p", "wb" ))
         pickle.dump(self.frame_classifier, open( path+"/frame_classifier.p", "wb" ))
 
     def load(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
+        """
+        Loads a saved model from disk.
+
+        Args:
+        - out_path (str): The output directory path.
+        - name (str): The name of the saved model.
+        """
         path=os.path.join(out_path,name)
         self.reducer=pd.read_pickle(path+"/reducer.p")
         self.frame_classifier=pd.read_pickle(path+"/frame_classifier.p")
         
     # get output from an audio sample in w2v2 feature extractor
     def get_last_hidden_state(self, s, fs):
+        """
+        Returns the last hidden state output of the Wav2Vec2 model given an audio sample.
+
+        Args:
+        - s: The audio sample.
+        - fs: The sampling rate of the audio.
+
+        Returns:
+        - The last hidden state output of the Wav2Vec2 model.
+        """
         input_values = self.processor(torch.tensor(s), sampling_rate=fs, return_tensors="pt").input_values.to('cpu')
 
         if self.w2v2_model_format=="torch":
@@ -146,9 +204,27 @@ class Wav2Vec2ForFramePrediction:
 
     # reduce dimension from w2v2 output
     def reduce_lhs_dimension(self, lhs):
+        """
+        Reduces the dimensionality of the last hidden state output using PCA.
+
+        Args:
+        - lhs: The last hidden state output of the Wav2Vec2 model.
+
+        Returns:
+        - The reduced last hidden state output.
+        """
         return self.reducer.transform(lhs[0])
 
     def fit(self, X, y):
+        """
+        Trains the dimensionality reduction model and frame classifier using the given training data. 
+        This training input data X must be the last hidden states for each audio frame. The labels are the labels (phones that must be in the alphabet used)
+
+
+        Args:
+        - X: The training data.
+        - y: The target labels.
+        """
         self.X_train = X
         self.y_train_labels = y
         
@@ -163,6 +239,16 @@ class Wav2Vec2ForFramePrediction:
 
     # from an audio sample, computes the probability matrix of each frame corresponding to every phoneme
     def predict_phone_prob_matrix(self, s, fs):
+        """
+        Computes the probability matrix of each frame corresponding to every phoneme for an audio sample.
+
+        Args:
+        - s: The audio sample.
+        - fs: The sampling rate of the audio.
+
+        Returns:
+        - The probability matrix of each frame corresponding to every phoneme.
+        """
         self.timestamps = []
         start = time()
         self.lhs = self.get_last_hidden_state(s, fs)
@@ -193,6 +279,21 @@ class Wav2Vec2ForFramePrediction:
         return phone_prob_matrix
 
     def audio_to_phone_prob_matrix(self, audio, phonetics, max_speech_rate=8, mode="numpy"):
+        """
+        Converts an audio sample to a probability matrix of phonemes.
+
+        Args:
+        - audio: The audio sample.
+        - phonetics: The phonetic transcription of the audio.
+        - max_speech_rate (float): The maximum accepted speech rate in seconds per phoneme. 
+        This act as a detector of abnormally short audio sample compared to the number of phonemes to detect very short audios with nothing usefule in them.
+        - mode (str): The mode of the audio data ("numpy" or "file" or "bytes").
+
+        Returns:
+        - audio_status (str): The status of the audio conversion ("success" or "failure").
+        - s: The processed audio sample.
+        - phone_prob_matrix: The probability matrix of phonemes.
+        """
         phonetics=phonetics.replace('-',' ').replace('{','').replace('}','')
         with CodeTimer('load audio'): audio_status, s = audio_load_and_check(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
         if audio_status=="success": 
@@ -202,6 +303,21 @@ class Wav2Vec2ForFramePrediction:
             return audio_status, s, None
 
     def audio_to_phone_prob_df(self, audio, phonetics, max_speech_rate=8, mode="numpy"):
+        """
+        Converts an audio sample to a DataFrame of phoneme probabilities. 
+        It uses the function above, and put colomns names as the alphabet for claeity and readability.
+
+        Args:
+        - audio: The audio sample.
+        - phonetics: The phonetic transcription of the audio.
+        - max_speech_rate (float): The maximum speech rate in seconds per phoneme.
+        - mode (str): The mode of the audio data ("numpy" or "torch").
+
+        Returns:
+        - audio_status (str): The status of the audio conversion ("success" or "failure").
+        - s: The processed audio sample.
+        - phone_prob_df: The DataFrame of phoneme probabilities.
+        """
         audio_status, s, phone_prob_matrix=self.audio_to_phone_prob_matrix(audio, phonetics, max_speech_rate=max_speech_rate, mode=mode)
         if audio_status=="success": 
             phone_prob_df=pd.DataFrame(phone_prob_matrix)
@@ -211,6 +327,18 @@ class Wav2Vec2ForFramePrediction:
             return audio_status, s, None
 
     def max_posterior_phone_df(self, phone_prob_df, proba_thresh=0.5):
+        """
+        Computes the maximum posterior probability of each phoneme from a DataFrame of phoneme probabilities.
+
+        Args:
+        - phone_prob_df: The DataFrame of phoneme probabilities.
+        - proba_thresh (float): The probability threshold.
+
+        Returns:
+        - max_posterior_df: The DataFrame of maximum posterior probabilities.
+        - max_posterior_df_filtered_processed: The processed (no silences, collapsed per phoneme instead of per frame) DataFrame of maximum posterior probabilities.
+        - max_posterior_df_filtered_processed_threshed: The thresholded (remove phones with to low posterior probability) DataFrame of maximum posterior probabilities.
+        """
         phone_prob_df.max(axis=1)
         max_idxs=np.argmax(phone_prob_df,axis=1)
         phone_prob_df.argmax(axis=1)
@@ -249,6 +377,16 @@ class Wav2Vec2ForFramePrediction:
         return max_posterior_df, max_posterior_df_filtered_processed, max_posterior_df_filtered_processed_threshed
 
     def phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list):
+        """
+        Performs forced alignment segmentation on a probability matrix of phonemes.
+
+        Args:
+        - phone_prob_matrix: The probability matrix of phonemes.
+        - phoneme_list: The list of phonemes.
+
+        Returns:
+        - df_segmented: The segmented DataFrame.
+        """
         with CodeTimer('DTW'): 
             df_segmented=self.forced_aligner.probas_to_df_segmented(phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output)
             if len(df_segmented)>0:
