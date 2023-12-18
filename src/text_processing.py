@@ -171,6 +171,12 @@ def phonetics_indexed_df_from_formatted_phonetics(phonetics):
     return phonetics_indexed_df
 
 
+def cmu_ensure_phonetics_consistency(phonetics: str) -> str:
+    """Replace CMU 'double' phones (CH, JH) by their
+    single-phone equivalents (T_SH, D_ZH)"""
+    return phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
+
+
 def check_phonemes(phonemes):
     """This function returns a non existing phoneme if it happens. else it returns None"""
     ps = remove_stress_annots(phonemes)

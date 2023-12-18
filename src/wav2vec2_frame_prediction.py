@@ -94,8 +94,8 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
     if np.abs(s).sum() == 0:
         return "success: no voiced sound detected (only 0's in waveform)", None
 
-    f0Samples = getIntonation(s, fs)
-    if sum([el != el for el in f0Samples]) == len(f0Samples):
+    f0_samples = getIntonation(s, fs)
+    if sum([el != el for el in f0_samples]) == len(f0_samples):
         return "success: no voiced sound detected (no pitch detected)", None
     return "success", s
 
@@ -104,7 +104,7 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
 def extract_word(df_segmented, phonetics, target_word_idx):
     start_idx = sum([len(p) for p in phonetics][:target_word_idx])
     end_idx = sum([len(p) for p in phonetics][: target_word_idx + 1])
-    df_word = df_segmented[start_idx:end_idx]
+    df_word = df_segmented[start_idx:end_idx].copy()
     return df_word
 
 
@@ -393,7 +393,7 @@ class Wav2Vec2ForFramePrediction:
 
     def max_posterior_phone_df(
         self, phone_prob_df: pd.DataFrame, proba_thresh: float = 0.5
-    ) -> tuple(pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    ) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
         """
         Computes the maximum posterior probability of each phoneme from a DataFrame
         of phoneme probabilities.
@@ -417,7 +417,9 @@ class Wav2Vec2ForFramePrediction:
         max_posterior_df["phone"] = max_posterior_df.max_idx.apply(lambda x: alphabet[x])
         max_posterior_df["proba"] = phone_prob_df.max(axis=1)
 
-        max_posterior_df_filtered = max_posterior_df[max_posterior_df.phone != "[SIL]"]
+        max_posterior_df_filtered = max_posterior_df[
+            max_posterior_df.phone != "[SIL]"
+        ].copy()
 
         # group consecutive duplicates
         max_posterior_df_filtered["idx_for_merging"] = (
@@ -427,9 +429,10 @@ class Wav2Vec2ForFramePrediction:
         def merging(x):
             d = {}
             d["phone"] = x["phone"].iloc[0]
+            d["max_idx"] = x["max_idx"].iloc[0]
             d["n_frames"] = len(x)
             d["probas"] = x["proba"].tolist()
-            d["max_proba"] = x["max_proba"].max()
+            d["max_proba"] = x["proba"].max()
             d["mean_proba"] = np.mean(d["probas"])
             return pd.Series(d)
 
@@ -447,9 +450,9 @@ class Wav2Vec2ForFramePrediction:
         )
 
         # regroup once more, since after thresholding we may once again have duplicates
-        df = max_posterior_df_filtered_processed_threshed
-
-        df["idx_for_merging"] = df["max_idx"].diff().ne(0).cumsum()
+        max_posterior_df_filtered_processed_threshed["idx_for_merging"] = (
+            max_posterior_df_filtered_processed_threshed["max_idx"].diff().ne(0).cumsum()
+        )
 
         def merging(x):
             d = {}
@@ -462,10 +465,9 @@ class Wav2Vec2ForFramePrediction:
             return pd.Series(d)
 
         max_posterior_df_filtered_processed_threshed = (
-            df.groupby("idx_for_merging").apply(merging).reset_index(drop=True)
-        )
-        max_posterior_df_filtered_processed_threshed.drop(
-            columns="idx_for_merging", inplace=True
+            max_posterior_df_filtered_processed_threshed.groupby("idx_for_merging")
+            .apply(merging)
+            .reset_index(drop=True)
         )
 
         return (
@@ -476,16 +478,33 @@ class Wav2Vec2ForFramePrediction:
 
     def phone_prob_matrix_segmentation(
         self, phone_prob_matrix: np.ndarray, phoneme_list: list[str]
-    ) -> tuple(pd.DataFrame, float):
+    ) -> (pd.DataFrame, float):
         """
-        Performs forced alignment segmentation on a probability matrix of phonemes.
+        Performs forced alignment segmentation on a probability matrix of phones.
+
+        Given a phone probability matrix of shape T x (N+1), where T is the number
+        of frames and N the number of target phones, and a list of M target phones,
+        return a dataframe with M rows, where the phone matrix has been segmented
+        according to the DTW path.
 
         Args:
-        - phone_prob_matrix: The probability matrix of phonemes.
-        - phoneme_list: The list of phonemes.
+        - phone_prob_matrix: The predicted probability matrix of phones.
+        - phoneme_list: The target list of phones.
 
         Returns:
-        - df_segmented: The segmented DataFrame.
+        - df_segmented: The segmented DataFrame, with columns:
+            - phones: the expected phones that the alignment was done to
+            - start_idx: the starting frame index of the phone
+            - end_idx: the ending frame index of the phone
+            - pred_phones_audio: predicted phone for each aligned group
+                (= the phone with the max. probability after pooling)
+            - proba_means: the phone probability vectors pooled across
+                the frames of the aligned group
+            - GT_proba: the ground truth phone probability from the pooled vector
+            - pred_proba: the probability value of the predicted phone
+            - start: the start time of the phone in seconds
+            - end: the end time of the phone in seconds
+            - n_times: the number of duplicates collapsed
         - dtw_cost: The final DTW alignment cost value
         """
         with CodeTimer('DTW', silent=True):
@@ -493,6 +512,7 @@ class Wav2Vec2ForFramePrediction:
                 phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output
             )
             if len(df_segmented) > 0:
+                # FIXME this is horrible style!
                 self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
             else:
                 self.pred_phones_audio = []

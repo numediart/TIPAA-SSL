@@ -17,6 +17,7 @@ from src.audio_processing import getIntonation, getIntensity, normalize
 print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
 
 from src.text_processing import (
+    cmu_ensure_phonetics_consistency,
     unstress,
     split_phonetics,
     remove_stress_annots,
@@ -91,6 +92,9 @@ default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
 # default_model=default_model_charsiu
 
 print_memory_usage("RAM - DL_speech_tech after default_model")
+
+
+MAX_PER_FOR_ACCEPTANCE = 0.8
 
 
 target_accepted_alternatives = {
@@ -276,39 +280,43 @@ def predict_phone(
     return phonetic_detection, syl
 
 
-def compute_stress_score(df_segmented, audio, fs=16000):
+def compute_stress_score(
+    df_segmented: pd.DataFrame, audio: np.ndarray, vowels: set[str], fs: int = 16000
+):
     """Use df_segmented to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute
     a value by vowel representing a stress intensity
 
     Args:
         phonetics (str): formatted phonetics
         audio (np array): audio signal
+        vowels: set of vowels
+        fs: sampling frequency
     Returns:
         weighted_score [type]: stress intensity score
     """
     # select vowels
-    filtered_df = df_segmented[df_segmented.phones.isin(cmu_vowels)]
+    filtered_df = df_segmented[df_segmented.phones.isin(vowels)]
 
-    f0Samples = getIntonation(audio, fs)
+    f0_samples = getIntonation(audio, fs)
     intensity = getIntensity(audio, fs)
 
     # extract features
     # each word start and end position expressed in samples
-    startPositions_samples = (
+    start_positions_samples = (
         (round(fs * filtered_df.loc[:, 'start']) + 1).astype(int).tolist()
     )
-    stopPositions_samples = round(fs * filtered_df.loc[:, 'end']).astype(int).tolist()
+    stop_positions_samples = round(fs * filtered_df.loc[:, 'end']).astype(int).tolist()
 
     # to make sure we don t go beyond the end of the signal
-    assert stopPositions_samples[-1] < len(
+    assert stop_positions_samples[-1] < len(
         audio
     ), "The end of the last phoneme should be inside the signal"
 
     Imax, Imean, Fmax, Fmean, Dur = [], [], [], [], []
     for i in range(len(filtered_df)):
-        range_vowel = range(startPositions_samples[i], stopPositions_samples[i])
+        range_vowel = range(start_positions_samples[i], stop_positions_samples[i])
         Ivowel = intensity[range_vowel]
-        Fvowel = f0Samples[range_vowel]
+        Fvowel = f0_samples[range_vowel]
 
         Imax.append(max(Ivowel))
         Imean.append(np.mean(Ivowel))
@@ -336,17 +344,47 @@ def compute_stress_score(df_segmented, audio, fs=16000):
 
 
 def stress_from_df_segmented_audio(
-    s,
-    df_segmented,
-    phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D",
-    n_words_by_chunk=[
-        7
-    ],  # this parameter is used only when level="sentence". When level="word", it is ignored. This could probably be implemented in a safer way.
-    level="sentence",
-    model=default_model,
-    vowels=cmu_vowels,
-):
+    sound: np.ndarray,
+    df_segmented: pd.DataFrame,
+    phonetics: str,
+    n_words_by_chunk: list[int] | None = None,
+    level: str = "sentence",
+    model: Wav2Vec2ForFramePrediction = default_model,
+    vowels: set[str] = cmu_vowels,
+) -> dict:
+    """Extract stress from a dataframe of segmented phonemes and an audio signal
+
+    Parameters
+    ----------
+    sound : np.array
+        audio signal
+    df_segmented : pd.DataFrame
+        dataframe of segmented phonemes
+    phonetics : str
+        Phonetics, example: "AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D"
+    n_words_by_chunk : list[int], optional
+        Number of words by chunk (used only when level="sentence")
+        For the above phonetics example, would be [7]
+    level: str
+        level of stress extraction. Can be either "word" or "sentence"
+    model : Wav2Vec2ForFramePrediction
+        speech model
+    vowels : set[str]
+        set of vowels
+
+    Returns
+    -------
+    dict
+        stress extraction results, in the form of a dictionary with keys:
+        "status", "stress_intensities", "stress_binaries"
+        Examples:
+         - for sentence stress: {"status": "success", "stress_intensities": [100], "stress_binaries": [1]}
+         - for word stress: {"status": "success", "stress_intensities": [[100]], "stress_binaries": [[1]]}
+    """
     if level == "sentence":
+        assert (
+            n_words_by_chunk is not None
+        ), "n_words_by_chunk should be provided in 'sentence' mode"
         assert sum(n_words_by_chunk) == len(
             phonetics.split(' ')
         ), 'The total number of words by chunk does not correspond to the number of words in phonetics'
@@ -367,7 +405,7 @@ def stress_from_df_segmented_audio(
             }
 
     with CodeTimer('stress extraction'):
-        ws = compute_stress_score(df_segmented, s, fs=model.fs)
+        ws = compute_stress_score(df_segmented, sound, vowels, fs=model.fs)
 
     # TODO: I think I should check for voiceness, but I don't know if I should do it for all vowels
     if sum([el != el for el in ws]) == len(ws):
@@ -378,7 +416,7 @@ def stress_from_df_segmented_audio(
 
     phonetics_indexed_df = phonetics_indexed_df_from_formatted_phonetics(phonetics)
     is_vowel = phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
-    vowels_indexed_df = phonetics_indexed_df[is_vowel]
+    vowels_indexed_df = phonetics_indexed_df[is_vowel].copy()
     # print(vowels_indexed_df)
 
     # assert len(vowels_indexed_df) == len(ws), "n of vowels should be the same as length of vowel stresses"
@@ -452,7 +490,7 @@ def stress_from_formatted_phonetics(
     vowels=cmu_vowels,
 ):
     phonetics = phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
-    audio_status, s, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+    audio_status, sound, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
     if audio_status != "success":
@@ -470,7 +508,7 @@ def stress_from_formatted_phonetics(
         return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
 
     return stress_from_df_segmented_audio(
-        s,
+        sound,
         df_segmented,
         phonetics=phonetics,
         n_words_by_chunk=n_words_by_chunk,
@@ -838,10 +876,12 @@ def list_pairwise_alignment(LISTA, LISTB):
 
     LISTA__, LISTB__, LATtoHAN, HANtoLAT = words_to_unicode_chars(LISTA, LISTB)
     alignments = pairwise2.align.globalxx(LISTA__, LISTB__)
-    RESA, RESB = unicode_chars_to_words(
+    if len(alignments) == 0:
+        return None, None
+    res_a, res_b = unicode_chars_to_words(
         alignments[0].seqA, alignments[0].seqB, LATtoHAN, HANtoLAT
     )
-    return RESA, RESB
+    return res_a, res_b
 
 
 def post_analysis(
@@ -868,7 +908,7 @@ def post_analysis(
     -------
     pd.DataFrame, float, float: dataframe with segmentation,
         phone error rate (after alignment between predicted and expected),
-        cost of the DTW alignment
+        cost of the DTW alignment (normalized by the number of exp. phones)
     """
     split_phonetics = [p.replace('|', '_').split('_') for p in phonetics.split(' ')]
     expected_phoneme_list = remove_stress_annots(sum(split_phonetics, []))
@@ -880,17 +920,22 @@ def post_analysis(
     ) = model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=proba_thresh)
     pred_phoneme_list = max_posterior_df_filtered_processed_threshed.phone.tolist()
 
-    RESA, RESB = list_pairwise_alignment(pred_phoneme_list, expected_phoneme_list)
+    pred_aligned, exp_aligned = list_pairwise_alignment(
+        pred_phoneme_list, expected_phoneme_list
+    )
+    if not pred_aligned and exp_aligned:
+        return None, None, None
 
-    pairwise_align_df = pd.DataFrame([RESB, RESA])
+    pairwise_align_df = pd.DataFrame([exp_aligned, pred_aligned])
     pairwise_align_df.index = ['expected', 'predicted']
 
-    per_aligned = levenshtein_distance(RESB, RESA) / len(RESB)
+    per_aligned = levenshtein_distance(exp_aligned, pred_aligned) / len(exp_aligned)
     # print(f"expected: {RESB}, predicted: {RESA}, error_rate: {error_rate}, per: {per_aligned}")
 
     df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, expected_phoneme_list
     )
+    dtw_cost = -dtw_cost / len(expected_phoneme_list)
 
     if len(df_segmented) == 0:
         return None, per_aligned, dtw_cost
@@ -904,6 +949,7 @@ def post_analysis(
         df_segmented = df_segmented.reset_index(drop=True)
 
     df_segmented['predicted_phones'] = pairwise_align_df.T.predicted
+    df_segmented = df_segmented.reset_index(drop=True)
 
     return df_segmented, per_aligned, dtw_cost
 
@@ -1284,12 +1330,12 @@ def multiple_aspect_from_prob_matrix(
     df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
-    print('multi_aspect: df_segmented computed')
+    # print('multi_aspect: df_segmented computed')
 
     stress_dict = stress_from_df_segmented_audio(
         s, df_segmented, phonetics=phonetics, level="word", model=model, vowels=vowels
     )
-    print('multi_aspect: stress_dict word computed')
+    # print('multi_aspect: stress_dict word computed')
 
     # in the speech tech through API, the phonetics is sent by chunk (list of strings) at flask level,
     # and I build the n_words_by_chunk and re-join the phonetics as 1 string
@@ -1304,13 +1350,13 @@ def multiple_aspect_from_prob_matrix(
         model=model,
         vowels=vowels,
     )
-    print('multi_aspect: stress_dict_sentence computed')
+    # print('multi_aspect: stress_dict_sentence computed')
 
     phonetics_indexed_df = phonetics_indexed_df_from_formatted_phonetics(phonetics)
     is_vowel = phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
     phonetics_indexed_df['is_vowel'] = is_vowel
-    vowels_indexed_df = phonetics_indexed_df[is_vowel]
-    print('multi_aspect: indexes computed')
+    vowels_indexed_df = phonetics_indexed_df[is_vowel].copy()
+    # print('multi_aspect: indexes computed')
 
     clusters = []
     for w_i, w_df in phonetics_indexed_df.groupby('word_idx'):
@@ -1334,7 +1380,7 @@ def multiple_aspect_from_prob_matrix(
                 }
             )
     clusters_df = pd.DataFrame(clusters)
-    print('multi_aspect: clusters_df computed')
+    # print('multi_aspect: clusters_df computed')
 
     # performing vowel contrasts based on the vowels_indexed_df
     vowel_detections = []
@@ -1354,7 +1400,7 @@ def multiple_aspect_from_prob_matrix(
         # {"status": "success", "phonetic_detection": phonetic_detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
     vowel_detections_df = pd.DataFrame(vowel_detections)
     vowels_indexed_df['detection'] = vowel_detections_df.phonetic_detection.tolist()
-    print('multi_aspect: vowels_indexed_df computed')
+    # print('multi_aspect: vowels_indexed_df computed')
 
     cluster_detections = []
     for i, r in clusters_df.iterrows():
@@ -1374,7 +1420,7 @@ def multiple_aspect_from_prob_matrix(
             )
             cluster_detections.append(res)
     cluster_detections_df = pd.DataFrame(cluster_detections)
-    print('multi_aspect: vowels_indexed_df computed')
+    # print('multi_aspect: vowels_indexed_df computed')
 
     clusters_df = clusters_df[clusters_df.cluster != '']
     clusters_df['detection'] = cluster_detections_df.phonetic_detection.tolist()
@@ -1404,48 +1450,46 @@ def multiple_aspect_from_prob_matrix(
             syl_dfs.append(s_df.sort_values('position_idx'))
     final_merged_results = pd.concat(syl_dfs)
 
-    final_merged_results[
-        [
-            "word_idx",
-            "syl_idx",
-            "phones",
-            "detection",
-            "stress_intensities",
-            "stress_binaries_word",
-            "stress_binaries_sentence",
-        ]
-    ].T
-
     return final_merged_results
 
 
 def multiple_aspect_from_formatted_phonetics_audio(
     audio,
-    phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D",
-    vowels=cmu_vowels,
-    max_speech_rate=8,
-    mode='file',
-    model=default_model,
-    to_gibberish=cmu_to_gibberish,
-    **kwargs,
-):
-    phonetics = phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
+    phonetics: str = "AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D",
+    vowels: set = cmu_vowels,
+    max_speech_rate: int = 8,
+    mode: str = "file",
+    model: Wav2Vec2ForFramePrediction = default_model,
+    to_gibberish: dict[str, str] = cmu_to_gibberish,
+) -> (str, pd.DataFrame, pd.DataFrame, float, float):
+    phonetics = cmu_ensure_phonetics_consistency(phonetics)
     audio_status, s, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
 
+    if audio_status != "success":
+        return audio_status, None, None, None, None
+
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
 
-    return multiple_aspect_from_prob_matrix(
-        phone_prob_matrix,
-        s,
-        phonetics=phonetics,
-        vowels=vowels,
-        max_speech_rate=max_speech_rate,
-        mode=mode,
-        model=model,
-        to_gibberish=to_gibberish,
+    segmented_df, per, dtw_cost = post_analysis(phone_prob_matrix, phonetics, model=model)
+
+    return (
+        audio_status,
+        multiple_aspect_from_prob_matrix(
+            phone_prob_matrix,
+            s,
+            phonetics=phonetics,
+            vowels=vowels,
+            max_speech_rate=max_speech_rate,
+            mode=mode,
+            model=model,
+            to_gibberish=to_gibberish,
+        ),
+        segmented_df,
+        per,
+        dtw_cost,
     )
 
 

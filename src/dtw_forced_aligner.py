@@ -132,7 +132,13 @@ class dtw_forced_aligner:
         """
         Compute the collapsed probability vector of every phoneme alignment.
 
-        collapse_method is 'mean' or 'max'. It means we either use mean pooling or max pooling across time to have a probability vector
+        Given a set of frames matched to a target phone through the DTW,
+        collapse the phone probabilities of the frames to a single probability vector.
+        The collapse_method is 'mean' or 'max', ie we either use mean pooling or max
+        pooling across time.
+
+        The predicted phones are the phones with the
+        highest probability in the collapsed probability vectors.
 
         Args:
             aligned_phones (list): The list of aligned phonemes.
@@ -242,12 +248,10 @@ class dtw_forced_aligner:
 
         def collapse_consecutive_duplicates(df):
             df = df.reset_index(drop=True)
-            blocks = []
 
             groups = df.groupby([(df.phones != df.phones.shift()).cumsum()])
             new_df = groups.first().reset_index(drop=True)
-            ends = groups.last().end
-            new_df["end"] = ends
+            new_df["end"] = groups.last().end.reset_index(drop=True)
             return new_df
 
         def divide_consecutive_duplicates(p_df, phone_list):
@@ -319,19 +323,31 @@ class dtw_forced_aligner:
         return phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx
 
     def probas_to_df_segmented(
-        self, phone_prob_matrix, target_phonemes, time_per_output=0.02
+        self,
+        phone_prob_matrix: np.ndarray,
+        target_phonemes: list[str],
+        time_per_output: float = 0.02,
     ):
         """
         Convert probability matrix to a segmented DataFrame.
 
-        Args:
-            phone_prob_matrix (np.array[float]): The phone probability matrix possibly contanining silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
-            target_phonemes (list): The list of target phonemes.
-            time_per_output (float, optional): The time per output. Defaults to 0.02.
+        Parameters
+        ----------
+        phone_prob_matrix (np.array[float]):
+            The phone probability matrix possibly contanining silent frames.
+            It is of shape T x (N+1), where T is the number of frames and N is the number of phones.
+            (N+1) because we include the silent sound.
+        target_phonemes (list):
+            The list of target phonemes.
+        time_per_output (float, optional):
+            The time between frames in seconds. Defaults to 0.02.
 
         Returns:
-            pd.DataFrame: The segmented DataFrame.
-            float: the DTW aligment cost value
+        --------
+        pd.DataFrame:
+            The segmented DataFrame.
+        float:
+            the DTW aligment cost value
         """
         (
             phone_prob_matrix_nonsil,
