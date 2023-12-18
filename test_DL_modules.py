@@ -199,7 +199,7 @@ def test_particular_cases():
     with CodeTimer('whole phone prediction'):
         # df_segmented = default_model.predict_with_timings(s, remove_stress_annots(split_phonetics))
         phone_prob_matrix = default_model.predict_phone_prob_matrix(s, default_model.fs)
-        df_segmented = default_model.phone_prob_matrix_segmentation(
+        df_segmented, _ = default_model.phone_prob_matrix_segmentation(
             phone_prob_matrix, remove_stress_annots(split_phonetics)
         )
 

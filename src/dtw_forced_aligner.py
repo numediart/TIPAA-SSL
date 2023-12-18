@@ -58,18 +58,24 @@ class dtw_forced_aligner:
         """
         Perform forced alignment to get the most likely path using Dynamic Time Warping.
 
-        with N phonemes + silence token, phone_prob_matrix_nonsil is of shape T x (N+1). let's call L the length of the phoneme sequence.
-        phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
-        for each phoneme of the sequence, we extract a number for each time step that is a similarity measure between the frame proba and the phoneme, i.e. a dot product divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
+        With N phonemes + silence token, phone_prob_matrix_nonsil is of shape T x (N+1).
+        Let's call L the length of the phoneme sequence.
+        phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition
+        (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
+        For each phoneme of the sequence, we extract a number for each time step that is a
+        similarity measure between the frame proba and the phoneme, i.e. a dot product
+        divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
         if it is a one-hot, a dot product is equivalent as just taking the element with that index from the prob vector.
 
         Args:
-            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for non-silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for
+                non-silent frames. It is of shape T x (N+1), where T is
+                the number of frames and N is the number of phonemes.
             target_phonemes (list): The list of target phonemes.
 
         Returns:
-            Tuple[bool, List[str]]: A tuple containing a boolean indicating the success of forced alignment and the list of aligned phonemes.
-
+            Tuple[bool, List[str], float]: A tuple containing a boolean indicating the
+                success of forced alignment, the list of aligned phonemes, the DTW alignment cost
         """
 
         # one_hot_matrix=np.zeros((len(self.id_to_p), len(target_phonemes)))
@@ -92,12 +98,12 @@ class dtw_forced_aligner:
                 aligned_phones_labels.insert(0, target_labels[index])
             # using the label encoder to find the phoneme
             aligned_phones = [self.id_to_p[el] for el in aligned_phones_labels]
-            return True, aligned_phones
+            return True, aligned_phones, D[-1, -1]
         except ParameterError:
-            print('DTW failed, most probably the audio is too far from what is expected.')
+            # print('DTW failed, most probably the audio is too far from what is expected.')
             aligned_phones = ["[SIL]"] * len(phone_prob_matrix_nonsil)
 
-            return False, aligned_phones
+            return False, aligned_phones, None
 
     # forced alignment but with all the audio sample's frames
     def get_alignment_with_silence(
@@ -239,11 +245,10 @@ class dtw_forced_aligner:
             blocks = []
 
             groups = df.groupby([(df.phones != df.phones.shift()).cumsum()])
-            for i, g in groups:
-                r = g.iloc[0]
-                r.end = g.iloc[-1].end
-                blocks.append(r.to_dict())
-            return pd.DataFrame.from_records(blocks)
+            new_df = groups.first().reset_index(drop=True)
+            ends = groups.last().end
+            new_df["end"] = ends
+            return new_df
 
         def divide_consecutive_duplicates(p_df, phone_list):
             grouped_phone_list = group_consecutive_duplicates(phone_list)
@@ -326,6 +331,7 @@ class dtw_forced_aligner:
 
         Returns:
             pd.DataFrame: The segmented DataFrame.
+            float: the DTW aligment cost value
         """
         (
             phone_prob_matrix_nonsil,
@@ -333,7 +339,7 @@ class dtw_forced_aligner:
             non_silence_frames_idx,
         ) = self.get_phone_prob_matrix_nonsil(phone_prob_matrix)
 
-        status, aligned_phones = self.get_forced_alignment(
+        status, aligned_phones, dtw_cost = self.get_forced_alignment(
             phone_prob_matrix_nonsil, target_phonemes
         )
 
@@ -356,5 +362,6 @@ class dtw_forced_aligner:
             )
         else:
             df_segmented = pd.DataFrame()
+            dtw_cost = None
 
-        return df_segmented
+        return df_segmented, dtw_cost

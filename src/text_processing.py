@@ -34,7 +34,7 @@ drop_consecutive_duplicate_elements = lambda L: [key for key, _group in groupby(
 split_phonetics = lambda phonetics: [
     [s.split('_') for s in w.split('|')] for w in phonetics.split(' ')
 ]
-group_consecutive_duplicates = lambda L: [(k, sum(1 for i in g)) for k, g in groupby(L)]
+group_consecutive_duplicates = lambda L: [(k, len(list(g))) for k, g in groupby(L)]
 
 from src.pronunciation_dictionaries import (
     unstress,

@@ -460,7 +460,7 @@ def stress_from_formatted_phonetics(
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
     phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
 
@@ -584,7 +584,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
             "gibberish_detected": "null",
         }
     phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
 
@@ -666,7 +666,7 @@ def schwa_sound_from_formatted_phonetics_audio(
             "gibberish_detected": "null",
         }
     phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
 
@@ -927,7 +927,7 @@ def start_end_contrast_from_prob_matrix(
     )
 
     phoneme_list = sum(split_phonetics_by_words, [])
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
     df_word = extract_word(df_segmented, split_phonetics_by_words, target_word_idx)
@@ -1259,7 +1259,7 @@ def multiple_aspect_from_prob_matrix(
     **kwargs,
 ):
     phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
     print('multi_aspect: df_segmented computed')
@@ -1679,7 +1679,7 @@ def use_tests():
     audio, fs = read_audio_file(path, fs=16000)
     phone_prob_matrix = default_model.predict_phone_prob_matrix(s, default_model.fs)
     phoneme_list = 'IH1_T'.replace(' ', '_').replace('|', '_').split('_')
-    df_segmented = default_model.phone_prob_matrix_segmentation(
+    df_segmented, _ = default_model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
 
@@ -1689,7 +1689,7 @@ def use_tests():
     self = default_model_ipa
     phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
     phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
-    df_segmented = default_model_ipa.phone_prob_matrix_segmentation(
+    df_segmented, _ = default_model_ipa.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
 

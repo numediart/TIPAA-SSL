@@ -99,9 +99,10 @@ class charsiu_phone_forced_aligner(charsiu_forced_aligner):
 charsiu_phone_forced_aligner.audio_to_phone_prob_matrix = (
     Wav2Vec2ForFramePrediction.audio_to_phone_prob_matrix
 )
-charsiu_phone_forced_aligner.phone_prob_matrix_segmentation = (
-    Wav2Vec2ForFramePrediction.phone_prob_matrix_segmentation
-)
+(
+    charsiu_phone_forced_aligner.phone_prob_matrix_segmentation,
+    _,
+) = Wav2Vec2ForFramePrediction.phone_prob_matrix_segmentation
 
 
 def use_tests():

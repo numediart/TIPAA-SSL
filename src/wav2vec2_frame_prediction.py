@@ -474,7 +474,9 @@ class Wav2Vec2ForFramePrediction:
             max_posterior_df_filtered_processed_threshed,
         )
 
-    def phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list):
+    def phone_prob_matrix_segmentation(
+        self, phone_prob_matrix: np.ndarray, phoneme_list: list[str]
+    ) -> tuple(pd.DataFrame, float):
         """
         Performs forced alignment segmentation on a probability matrix of phonemes.
 
@@ -494,7 +496,7 @@ class Wav2Vec2ForFramePrediction:
             else:
                 self.pred_phones_audio = []
                 # TODO: declare model.status to be that nothing expected was detected and use that in calls of this function, among other things in pronunciation aspect functions
-        return df_segmented
+        return df_segmented, dtw_cost
 
 
 def train_Wav2Vec2ForFramePrediction_model():
@@ -667,7 +669,7 @@ def inference_demo():
 
     # phoneme predictions on a single audio sample with forced alignment
     phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, data.cmu_phones.iloc[0]
     )
 
@@ -679,7 +681,7 @@ def inference_demo():
     )
     model.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
     phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, data.phone_df.iloc[0].phone.tolist()
     )
 
