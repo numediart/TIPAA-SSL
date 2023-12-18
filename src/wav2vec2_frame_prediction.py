@@ -391,64 +391,81 @@ class Wav2Vec2ForFramePrediction:
         else:
             return audio_status, s, None
 
-    def max_posterior_phone_df(self, phone_prob_df, proba_thresh=0.5):
+    def max_posterior_phone_df(
+        self, phone_prob_df: pd.DataFrame, proba_thresh: float = 0.5
+    ) -> tuple(pd.DataFrame, pd.DataFrame, pd.DataFrame):
         """
-        Computes the maximum posterior probability of each phoneme from a DataFrame of phoneme probabilities.
+        Computes the maximum posterior probability of each phoneme from a DataFrame
+        of phoneme probabilities.
 
         Args:
         - phone_prob_df: The DataFrame of phoneme probabilities.
-        - proba_thresh (float): The probability threshold.
+        - proba_thresh (float): The probability threshold, by default 0.5.
 
         Returns:
         - max_posterior_df: The DataFrame of maximum posterior probabilities.
-        - max_posterior_df_filtered_processed: The processed (no silences, collapsed per phoneme instead of per frame) DataFrame of maximum posterior probabilities.
-        - max_posterior_df_filtered_processed_threshed: The thresholded (remove phones with to low posterior probability) DataFrame of maximum posterior probabilities.
+        - max_posterior_df_filtered_processed: The processed (no silences, collapsed
+            per phoneme instead of per frame) DataFrame of maximum posterior probabilities.
+        - max_posterior_df_filtered_processed_threshed: The thresholded
+          (remove phones with to low posterior probability) DataFrame of maximum posterior probabilities.
         """
-        phone_prob_df.max(axis=1)
         max_idxs = np.argmax(phone_prob_df, axis=1)
-        phone_prob_df.argmax(axis=1)
 
         alphabet = self.alphabet + ['[SIL]']
 
-        max_posterior_df = pd.DataFrame()
-        max_posterior_df['phone'] = [alphabet[i] for i in max_idxs]
-        max_posterior_df['proba'] = phone_prob_df.max(axis=1)
+        max_posterior_df = pd.DataFrame({"max_idx": max_idxs})
+        max_posterior_df["phone"] = max_posterior_df.max_idx.apply(lambda x: alphabet[x])
+        max_posterior_df["proba"] = phone_prob_df.max(axis=1)
 
         max_posterior_df_filtered = max_posterior_df[max_posterior_df.phone != "[SIL]"]
 
-        groups = group_consecutive_duplicates(max_posterior_df_filtered.phone)
-        n_frame_per_phoneme = [el[-1] for el in groups]
-        cumsum = np.cumsum(n_frame_per_phoneme)
+        # group consecutive duplicates
+        max_posterior_df_filtered["idx_for_merging"] = (
+            max_posterior_df_filtered["max_idx"].diff().ne(0).cumsum()
+        )
 
-        start = 0
-        records = []
-        for end in cumsum:
-            phone_df = max_posterior_df_filtered[start:end]
-            phone = phone_df.phone.iloc[0]
+        def merging(x):
+            d = {}
+            d["phone"] = x["phone"].iloc[0]
+            d["n_frames"] = len(x)
+            d["probas"] = x["proba"].tolist()
+            d["max_proba"] = x["max_proba"].max()
+            d["mean_proba"] = np.mean(d["probas"])
+            return pd.Series(d)
 
-            assert (
-                len(phone_df.phone.unique()) == 1
-            ), "We grouped the dataframe per duplicate phones, so this dataframe should be of length 1"
-
-            probas = phone_df.proba.tolist()
-            record = {
-                'phone': phone,
-                'n_frames': len(phone_df),
-                'probas': probas,
-                'max_proba': max(probas),
-                'mean_proba': np.mean(probas),
-            }
-            records.append(record)
-
-            start = end
-        max_posterior_df_filtered_processed = pd.DataFrame(records)
-        # max_posterior_df_filtered=max_posterior_df[max_posterior_df.proba>proba_thresh][max_posterior_df.phone!="[SIL]"]
-        # max_posterior_df_filtered_collapsed=max_posterior_df_filtered.sort_values('proba', ascending=False).drop_duplicates('phone').sort_index()
+        max_posterior_df_filtered_processed = (
+            max_posterior_df_filtered.groupby("idx_for_merging")
+            .apply(merging)
+            .reset_index(drop=True)
+        )
+        max_posterior_df_filtered.drop(columns="idx_for_merging", inplace=True)
 
         max_posterior_df_filtered_processed_threshed = (
             max_posterior_df_filtered_processed[
                 max_posterior_df_filtered_processed.max_proba > proba_thresh
-            ]
+            ].copy()
+        )
+
+        # regroup once more, since after thresholding we may once again have duplicates
+        df = max_posterior_df_filtered_processed_threshed
+
+        df["idx_for_merging"] = df["max_idx"].diff().ne(0).cumsum()
+
+        def merging(x):
+            d = {}
+            d["phone"] = x["phone"].iloc[0]
+            d["n_frames"] = x["n_frames"].sum()
+            d["probas"] = sum([], x["probas"])
+            d["max_proba"] = x["max_proba"].max()
+            # do a weighted average by number of frames from the previous grouping
+            d["mean_proba"] = np.mean(x["n_frames"] * x["mean_proba"]) / d["n_frames"]
+            return pd.Series(d)
+
+        max_posterior_df_filtered_processed_threshed = (
+            df.groupby("idx_for_merging").apply(merging).reset_index(drop=True)
+        )
+        max_posterior_df_filtered_processed_threshed.drop(
+            columns="idx_for_merging", inplace=True
         )
 
         return (
