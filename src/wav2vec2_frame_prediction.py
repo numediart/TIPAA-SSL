@@ -455,7 +455,7 @@ class Wav2Vec2ForFramePrediction:
             d = {}
             d["phone"] = x["phone"].iloc[0]
             d["n_frames"] = x["n_frames"].sum()
-            d["probas"] = sum([], x["probas"])
+            d["probas"] = sum(x["probas"], [])
             d["max_proba"] = x["max_proba"].max()
             # do a weighted average by number of frames from the previous grouping
             d["mean_proba"] = np.mean(x["n_frames"] * x["mean_proba"]) / d["n_frames"]

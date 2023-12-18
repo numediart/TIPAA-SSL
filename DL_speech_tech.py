@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from syllabipy.sonoripy import SonoriPy
 from linetimer import CodeTimer
+from nltk.metrics.distance import edit_distance as levenshtein_distance
 
 print_memory_usage("RAM - DL_speech_tech after external dependencies")
 from src.audio_processing import getIntonation, getIntensity, normalize
@@ -824,7 +825,8 @@ def phonetic_reference_processing(
 
 
 from Bio import pairwise2
-from scripts.mfa_utils import words_to_unicode_chars, unicode_chars_to_words
+
+from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
 
 
 def list_pairwise_alignment(LISTA, LISTB):
@@ -843,35 +845,55 @@ def list_pairwise_alignment(LISTA, LISTB):
 
 
 def post_analysis(
-    phone_prob_matrix, phonetics='T_ER1_N_D ER0|AW1_N_D', model=default_model
+    phone_prob_matrix: np.ndarray,
+    phonetics: str,
+    model: Wav2Vec2ForFramePrediction = default_model,
+    proba_thresh: float = 0.5,
 ):
+    """Verify matching between predicted phones and expected phones.
+    Useful for rejecting recordings which do not match the assignment.
+
+    Parameters
+    ----------
+    phone_prob_matrix : np.ndarray
+        Phone probability matrix from the model
+    phonetics : str
+        Expected phonetics (word or sentence)
+    model : Wav2Vec2ForFramePrediction, optional
+        Model to use, by default default_model
+    proba_thresh : float, optional
+        Probability threshold for phone prediction, by default 0.5
+
+    Returns
+    -------
+    pd.DataFrame, float, float: dataframe with segmentation,
+        phone error rate (after alignment between predicted and expected),
+        cost of the DTW alignment
+    """
     split_phonetics = [p.replace('|', '_').split('_') for p in phonetics.split(' ')]
-    phoneme_list = remove_stress_annots(sum(split_phonetics, []))
+    expected_phoneme_list = remove_stress_annots(sum(split_phonetics, []))
 
     (
         max_posterior_df,
         max_posterior_df_filtered_processed,
         max_posterior_df_filtered_processed_threshed,
-    ) = model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.5)
+    ) = model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=proba_thresh)
+    pred_phoneme_list = max_posterior_df_filtered_processed_threshed.phone.tolist()
 
-    # the phonetics come from 2 different sources, they are hopefully similar but probably not identical
-    # because of that, I have to do pairwise alignment to retrieve the index in the mfa phonetics
-    RESA, RESB = list_pairwise_alignment(
-        max_posterior_df_filtered_processed_threshed.phone.tolist(), phoneme_list
-    )
+    RESA, RESB = list_pairwise_alignment(pred_phoneme_list, expected_phoneme_list)
 
     pairwise_align_df = pd.DataFrame([RESB, RESA])
     pairwise_align_df.index = ['expected', 'predicted']
 
-    if '-' in pairwise_align_df.T.expected.tolist():
-        error_rate = pairwise_align_df.T.expected.value_counts()['-'] / len(phoneme_list)
-    else:
-        error_rate = 0
+    per_aligned = levenshtein_distance(RESB, RESA) / len(RESB)
+    # print(f"expected: {RESB}, predicted: {RESA}, error_rate: {error_rate}, per: {per_aligned}")
 
-    df_segmented = model.phone_prob_matrix_segmentation(phone_prob_matrix, phoneme_list)
+    df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
+        phone_prob_matrix, expected_phoneme_list
+    )
 
     if len(df_segmented) == 0:
-        return None, error_rate
+        return None, per_aligned, dtw_cost
 
     df_segmented['n_frames'] = df_segmented.end_idx - df_segmented.start_idx
     # insert a row at the dashes position by using float indexing
@@ -883,7 +905,7 @@ def post_analysis(
 
     df_segmented['predicted_phones'] = pairwise_align_df.T.predicted
 
-    return df_segmented, error_rate
+    return df_segmented, per_aligned, dtw_cost
 
 
 def start_end_contrast_from_prob_matrix(
