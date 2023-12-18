@@ -193,8 +193,8 @@ class dtw_forced_aligner:
             pd.DataFrame: The segmented DataFrame.
         """
 
-        print(alignment_with_silence)
-        print(phones)
+        # print(alignment_with_silence)
+        # print(phones)
 
         start_idx = []
         end_idx = []
@@ -217,7 +217,7 @@ class dtw_forced_aligner:
         timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
         timings_df = pd.DataFrame(timings)
 
-        print(timings_df)
+        # print(timings_df)
 
         df_segmented = pd.DataFrame(columns=['phones', 'start_idx', 'end_idx'])
 

@@ -329,10 +329,10 @@ class Wav2Vec2ForFramePrediction:
         # phone_prob_matrix = phone_prob_matrix[:,:-1]
         self.phone_prob_matrix = phone_prob_matrix
 
-        print(
-            'times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba'
-        )
-        print(self.timestamps)
+        # print(
+        #     'times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba'
+        # )
+        # print(self.timestamps)
         return phone_prob_matrix
 
     def audio_to_phone_prob_matrix(
@@ -486,9 +486,10 @@ class Wav2Vec2ForFramePrediction:
 
         Returns:
         - df_segmented: The segmented DataFrame.
+        - dtw_cost: The final DTW alignment cost value
         """
-        with CodeTimer('DTW'):
-            df_segmented = self.forced_aligner.probas_to_df_segmented(
+        with CodeTimer('DTW', silent=True):
+            df_segmented, dtw_cost = self.forced_aligner.probas_to_df_segmented(
                 phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output
             )
             if len(df_segmented) > 0:
