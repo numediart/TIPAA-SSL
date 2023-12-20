@@ -4,34 +4,35 @@ print_memory_usage = lambda stage: print(
     stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
 )
 
-from performance_functions import (
-    pContrast_on_synth_words,
-    final_ed_from_audiobook_data,
-    final_s_from_audiobook_data,
-    stress_GE_performance_test,
-)
-from DL_speech_tech import (
-    default_model,
-    stress_from_formatted_phonetics,
-    phonemeContrast_from_formatted_phonetics_audio,
-    start_end_contrast_from_formatted_phonetics_audio,
-    compute_stress_score,
-    multiple_aspect_from_formatted_phonetics_audio,
-)
-
-from src.audio_processing import prepare_audio_file, read_audio_file
-from src.text_processing import (
-    prefill_for_sentence,
-    get_augmented_mfa_dict,
-    chunk_text,
-    remove_stress_annots,
-)
-from src.label_data_processing import actor_recordings
 import base64
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
-from linetimer import CodeTimer
 
 import pandas as pd
+from linetimer import CodeTimer
+
+from DL_speech_tech import (
+    MAX_PER_FOR_ACCEPTANCE,
+    compute_stress_score,
+    default_model,
+    multiple_aspect_from_formatted_phonetics_audio,
+    phonemeContrast_from_formatted_phonetics_audio,
+    start_end_contrast_from_formatted_phonetics_audio,
+    stress_from_formatted_phonetics,
+)
+from performance_functions import (
+    final_ed_from_audiobook_data,
+    final_s_from_audiobook_data,
+    pContrast_on_synth_words,
+    stress_GE_performance_test,
+)
+from src.audio_processing import prepare_audio_file, read_audio_file
+from src.label_data_processing import actor_recordings
+from src.pronunciation_dictionaries import cmu_consonants, cmu_vowels
+from src.text_processing import (
+    chunk_text,
+    get_augmented_mfa_dict,
+    prefill_for_sentence,
+    remove_stress_annots,
+)
 
 
 def a_test_pConstrast():
@@ -77,7 +78,11 @@ def DL_speech_tech_functions(model=default_model):
     # encode_string = base64.b64encode(open(path, "rb").read())
     # formatted_phonetics=prefill_for_sentence('During the nineteen sixties Gregory became active in civil rights')['phonetics']
 
-    detection_df = multiple_aspect_from_formatted_phonetics_audio(
+    (
+        audio_status,
+        detection_df,
+        post_analysis_results,
+    ) = multiple_aspect_from_formatted_phonetics_audio(
         encode_string,
         phonetics=formatted_phonetics,
         max_speech_rate=8,
@@ -87,6 +92,10 @@ def DL_speech_tech_functions(model=default_model):
     assert (
         sum(detection_df.phones != detection_df.detection) / len(detection_df) < 0.2
     ), "Test example has a too high phoneme error rate"
+    assert (
+        post_analysis_results
+        and post_analysis_results.per_aligned < MAX_PER_FOR_ACCEPTANCE
+    ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
 
     # try with nonsense phonetics
     # df.text[df.text.str.split(' ').apply(len)==1]
@@ -94,7 +103,11 @@ def DL_speech_tech_functions(model=default_model):
     row = df[df.text == 'it'].iloc[0]
     s, fs = read_audio_file(row.audio_file_url, fs=16000)
     formatted_phonetics = row.cmu_phonetics
-    detection_df = multiple_aspect_from_formatted_phonetics_audio(
+    (
+        audio_status,
+        detection_df,
+        post_analysis_results,
+    ) = multiple_aspect_from_formatted_phonetics_audio(
         s, phonetics=formatted_phonetics, max_speech_rate=8, mode='numpy', model=model
     )
 
@@ -103,8 +116,11 @@ def DL_speech_tech_functions(model=default_model):
         assert (
             sum(detection_df.phones != detection_df.detection) / len(detection_df) == 0
         ), "Test example has a too high phoneme error rate.The audio contains a native pronunciation of 'IH1_T'"
+        assert (
+            post_analysis_results
+            and post_analysis_results.per_aligned < MAX_PER_FOR_ACCEPTANCE
+        ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
 
-    df[df.text == 'One *hundred* percent.'].text
     row = df[df.text == 'One *hundred* percent.'].iloc[0]
     s, fs = read_audio_file(row.audio_file_url, fs=16000)
 
@@ -205,7 +221,7 @@ def test_particular_cases():
 
     # with CodeTimer('stress extraction'): ws=model.compute_stress_score(s,phonetics)
     with CodeTimer('stress extraction'):
-        ws = compute_stress_score(df_segmented, s, fs=default_model.fs)
+        ws = compute_stress_score(df_segmented, s, vowels=cmu_vowels, fs=default_model.fs)
 
 
 def a_test_stress_detection():
