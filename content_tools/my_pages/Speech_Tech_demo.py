@@ -12,25 +12,7 @@ from utils import (
 
 from DL_speech_tech import MAX_PER_FOR_ACCEPTANCE
 
-progress_bar = st.sidebar.progress(0)
-status_text = st.sidebar.empty()
-
-
-def report_function(i, title=""):
-    status_text.text(title + " %i%% Complete" % i)
-    progress_bar.progress(i)
-
-
 st.title("Speech Tech Demo")
-
-
-# @st.experimental_memo
-@st.cache_data
-def process(json_str):
-    sentences = [el for el in json_str.split('\n') if el != '']
-    df, df_errors = prefill_content(sentences)
-
-    return df
 
 
 # if check_password():
@@ -50,40 +32,72 @@ if True:
         formatted_phonetics_mod = st.text_input(
             "Adjust phonetics if needed:", value=formatted_phonetics
         )
-        # st.text(formatted_phonetics)
 
-        wav_audio_data = st_audiorec()
-        if wav_audio_data is not None:
-            # display audio data as received on the backend
-            # st.audio(wav_audio_data, format='audio/wav')
+        st.markdown("Either record yourself:")
 
-            if st.button("Run Analysis"):
+        wav_audio_data_rec = st_audiorec()
+
+        audio_upload = st.file_uploader(
+            "Or upload an audio file:", type=["wav", "mp3", "ogg"]
+        )
+
+        if wav_audio_data_rec is not None or audio_upload is not None:
+            if wav_audio_data_rec is not None:
+                wav_audio_data = wav_audio_data_rec
+                audio_type = "audio/wav"
+                data_used = "recording"
+            elif audio_upload is not None:
+                wav_audio_data = audio_upload.getvalue()
+                file_name = audio_upload.name.lower()
+                if file_name.endswith(".mp3"):
+                    audio_type = "audio/mp3"
+                elif file_name.endswith(".ogg"):
+                    audio_type = "audio/ogg"
+                else:
+                    audio_type = "audio/wav"
+                # display audio data as received
+                st.audio(wav_audio_data, format=audio_type)
+                data_used = "upload"
+
+            if st.button(f"Run Analysis (using {data_used})"):
                 (
                     audio_status,
                     detection_df,
-                    segmented_df,
-                    per,
-                    dtw_cost,
+                    post_analysis_results,
                 ) = multiple_aspect_from_formatted_phonetics_audio(
                     wav_audio_data, phonetics=formatted_phonetics_mod, mode="bytes"
                 )
-                st.markdown("## Results\n### Mutiple speech aspect detection")
-                st.markdown("Audio check status: " + audio_status)
-                st.dataframe(detection_df)
-                st.markdown(
-                    f"""
-                    ### Post analysis
-                     - Phone error rate (lower is better): {per:.2f}
-                     - DTW cost (higher is better): {dtw_cost:.2f}"""
-                )
-                if per is None:
-                    st.error("Recording should be rejected (PER: None)")
-                elif per > MAX_PER_FOR_ACCEPTANCE:
-                    st.error(
-                        f"Recording should be rejected (PER: {per:.2f} > {MAX_PER_FOR_ACCEPTANCE:.2f})"
-                    )
+
+                st.markdown("## Results")
+                st.markdown("Basic audio check status: " + audio_status)
+
+                st.markdown("### Mutiple speech aspect detection")
+                st.dataframe(detection_df, hide_index=True)
+
+                st.markdown("### Post analysis")
+                if post_analysis_results is None:
+                    st.error("Recording should be rejected (pairwise alignment failed)")
+                elif post_analysis_results.df_segmented is None:
+                    st.error("Recording should be rejected (DTW failed)")
                 else:
-                    st.success(
-                        f"Recording should be accepted (PER: {per:.2f} <= {MAX_PER_FOR_ACCEPTANCE:.2f})"
+                    per = post_analysis_results.per_aligned
+                    st.markdown(
+                        f"""
+                        - Detected phones: {" ".join(post_analysis_results.predicted_phones)}
+                        - Detected aligned phones: {" ".join(post_analysis_results.predicted_aligned_phones)}
+                        - Expected aligned phones: {" ".join(post_analysis_results.expected_aligned_phones)}
+                        - Phone error rate (lower = better matching): {per:.2f}
+                        - DTW cost (higher = better matching): {post_analysis_results.dtw_cost:.2f}
+                        - Silent frame ratio: {post_analysis_results.silent_frame_ratio:.2f} (fraction of silent frames in the raw recording)
+                        - Phone count ratio: {post_analysis_results.phone_count_ratio:.2f} (ratio of number of detected phones over expected phones)
+                        """
                     )
-                st.dataframe(segmented_df)
+                    if per > MAX_PER_FOR_ACCEPTANCE:
+                        st.error(
+                            f"Recording should be rejected (PER: {per:.2f} > {MAX_PER_FOR_ACCEPTANCE:.2f})"
+                        )
+                    else:
+                        st.success(
+                            f"Recording should be accepted (PER: {per:.2f} <= {MAX_PER_FOR_ACCEPTANCE:.2f})"
+                        )
+                    st.dataframe(post_analysis_results.df_segmented, hide_index=True)
