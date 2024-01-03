@@ -60,7 +60,7 @@ def prepare_audio_file(audio_file, fs=16000):
 
 
 # signal processing (pitch, instensity, normalization...)
-def getf0Samples(s, fs):
+def getf0Samples(s: np.ndarray, fs: int) -> np.ndarray:
     """Uses pyworld vocoder to extract fundamental frequency of the signal in Hz
     and converts it in semitones. And then upsample up to signal length
 
@@ -92,7 +92,7 @@ def getf0Samples(s, fs):
     return f0Samples
 
 
-def getIntonation(s, fs):
+def getIntonation(s: np.ndarray, fs: int) -> np.ndarray:
     f0Samples = getf0Samples(s, fs)
     # replace nans with minimum value
     f0Samples = np.nan_to_num(f0Samples, nan=np.nanmin(f0Samples))
@@ -268,7 +268,9 @@ def align_audios(
     return out
 
 
-def read_audio_file(audio_file, fs=16000):
+def read_audio_file(
+    audio_file: str | io.IOBase, fs: int = 16000
+) -> tuple[np.ndarray, int]:
     """
     -audio file is a path or file-like object
     -then read that with "soundfile" when possible, else with "pydub"
@@ -291,9 +293,8 @@ def read_audio_file(audio_file, fs=16000):
         orig_sr = audio.frame_rate
 
     # if the signal is a 2D array, we take the first channel only to have a 1D array
-    if len(s.shape) > 1:
-        if s.shape[-1] == 2:
-            s = s[:, 0]
+    if len(s.shape) > 1 and s.shape[-1] == 2:
+        s = s[:, 0]
     # if len(s) is 0, stop here, don't try to resample it, it will throw an error
     if len(s) == 0:
         return s, fs
@@ -324,9 +325,8 @@ def audio64_from_file(path, fs=16000):
     # writing bytes of an ogg file with virtual io, then encoding with base64
     try:
         s, orig_sr = sf.read(path)
-        if len(s.shape) > 1:
-            if s.shape[-1] == 2:
-                s = s[:, 0]
+        if len(s.shape) > 1 and s.shape[-1] == 2:
+            s = s[:, 0]
         s = librosa.resample(s, orig_sr=orig_sr, target_sr=fs)
     except:
         s, fs = librosa.load(path, sr=fs)

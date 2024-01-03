@@ -1,11 +1,13 @@
 import streamlit as st
 from st_audiorec import st_audiorec
 
+from src.wav2vec2_frame_prediction import AudioMode
+from DL_speech_tech import multiple_aspect_from_formatted_phonetics_audio
+
 st.set_page_config(page_icon="✂️", page_title="Speech Tech Demo")
 
 from utils import (
     check_password,
-    multiple_aspect_from_formatted_phonetics_audio,
     prefill_content,
     prefill_for_sentence,
 )
@@ -32,6 +34,7 @@ if True:
         formatted_phonetics_mod = st.text_input(
             "Adjust phonetics if needed:", value=formatted_phonetics
         )
+        assert formatted_phonetics_mod is not None
 
         st.markdown("Either record yourself:")
 
@@ -58,18 +61,23 @@ if True:
                 # display audio data as received
                 st.audio(wav_audio_data, format=audio_type)
                 data_used = "upload"
+            else:
+                raise ValueError("No audio data")
 
             if st.button(f"Run Analysis (using {data_used})"):
                 (
-                    audio_status,
+                    audio_load,
                     detection_df,
                     post_analysis_results,
                 ) = multiple_aspect_from_formatted_phonetics_audio(
-                    wav_audio_data, phonetics=formatted_phonetics_mod, mode="bytes"
+                    wav_audio_data,
+                    phonetics=formatted_phonetics_mod,
+                    mode=AudioMode.BYTES,
                 )
+                print(audio_load)
 
                 st.markdown("## Results")
-                st.markdown("Basic audio check status: " + audio_status)
+                st.markdown("Basic audio check status: " + str(audio_load.status))
 
                 st.markdown("### Mutiple speech aspect detection")
                 st.dataframe(detection_df, hide_index=True)
@@ -90,6 +98,7 @@ if True:
                         - DTW cost (higher = better matching): {post_analysis_results.dtw_cost:.2f}
                         - Silent frame ratio: {post_analysis_results.silent_frame_ratio:.2f} (fraction of silent frames in the raw recording)
                         - Phone count ratio: {post_analysis_results.phone_count_ratio:.2f} (ratio of number of detected phones over expected phones)
+                        - Pitch ratio: {audio_load.pitch_frame_ratio:.2f} (ratio of pitch in the raw recording over expected pitch)
                         """
                     )
                     if per > MAX_PER_FOR_ACCEPTANCE:

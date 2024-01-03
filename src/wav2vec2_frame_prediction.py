@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from enum import Enum, auto
 import pandas as pd
 import numpy as np
 import pickle
@@ -32,11 +34,73 @@ cmu_consonants = [p[0] for p in cmu_phones_info if p[1][0] != 'vowel']
 
 import soundfile as sf
 from scipy.io.wavfile import read
-from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
+from src.audio_processing import (
+    getIntonation,
+    read_audio_file,
+    read_audio_string,
+    read_audio_bytes,
+)
 from linetimer import CodeTimer
 
 
-def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
+class AudioStatus(Enum):
+    SUCCESS = "success"
+    EMPTY = "error, audio is empty (has zero sample)"
+    TOO_SHORT = "error, audio is too short compared to the expected number of syllables"
+    TOO_LONG = "error, audio is too long compared to the expected number of syllables"
+    NO_SOUND = "error, no voiced sound detected (only 0's in waveform)"
+    NO_PITCH = "error, no voiced sound detected (no pitch detected)"
+    FILE_NOT_FOUND = "error, audio file not found"
+
+
+@dataclass
+class AudioLoadResult:
+    """Result of loading audio, with status, waveform, sampling rate, and pitch frame ratio
+
+    status: AudioStatus
+        status of the file loading and checking
+    waveform: np.ndarray | None
+        waveform
+    sampling_rate: int | None
+        sampling rate in Hz
+    pitch_frame_ratio: float | None
+        ratio of frames with pitch detected
+    """
+
+    status: AudioStatus
+    waveform: np.ndarray | None
+    sampling_rate: int | None
+    pitch_frame_ratio: float | None
+
+
+class AudioMode(Enum):
+    """Mode of audio input
+
+    FILE: file path
+    BASE64: base64 encoded string
+    BYTES: raw bytes
+    NUMPY: numpy array of waveform
+    """
+
+    FILE = 0
+    BASE64 = 1
+    BYTES = 2
+    NUMPY = 3
+
+
+# File path, or raw bytes, or base64 encoded string, or numpy array
+# Depending on the mode (AudioMode)
+AudioInput = str | bytes | np.ndarray
+
+
+def audio_load_and_check(
+    audio: AudioInput,
+    phonetics: str,
+    min_speech_rate: float = 4,
+    max_speech_rate: float = 8,
+    mode: AudioMode = AudioMode.FILE,
+    fs: int = 16000,
+) -> AudioLoadResult:
     """Load audio with modes: from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array
     Then check duration to see if it's plausible
 
@@ -47,57 +111,36 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
     """
     n_syllables_tot = sum([len(el.split('|')) for el in phonetics.split(' ')])
 
-    # TODO: change this by the use of src.audio_processing.read_audio_file
-    if mode == 'file':
+    if mode == AudioMode.FILE:
         try:
-            f = sf.SoundFile('./inputs/' + audio + '.wav')
+            fs, s = read_audio_file('./inputs/' + audio + '.wav', fs=fs)
         except FileNotFoundError:
-            return "error: audio file not found", None
-        if f.frames == 0:
-            return "success: audio is empty (has zero sample)", None
-        duration = f.frames / f.samplerate
-        speech_rate = n_syllables_tot / duration
-        if speech_rate > max_speech_rate:
-            return (
-                "success: audio is too short compared to the expected number of syllables",
-                None,
-            )
-        try:
-            fs, s = read('./inputs/' + audio + '.wav')
-            s = s / 32767
-        except FileNotFoundError:
-            return "error: audio file not found", None
+            return AudioLoadResult(AudioStatus.FILE_NOT_FOUND, None, None, None)
+    elif mode == AudioMode.BASE64:
+        s, fs = read_audio_string(audio, fs=fs)
+    elif mode == AudioMode.BYTES:
+        s, fs = read_audio_bytes(audio, fs=fs)
+    elif mode == AudioMode.NUMPY:
+        s = audio
 
-    elif mode == 'base64' or mode == 'bytes' or mode == "numpy":
-        if mode == 'base64':
-            s, fs = read_audio_string(audio, fs=fs)
-        elif mode == 'bytes':
-            s, fs = read_audio_bytes(audio, fs=fs)
-        elif mode == "numpy":
-            s = audio
+    if len(s) == 0:
+        return AudioLoadResult(AudioStatus.EMPTY, None, None, None)
 
-        if len(s) == 0:
-            return "success: audio is empty (has zero sample)", None
-        duration = len(s) / fs
-        speech_rate = n_syllables_tot / duration
-        if speech_rate > max_speech_rate:
-            return (
-                "success: audio is too short compared to the expected number of syllables",
-                None,
-            )
-    else:
-        return (
-            "error: mode for audio_load_and_check() must be file, base64, bytes or numpy",
-            None,
-        )
+    duration = len(s) / fs
+    speech_rate = n_syllables_tot / duration
+    if speech_rate > max_speech_rate:
+        return AudioLoadResult(AudioStatus.TOO_SHORT, s, fs, None)
+    elif speech_rate < min_speech_rate:
+        return AudioLoadResult(AudioStatus.TOO_LONG, s, fs, None)
 
     if np.abs(s).sum() == 0:
-        return "success: no voiced sound detected (only 0's in waveform)", None
+        return AudioLoadResult(AudioStatus.NO_SOUND, s, fs, None)
 
     f0_samples = getIntonation(s, fs)
-    if sum([el != el for el in f0_samples]) == len(f0_samples):
-        return "success: no voiced sound detected (no pitch detected)", None
-    return "success", s
+    pitch_frame_ratio = len(f0_samples[f0_samples > 0]) / len(f0_samples)
+    if pitch_frame_ratio == 0:
+        return AudioLoadResult(AudioStatus.NO_PITCH, s, fs, pitch_frame_ratio)
+    return AudioLoadResult(AudioStatus.SUCCESS, s, fs, pitch_frame_ratio)
 
 
 # processing functions of df_segmented, which is the output of prediction and forced alignment
@@ -282,7 +325,7 @@ class Wav2Vec2ForFramePrediction:
         self.frame_classifier.fit(self.X_train_reduced, self.y_train)
 
     # from an audio sample, computes the probability matrix of each frame corresponding to every phoneme
-    def predict_phone_prob_matrix(self, s, fs):
+    def predict_phone_prob_matrix(self, s: np.ndarray, fs: int) -> np.ndarray:
         """
         Computes the probability matrix of each frame corresponding to every phoneme for an audio sample.
 
@@ -336,64 +379,86 @@ class Wav2Vec2ForFramePrediction:
         return phone_prob_matrix
 
     def audio_to_phone_prob_matrix(
-        self, audio, phonetics, max_speech_rate=8, mode="numpy"
-    ):
+        self,
+        audio: AudioInput,
+        phonetics: str,
+        max_speech_rate: float = 8,
+        mode: AudioMode = AudioMode.NUMPY,
+    ) -> tuple[AudioLoadResult, np.ndarray | None]:
         """
         Converts an audio sample to a probability matrix of phonemes.
 
-        Args:
-        - audio: The audio sample.
-        - phonetics: The phonetic transcription of the audio.
-        - max_speech_rate (float): The maximum accepted speech rate in seconds per phoneme.
-        This act as a detector of abnormally short audio sample compared to the number of phonemes to detect very short audios with nothing usefule in them.
-        - mode (str): The mode of the audio data ("numpy" or "file" or "bytes").
+        Parameters
+        ----------
+        audio : AudioInput
+            The audio sample.
+        phonetics : str
+            The phonetic transcription of the audio.
+        max_speech_rate : float
+            The maximum accepted speech rate in syllables per second.
+            This acts as a detector of abnormally short audio sample compared to the
+            number of phonemes to detect very short audios with nothing useful in them.
+        mode : AudioMode
+            The mode of the audio data.
 
-        Returns:
-        - audio_status (str): The status of the audio conversion ("success" or "failure").
-        - s: The processed audio sample.
-        - phone_prob_matrix: The probability matrix of phonemes.
+        Returns
+        -------
+        audio_load : AudioLoadResult
+            The status of the audio loading and check
+        phone_prob_matrix : np.ndarray
+            The probability matrix of phonemes.
         """
         phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
-        with CodeTimer('load audio'):
-            audio_status, s = audio_load_and_check(
-                audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
+        with CodeTimer('load audio', silent=True):
+            audio_load = audio_load_and_check(
+                audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, fs=self.fs
             )
-        if audio_status == "success":
-            with CodeTimer('phone_prob_matrix prediction'):
-                phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
-            return audio_status, s, phone_prob_matrix
+        if audio_load.status == AudioStatus.SUCCESS:
+            with CodeTimer('phone_prob_matrix prediction', silent=True):
+                phone_prob_matrix = self.predict_phone_prob_matrix(
+                    audio_load.waveform, self.fs
+                )
+            return audio_load, phone_prob_matrix
         else:
-            return audio_status, s, None
+            return audio_load, None
 
-    def audio_to_phone_prob_df(self, audio, phonetics, max_speech_rate=8, mode="numpy"):
+    def audio_to_phone_prob_df(
+        self, audio, phonetics, max_speech_rate=8, mode: AudioMode = AudioMode.NUMPY
+    ):
         """
         Converts an audio sample to a DataFrame of phoneme probabilities.
-        It uses the function above, and put colomns names as the alphabet for claeity and readability.
 
-        Args:
-        - audio: The audio sample.
-        - phonetics: The phonetic transcription of the audio.
-        - max_speech_rate (float): The maximum speech rate in seconds per phoneme.
-        - mode (str): The mode of the audio data ("numpy" or "torch").
+        Parameters
+        ----------
+        audio : type
+            The audio sample.
+        phonetics : str
+            The phonetic transcription of the audio.
+        max_speech_rate : float
+            The maximum accepted speech rate in syllables per second.
+        mode : AudioMode
+            The mode of the audio data.
 
-        Returns:
-        - audio_status (str): The status of the audio conversion ("success" or "failure").
-        - s: The processed audio sample.
-        - phone_prob_df: The DataFrame of phoneme probabilities.
+        Returns
+        -------
+        audio_load : AudioLoadResult
+            The status of the audio loading and check.
+        phone_prob_df : type
+            The DataFrame of phoneme probabilities.
         """
-        audio_status, s, phone_prob_matrix = self.audio_to_phone_prob_matrix(
+        audio_load, phone_prob_matrix = self.audio_to_phone_prob_matrix(
             audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
         )
-        if audio_status == "success":
+        if audio_load.status == AudioStatus.SUCCESS:
             phone_prob_df = pd.DataFrame(phone_prob_matrix)
             phone_prob_df.columns = self.alphabet + ["[SIL]"]
-            return audio_status, s, phone_prob_df
+            return audio_load, phone_prob_df
         else:
-            return audio_status, s, None
+            return audio_load, None
 
     def max_posterior_phone_df(
         self, phone_prob_df: pd.DataFrame, proba_thresh: float = 0.5
-    ) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Computes the maximum posterior probability of each phoneme from a DataFrame
         of phoneme probabilities.
@@ -478,7 +543,7 @@ class Wav2Vec2ForFramePrediction:
 
     def phone_prob_matrix_segmentation(
         self, phone_prob_matrix: np.ndarray, phoneme_list: list[str]
-    ) -> (pd.DataFrame, float):
+    ) -> tuple[pd.DataFrame, float]:
         """
         Performs forced alignment segmentation on a probability matrix of phones.
 

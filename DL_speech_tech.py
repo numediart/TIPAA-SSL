@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum, auto
 import os, psutil
 
 print_memory_usage = lambda stage: print(
@@ -64,6 +65,10 @@ for k in cmu_consonants:
 # model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
 
 from src.wav2vec2_frame_prediction import (
+    AudioInput,
+    AudioLoadResult,
+    AudioMode,
+    AudioStatus,
     Wav2Vec2ForFramePrediction,
     extract_word,
     audio_load_and_check,
@@ -96,6 +101,11 @@ print_memory_usage("RAM - DL_speech_tech after default_model")
 
 
 MAX_PER_FOR_ACCEPTANCE = 0.8
+
+
+class StressCategory(Enum):
+    word = auto()
+    sentence = auto()
 
 
 target_accepted_alternatives = {
@@ -344,15 +354,21 @@ def compute_stress_score(
 ###################   Pronunciation aspect functions  ################
 
 
+class StressAnalysisResult:
+    status: str
+    stress_intensities: list[int] | list[list[int]]
+    stress_binaries: list[int] | list[list[int]]
+
+
 def stress_from_df_segmented_audio(
     sound: np.ndarray,
     df_segmented: pd.DataFrame,
     phonetics: str,
     n_words_by_chunk: list[int] | None = None,
-    level: str = "sentence",
+    level: StressCategory = StressCategory.sentence,
     model: Wav2Vec2ForFramePrediction = default_model,
     vowels: set[str] = cmu_vowels,
-) -> dict:
+) -> StressAnalysisResult:
     """Extract stress from a dataframe of segmented phonemes and an audio signal
 
     Parameters
@@ -366,7 +382,7 @@ def stress_from_df_segmented_audio(
     n_words_by_chunk : list[int], optional
         Number of words by chunk (used only when level="sentence")
         For the above phonetics example, would be [7]
-    level: str
+    level: StressCategory
         level of stress extraction. Can be either "word" or "sentence"
     model : Wav2Vec2ForFramePrediction
         speech model
@@ -375,14 +391,13 @@ def stress_from_df_segmented_audio(
 
     Returns
     -------
-    dict
-        stress extraction results, in the form of a dictionary with keys:
-        "status", "stress_intensities", "stress_binaries"
+    StressAnalysisResult
+        stress extraction results
         Examples:
          - for sentence stress: {"status": "success", "stress_intensities": [100], "stress_binaries": [1]}
          - for word stress: {"status": "success", "stress_intensities": [[100]], "stress_binaries": [[1]]}
     """
-    if level == "sentence":
+    if level == StressCategory.sentence:
         assert (
             n_words_by_chunk is not None
         ), "n_words_by_chunk should be provided in 'sentence' mode"
@@ -392,20 +407,12 @@ def stress_from_df_segmented_audio(
 
     vowels_df = df_segmented[df_segmented.phones.isin(vowels)]
     if len(vowels_df) == 1:
-        if level == "sentence":
-            return {
-                "status": "success",
-                "stress_intensities": [100],
-                "stress_binaries": [1],
-            }
-        if level == "word":
-            return {
-                "status": "success",
-                "stress_intensities": [[100]],
-                "stress_binaries": [[1]],
-            }
+        if level == StressCategory.sentence:
+            return StressAnalysisResult("success", [100], [1])
+        if level == StressCategory.word:
+            return StressAnalysisResult("success", [[100]], [[1]])
 
-    with CodeTimer('stress extraction'):
+    with CodeTimer('stress extraction', silent=True):
         ws = compute_stress_score(df_segmented, sound, vowels, fs=model.fs)
 
     # TODO: I think I should check for voiceness, but I don't know if I should do it for all vowels
@@ -413,27 +420,25 @@ def stress_from_df_segmented_audio(
         status = (
             "success: no voiced sound detected inside supposed vowels (no pitch detected)"
         )
-        return {"status": status, "stress_intensities": [], "stress_binaries": []}
+        return StressAnalysisResult(status, [], [])
 
     phonetics_indexed_df = phonetics_indexed_df_from_formatted_phonetics(phonetics)
     is_vowel = phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
     vowels_indexed_df = phonetics_indexed_df[is_vowel].copy()
-    # print(vowels_indexed_df)
 
     # assert len(vowels_indexed_df) == len(ws), "n of vowels should be the same as length of vowel stresses"
 
     if len(vowels_indexed_df) != len(ws):
         status = "error: n of vowels should be the same as length of vowel stresses"
         print("n of vowels should be the same as length of vowel stresses")
-        return {"status": status, "stress_intensities": [], "stress_binaries": []}
+        return StressAnalysisResult(status, [], [])
 
     try:
         vowels_indexed_df.loc[:, 'stress_scores'] = (100 * ws).astype(int)
     except:
         status = "error: n of vowels should be the same as length of vowel stresses"
         print("n of vowels should be the same as length of vowel stresses")
-        return {"status": status, "stress_intensities": [], "stress_binaries": []}
-        # import pdb;pdb.set_trace()
+        return StressAnalysisResult(status, [], [])
 
     word_bins = []
     word_intensities = []
@@ -444,13 +449,9 @@ def stress_from_df_segmented_audio(
         word_bins.append(bins)
         word_intensities.append(word.stress_scores.tolist())
 
-    if level == "word":
-        return {
-            "status": "success",
-            "stress_intensities": word_intensities,
-            "stress_binaries": word_bins,
-        }
-    elif level == "sentence":
+    if level == StressCategory.word:
+        return StressAnalysisResult("success", word_intensities, word_bins)
+    elif level == StressCategory.sentence:
         max_word_intensities = [max(w) for w in word_intensities]
         scores_grouped_by_chunk = []
         cumsum = 0
@@ -465,37 +466,34 @@ def stress_from_df_segmented_audio(
         for chunk in scores_grouped_by_chunk:
             bin = intensity_to_bin(chunk, n_max=roundup(len(chunk) / 3))
             bins_by_chunk.append(bin)
-        return {
-            "status": "success",
-            "stress_intensities": sum(scores_grouped_by_chunk, []),
-            "stress_binaries": sum(bins_by_chunk, []),
-        }
+        return StressAnalysisResult(
+            "success", sum(scores_grouped_by_chunk, []), sum(bins_by_chunk, [])
+        )
     else:
-        return {
-            "status": "error: "
-            + level
-            + "is not a valid level in stress_from_formatted_phonetics. It has to be either 'word' or 'sentence'.",
-            "stress_intensities": [],
-            "stress_binaries": [],
-        }
+        return StressAnalysisResult(
+            f"error: {level} is not a valid level in stress_from_formatted_phonetics. "
+            "It has to be either 'word' or 'sentence'.",
+            [],
+            [],
+        )
 
 
 def stress_from_formatted_phonetics(
-    audio,
-    phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D",
-    n_words_by_chunk=[7],
-    level="sentence",
-    max_speech_rate=8,
-    mode='file',
-    model=default_model,
-    vowels=cmu_vowels,
-):
+    audio: AudioInput,
+    phonetics: str,
+    n_words_by_chunk: list[int] | None = None,
+    level: StressCategory = StressCategory.sentence,
+    max_speech_rate: float = 8,
+    mode: AudioMode = AudioMode.FILE,
+    model: Wav2Vec2ForFramePrediction = default_model,
+    vowels: set[str] = cmu_vowels,
+) -> StressAnalysisResult:
     phonetics = phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
-    audio_status, sound, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+    audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
-    if audio_status != "success":
-        return {"status": audio_status, "stress_intensities": [], "stress_binaries": []}
+    if audio_load.status != AudioStatus.SUCCESS:
+        return StressAnalysisResult(audio_load.status, [], [])
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
@@ -504,12 +502,11 @@ def stress_from_formatted_phonetics(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
 
-    print("model status", model.status)
     if model.status != "success":
-        return {"status": model.status, "stress_intensities": [], "stress_binaries": []}
+        return StressAnalysisResult(model.status, [], [])
 
     return stress_from_df_segmented_audio(
-        sound,
+        audio_load.waveform,
         df_segmented,
         phonetics=phonetics,
         n_words_by_chunk=n_words_by_chunk,
@@ -602,7 +599,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
     target_phones='ER1',
     alternatives=cmu_vowels,
     max_speech_rate=8,
-    mode='file',
+    mode: AudioMode = AudioMode.FILE,
     model=default_model,
     to_gibberish=cmu_to_gibberish,
     **kwargs,
@@ -612,13 +609,13 @@ def phonemeContrast_from_formatted_phonetics_audio(
         to_gibberish[unstress(p)]
         for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]
     ]
-    audio_status, _, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+    audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
 
-    if audio_status != "success":
+    if audio_load.status != AudioStatus.SUCCESS:
         return {
-            "status": audio_status,
+            "status": audio_load.status,
             "phonetic_detection": "null",
             "gibberish_truth": '_'.join(g_t),
             "gibberish_detected": "null",
@@ -684,7 +681,7 @@ def schwa_sound_from_formatted_phonetics_audio(
     # alternatives=cmu_vowels,
     alternatives=cmu_stressed_vowels,
     max_speech_rate=8,
-    mode='file',
+    mode: AudioMode = AudioMode.FILE,
     # model=default_model_stressed,
     model=default_model,
     to_gibberish=cmu_to_gibberish,
@@ -695,12 +692,12 @@ def schwa_sound_from_formatted_phonetics_audio(
         to_gibberish[unstress(p)]
         for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]
     ]
-    audio_status, s, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+    audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
-    if audio_status != "success":
+    if audio_load.status != AudioStatus.SUCCESS:
         return {
-            "status": audio_status,
+            "status": audio_load.status,
             "phonetic_detection": "null",
             "gibberish_truth": '_'.join(g_t),
             "gibberish_detected": "null",
@@ -742,8 +739,13 @@ def schwa_sound_from_formatted_phonetics_audio(
                     "gibberish_detected": '_'.join(g_d),
                 }
 
-    stress_dict = stress_from_df_segmented_audio(
-        s, df_segmented, phonetics=phonetics, level="word", model=model, vowels=vowels
+    stress_result = stress_from_df_segmented_audio(
+        audio_load.s,
+        df_segmented,
+        phonetics=phonetics,
+        level="word",
+        model=model,
+        vowels=vowels,
     )
     # {"status": "success", "stress_intensities": word_intensities, "stress_binaries": word_bins}
     phoneme_contrast_dict = phonemeContrast_from_df_segmented(
@@ -759,12 +761,12 @@ def schwa_sound_from_formatted_phonetics_audio(
     )
     # {"status": "success", "phonetic_detection": phonetic_detection, "gibberish_truth": '_'.join(g_t), "gibberish_detected": '_'.join(g_d)}
 
-    if stress_dict['status'] != "success":
-        return {"status": stress_dict['status']}
+    if stress_result.satus == "success":
+        return {"status": stress_result.status}
     elif phoneme_contrast_dict['status'] != "success":
         return {"status": phoneme_contrast_dict['status']}
     else:
-        stress_intensities_word = stress_dict['stress_intensities'][target_word_idx]
+        stress_intensities_word = stress_result.stress_intensities[target_word_idx]
 
         # find the least stressed vowels according to a ranking and threshold
         # if threshold=0, no contraint due to threshold, only ranking constraint
@@ -999,7 +1001,7 @@ def start_end_contrast_from_prob_matrix(
     # basis='[UNK]_D',
     basis=None,
     max_speech_rate=8,
-    mode='file',
+    mode: AudioMode = AudioMode.FILE,
     position="end",
     model=default_model,
     vowels=cmu_vowels,
@@ -1067,8 +1069,6 @@ def start_end_contrast_from_prob_matrix(
                     "gibberish_detected": '_'.join(g_d),
                 }
 
-    print(df_word)
-
     # selection of the syllable, then divide it into a root and a termination (or start and root)
     df_word['syl_idx'] = syl_idxs
 
@@ -1110,8 +1110,6 @@ def start_end_contrast_from_prob_matrix(
             # As we use index based on numbers in dataframe, cyclical indexing can be supported by taking the the last df index from the list
             df_syl.loc[df_syl.index[p_idx], "pred_phones_audio"] = phonetic_detection
 
-    print(df_syl)
-
     # syl_detected=drop_consecutive_duplicates(df_syl[['pred_phones_audio']]).pred_phones_audio.tolist()
     syl_detected = df_syl[['pred_phones_audio']].pred_phones_audio.tolist()
 
@@ -1123,7 +1121,6 @@ def start_end_contrast_from_prob_matrix(
 
     ter = drop_consecutive_duplicate_elements(ter)
 
-    print('ter', ter)
     if len(ter) == len(GT):
         ter_post = []
         for i, p in enumerate(ter):
@@ -1137,8 +1134,6 @@ def start_end_contrast_from_prob_matrix(
                 ter_post.append(unstress(p))
     else:
         ter_post = ter
-
-    print('ter_post', ter_post)
 
     # there might be consecutive duplicates when we concatenate root and ter_post
     # g_d=drop_consecutive_duplicate_elements([to_gibberish[unstress(p)] for p in root+ter_post])
@@ -1165,9 +1160,6 @@ def start_end_contrast_from_prob_matrix(
 
     detection = '_'.join(detection)
 
-    print("detection before post corr of whole termination", detection)
-    print('target_phones', target_phones)
-
     # phonetic detection needs to be the stressed version for backwards compatibility
     # however, here I convert to stressed version only when correct
     if (
@@ -1183,7 +1175,6 @@ def start_end_contrast_from_prob_matrix(
             if detection in terminations_accepted_alternatives[unstressed_target]:
                 detection = target_phones
 
-    print('detection', detection)
     return {
         "status": "success",
         "phonetic_detection": detection,
@@ -1201,7 +1192,7 @@ def start_end_contrast_from_formatted_phonetics_audio(
     # basis='[UNK]_D',
     basis=None,
     max_speech_rate=8,
-    mode='file',
+    mode: AudioMode = AudioMode.FILE,
     position="end",
     model=default_model,
     vowels=cmu_vowels,
@@ -1222,12 +1213,12 @@ def start_end_contrast_from_formatted_phonetics_audio(
         to_gibberish[unstress(p)]
         for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]
     ]
-    audio_status, _, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+    audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
-    if audio_status != "success":
+    if audio_load.status != AudioStatus.SUCCESS:
         return {
-            "status": audio_status,
+            "status": audio_load.status,
             "phonetic_detection": "null",
             "gibberish_truth": '_'.join(g_t),
             "gibberish_detected": "null",
@@ -1344,7 +1335,7 @@ def analyze_start_end_for_synth_word(
             target_phones=target_phones,
             basis=basis,
             position=position,
-            mode='numpy',
+            mode=AudioMode.NUMPY,
             model=model,
         )
         results.append(res)
@@ -1358,7 +1349,7 @@ def multiple_aspect_from_prob_matrix(
     phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D",
     vowels=cmu_vowels,
     max_speech_rate=8,
-    mode='file',
+    mode: AudioMode = AudioMode.FILE,
     model=default_model,
     to_gibberish=cmu_to_gibberish,
     **kwargs,
@@ -1369,8 +1360,13 @@ def multiple_aspect_from_prob_matrix(
     )
     # print('multi_aspect: df_segmented computed')
 
-    stress_dict = stress_from_df_segmented_audio(
-        s, df_segmented, phonetics=phonetics, level="word", model=model, vowels=vowels
+    stress_result = stress_from_df_segmented_audio(
+        s,
+        df_segmented,
+        phonetics=phonetics,
+        level=StressCategory.word,
+        model=model,
+        vowels=vowels,
     )
     # print('multi_aspect: stress_dict word computed')
 
@@ -1378,12 +1374,12 @@ def multiple_aspect_from_prob_matrix(
     # and I build the n_words_by_chunk and re-join the phonetics as 1 string
     # Here I always assume a single chunk for now. I could use punctuation in text to compute n_words_by_chunk as well
     n_words_by_chunk = [len(phonetics.split(' '))]
-    stress_dict_sentence = stress_from_df_segmented_audio(
+    stress_result_sentence = stress_from_df_segmented_audio(
         s,
         df_segmented,
         phonetics=phonetics,
         n_words_by_chunk=n_words_by_chunk,
-        level="sentence",
+        level=StressCategory.sentence,
         model=model,
         vowels=vowels,
     )
@@ -1468,15 +1464,15 @@ def multiple_aspect_from_prob_matrix(
         ["phones", "word_idx", "syl_idx", "position", "detection"]
     ]
 
-    vowels_indexed_df['stress_intensities'] = sum(stress_dict['stress_intensities'], [])
-    vowels_indexed_df['stress_binaries_word'] = sum(stress_dict['stress_binaries'], [])
+    vowels_indexed_df['stress_intensities'] = sum(stress_result.stress_intensities, [])
+    vowels_indexed_df['stress_binaries_word'] = sum(stress_result.stress_binaries, [])
     clusters_df.columns = ["phones", "word_idx", "syl_idx", "position", "detection"]
 
     merged_results = pd.concat([vowels_indexed_df, clusters_df])
 
     syl_dfs = []
     for w_i, w_df in merged_results.groupby('word_idx'):
-        w_df['stress_binaries_sentence'] = stress_dict_sentence['stress_binaries'][w_i]
+        w_df['stress_binaries_sentence'] = stress_result_sentence.stress_binaries[w_i]
         for s_i, s_df in w_df.groupby('syl_idx'):
             map_to_i = {'start': 0, 'middle': 1, 'end': 2}
             s_df['position_idx'] = s_df['position'].apply(lambda r: map_to_i[r])
@@ -1491,21 +1487,21 @@ def multiple_aspect_from_prob_matrix(
 
 
 def multiple_aspect_from_formatted_phonetics_audio(
-    audio,
+    audio: AudioInput,
     phonetics: str,
     vowels: set = cmu_vowels,
     max_speech_rate: int = 8,
-    mode: str = "file",
+    mode: AudioMode = AudioMode.FILE,
     model: Wav2Vec2ForFramePrediction = default_model,
     to_gibberish: dict[str, str] = cmu_to_gibberish,
-) -> (str, pd.DataFrame | None, PostAnalysisResult | None):
+) -> tuple[AudioLoadResult, pd.DataFrame | None, PostAnalysisResult | None]:
     phonetics = cmu_ensure_phonetics_consistency(phonetics)
-    audio_status, s, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+    audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
 
-    if audio_status != "success":
-        return audio_status, None, None
+    if audio_load.status != AudioStatus.SUCCESS:
+        return audio_load, None, None
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
@@ -1513,10 +1509,10 @@ def multiple_aspect_from_formatted_phonetics_audio(
     post_analysis_result = post_analysis(phone_prob_matrix, phonetics, model=model)
 
     return (
-        audio_status,
+        audio_load,
         multiple_aspect_from_prob_matrix(
             phone_prob_matrix,
-            s,
+            audio_load.s,
             phonetics=phonetics,
             vowels=vowels,
             max_speech_rate=max_speech_rate,
