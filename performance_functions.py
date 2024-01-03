@@ -11,6 +11,7 @@ from src.label_data_processing import build_user_data_df
 # exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
 
 from DL_speech_tech import (
+    StressCategory,
     schwa_sound_from_formatted_phonetics_audio,
     phonemeContrast_from_formatted_phonetics_audio,
     stress_from_formatted_phonetics,
@@ -42,6 +43,8 @@ from src.libri_phonetization_data import *
 from tqdm import tqdm
 
 import warnings
+
+from src.wav2vec2_frame_prediction import AudioMode
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -177,7 +180,7 @@ def compute_predictions(
     return result_df
 
 
-def stress_GE_performance_test(level='sentence'):
+def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
     df = get_data_stressed_content()
     stress_intensities = []
     stress_binaries = []
@@ -195,11 +198,11 @@ def stress_GE_performance_test(level='sentence'):
             phonetics=row.phonetics,
             n_words_by_chunk=n_words_by_chunk,
             level=level,
-            mode="numpy",
+            mode=AudioMode.NUMPY,
         )
         print(res)
-        stress_intensities.append(res['stress_intensities'])
-        stress_binaries.append(res['stress_binaries'])
+        stress_intensities.append(res.stress_intensities)
+        stress_binaries.append(res.stress_binaries)
     df['stress_intensities'] = stress_intensities
     df['stress_binaries'] = stress_binaries
 

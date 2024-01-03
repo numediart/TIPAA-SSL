@@ -43,7 +43,8 @@ from src.audio_processing import (
 from linetimer import CodeTimer
 
 
-class AudioStatus(Enum):
+# StrEnum in python 3.12
+class AudioStatus(str, Enum):
     SUCCESS = "success"
     EMPTY = "error, audio is empty (has zero sample)"
     TOO_SHORT = "error, audio is too short compared to the expected number of syllables"
@@ -112,8 +113,10 @@ def audio_load_and_check(
     n_syllables_tot = sum([len(el.split('|')) for el in phonetics.split(' ')])
 
     if mode == AudioMode.FILE:
+        if not isinstance(audio, str):
+            raise TypeError(f"audio must be of type str, not {type(audio)}")
         try:
-            fs, s = read_audio_file('./inputs/' + audio + '.wav', fs=fs)
+            s, fs = read_audio_file(audio, fs=fs)
         except FileNotFoundError:
             return AudioLoadResult(AudioStatus.FILE_NOT_FOUND, None, None, None)
     elif mode == AudioMode.BASE64:
@@ -121,7 +124,11 @@ def audio_load_and_check(
     elif mode == AudioMode.BYTES:
         s, fs = read_audio_bytes(audio, fs=fs)
     elif mode == AudioMode.NUMPY:
-        s = audio
+        if not isinstance(audio, np.ndarray):
+            raise TypeError(f"audio must be of type np.ndarray, not {type(audio)}")
+        s: np.ndarray = audio
+    else:
+        raise ValueError(f"Unknown audio mode {mode}")
 
     if len(s) == 0:
         return AudioLoadResult(AudioStatus.EMPTY, None, None, None)
@@ -199,7 +206,7 @@ class Wav2Vec2ForFramePrediction:
         - reducer (PCA): A PCA dimensionality reduction model, could be another sklearn reduction model.
         - frame_classifier (KNeighborsClassifier): By default, a K-nearest neighbors classifier for frame classification. It sould be any other sklearn mclassifier.
         """
-        self.status = 'success'
+        self.status = AudioStatus.SUCCESS
         self.pred_phones_audio = []
         self.fs = 16000
         self.time_per_output = 0.02
@@ -415,6 +422,7 @@ class Wav2Vec2ForFramePrediction:
             )
         if audio_load.status == AudioStatus.SUCCESS:
             with CodeTimer('phone_prob_matrix prediction', silent=True):
+                assert audio_load.waveform is not None
                 phone_prob_matrix = self.predict_phone_prob_matrix(
                     audio_load.waveform, self.fs
                 )

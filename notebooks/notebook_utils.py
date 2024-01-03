@@ -1,7 +1,6 @@
 import ffmpeg
-from ipywebrtc import AudioRecorder, CameraStream
 import IPython
-import io
+from ipywebrtc import AudioRecorder, CameraStream
 from numpy import ndarray
 
 from src.audio_processing import read_audio_file
@@ -19,7 +18,7 @@ def record_audio():
 
 def get_recording(
     recorder: AudioRecorder, output: str = "recording.wav", sr: int = 16_000
-) -> (ndarray, int):
+) -> tuple[ndarray, int]:
     """From a recording, return the audio signal and the sample rate.
     Also write it to a file if specified.
 

@@ -8,6 +8,7 @@ from marshmallow import fields, Schema, EXCLUDE
 
 import json
 from DL_speech_tech import (
+    StressCategory,
     phonemeContrast_from_formatted_phonetics_audio,
     start_end_contrast_from_formatted_phonetics_audio,
 )
@@ -25,6 +26,7 @@ from server.utils import (
     sentence_stress_responseSchema_v2,
     word_stress_responseSchema_v2,
 )
+from src.wav2vec2_frame_prediction import AudioMode
 
 # bp=Blueprint('DL_modules_v2', __name__, url_prefix='/')
 
@@ -85,7 +87,9 @@ class dl_sentence_stress_api_v2_mp(MethodView):
                 mimetype="application/json",
             )
         properties = ["phonetics", "audio"]
-        return request_stress_v2(d, properties, "sentence", mode='bytes')
+        return request_stress_v2(
+            d, properties, StressCategory.SENTENCE, mode=AudioMode.BYTES
+        )
 
 
 @bp.route('/w2v/stress/word', methods=['POST'])
@@ -106,7 +110,7 @@ class dl_word_stress_api_v2_mp(MethodView):
                 mimetype="application/json",
             )
         properties = ["phonetics", "audio"]
-        return request_stress_v2(d, properties, "word", mode='bytes')
+        return request_stress_v2(d, properties, StressCategory.WORD, mode=AudioMode.BYTES)
 
 
 example_vowel_contrast = {
@@ -136,7 +140,7 @@ class dl_vowel_contrast_api_v2_mp(MethodView):
                 mimetype="application/json",
             )
         properties = ["phonetics", "audio", "word_idx", "target", "syl_idx"]
-        return request_contrast(d, properties, mode='bytes')
+        return request_contrast(d, properties, mode=AudioMode.BYTES)
 
 
 example_consonant_contrast = {
@@ -175,7 +179,11 @@ class dl_consonant_contrast_api_v2_mp(MethodView):
         ]
         target_occurence_idx = int(d['target_occurence_idx'])
         return request_contrast(
-            d, properties, target_occurence_idx, alternatives=cmu_consonants, mode='bytes'
+            d,
+            properties,
+            target_occurence_idx,
+            alternatives=cmu_consonants,
+            mode=AudioMode.BYTES,
         )
 
 
@@ -208,7 +216,7 @@ class dl_termination_contrast_api_v2_mp(MethodView):
             d,
             properties,
             tech_function=start_end_contrast_from_formatted_phonetics_audio,
-            mode='bytes',
+            mode=AudioMode.BYTES,
             target_type="termination",
         )
 
@@ -246,6 +254,6 @@ class dl_cluster_contrast_api_v2_mp(MethodView):
             d,
             properties,
             tech_function=start_end_contrast_from_formatted_phonetics_audio,
-            mode='bytes',
+            mode=AudioMode.BYTES,
             target_type="cluster",
         )

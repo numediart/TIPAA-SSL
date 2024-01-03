@@ -136,7 +136,9 @@ def remove_special_characters(
     return sentence
 
 
-def get_chunks(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
+def get_chunks(
+    text: str, chunking_chars: set[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
+) -> list[str]:
     for c in chunking_chars:
         text = text.replace(c, chunking_chars[0])
     chunks = text.split(chunking_chars[0])
@@ -144,7 +146,20 @@ def get_chunks(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
     return chunks
 
 
-def chunk_text(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
+def chunk_text(
+    text: str, chunking_chars: set[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
+) -> list[int]:
+    """This function takes a text and chunks it in sentences, using a set of chunking characters.
+    It returns the number of words in each chunk.
+
+    Examples:
+        >>> chunk_text("hello")
+        [1]
+        >>> chunk_text("hello, world")
+        [1, 1]
+        >>> chunk_text("hello, world: how are you?")
+        [1, 1, 3]
+    """
     chunks = get_chunks(text, chunking_chars=chunking_chars)
     # split each chunk in words, remove empty strings, get length (to know the n of words in each chunk)
     n_words_by_chunk = [len(list(filter(None, el.split(' ')))) for el in chunks]
