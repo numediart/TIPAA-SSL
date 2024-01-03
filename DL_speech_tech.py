@@ -1513,7 +1513,7 @@ def multiple_aspect_from_formatted_phonetics_audio(
         audio_load,
         multiple_aspect_from_prob_matrix(
             phone_prob_matrix,
-            audio_load.s,
+            audio_load.waveform,
             phonetics=phonetics,
             vowels=vowels,
             max_speech_rate=max_speech_rate,

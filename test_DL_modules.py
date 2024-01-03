@@ -143,7 +143,9 @@ def DL_speech_tech_functions(model=default_model):
         mode=AudioMode.NUMPY,
         model=model,
     )
-    assert res['stress_binaries'][1] == 1, "Stress detection failed"
+    assert (
+        res.stress_binaries is not None and res.stress_binaries[1] == 1
+    ), "Stress detection failed"
     res = start_end_contrast_from_formatted_phonetics_audio(
         s,
         phonetics=formatted_phonetics,

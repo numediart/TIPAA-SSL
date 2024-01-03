@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from enum import Enum, auto
+from strenum import StrEnum
+from enum import Enum
 import pandas as pd
 import numpy as np
 import pickle
@@ -43,14 +44,14 @@ from src.audio_processing import (
 from linetimer import CodeTimer
 
 
-# StrEnum in python 3.12
-class AudioStatus(str, Enum):
+# StrEnum in python 3.11
+class AudioStatus(StrEnum):
     SUCCESS = "success"
-    EMPTY = "error, audio is empty (has zero sample)"
-    TOO_SHORT = "error, audio is too short compared to the expected number of syllables"
-    TOO_LONG = "error, audio is too long compared to the expected number of syllables"
-    NO_SOUND = "error, no voiced sound detected (only 0's in waveform)"
-    NO_PITCH = "error, no voiced sound detected (no pitch detected)"
+    EMPTY = "success, audio is empty (has zero sample)"
+    TOO_SHORT = "success, audio is too short compared to the expected number of syllables"
+    TOO_LONG = "success, audio is too long compared to the expected number of syllables"
+    NO_SOUND = "success, no voiced sound detected (only 0's in waveform)"
+    NO_PITCH = "success, no voiced sound detected (no pitch detected)"
     FILE_NOT_FOUND = "error, audio file not found"
 
 
@@ -97,7 +98,7 @@ AudioInput = str | bytes | np.ndarray
 def audio_load_and_check(
     audio: AudioInput,
     phonetics: str,
-    min_speech_rate: float = 4,
+    min_speech_rate: float = 1,
     max_speech_rate: float = 8,
     mode: AudioMode = AudioMode.FILE,
     fs: int = 16000,
@@ -138,6 +139,9 @@ def audio_load_and_check(
     if speech_rate > max_speech_rate:
         return AudioLoadResult(AudioStatus.TOO_SHORT, s, fs, None)
     elif speech_rate < min_speech_rate:
+        print(
+            f"{phonetics}: speech_rate={speech_rate} < {min_speech_rate}, duration = {duration}, n_syllables_tot = {n_syllables_tot}"
+        )
         return AudioLoadResult(AudioStatus.TOO_LONG, s, fs, None)
 
     if np.abs(s).sum() == 0:

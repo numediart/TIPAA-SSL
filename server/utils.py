@@ -333,7 +333,7 @@ def request_contrast(
         mode=mode,
     )
 
-    if res['status'] != AudioStatus.SUCCESS:
+    if "success" not in str(res['status']):
         res['error'] = True
         # res['detected']=define_detected_flag(res['status'])
         response = json.dumps(res)
@@ -384,7 +384,7 @@ def call_stress_fn(
         res = {"status": "error: no such stress module"}
         return Response(json.dumps(res), status=500, mimetype="application/json")
 
-    if "error" in res.status:
+    if "success" not in res.status:
         response = asdict(res)
         response['error'] = True
         # res['detected']=define_detected_flag(res['status'])
