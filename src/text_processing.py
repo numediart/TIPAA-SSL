@@ -77,6 +77,15 @@ syllables_dfs = {
 print_memory_usage('RAM - text_processing after syllables_df')
 
 
+# class Phonetics(str):
+#     pass
+
+
+# class PhoneList(list[str]):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs
+
+
 def show_alternatives_distributions():
     import numpy as np
 
@@ -143,7 +152,30 @@ def chunk_text(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
     return n_words_by_chunk
 
 
-def phonetics_indexed_df_from_formatted_phonetics(phonetics):
+def phonetics_indexed_df_from_formatted_phonetics(phonetics: str) -> pd.DataFrame:
+    """This function takes a formatted phonetics string (sentence) and returns a dataframe
+    with the phones, the word index and the syllable index.
+
+    Parameters
+    ----------
+    phonetics : str
+        formatted phonetics string
+        Example: "HH_AW1 L_AH1|V_L_IY0" ("how lovely")
+
+    Returns
+    -------
+    pandas.DataFrame
+        dataframe with the phones, the word index and the syllable index, example:
+
+          phones  word_idx  syl_idx
+        0     HH         0        0
+        1    AW1         0        0
+        2      L         1        0
+        3    AH1         1        0
+        4      V         1        1
+        5      L         1        1
+        6    IY0         1        1
+    """
     word_split_phonetics = [p.replace('|', '_').split('_') for p in phonetics.split(' ')]
     n_phone_by_word = [len(w) for w in word_split_phonetics]
 

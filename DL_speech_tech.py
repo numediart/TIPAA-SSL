@@ -283,7 +283,7 @@ def predict_phone(
 
 def compute_stress_score(
     df_segmented: pd.DataFrame, audio: np.ndarray, vowels: set[str], fs: int = 16000
-):
+) -> np.ndarray:
     """Use df_segmented to have the timings of vowels and compute prosody features (intesity, pitch, ...) to compute
     a value by vowel representing a stress intensity
 
@@ -293,7 +293,7 @@ def compute_stress_score(
         vowels: set of vowels
         fs: sampling frequency
     Returns:
-        weighted_score [type]: stress intensity score
+        weighted_score [np array]: stress intensity score
     """
     # select vowels
     filtered_df = df_segmented[df_segmented.phones.isin(vowels)]
@@ -390,7 +390,7 @@ def stress_from_df_segmented_audio(
             phonetics.split(' ')
         ), 'The total number of words by chunk does not correspond to the number of words in phonetics'
 
-    vowels_df = df_segmented[df_segmented.phones.isin(cmu_vowels)]
+    vowels_df = df_segmented[df_segmented.phones.isin(vowels)]
     if len(vowels_df) == 1:
         if level == "sentence":
             return {
@@ -1036,6 +1036,7 @@ def start_end_contrast_from_prob_matrix(
     )
     df_word = extract_word(df_segmented, split_phonetics_by_words, target_word_idx)
 
+    # FIXME extremely bad style
     if model.status != "success":
         # g_d=[to_gibberish[unstress(p)] for p in model.pred_phones_audio]
         g_d = [

@@ -149,7 +149,7 @@ def getIntensity(s, fs):
     return int_db
 
 
-def normalize(x):
+def normalize(x: np.ndarray | list) -> np.ndarray:
     """normalizes a signal between 0 and 1
 
     Args:
@@ -158,8 +158,12 @@ def normalize(x):
     Returns:
         numpy array: normalized signal
     """
-    y = x - min(x)
-    return y / max(y)
+    if len(x) == 0:
+        return x
+    x = np.array(x)
+    y = x - x.min()
+    ymax = y.max()
+    return y / ymax if ymax > 0 else y
 
 
 def slow_down_audiotsm(
