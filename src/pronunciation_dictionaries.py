@@ -228,7 +228,7 @@ def differs_by_one_insertion(seq1, seq2):
             i += 1
             j += 1
 
-    if inserted_token is None:
+    if inserted_token is None or inserted_idx is None:
         inserted_token = seq2[-1]
         inserted_idx = len(seq2) - 1
     # explicit check that the only difference is the inserted token

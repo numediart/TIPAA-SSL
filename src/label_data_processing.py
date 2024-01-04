@@ -268,7 +268,7 @@ def select_accent(df, accent=None):
         elif accent == "US":
             df = df[df.path.apply(lambda r: '_US_' in r.split('/')[-1])]
         else:
-            raise "accent must be US or UK or None"
+            raise ValueError("accent must be US or UK or None")
     return df
 
 
@@ -295,7 +295,7 @@ def synth_words_data(
         df['phonetics'] = df.progress_apply(
             lambda r: phonetic_dict[r.text] if r.text in phonetic_dict else float('nan'),
             axis=1,
-        )
+        )  # type: ignore
 
         df = df.dropna()
 

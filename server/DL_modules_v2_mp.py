@@ -76,7 +76,7 @@ class dl_sentence_stress_api_v2_mp(MethodView):
     @bp.response(200, sentence_stress_responseSchema_v2)
     def post(self, data):
         d = request.values.to_dict()
-        d['phonetics'] = d['phonetics'].split(',')
+        d['phonetics'] = d['phonetics'].split(',')  # type: ignore
         d["audio"] = request.files['audio'].read()
         global stress_params_file
         err = check_schema(d, stress_params_file)
@@ -98,7 +98,7 @@ class dl_word_stress_api_v2_mp(MethodView):
     @bp.response(200, word_stress_responseSchema_v2)
     def post(self, data):
         d = request.values.to_dict()
-        d['phonetics'] = d['phonetics'].split(',')
+        d["phonetics"] = d['phonetics'].split(',')  # type: ignore
         d["audio"] = request.files['audio'].read()
 
         global stress_params_file

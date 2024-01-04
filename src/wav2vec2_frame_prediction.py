@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from typing import Sequence, cast
+from sklearn.base import ClassifierMixin, TransformerMixin
 from strenum import StrEnum
 from enum import Enum
 import pandas as pd
@@ -63,7 +65,7 @@ class AudioLoadResult:
         status of the file loading and checking
     waveform: np.ndarray | None
         waveform
-    sampling_rate: int | None
+    sampling_rate: float | None
         sampling rate in Hz
     pitch_frame_ratio: float | None
         ratio of frames with pitch detected
@@ -71,7 +73,7 @@ class AudioLoadResult:
 
     status: AudioStatus
     waveform: np.ndarray | None
-    sampling_rate: int | None
+    sampling_rate: float | None
     pitch_frame_ratio: float | None
 
 
@@ -92,7 +94,7 @@ class AudioMode(Enum):
 
 # File path, or raw bytes, or base64 encoded string, or numpy array
 # Depending on the mode (AudioMode)
-AudioInput = str | bytes | np.ndarray
+AudioInput = str | bytes | bytearray | np.ndarray
 
 
 def audio_load_and_check(
@@ -101,7 +103,7 @@ def audio_load_and_check(
     min_speech_rate: float = 1,
     max_speech_rate: float = 8,
     mode: AudioMode = AudioMode.FILE,
-    fs: int = 16000,
+    fs: float = 16000,
 ) -> AudioLoadResult:
     """Load audio with modes: from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array
     Then check duration to see if it's plausible
@@ -121,8 +123,12 @@ def audio_load_and_check(
         except FileNotFoundError:
             return AudioLoadResult(AudioStatus.FILE_NOT_FOUND, None, None, None)
     elif mode == AudioMode.BASE64:
+        if isinstance(audio, np.ndarray):
+            raise TypeError(f"audio must be of type str or bytes, not {type(audio)}")
         s, fs = read_audio_string(audio, fs=fs)
     elif mode == AudioMode.BYTES:
+        if not isinstance(audio, bytes | bytearray):
+            raise TypeError(f"audio must be of type bytes, not {type(audio)}")
         s, fs = read_audio_bytes(audio, fs=fs)
     elif mode == AudioMode.NUMPY:
         if not isinstance(audio, np.ndarray):
@@ -148,7 +154,7 @@ def audio_load_and_check(
         return AudioLoadResult(AudioStatus.NO_SOUND, s, fs, None)
 
     f0_samples = getIntonation(s, fs)
-    pitch_frame_ratio = len(f0_samples[f0_samples > 0]) / len(f0_samples)
+    pitch_frame_ratio = (f0_samples > 0).sum() / len(f0_samples)
     if pitch_frame_ratio == 0:
         return AudioLoadResult(AudioStatus.NO_PITCH, s, fs, pitch_frame_ratio)
     return AudioLoadResult(AudioStatus.SUCCESS, s, fs, pitch_frame_ratio)
@@ -190,14 +196,16 @@ class Wav2Vec2ForFramePrediction:
     - phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list): Performs forced alignment segmentation on a probability matrix of phonemes.
     """
 
+    SILENCE = "[SIL]"
+
     def __init__(
         self,
-        alphabet,
-        collapse_method='mean',
-        w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft",
-        w2v2_model_format="torch",
-        reducer=PCA(n_components=0.95, random_state=42),
-        frame_classifier=KNeighborsClassifier(10),
+        alphabet: Sequence[str],
+        collapse_method: str = "mean",
+        w2v2_model_path: str = "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft",
+        w2v2_model_format: str = "torch",
+        reducer: TransformerMixin | None = None,
+        frame_classifier: ClassifierMixin | None = None,
     ):  # , phoneme_classifier=None):
         """
         Initializes the Wav2Vec2ForFramePrediction object with the specified attributes.
@@ -210,10 +218,10 @@ class Wav2Vec2ForFramePrediction:
         - reducer (PCA): A PCA dimensionality reduction model, could be another sklearn reduction model.
         - frame_classifier (KNeighborsClassifier): By default, a K-nearest neighbors classifier for frame classification. It sould be any other sklearn mclassifier.
         """
-        self.status = AudioStatus.SUCCESS
+        self.status: AudioStatus = AudioStatus.SUCCESS
         self.pred_phones_audio = []
-        self.fs = 16000
-        self.time_per_output = 0.02
+        self.fs: float = 16000
+        self.time_per_output: float = 0.02
 
         self.alphabet = alphabet
         self.collapse_method = collapse_method
@@ -221,11 +229,12 @@ class Wav2Vec2ForFramePrediction:
             alphabet, collapse_method=collapse_method
         )
 
-        self.id_to_p = {i: p for i, p in enumerate(self.alphabet + ['[SIL]'])}
-        self.p_to_id = {p: i for i, p in enumerate(self.alphabet + ['[SIL]'])}
+        alphabet_with_sil = self.add_silence(alphabet)
+        self.id_to_p = dict(enumerate(alphabet_with_sil))
+        self.p_to_id = {p: i for i, p in enumerate(alphabet_with_sil)}
 
-        self.reducer = reducer
-        self.frame_classifier = frame_classifier
+        self.reducer = reducer or PCA(n_components=0.95, random_state=42)
+        self.frame_classifier = frame_classifier or KNeighborsClassifier(10)
 
         # import Wav2Vec2 feature extractor
         self.w2v2_model_format = w2v2_model_format
@@ -248,6 +257,19 @@ class Wav2Vec2ForFramePrediction:
 
         self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
         # self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-base-960h")
+
+    @classmethod
+    def add_silence(cls, alphabet: Sequence[str]) -> Sequence[str]:
+        """
+        Adds the silence token to the alphabet.
+
+        Args:
+        - alphabet (list): A list of phone labels.
+
+        Returns:
+        - The alphabet with the silence token.
+        """
+        return [*alphabet, cls.SILENCE]
 
     def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
         """
@@ -293,7 +315,7 @@ class Wav2Vec2ForFramePrediction:
 
         if self.w2v2_model_format == "torch":
             with torch.no_grad():
-                return self.model(input_values).hidden_states[-1]
+                return self.model(input_values).hidden_states[-1]  # type: ignore
         else:
             onnx_outputs = self.session.run(
                 None, {self.session.get_inputs()[0].name: input_values.numpy()}
@@ -311,7 +333,7 @@ class Wav2Vec2ForFramePrediction:
         Returns:
         - The reduced last hidden state output.
         """
-        return self.reducer.transform(lhs[0])
+        return self.reducer.transform(lhs[0])  # type: ignore
 
     def fit(self, X, y):
         """
@@ -329,14 +351,14 @@ class Wav2Vec2ForFramePrediction:
         self.y_train = [self.p_to_id[el] for el in y]
 
         print('fit frame reducer...')
-        self.reducer.fit(self.X_train)
+        self.reducer.fit(self.X_train)  # type: ignore
         print('reduce training data')
-        self.X_train_reduced = self.reducer.transform(self.X_train)
+        self.X_train_reduced = self.reducer.transform(self.X_train)  # type: ignore
         print('fit frame classifier...')
-        self.frame_classifier.fit(self.X_train_reduced, self.y_train)
+        self.frame_classifier.fit(self.X_train_reduced, self.y_train)  # type: ignore
 
     # from an audio sample, computes the probability matrix of each frame corresponding to every phoneme
-    def predict_phone_prob_matrix(self, s: np.ndarray, fs: int) -> np.ndarray:
+    def predict_phone_prob_matrix(self, s: np.ndarray, fs: float) -> np.ndarray:
         """
         Computes the probability matrix of each frame corresponding to every phoneme for an audio sample.
 
@@ -357,7 +379,9 @@ class Wav2Vec2ForFramePrediction:
         self.timestamps.append(time() - start)
 
         start = time()
-        phone_prob_matrix = self.frame_classifier.predict_proba(self.reduced_lhs)
+        phone_prob_matrix = cast(
+            np.ndarray, self.frame_classifier.predict_proba(self.reduced_lhs)  # type: ignore
+        )
         self.timestamps.append(time() - start)
 
         # if during training, the classifier has not seen some of the labels, it won't be in the possible labels, and the proba matrix will have a reduced shape
@@ -365,7 +389,7 @@ class Wav2Vec2ForFramePrediction:
         ids_to_add = [
             el
             for el in range(len(self.id_to_p))
-            if el not in self.frame_classifier.classes_
+            if el not in self.frame_classifier.classes_  # type: ignore
         ]
 
         for i in ids_to_add:
@@ -381,6 +405,7 @@ class Wav2Vec2ForFramePrediction:
         # we defined the silence as the last token, we remove it here.
         # Silence will be deteted in the forced aligner by checking that the sum of the remaining probablities are not close to 1 (<0.2)
         # phone_prob_matrix = phone_prob_matrix[:,:-1]
+        # FIXME bad style
         self.phone_prob_matrix = phone_prob_matrix
 
         # print(
@@ -463,7 +488,7 @@ class Wav2Vec2ForFramePrediction:
         )
         if audio_load.status == AudioStatus.SUCCESS:
             phone_prob_df = pd.DataFrame(phone_prob_matrix)
-            phone_prob_df.columns = self.alphabet + ["[SIL]"]
+            phone_prob_df.columns = self.add_silence(self.alphabet)  # type: ignore
             return audio_load, phone_prob_df
         else:
             return audio_load, None
@@ -488,14 +513,14 @@ class Wav2Vec2ForFramePrediction:
         """
         max_idxs = np.argmax(phone_prob_df, axis=1)
 
-        alphabet = self.alphabet + ['[SIL]']
+        alphabet = self.add_silence(self.alphabet)
 
         max_posterior_df = pd.DataFrame({"max_idx": max_idxs})
         max_posterior_df["phone"] = max_posterior_df.max_idx.apply(lambda x: alphabet[x])
         max_posterior_df["proba"] = phone_prob_df.max(axis=1)
 
         max_posterior_df_filtered = max_posterior_df[
-            max_posterior_df.phone != "[SIL]"
+            max_posterior_df.phone != self.SILENCE
         ].copy()
 
         # group consecutive duplicates
@@ -531,7 +556,7 @@ class Wav2Vec2ForFramePrediction:
             max_posterior_df_filtered_processed_threshed["max_idx"].diff().ne(0).cumsum()
         )
 
-        def merging(x):
+        def merging2(x):
             d = {}
             d["phone"] = x["phone"].iloc[0]
             d["n_frames"] = x["n_frames"].sum()
@@ -543,7 +568,7 @@ class Wav2Vec2ForFramePrediction:
 
         max_posterior_df_filtered_processed_threshed = (
             max_posterior_df_filtered_processed_threshed.groupby("idx_for_merging")
-            .apply(merging)
+            .apply(merging2)
             .reset_index(drop=True)
         )
 
@@ -555,7 +580,7 @@ class Wav2Vec2ForFramePrediction:
 
     def phone_prob_matrix_segmentation(
         self, phone_prob_matrix: np.ndarray, phoneme_list: list[str]
-    ) -> tuple[pd.DataFrame, float]:
+    ) -> tuple[pd.DataFrame, float | None]:
         """
         Performs forced alignment segmentation on a probability matrix of phones.
 
@@ -582,7 +607,7 @@ class Wav2Vec2ForFramePrediction:
             - start: the start time of the phone in seconds
             - end: the end time of the phone in seconds
             - n_times: the number of duplicates collapsed
-        - dtw_cost: The final DTW alignment cost value
+        - dtw_cost: The final DTW alignment cost value (or None if alignment failed)
         """
         with CodeTimer('DTW', silent=True):
             df_segmented, dtw_cost = self.forced_aligner.probas_to_df_segmented(

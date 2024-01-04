@@ -1,4 +1,5 @@
 import os, psutil
+from typing import Iterable, Sequence
 
 print_memory_usage = lambda stage: print(
     stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
@@ -137,7 +138,7 @@ def remove_special_characters(
 
 
 def get_chunks(
-    text: str, chunking_chars: set[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
+    text: str, chunking_chars: Sequence[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
 ) -> list[str]:
     for c in chunking_chars:
         text = text.replace(c, chunking_chars[0])
@@ -147,7 +148,7 @@ def get_chunks(
 
 
 def chunk_text(
-    text: str, chunking_chars: set[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
+    text: str, chunking_chars: Sequence[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
 ) -> list[int]:
     """This function takes a text and chunks it in sentences, using a set of chunking characters.
     It returns the number of words in each chunk.
@@ -1076,7 +1077,7 @@ print_memory_usage('RAM - text_processing after all function declarations')
 
 def use_tests():
     # from src.text_processing import *
-    prefill_for_sentence(sentence)
+    # prefill_for_sentence(sentence)
 
     sentence = "A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
 

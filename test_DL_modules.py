@@ -27,7 +27,7 @@ from performance_functions import (
     pContrast_on_synth_words,
     stress_GE_performance_test,
 )
-from src.audio_processing import prepare_audio_file, read_audio_file
+from src.audio_processing import read_audio_file
 from src.label_data_processing import actor_recordings
 from src.pronunciation_dictionaries import cmu_consonants, cmu_vowels
 from src.text_processing import (

@@ -1,72 +1,28 @@
-import pyworld as pw
-import soundfile as sf
-import numpy as np
-import librosa
-import pytsmod as tsm
-
-from soundfile import LibsndfileError
-from pydub import AudioSegment
-import io
 import array
-from pydub import AudioSegment
-from pydub.utils import get_array_type
-
-from audiotsm import phasevocoder
-from audiotsm.io.wav import WavReader, WavWriter
-from scipy.interpolate import interp1d
-import uuid
-from scipy.io.wavfile import write, read
-import os
 import base64
 import io
 
-
-def load_audio(waveFileAddress, fs=16000):
-    """Load audio, remove DC and normalize waveform
-    speech_correction refers to the use of MetricGAN+. A speech enhancement system based on an adversarial loss and PESQ/STOI metrics
-    to improve audio quality.
-
-    Args:
-        waveFileAddress (string): wav file address
-    Returns:
-        numpy array, int: waveform signal and frequency of sampling
-    """
-    # fs, s = read(waveFileAddress)
-    s, fs = librosa.load(waveFileAddress, sr=fs)
-
-    # if speech_correction:
-    #     s=speech_enhancement(s)
-
-    # trim silences
-    # s, index = librosa.effects.trim(s, top_db=20)
-    # remove DC
-    s = (
-        s - s[int(0.15 * len(s)) : int(0.85 * len(s))].mean()
-    )  # we exclude 15% at each side that might contain buffer initialization/release noises
-    # normalization
-    s = 0.90 * s / max(abs(s))
-    return s, fs
-
-
-def prepare_audio_file(audio_file, fs=16000):
-    rID = str(uuid.uuid4())
-    if os.path.exists(audio_file):
-        s, fs = load_audio(audio_file, fs=fs)
-    else:
-        return "error: " + audio_file + " could not be loaded", None
-    write('./inputs/' + rID + '.wav', fs, (s * 32767).astype(np.int16))
-
-    return "success", rID
+import librosa
+import numpy as np
+import pytsmod as tsm
+import pyworld as pw
+import soundfile as sf
+from audiotsm import phasevocoder
+from audiotsm.io.wav import WavReader, WavWriter
+from pydub import AudioSegment
+from pydub.utils import get_array_type
+from scipy.interpolate import interp1d
+from soundfile import LibsndfileError
 
 
 # signal processing (pitch, instensity, normalization...)
-def getf0Samples(s: np.ndarray, fs: int) -> np.ndarray:
+def getf0Samples(s: np.ndarray, fs: float) -> np.ndarray:
     """Uses pyworld vocoder to extract fundamental frequency of the signal in Hz
     and converts it in semitones. And then upsample up to signal length
 
     Args:
         s (numpy array): audio waveform signal
-        fs (int): frequency of sampling
+        fs (float): frequency of sampling
 
     Returns:
         numpy array: upsampled f0 contour in semitones
@@ -74,7 +30,7 @@ def getf0Samples(s: np.ndarray, fs: int) -> np.ndarray:
 
     # pyin works as a replacement of pyworld, but I saw a slightly lower performance with it, so I'm not changing that for now
     # f0, voiced_flag, voiced_prob=librosa.pyin(s, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=fs)
-    f0, sp, ap = pw.wav2world(s.astype(np.float64), fs)
+    f0, sp, ap = pw.wav2world(s.astype(np.float64), fs)  # type: ignore
 
     f0 += 10**-10  # to avoid zeros going in the log, add a tiny number
 
@@ -92,7 +48,7 @@ def getf0Samples(s: np.ndarray, fs: int) -> np.ndarray:
     return f0Samples
 
 
-def getIntonation(s: np.ndarray, fs: int) -> np.ndarray:
+def getIntonation(s: np.ndarray, fs: float) -> np.ndarray:
     f0Samples = getf0Samples(s, fs)
     # replace nans with minimum value
     f0Samples = np.nan_to_num(f0Samples, nan=np.nanmin(f0Samples))
@@ -149,7 +105,7 @@ def getIntensity(s, fs):
     return int_db
 
 
-def normalize(x: np.ndarray | list) -> np.ndarray:
+def normalize(x: np.ndarray | list) -> np.ndarray | list:
     """normalizes a signal between 0 and 1
 
     Args:
@@ -269,8 +225,8 @@ def align_audios(
 
 
 def read_audio_file(
-    audio_file: str | io.IOBase, fs: int = 16000
-) -> tuple[np.ndarray, int]:
+    audio_file: str | io.IOBase, fs: float = 16000
+) -> tuple[np.ndarray, float]:
     """
     -audio file is a path or file-like object
     -then read that with "soundfile" when possible, else with "pydub"
@@ -303,7 +259,9 @@ def read_audio_file(
     return new_s, fs
 
 
-def read_audio_bytes(audio_bytes, fs=16000):
+def read_audio_bytes(
+    audio_bytes: bytes | bytearray, fs: float = 16000
+) -> tuple[np.ndarray, float]:
     """
     -put into a file-like object with "io",
     -then calls read_audio_file that reads with "soundfile" when possible, else with "pydub"
@@ -311,7 +269,9 @@ def read_audio_bytes(audio_bytes, fs=16000):
     return read_audio_file(io.BytesIO(audio_bytes), fs=fs)
 
 
-def read_audio_string(encoded_string, fs=16000):
+def read_audio_string(
+    encoded_string: str | bytearray | bytes, fs: float = 16000
+) -> tuple[np.ndarray, float]:
     """
     -decodes base64,
     -call read_audio_bytes
@@ -321,7 +281,7 @@ def read_audio_string(encoded_string, fs=16000):
     return s, fs
 
 
-def audio64_from_file(path, fs=16000):
+def audio64_from_file(path: str, fs: float = 16000) -> bytes:
     # writing bytes of an ogg file with virtual io, then encoding with base64
     try:
         s, orig_sr = sf.read(path)
@@ -341,7 +301,10 @@ def test_pyin():
     path = 'data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
     s, fs = librosa.load(path, sr=16000)
     f0, voiced_flag, voiced_prob = librosa.pyin(
-        s, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=fs
+        s,
+        fmin=float(librosa.note_to_hz('C2')),
+        fmax=float(librosa.note_to_hz('C7')),
+        sr=fs,
     )
 
     f0 += 10**-10  # to avoid zeros going in the log, add a tiny number

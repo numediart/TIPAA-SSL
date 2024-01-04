@@ -327,7 +327,7 @@ class dtw_forced_aligner:
         phone_prob_matrix: np.ndarray,
         target_phonemes: list[str],
         time_per_output: float = 0.02,
-    ) -> tuple[pd.DataFrame, float]:
+    ) -> tuple[pd.DataFrame, float | None]:
         """
         Convert probability matrix to a segmented DataFrame.
 
