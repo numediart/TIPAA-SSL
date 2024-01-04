@@ -489,7 +489,7 @@ def stress_from_formatted_phonetics(
     model: Wav2Vec2ForFramePrediction = default_model,
     vowels: set[str] = cmu_vowels,
 ) -> StressAnalysisResult:
-    phonetics = phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
+    phonetics = cmu_ensure_phonetics_consistency(phonetics)
     audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
@@ -605,7 +605,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
     to_gibberish=cmu_to_gibberish,
     **kwargs,
 ):
-    phonetics = phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
+    phonetics = cmu_ensure_phonetics_consistency(phonetics)
     g_t = [
         to_gibberish[unstress(p)]
         for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]
@@ -688,7 +688,7 @@ def schwa_sound_from_formatted_phonetics_audio(
     to_gibberish=cmu_to_gibberish,
     **kwargs,
 ):
-    phonetics = phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
+    phonetics = cmu_ensure_phonetics_consistency(phonetics)
     g_t = [
         to_gibberish[unstress(p)]
         for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]

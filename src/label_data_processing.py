@@ -3,6 +3,7 @@ import numpy as np
 import pdb
 from glob import glob
 from src.text_processing import (
+    cmu_ensure_phonetics_consistency,
     remove_special_characters,
     remove_stress_annots,
     prefill_content,
@@ -318,7 +319,7 @@ def synth_words_data(
     df = df.dropna()
     df = select_accent(df, accent=accent)
     df['phonetics'] = df.apply(
-        lambda r: r.phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH'), axis=1
+        lambda r: cmu_ensure_phonetics_consistency(r.phonetics), axis=1
     )
     # recompute syl_p, because I modified phonetics with CH and JH
     df['syl_p'] = df.phonetics.str.split('|').apply(

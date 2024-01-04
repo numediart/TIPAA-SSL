@@ -180,7 +180,7 @@ def compute_predictions(
     return result_df
 
 
-def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
+def stress_GE_performance_test(level: StressCategory = StressCategory.sentence):
     df = get_data_stressed_content()
     stress_intensities = []
     stress_binaries = []
@@ -503,7 +503,7 @@ def pContrast_from_audiobook_data(
     )
 
     selection['cmu_phonetics'] = selection.apply(
-        lambda r: r.cmu_phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH'), axis=1
+        lambda r: cmu_ensure_phonetics_consistency(r.cmu_phonetics), axis=1
     )
     df = selection
     df_words = df.apply(
@@ -806,7 +806,7 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_mode
 def final_ed_fake_mistakes(n=100):
     df = synth_words_data()
     df['phonetics'] = df.apply(
-        lambda r: r.phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH'), axis=1
+        lambda r: cmu_ensure_phonetics_consistency(r.phonetics), axis=1
     )
 
     df['target_word_indexes'] = 0

@@ -74,7 +74,6 @@ if True:
                     phonetics=formatted_phonetics_mod,
                     mode=AudioMode.BYTES,
                 )
-                print(audio_load)
 
                 st.markdown("## Results")
                 st.markdown("Basic audio check status: " + str(audio_load.status))
@@ -98,7 +97,7 @@ if True:
                         - DTW cost (higher = better matching): {post_analysis_results.dtw_cost:.2f}
                         - Silent frame ratio: {post_analysis_results.silent_frame_ratio:.2f} (fraction of silent frames in the raw recording)
                         - Phone count ratio: {post_analysis_results.phone_count_ratio:.2f} (ratio of number of detected phones over expected phones)
-                        - Pitch ratio: {audio_load.pitch_frame_ratio:.2f} (ratio of pitch in the raw recording over expected pitch)
+                        - Pitch ratio: {audio_load.pitch_frame_ratio:.2f} (ratio of number of frames with detected pitch over total number of frames)
                         """
                     )
                     if per > MAX_PER_FOR_ACCEPTANCE:
