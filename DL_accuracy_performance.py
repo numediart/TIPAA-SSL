@@ -442,7 +442,7 @@ def phoneme_confusions(
         print('phoneme')
         print(results[p])
 
-    plot_confusion_results(results, name=name + '_' + accent)
+    plot_confusion_results(results, name=name + '_' + (accent or "allAccents"))
 
     return results
 
@@ -946,30 +946,30 @@ def h_sound_artificial_data(model=default_model):
 
 
 def final_ed_s_confusions_on_synth_words():
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from src.charsiu_utils import charsiu_phone_forced_aligner
 
-    default_model_charsiu = charsiu_phone_forced_aligner(
-        aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
-    )
+    # default_model_charsiu = charsiu_phone_forced_aligner(
+    #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
+    # )
     from datetime import datetime
 
     now = datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
-    final_ed_confusions_on_synth_words(
-        n=100,
-        model=default_model_charsiu,
-        name='plots/final_ed_synth_words_charsiu_' + date_time,
-    )
+    # final_ed_confusions_on_synth_words(
+    #     n=100,
+    #     model=default_model_charsiu,
+    #     name='plots/final_ed_synth_words_charsiu_' + date_time,
+    # )
     final_ed_confusions_on_synth_words(
         n=100,
         model=default_model,
         name='plots/final_ed_synth_words_pipeline_onnx_' + date_time,
     )
-    final_s_confusions_on_synth_words(
-        n=100,
-        model=default_model_charsiu,
-        name='plots/final_s_synth_words_charsiu_' + date_time,
-    )
+    # final_s_confusions_on_synth_words(
+    #     n=100,
+    #     model=default_model_charsiu,
+    #     name='plots/final_s_synth_words_charsiu_' + date_time,
+    # )
     final_s_confusions_on_synth_words(
         n=100,
         model=default_model,
@@ -1157,14 +1157,14 @@ def model_comparison():
         }
         return stats
 
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from src.charsiu_utils import charsiu_phone_forced_aligner
 
-    default_model_charsiu = charsiu_phone_forced_aligner(
-        aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
-    )
-    stats_prod = stats_pronunciation_aspects(default_model_charsiu)
-    with open('stats_prod_target_to_basis', 'w') as f:
-        f.write(stats_prod.__str__())
+    # default_model_charsiu = charsiu_phone_forced_aligner(
+    #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
+    # )
+    # stats_prod = stats_pronunciation_aspects(default_model_charsiu)
+    # with open('stats_prod_target_to_basis', 'w') as f:
+    #     f.write(stats_prod.__str__())
 
     stats_pipeline = {}
     for m in models:
@@ -1249,7 +1249,7 @@ def model_comparison():
     ].T
 
 
-def use_tests():
+if __name__ == "__main__":
     final_ed_s_confusions_on_synth_words()
 
     from datetime import datetime
@@ -1257,32 +1257,31 @@ def use_tests():
     now = datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
 
-    _, results = phoneme_confusions(
+    results = phoneme_confusions(
         phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100
     )
     plot_confusion_results(
         results, name='plots/vowel_confusions_on_synth_words_' + date_time
     )
 
-    # from DL_accuracy_performance import *
-    pContrast_for_actor_recordings(target_phones='AO1')
+    # pContrast_for_actor_recordings(target_phones='AO1')
 
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from src.charsiu_utils import charsiu_phone_forced_aligner
 
-    default_model_charsiu = charsiu_phone_forced_aligner(
-        aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
-    )
-    pContrast_for_actor_recordings(target_phones='AO1', model=default_model_charsiu)
+    # default_model_charsiu = charsiu_phone_forced_aligner(
+    #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
+    # )
+    # pContrast_for_actor_recordings(target_phones='AO1', model=default_model_charsiu)
 
-    start_end_phoneme_from_audiobook_data(phoneme='HH')
-    start_end_phoneme_from_audiobook_data(phoneme='S', basis='S', position="end")
-    start_end_phoneme_from_audiobook_data(phoneme='Z', basis='Z', position="end")
+    # start_end_phoneme_from_audiobook_data(phoneme='HH')
+    # start_end_phoneme_from_audiobook_data(phoneme='S', basis='S', contrast="end")
+    # start_end_phoneme_from_audiobook_data(phoneme='Z', basis='Z', contrast="end")
 
-    r = final_ed_for_actor_recordings()
-    r = final_ed_for_actor_recordings('T')
-    r = final_ed_for_actor_recordings("IH0_D")
+    # r = final_ed_for_actor_recordings()
+    # r = final_ed_for_actor_recordings('T')
+    # r = final_ed_for_actor_recordings("IH0_D")
 
-    pContrast_for_actor_recordings(target_phones='AO1')
+    # pContrast_for_actor_recordings(target_phones='AO1')
 
     stress_GE_performance_test(level='word')
     stress_GE_performance_test(level='sentence')

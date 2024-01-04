@@ -136,12 +136,6 @@ def compute_predictions(
                 target_syllable_idx = r.target_syllable_indexes
             try:
                 s, fs = read_audio_file(r.fpath, fs=16000)
-            except Exception as e:
-                print('error in reading audio in compute_predictions')
-                print('row information')
-                print(r)
-                print(e)
-            try:
                 # this is only for start_end_contrasts, I am putting a default if does not exist
                 contrast = r.contrast if 'contrast' in r else 'end'
                 res = tech_function(
@@ -154,7 +148,7 @@ def compute_predictions(
                     basis=basis,
                     contrast=contrast,
                     alternatives=alternatives,
-                    mode='numpy',
+                    mode=AudioMode.NUMPY,
                     model=model,
                     **kwargs,
                 )
@@ -180,7 +174,7 @@ def compute_predictions(
     return result_df
 
 
-def stress_GE_performance_test(level: StressCategory = StressCategory.sentence):
+def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
     df = get_data_stressed_content()
     stress_intensities = []
     stress_binaries = []
@@ -574,7 +568,7 @@ def start_end_phoneme_from_audiobook_data(
         target_phones=target_phones,
         tech_function=start_end_contrast_from_formatted_phonetics_audio,
         basis=basis,
-        contrast=contrast,
+        # contrast=contrast,
         model=model,
     )
     phonetic_detections = result_df.phonetic_detection
