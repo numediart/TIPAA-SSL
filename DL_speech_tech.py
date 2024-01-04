@@ -1,6 +1,10 @@
+from collections.abc import Sequence
+import math
+import os
 from dataclasses import dataclass
 from enum import Enum, auto
-import os, psutil
+
+import psutil
 
 print_memory_usage = lambda stage: print(
     stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
@@ -20,6 +24,8 @@ print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
 
 from src.text_processing import (
     cmu_ensure_phonetics_consistency,
+    remove_acronym_hyphen,
+    split_phonetics_to_phones,
     unstress,
     split_phonetics,
     remove_stress_annots,
@@ -184,12 +190,9 @@ def remove_downwards_trend(y):
     return y.astype(int).tolist()
 
 
-import math
-
-roundup = lambda n: math.ceil(n)
-
-
-def intensity_to_bin(scores, n_max=2, threshold=60):
+def intensity_to_bin(
+    scores: Sequence[float], n_max: int = 2, threshold: float = 60
+) -> list[int]:
     """Convert a list of scores to binaries according to a threshold and a maximum numbers of "1" authorized.
     All elements are 0 except the ones that verify following conditions:
     - be among the n_max highest elements
@@ -239,7 +242,7 @@ def predict_phone(
 ):
     """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'"""
     # phoneme_set=[p for p in remove_stress_annots(phoneme_set)]+["[SIL]"]
-    phoneme_set = [p for p in phoneme_set] + ["[SIL]"]
+    phoneme_set = [*list(phoneme_set), "[SIL]"]
 
     # split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
     # df_word=self.predict_word(audio, split_phonetics, target_word_idx)
@@ -465,7 +468,7 @@ def stress_from_df_segmented_audio(
 
         bins_by_chunk = []
         for chunk in scores_grouped_by_chunk:
-            bin = intensity_to_bin(chunk, n_max=roundup(len(chunk) / 3))
+            bin = intensity_to_bin(chunk, n_max=math.ceil(len(chunk) / 3))
             bins_by_chunk.append(bin)
         return StressAnalysisResult(
             "success", sum(scores_grouped_by_chunk, []), sum(bins_by_chunk, [])
@@ -497,8 +500,8 @@ def stress_from_formatted_phonetics(
         return StressAnalysisResult(str(audio_load.status), [], [])
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
-    phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
-    phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
+    phonetics = remove_acronym_hyphen(phonetics)
+    phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
@@ -534,7 +537,7 @@ def phonemeContrast_from_df_segmented(
         for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]
     ]
 
-    phones_by_words = [el.split('_') for el in phonetics.replace('|', '_').split(' ')]
+    phones_by_words = split_phonetics(phonetics)
     df_word = extract_word(df_segmented, phones_by_words, target_word_idx)
     phonetic_detection, detected_syllable = predict_phone(
         model.forced_aligner,
@@ -556,7 +559,7 @@ def phonemeContrast_from_df_segmented(
             "gibberish_detected": "null",
         }
 
-    if 'SIL' in phonetic_detection:
+    if model.SILENCE in phonetic_detection:
         return {
             "status": model.status,
             "phonetic_detection": "null",
@@ -621,7 +624,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
             "gibberish_truth": '_'.join(g_t),
             "gibberish_detected": "null",
         }
-    phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
+    phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
@@ -703,7 +706,7 @@ def schwa_sound_from_formatted_phonetics_audio(
             "gibberish_truth": '_'.join(g_t),
             "gibberish_detected": "null",
         }
-    phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
+    phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
@@ -773,7 +776,7 @@ def schwa_sound_from_formatted_phonetics_audio(
         # if threshold=0, no contraint due to threshold, only ranking constraint
         unstressed_bin_f = lambda stress_intensities_word: intensity_to_bin(
             [100 - el for el in stress_intensities_word],
-            n_max=roundup(len(stress_intensities_word) / 3),
+            n_max=math.ceil(len(stress_intensities_word) / 3),
             threshold=0,
         )
         unstressed_bin = unstressed_bin_f(stress_intensities_word)
@@ -817,7 +820,7 @@ def phonetic_reference_processing(
     contrast_idx,
 ):
     ### Phonetics processing to build a reference with the basis replacing target_phones
-    phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
+    phonetics = remove_acronym_hyphen(phonetics)
 
     phonetics_indexed_df = phonetics_indexed_df_from_formatted_phonetics(
         phonetics.split(' ')[target_word_idx]
@@ -826,7 +829,7 @@ def phonetic_reference_processing(
     syl_GT = remove_stress_annots(
         phonetics.split(' ')[target_word_idx].split('|')[target_syllable_idx].split('_')
     )
-    split_phonetics_words = [p.replace('|', '_').split('_') for p in phonetics.split(' ')]
+    split_phonetics_words = split_phonetics(phonetics)
     split_phonetics_syls = [
         [syl.split('_') for syl in p.split('|')] for p in phonetics.split(' ')
     ]
@@ -924,8 +927,8 @@ def post_analysis(
     -------
     PostAnalysisResults: summary of the quality checks
     """
-    split_phonetics = [p.replace('|', '_').split('_') for p in phonetics.split(' ')]
-    expected_phoneme_list = remove_stress_annots(sum(split_phonetics, []))
+    phone_list = split_phonetics_to_phones(phonetics)
+    expected_phoneme_list = remove_stress_annots(sum(phone_list, []))
 
     (
         max_posterior_df,
@@ -934,7 +937,7 @@ def post_analysis(
     ) = model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=proba_thresh)
 
     pred_phoneme_list = max_posterior_df_filtered_processed_threshed.phone.tolist()
-    silent_frame_ratio = (max_posterior_df.phone == '[SIL]').mean()
+    silent_frame_ratio = (max_posterior_df.phone == model.SILENCE).mean()
     phone_count_ratio = len(max_posterior_df_filtered_processed_threshed) / len(
         expected_phoneme_list
     )
@@ -1076,7 +1079,7 @@ def start_end_contrast_from_prob_matrix(
     if target_syllable_idx == -1:
         target_syllable_idx = syl_idxs[-1]
     df_syl = df_word[df_word.syl_idx == target_syllable_idx]
-    df_syl = df_syl[df_syl.pred_phones_audio != '[SIL]']
+    df_syl = df_syl[df_syl.pred_phones_audio != model.SILENCE]
 
     # filter out phonemes too short inside the termination,
     # if forced alignment lead to assigning very few frames for a phoneme, we assume it means it does not really exists
@@ -1207,7 +1210,7 @@ def start_end_contrast_from_formatted_phonetics_audio(
         elif position == "start":
             target_syllable_idx = 0
         else:
-            print("position should be start or end")
+            raise ValueError("position should be start or end")
 
     g_t = [
         to_gibberish[unstress(p)]
@@ -1299,7 +1302,9 @@ def phonetic_content_analysis(
                 phonetic_content.loc[i, 'pred_phones_audio'] = r.phones
 
     # phonetic_content=phonetic_content[phonetic_content.n_frames>1]
-    phonetic_content = phonetic_content[phonetic_content.pred_phones_audio != '[SIL]']
+    phonetic_content = phonetic_content[
+        phonetic_content.pred_phones_audio != model.SILENCE
+    ]
     phonetic_content = phonetic_content.loc[
         drop_consecutive_duplicates(
             phonetic_content[['phones', 'pred_phones_audio']]
@@ -1354,7 +1359,7 @@ def multiple_aspect_from_prob_matrix(
     to_gibberish=cmu_to_gibberish,
     **kwargs,
 ):
-    phoneme_list = phonetics.replace(' ', '_').replace('|', '_').split('_')
+    phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
@@ -1504,7 +1509,7 @@ def multiple_aspect_from_formatted_phonetics_audio(
         return audio_load, None, None
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
-    phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
+    phonetics = remove_acronym_hyphen(phonetics)
 
     post_analysis_result = post_analysis(phone_prob_matrix, phonetics, model=model)
 

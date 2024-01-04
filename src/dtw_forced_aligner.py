@@ -287,7 +287,6 @@ class dtw_forced_aligner:
             return p_df_full
 
         df_segmented2 = df_segmented[df_segmented.phones != '[SIL]']
-        # collapse_consecutive_duplicates(df_segmented)
         df_segmented2 = collapse_consecutive_duplicates(df_segmented2)
         if len(df_segmented) > 0:
             df_segmented = divide_consecutive_duplicates(
@@ -306,7 +305,6 @@ class dtw_forced_aligner:
         Returns:
             Tuple[np.array[float], list, list]: A tuple containing the phone probability matrix of non-silent frames, the list of indices of silence frames, and the list of indices of non-silence frames.
         """
-        phone_prob_matrix = [l for l in phone_prob_matrix]
 
         # Here we want to detect silence frames. The silence token is at the last index. Either we can threshold it, or maybe better: check if it's the max posterior probability
         # def condition(vect): return vect[-1]>0.8

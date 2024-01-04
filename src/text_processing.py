@@ -28,15 +28,6 @@ print_memory_usage('RAM - text_processing after external libraries')
 g2p = G2p()
 print_memory_usage('RAM - text_processing after g2p model')
 
-drop_consecutive_duplicates = lambda df: df.loc[
-    (df.shift() != df).sum(axis=1).astype(bool)
-]
-drop_consecutive_duplicate_elements = lambda L: [key for key, _group in groupby(L)]
-split_phonetics = lambda phonetics: [
-    [s.split('_') for s in w.split('|')] for w in phonetics.split(' ')
-]
-group_consecutive_duplicates = lambda L: [(k, len(list(g))) for k, g in groupby(L)]
-
 from src.pronunciation_dictionaries import (
     unstress,
     remove_stress_annots,
@@ -78,13 +69,36 @@ syllables_dfs = {
 print_memory_usage('RAM - text_processing after syllables_df')
 
 
-# class Phonetics(str):
-#     pass
+def drop_consecutive_duplicates(df):
+    return df.loc[(df.shift() != df).sum(axis=1).astype(bool)]
 
 
-# class PhoneList(list[str]):
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs
+def drop_consecutive_duplicate_elements(l):
+    return [key for key, _group in groupby(l)]
+
+
+def split_phonetics(phonetics: str) -> list[list[str]]:
+    """Take a formatted phonetics string (sentence) and return a list of words, each word being a list of phones
+
+    Example:
+        >>> split_phonetics("HH_AW1 L_AH1|V_L_IY0")
+        [['HH', 'AW1'], ['L', 'AH1', 'V', 'L', 'IY0']]
+    """
+    return [[s.split("_") for s in w.split("|")] for w in phonetics.split(" ")]
+
+
+def split_phonetics_to_phones(phonetics: str) -> list[str]:
+    """Take a formatted phonetics string (sentence) and return a list of phones
+
+    Example:
+        >>> split_phonetics_to_phones("HH_AW1 L_AH1|V_L_IY0")
+        ['HH', 'AW1', 'L', 'AH1', 'V', 'L', 'IY0']
+    """
+    return phonetics.replace(" ", "_").replace("|", "_").split("_")
+
+
+def group_consecutive_duplicates(L):
+    return [(k, len(list(g))) for k, g in groupby(L)]
 
 
 def show_alternatives_distributions():
@@ -583,7 +597,8 @@ def extract_special_chars(norm_sent, special_chars):
     return special_chars_dict_start, special_chars_dict_end
 
 
-get_acronyms_idxs = lambda words: [w_idx for w_idx, w in enumerate(words) if w.isupper()]
+def get_acronyms_idxs(words):
+    return [w_idx for w_idx, w in enumerate(words) if w.isupper()]
 
 
 def add_special_chars(split_text, special_chars_dict_start, special_chars_dict_end):
@@ -616,6 +631,10 @@ def acronyms_to_compound(split_text, acronym_idxs):
             else:
                 split_text[i] = el.replace('{', '').replace('}', '')
     return split_text
+
+
+def remove_acronym_hyphen(phonetics: str) -> str:
+    return phonetics.replace("-", " ").replace("{", "").replace("}", "")
 
 
 def text_normalization(
@@ -1022,12 +1041,12 @@ def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
                 lang=lang,
                 word_dict=word_dict,
             )
+            records.append(record)
         except:
             print('Error with sentence: ' + s)
             err = internal_error()
             err["sentence"] = s
             error_records.append(err)
-        records.append(record)
 
     df_errors = pd.DataFrame.from_records(error_records)
     # now=datetime.now()

@@ -30,6 +30,7 @@ from src.pronunciation_dictionaries import (
     cmu_stressed_alphabet,
     ipa_alphabet,
 )
+from text_processing import remove_acronym_hyphen
 
 cmu_vowels = [p[0] for p in cmu_phones_info if p[1][0] == 'vowel']
 cmu_consonants = [p[0] for p in cmu_phones_info if p[1][0] != 'vowel']
@@ -148,8 +149,20 @@ def audio_load_and_check(
     return AudioLoadResult(AudioStatus.SUCCESS, s, fs, pitch_frame_ratio)
 
 
-# processing functions of df_segmented, which is the output of prediction and forced alignment
-def extract_word(df_segmented, phonetics, target_word_idx):
+def extract_word(
+    df_segmented: pd.DataFrame, phonetics: list[list[str]], target_word_idx: int
+) -> pd.DataFrame:
+    """Extract a word from a df_segmented, given the phonetics and the target word index
+
+    Arguments
+    ---------
+    df_segmented : pd.DataFrame
+        The output of prediction and forced alignment
+    phonetics : list[list[str]]
+        The phonetic transcription of the audio, as a list of lists of phones
+    target_word_idx : int
+        The index of the target word in the phonetic transcription
+    """
     start_idx = sum([len(p) for p in phonetics][:target_word_idx])
     end_idx = sum([len(p) for p in phonetics][: target_word_idx + 1])
     df_word = df_segmented[start_idx:end_idx].copy()
@@ -424,7 +437,7 @@ class Wav2Vec2ForFramePrediction:
         phone_prob_matrix : np.ndarray
             The probability matrix of phonemes.
         """
-        phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
+        phonetics = remove_acronym_hyphen(phonetics)
         with CodeTimer('load audio', silent=True):
             audio_load = audio_load_and_check(
                 audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, fs=self.fs
