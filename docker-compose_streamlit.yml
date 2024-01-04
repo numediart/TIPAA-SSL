@@ -1,7 +1,9 @@
-version: '3'
+version: "3"
 
 services:
   flaskapp:
+    # this is needed to run the app on apple silicon
+    platform: linux/amd64
     build: ./
     volumes:
       # Just specify a path and let the Engine create a volume
@@ -10,6 +12,7 @@ services:
     # network_mode: host
     ports:
       - "8000:8000"
+    init: true
     restart: on-failure
     command: ["bash", "content_tools/run_content_tools.sh"]
 
@@ -22,6 +25,7 @@ services:
       - SERVER_NAME=0.0.0.0
     restart: always
     # network_mode: host
+    init: true
     ports:
       - "80:80"
       - "443:443"

@@ -17,6 +17,7 @@ def unstress(el: str) -> str:
 
 
 def remove_stress_annots(transcription: list[str]) -> list[str]:
+    """Remove stress annotations from a list of CMU phones"""
     return [unstress(el) for el in transcription]
 
 
