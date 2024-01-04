@@ -633,7 +633,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
         # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
         g_d = [
             to_gibberish[unstress(p)] if not 'UNK' in p else 'uh'
-            for p in model.pred_phones_audio
+            for p in df_segmented.pred_phones_audio
         ]
         if g_d == []:
             return {
@@ -715,7 +715,7 @@ def schwa_sound_from_formatted_phonetics_audio(
         # convert to gibberish, but translate UNK token to 'uh', the schwa because we don't know what it is
         g_d = [
             to_gibberish[unstress(p)] if not 'UNK' in p else 'uh'
-            for p in model.pred_phones_audio
+            for p in df_segmented.pred_phones_audio
         ]
         if g_d == []:
             return {
@@ -1041,10 +1041,9 @@ def start_end_contrast_from_prob_matrix(
 
     # FIXME extremely bad style
     if model.status != "success":
-        # g_d=[to_gibberish[unstress(p)] for p in model.pred_phones_audio]
         g_d = [
             to_gibberish[unstress(p)] if not 'UNK' in p else 'uh'
-            for p in model.pred_phones_audio
+            for p in df_segmented.pred_phones_audio
         ]
 
         if g_d == []:
@@ -1761,13 +1760,13 @@ def use_tests():
     max_idxs = np.argmax(phone_prob_df, axis=1)
     phone_prob_df.argmax(axis=1)
 
-    alphabet = default_model.alphabet + ['[SIL]']
+    alphabet = default_model.alphabet_with_silence
 
     max_posterior_df = pd.DataFrame()
     max_posterior_df['phone'] = [alphabet[i] for i in max_idxs]
     max_posterior_df['proba'] = phone_prob_df.max(axis=1)
     max_posterior_df_filtered = max_posterior_df[max_posterior_df.proba > 0.7][
-        max_posterior_df.phone != "[SIL]"
+        max_posterior_df.phone != default_model.SILENCE
     ]
     max_posterior_df_filtered.sort_values('proba', ascending=False).drop_duplicates(
         'phone'
@@ -1782,7 +1781,7 @@ def use_tests():
     )
 
     phone_prob_df = pd.DataFrame(phone_prob_matrix)
-    phone_prob_df.columns = default_model.alphabet + ["[SIL]"]
+    phone_prob_df.columns = default_model.alphabet_with_silence
 
     self = default_model_ipa
     phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)

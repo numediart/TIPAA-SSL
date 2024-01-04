@@ -1,49 +1,40 @@
-from dataclasses import dataclass
-from typing import Sequence, cast
-from sklearn.base import ClassifierMixin, TransformerMixin
-from strenum import StrEnum
-from enum import Enum
-import pandas as pd
-import numpy as np
-import pickle
 import os
-import torch
-import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.decomposition import PCA
-
-# from umap.umap_ import UMAP
-
-
+import pickle
+from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import Enum
 from time import time
+from typing import cast
+import logging
+
+import numpy as np
+import pandas as pd
+import torch
+from linetimer import CodeTimer
+from sklearn.base import ClassifierMixin, TransformerMixin
+from sklearn.decomposition import PCA
+from sklearn.neighbors import KNeighborsClassifier
+from strenum import StrEnum
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
-# from src.metrics import compute_PER, plot_cf_matrix
+from src.audio_processing import (
+    getIntonation,
+    read_audio_bytes,
+    read_audio_file,
+    read_audio_string,
+)
 from src.dtw_forced_aligner import dtw_forced_aligner
 from src.pronunciation_dictionaries import (
     cmu_alphabet,
-    ipa_alphabet,
     cmu_phones_info,
-    cmu_reducer,
     cmu_stressed_alphabet,
+    ipa_alphabet,
 )
 
-from src.text_processing import group_consecutive_duplicates
-
-global cmu_vowels
-# cmu_phones=[el[0] for el in cmu_phones_info]
 cmu_vowels = [p[0] for p in cmu_phones_info if p[1][0] == 'vowel']
 cmu_consonants = [p[0] for p in cmu_phones_info if p[1][0] != 'vowel']
 
-import soundfile as sf
-from scipy.io.wavfile import read
-from src.audio_processing import (
-    getIntonation,
-    read_audio_file,
-    read_audio_string,
-    read_audio_bytes,
-)
-from linetimer import CodeTimer
+logger = logging.getLogger(__name__)
 
 
 # StrEnum in python 3.11
@@ -145,9 +136,6 @@ def audio_load_and_check(
     if speech_rate > max_speech_rate:
         return AudioLoadResult(AudioStatus.TOO_SHORT, s, fs, None)
     elif speech_rate < min_speech_rate:
-        print(
-            f"{phonetics}: speech_rate={speech_rate} < {min_speech_rate}, duration = {duration}, n_syllables_tot = {n_syllables_tot}"
-        )
         return AudioLoadResult(AudioStatus.TOO_LONG, s, fs, None)
 
     if np.abs(s).sum() == 0:
@@ -206,7 +194,7 @@ class Wav2Vec2ForFramePrediction:
         w2v2_model_format: str = "torch",
         reducer: TransformerMixin | None = None,
         frame_classifier: ClassifierMixin | None = None,
-    ):  # , phoneme_classifier=None):
+    ):
         """
         Initializes the Wav2Vec2ForFramePrediction object with the specified attributes.
 
@@ -219,7 +207,6 @@ class Wav2Vec2ForFramePrediction:
         - frame_classifier (KNeighborsClassifier): By default, a K-nearest neighbors classifier for frame classification. It sould be any other sklearn mclassifier.
         """
         self.status: AudioStatus = AudioStatus.SUCCESS
-        self.pred_phones_audio = []
         self.fs: float = 16000
         self.time_per_output: float = 0.02
 
@@ -229,9 +216,9 @@ class Wav2Vec2ForFramePrediction:
             alphabet, collapse_method=collapse_method
         )
 
-        alphabet_with_sil = self.add_silence(alphabet)
-        self.id_to_p = dict(enumerate(alphabet_with_sil))
-        self.p_to_id = {p: i for i, p in enumerate(alphabet_with_sil)}
+        self.alphabet_with_silence = self.add_silence(alphabet)
+        self.id_to_p = dict(enumerate(self.alphabet_with_silence))
+        self.p_to_id = {p: i for i, p in enumerate(self.alphabet_with_silence)}
 
         self.reducer = reducer or PCA(n_components=0.95, random_state=42)
         self.frame_classifier = frame_classifier or KNeighborsClassifier(10)
@@ -256,7 +243,6 @@ class Wav2Vec2ForFramePrediction:
             )
 
         self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-        # self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-base-960h")
 
     @classmethod
     def add_silence(cls, alphabet: Sequence[str]) -> Sequence[str]:
@@ -350,11 +336,11 @@ class Wav2Vec2ForFramePrediction:
 
         self.y_train = [self.p_to_id[el] for el in y]
 
-        print('fit frame reducer...')
+        logger.info('fit frame reducer...')
         self.reducer.fit(self.X_train)  # type: ignore
-        print('reduce training data')
+        logger.info('reduce training data')
         self.X_train_reduced = self.reducer.transform(self.X_train)  # type: ignore
-        print('fit frame classifier...')
+        logger.info('fit frame classifier...')
         self.frame_classifier.fit(self.X_train_reduced, self.y_train)  # type: ignore
 
     # from an audio sample, computes the probability matrix of each frame corresponding to every phoneme
@@ -402,16 +388,10 @@ class Wav2Vec2ForFramePrediction:
                 axis=1,
             )
 
-        # we defined the silence as the last token, we remove it here.
-        # Silence will be deteted in the forced aligner by checking that the sum of the remaining probablities are not close to 1 (<0.2)
-        # phone_prob_matrix = phone_prob_matrix[:,:-1]
-        # FIXME bad style
-        self.phone_prob_matrix = phone_prob_matrix
-
-        # print(
-        #     'times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba'
-        # )
-        # print(self.timestamps)
+        logger.debug(
+            "Times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba:"
+        )
+        logger.debug(self.timestamps)
         return phone_prob_matrix
 
     def audio_to_phone_prob_matrix(
@@ -451,7 +431,8 @@ class Wav2Vec2ForFramePrediction:
             )
         if audio_load.status == AudioStatus.SUCCESS:
             with CodeTimer('phone_prob_matrix prediction', silent=True):
-                assert audio_load.waveform is not None
+                if audio_load.waveform is None:
+                    raise ValueError("phone_prob_matrix is None")
                 phone_prob_matrix = self.predict_phone_prob_matrix(
                     audio_load.waveform, self.fs
                 )
@@ -488,7 +469,7 @@ class Wav2Vec2ForFramePrediction:
         )
         if audio_load.status == AudioStatus.SUCCESS:
             phone_prob_df = pd.DataFrame(phone_prob_matrix)
-            phone_prob_df.columns = self.add_silence(self.alphabet)  # type: ignore
+            phone_prob_df.columns = self.alphabet_with_silence  # type: ignore
             return audio_load, phone_prob_df
         else:
             return audio_load, None
@@ -513,10 +494,10 @@ class Wav2Vec2ForFramePrediction:
         """
         max_idxs = np.argmax(phone_prob_df, axis=1)
 
-        alphabet = self.add_silence(self.alphabet)
-
         max_posterior_df = pd.DataFrame({"max_idx": max_idxs})
-        max_posterior_df["phone"] = max_posterior_df.max_idx.apply(lambda x: alphabet[x])
+        max_posterior_df["phone"] = max_posterior_df.max_idx.apply(
+            lambda x: self.alphabet_with_silence[x]
+        )
         max_posterior_df["proba"] = phone_prob_df.max(axis=1)
 
         max_posterior_df_filtered = max_posterior_df[
@@ -613,12 +594,6 @@ class Wav2Vec2ForFramePrediction:
             df_segmented, dtw_cost = self.forced_aligner.probas_to_df_segmented(
                 phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output
             )
-            if len(df_segmented) > 0:
-                # FIXME this is horrible style!
-                self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
-            else:
-                self.pred_phones_audio = []
-                # TODO: declare model.status to be that nothing expected was detected and use that in calls of this function, among other things in pronunciation aspect functions
         return df_segmented, dtw_cost
 
 
@@ -828,7 +803,7 @@ def inference_demo():
     # phoneme predictions on a single audio sample with forced alignment
     prob_matrix = model.predict_phone_prob_matrix(s, 16000)
 
-    latentogram = model.reducer.transform(model.lhs[0])
+    latentogram = model.reducer.transform(model.lhs[0])  # type: ignore
     df_segmented.start_idx.tolist()
 
     # to have horizontal line in white in the heatmap at the phone starts, I put a 6
