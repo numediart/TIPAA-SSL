@@ -36,11 +36,11 @@ class dtw_forced_aligner:
             collapse_method (str, optional): The method used to collapse probability vectors. Defaults to 'mean'.
         """
         self.alphabet = alphabet
-        self.id_to_p = {i: p for i, p in enumerate(self.alphabet + ['[SIL]'])}
-        self.p_to_id = {p: i for i, p in enumerate(self.alphabet + ['[SIL]'])}
+        self.id_to_p = dict(enumerate([*self.alphabet, '[SIL]']))
+        self.p_to_id = {p: i for i, p in enumerate([*self.alphabet, '[SIL]'])}
         self.collapse_method = collapse_method
 
-    def labelize_phonemes(self, phonemes):
+    def labelize_phonemes(self, phonemes: list[str]) -> np.ndarray:
         """
         Convert a list of phonemes to their corresponding ids.
 
@@ -54,7 +54,9 @@ class dtw_forced_aligner:
         return np.array([self.p_to_id[el] for el in phonemes])
 
     # from phone_prob_matrix_nonsil and target_phonemes, get the most likely path (forced alignment)
-    def get_forced_alignment(self, phone_prob_matrix_nonsil, target_phonemes):
+    def get_forced_alignment(
+        self, phone_prob_matrix_nonsil: np.ndarray, target_phonemes: list[str]
+    ) -> tuple[bool, list[str], float | None]:
         """
         Perform forced alignment to get the most likely path using Dynamic Time Warping.
 

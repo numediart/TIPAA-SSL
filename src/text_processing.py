@@ -77,14 +77,26 @@ def drop_consecutive_duplicate_elements(l):
     return [key for key, _group in groupby(l)]
 
 
-def split_phonetics(phonetics: str) -> list[list[str]]:
-    """Take a formatted phonetics string (sentence) and return a list of words, each word being a list of phones
+def split_phonetics(phonetics: str) -> list[list[list[str]]]:
+    """Take a formatted phonetics string (sentence) and
+    split it into words, syllables and phones.
+
+    Example:
+        >>> split_phonetics("HH_AW1 L_AH1|V_L_IY0")
+        [[['HH', 'AW1']], [['L', 'AH1'], ['V', 'L', 'IY0']]]
+    """
+    return [[s.split("_") for s in w.split("|")] for w in phonetics.split(" ")]
+
+
+def split_phonetics_by_words(phonetics: str) -> list[list[str]]:
+    """Take a formatted phonetics string (sentence) and
+    split it into words and phones.
 
     Example:
         >>> split_phonetics("HH_AW1 L_AH1|V_L_IY0")
         [['HH', 'AW1'], ['L', 'AH1', 'V', 'L', 'IY0']]
     """
-    return [[s.split("_") for s in w.split("|")] for w in phonetics.split(" ")]
+    return [w.split("_") for w in phonetics.replace("|", "_").split(" ")]
 
 
 def split_phonetics_to_phones(phonetics: str) -> list[str]:
@@ -95,6 +107,16 @@ def split_phonetics_to_phones(phonetics: str) -> list[str]:
         ['HH', 'AW1', 'L', 'AH1', 'V', 'L', 'IY0']
     """
     return phonetics.replace(" ", "_").replace("|", "_").split("_")
+
+
+def count_syllables(phonetics: str) -> int:
+    """Take a formatted phonetics string (sentence) and return the number of syllables
+
+    Example:
+        >>> count_syllables("HH_AW1 L_AH1|V_L_IY0")
+        3
+    """
+    return sum(len(w) for w in split_phonetics(phonetics))
 
 
 def group_consecutive_duplicates(L):
@@ -633,7 +655,7 @@ def acronyms_to_compound(split_text, acronym_idxs):
     return split_text
 
 
-def remove_acronym_hyphen(phonetics: str) -> str:
+def remove_grouping_hyphens(phonetics: str) -> str:
     return phonetics.replace("-", " ").replace("{", "").replace("}", "")
 
 

@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 from collections.abc import Sequence
@@ -5,7 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 from time import time
 from typing import cast
-import logging
 
 import numpy as np
 import pandas as pd
@@ -19,6 +19,7 @@ from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
 from src.audio_processing import (
     getIntonation,
+    getIntensity,
     read_audio_bytes,
     read_audio_file,
     read_audio_string,
@@ -30,7 +31,7 @@ from src.pronunciation_dictionaries import (
     cmu_stressed_alphabet,
     ipa_alphabet,
 )
-from text_processing import remove_acronym_hyphen
+from src.text_processing import remove_grouping_hyphens
 
 cmu_vowels = [p[0] for p in cmu_phones_info if p[1][0] == 'vowel']
 cmu_consonants = [p[0] for p in cmu_phones_info if p[1][0] != 'vowel']
@@ -45,6 +46,7 @@ class AudioStatus(StrEnum):
     TOO_SHORT = "success, audio is too short compared to the expected number of syllables"
     TOO_LONG = "success, audio is too long compared to the expected number of syllables"
     NO_SOUND = "success, no voiced sound detected (only 0's in waveform)"
+    TOO_QUIET = "success, volume too low or no voice detected (intensity too low)"
     NO_PITCH = "success, no voiced sound detected (no pitch detected)"
     FILE_NOT_FOUND = "error, audio file not found"
 
@@ -59,6 +61,10 @@ class AudioLoadResult:
         waveform
     sampling_rate: float | None
         sampling rate in Hz
+    speech_rate: float | None
+        syllable frequency in syllables per second
+    silent_frame_ratio: float | None
+        ratio of silent frames
     pitch_frame_ratio: float | None
         ratio of frames with pitch detected
     """
@@ -66,7 +72,9 @@ class AudioLoadResult:
     status: AudioStatus
     waveform: np.ndarray | None
     sampling_rate: float | None
-    pitch_frame_ratio: float | None
+    speech_rate: float | None
+    silent_sample_ratio: float | None
+    pitch_sample_ratio: float | None
 
 
 class AudioMode(Enum):
@@ -94,6 +102,7 @@ def audio_load_and_check(
     phonetics: str,
     min_speech_rate: float = 1,
     max_speech_rate: float = 8,
+    silence_threshold: float = 40,
     mode: AudioMode = AudioMode.FILE,
     fs: float = 16000,
 ) -> AudioLoadResult:
@@ -113,7 +122,9 @@ def audio_load_and_check(
         try:
             s, fs = read_audio_file(audio, fs=fs)
         except FileNotFoundError:
-            return AudioLoadResult(AudioStatus.FILE_NOT_FOUND, None, None, None)
+            return AudioLoadResult(
+                AudioStatus.FILE_NOT_FOUND, None, None, None, None, None
+            )
     elif mode == AudioMode.BASE64:
         if isinstance(audio, np.ndarray):
             raise TypeError(f"audio must be of type str or bytes, not {type(audio)}")
@@ -130,23 +141,43 @@ def audio_load_and_check(
         raise ValueError(f"Unknown audio mode {mode}")
 
     if len(s) == 0:
-        return AudioLoadResult(AudioStatus.EMPTY, None, None, None)
-
-    duration = len(s) / fs
-    speech_rate = n_syllables_tot / duration
-    if speech_rate > max_speech_rate:
-        return AudioLoadResult(AudioStatus.TOO_SHORT, s, fs, None)
-    elif speech_rate < min_speech_rate:
-        return AudioLoadResult(AudioStatus.TOO_LONG, s, fs, None)
+        return AudioLoadResult(AudioStatus.EMPTY, None, None, None, None, None)
 
     if np.abs(s).sum() == 0:
-        return AudioLoadResult(AudioStatus.NO_SOUND, s, fs, None)
+        return AudioLoadResult(AudioStatus.NO_SOUND, s, fs, None, None, None)
+
+    # detect silent frames using intensity
+    intensity = getIntensity(s, fs)
+    silent_frames = intensity < silence_threshold
+    silent_sample_ratio = silent_frames.sum() / len(s)
+
+    # ideally we would detect the onset and the end of the
+    # voiced part of the audio, and only compute the speech rate
+    # on that part
+    nonsilent_duration = (~silent_frames).sum() / fs
+    speech_rate = n_syllables_tot / nonsilent_duration
 
     f0_samples = getIntonation(s, fs)
-    pitch_frame_ratio = (f0_samples > 0).sum() / len(f0_samples)
-    if pitch_frame_ratio == 0:
-        return AudioLoadResult(AudioStatus.NO_PITCH, s, fs, pitch_frame_ratio)
-    return AudioLoadResult(AudioStatus.SUCCESS, s, fs, pitch_frame_ratio)
+    # pitch frame ratio: ratio of nonsilent frames with pitch detected
+    pitch_sample_ratio = ((f0_samples > 0) & ~silent_frames).sum() / (
+        ~silent_frames
+    ).sum()
+
+    if silent_frames.all():
+        status = AudioStatus.TOO_QUIET
+    elif speech_rate > max_speech_rate:
+        status = AudioStatus.TOO_SHORT
+    # too tricky to have a reliable speech rate for very short audios
+    elif speech_rate < min_speech_rate and n_syllables_tot > 1:
+        status = AudioStatus.TOO_LONG
+    elif pitch_sample_ratio == 0:
+        status = AudioStatus.NO_PITCH
+    else:
+        status = AudioStatus.SUCCESS
+
+    return AudioLoadResult(
+        status, s, fs, speech_rate, silent_sample_ratio, pitch_sample_ratio
+    )
 
 
 def extract_word(
@@ -411,7 +442,9 @@ class Wav2Vec2ForFramePrediction:
         self,
         audio: AudioInput,
         phonetics: str,
+        min_speech_rate: float = 1,
         max_speech_rate: float = 8,
+        silence_threshold: float = 40,
         mode: AudioMode = AudioMode.NUMPY,
     ) -> tuple[AudioLoadResult, np.ndarray | None]:
         """
@@ -423,10 +456,14 @@ class Wav2Vec2ForFramePrediction:
             The audio sample.
         phonetics : str
             The phonetic transcription of the audio.
+        min_speech_rate : float
+            The minimum accepted speech rate in syllables per second.
         max_speech_rate : float
             The maximum accepted speech rate in syllables per second.
             This acts as a detector of abnormally short audio sample compared to the
             number of phonemes to detect very short audios with nothing useful in them.
+        silence_threshold : float
+            The threshold of silence in dBFS.
         mode : AudioMode
             The mode of the audio data.
 
@@ -437,10 +474,16 @@ class Wav2Vec2ForFramePrediction:
         phone_prob_matrix : np.ndarray
             The probability matrix of phonemes.
         """
-        phonetics = remove_acronym_hyphen(phonetics)
+        phonetics = remove_grouping_hyphens(phonetics)
         with CodeTimer('load audio', silent=True):
             audio_load = audio_load_and_check(
-                audio, phonetics, max_speech_rate=max_speech_rate, mode=mode, fs=self.fs
+                audio,
+                phonetics,
+                min_speech_rate=min_speech_rate,
+                max_speech_rate=max_speech_rate,
+                silence_threshold=silence_threshold,
+                mode=mode,
+                fs=self.fs,
             )
         if audio_load.status == AudioStatus.SUCCESS:
             with CodeTimer('phone_prob_matrix prediction', silent=True):
@@ -573,7 +616,7 @@ class Wav2Vec2ForFramePrediction:
         )
 
     def phone_prob_matrix_segmentation(
-        self, phone_prob_matrix: np.ndarray, phoneme_list: list[str]
+        self, phone_prob_matrix: np.ndarray, phone_list: list[str]
     ) -> tuple[pd.DataFrame, float | None]:
         """
         Performs forced alignment segmentation on a probability matrix of phones.
@@ -585,7 +628,7 @@ class Wav2Vec2ForFramePrediction:
 
         Args:
         - phone_prob_matrix: The predicted probability matrix of phones.
-        - phoneme_list: The target list of phones.
+        - phone_list: The target list of phones.
 
         Returns:
         - df_segmented: The segmented DataFrame, with columns:
@@ -605,7 +648,7 @@ class Wav2Vec2ForFramePrediction:
         """
         with CodeTimer('DTW', silent=True):
             df_segmented, dtw_cost = self.forced_aligner.probas_to_df_segmented(
-                phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output
+                phone_prob_matrix, phone_list, time_per_output=self.time_per_output
             )
         return df_segmented, dtw_cost
 

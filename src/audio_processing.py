@@ -79,7 +79,7 @@ def smooth(x, beta, window_len=11):
     return y[int(window_len / 2) : -int(window_len / 2) + 1]
 
 
-def getIntensity(s, fs):
+def getIntensity(s: np.ndarray, fs: float) -> np.ndarray:
     """computes intensity of the signal (squared signal, smoothed) in dB
 
     Args:

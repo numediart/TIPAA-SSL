@@ -24,7 +24,8 @@ print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
 
 from src.text_processing import (
     cmu_ensure_phonetics_consistency,
-    remove_acronym_hyphen,
+    remove_grouping_hyphens,
+    split_phonetics_by_words,
     split_phonetics_to_phones,
     unstress,
     split_phonetics,
@@ -500,7 +501,7 @@ def stress_from_formatted_phonetics(
         return StressAnalysisResult(str(audio_load.status), [], [])
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
-    phonetics = remove_acronym_hyphen(phonetics)
+    phonetics = remove_grouping_hyphens(phonetics)
     phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
@@ -537,7 +538,7 @@ def phonemeContrast_from_df_segmented(
         for p in split_phonetics(phonetics)[target_word_idx][target_syllable_idx]
     ]
 
-    phones_by_words = split_phonetics(phonetics)
+    phones_by_words = split_phonetics_by_words(phonetics)
     df_word = extract_word(df_segmented, phones_by_words, target_word_idx)
     phonetic_detection, detected_syllable = predict_phone(
         model.forced_aligner,
@@ -820,7 +821,7 @@ def phonetic_reference_processing(
     contrast_idx,
 ):
     ### Phonetics processing to build a reference with the basis replacing target_phones
-    phonetics = remove_acronym_hyphen(phonetics)
+    phonetics = remove_grouping_hyphens(phonetics)
 
     phonetics_indexed_df = phonetics_indexed_df_from_formatted_phonetics(
         phonetics.split(' ')[target_word_idx]
@@ -829,7 +830,7 @@ def phonetic_reference_processing(
     syl_GT = remove_stress_annots(
         phonetics.split(' ')[target_word_idx].split('|')[target_syllable_idx].split('_')
     )
-    split_phonetics_words = split_phonetics(phonetics)
+    split_phonetics_words = split_phonetics_by_words(phonetics)
     split_phonetics_syls = [
         [syl.split('_') for syl in p.split('|')] for p in phonetics.split(' ')
     ]
@@ -894,13 +895,13 @@ def list_pairwise_alignment(LISTA, LISTB):
 @dataclass
 class PostAnalysisResult:
     df_segmented: pd.DataFrame | None
+    dtw_cost: float | None
     per_aligned: float
-    dtw_cost: float
     silent_frame_ratio: float
     phone_count_ratio: float
-    predicted_phones: list[str] | None
-    predicted_aligned_phones: list[str] | None
-    expected_aligned_phones: list[str] | None
+    df_detection: pd.DataFrame
+    predicted_aligned_phones: list[str]
+    expected_aligned_phones: list[str]
 
 
 def post_analysis(
@@ -927,8 +928,7 @@ def post_analysis(
     -------
     PostAnalysisResults: summary of the quality checks
     """
-    phone_list = split_phonetics_to_phones(phonetics)
-    expected_phoneme_list = remove_stress_annots(sum(phone_list, []))
+    expected_phone_list = remove_stress_annots(split_phonetics_to_phones(phonetics))
 
     (
         max_posterior_df,
@@ -936,61 +936,50 @@ def post_analysis(
         max_posterior_df_filtered_processed_threshed,
     ) = model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=proba_thresh)
 
-    pred_phoneme_list = max_posterior_df_filtered_processed_threshed.phone.tolist()
+    pred_phone_list = max_posterior_df_filtered_processed_threshed.phone.tolist()
     silent_frame_ratio = (max_posterior_df.phone == model.SILENCE).mean()
     phone_count_ratio = len(max_posterior_df_filtered_processed_threshed) / len(
-        expected_phoneme_list
+        expected_phone_list
     )
 
     pred_aligned, exp_aligned = list_pairwise_alignment(
-        pred_phoneme_list, expected_phoneme_list
+        pred_phone_list, expected_phone_list
     )
     if not (pred_aligned and exp_aligned):
         return None
-
-    pairwise_align_df = pd.DataFrame([exp_aligned, pred_aligned])
-    pairwise_align_df.index = ['expected', 'predicted']
 
     per_aligned = levenshtein_distance(exp_aligned, pred_aligned) / len(exp_aligned)
     # print(f"expected: {RESB}, predicted: {RESA}, error_rate: {error_rate}, per: {per_aligned}")
 
     # Perform DTW between expected phones and predicted probability matrix
     df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
-        phone_prob_matrix, expected_phoneme_list
+        phone_prob_matrix, expected_phone_list
     )
 
-    # DTW failed
     if len(df_segmented) == 0:
-        return PostAnalysisResult(
-            None,
-            per_aligned,
-            None,
-            silent_frame_ratio,
-            phone_count_ratio,
-            pred_phoneme_list,
-            pred_aligned,
-            exp_aligned,
-        )
+        # DTW failed
+        df_segmented = None
+        dtw_cost = None
+    else:
+        dtw_cost = -dtw_cost / len(pred_phone_list)
+        df_segmented['n_frames'] = df_segmented.end_idx - df_segmented.start_idx
+        # insert a row at the dashes position by using float indexing
+        # dash_indexes = [i for i in range(len(exp_aligned)) if exp_aligned[i] == '-']
+        # for dash_idx in dash_indexes:
+        #     df_segmented.loc[dash_idx - 0.5] = np.nan
+        #     df_segmented = df_segmented.sort_index()
+        #     df_segmented = df_segmented.reset_index(drop=True)
 
-    dtw_cost = -dtw_cost / len(pred_phoneme_list)
-    df_segmented['n_frames'] = df_segmented.end_idx - df_segmented.start_idx
-    # insert a row at the dashes position by using float indexing
-    dash_indexes = pairwise_align_df.T[pairwise_align_df.T.expected == '-'].index.tolist()
-    for dash_idx in dash_indexes:
-        df_segmented.loc[dash_idx - 0.5] = np.nan
-        df_segmented = df_segmented.sort_index()
-        df_segmented = df_segmented.reset_index(drop=True)
-
-    df_segmented['predicted_phones'] = pairwise_align_df.T.predicted
-    df_segmented = df_segmented.reset_index(drop=True)
+        # df_segmented['predicted_phones'] = pred_aligned
+        # df_segmented = df_segmented.reset_index(drop=True)
 
     return PostAnalysisResult(
         df_segmented,
-        per_aligned,
         dtw_cost,
+        per_aligned,
         silent_frame_ratio,
         phone_count_ratio,
-        pred_phoneme_list,
+        max_posterior_df_filtered_processed_threshed,
         pred_aligned,
         exp_aligned,
     )
@@ -1353,11 +1342,9 @@ def multiple_aspect_from_prob_matrix(
     s,
     phonetics="AY1 W_UH1_D L_AH1_V T_UW1 G_OW1 T_UW1 AY1|ER0|L_AH0_N_D",
     vowels=cmu_vowels,
-    max_speech_rate=8,
     mode: AudioMode = AudioMode.FILE,
     model=default_model,
     to_gibberish=cmu_to_gibberish,
-    **kwargs,
 ):
     phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, _ = model.phone_prob_matrix_segmentation(
@@ -1495,23 +1482,33 @@ def multiple_aspect_from_formatted_phonetics_audio(
     audio: AudioInput,
     phonetics: str,
     vowels: set = cmu_vowels,
-    max_speech_rate: int = 8,
+    proba_thresh: float = 0.5,
+    min_speech_rate: float = 1,
+    max_speech_rate: float = 8,
+    silence_threshold: float = 40,
     mode: AudioMode = AudioMode.FILE,
     model: Wav2Vec2ForFramePrediction = default_model,
     to_gibberish: dict[str, str] = cmu_to_gibberish,
 ) -> tuple[AudioLoadResult, pd.DataFrame | None, PostAnalysisResult | None]:
     phonetics = cmu_ensure_phonetics_consistency(phonetics)
     audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
-        audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
+        audio,
+        phonetics,
+        min_speech_rate=min_speech_rate,
+        max_speech_rate=max_speech_rate,
+        silence_threshold=silence_threshold,
+        mode=mode,
     )
 
     if audio_load.status != AudioStatus.SUCCESS:
         return audio_load, None, None
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
-    phonetics = remove_acronym_hyphen(phonetics)
+    phonetics = remove_grouping_hyphens(phonetics)
 
-    post_analysis_result = post_analysis(phone_prob_matrix, phonetics, model=model)
+    post_analysis_result = post_analysis(
+        phone_prob_matrix, phonetics, model=model, proba_thresh=proba_thresh
+    )
 
     return (
         audio_load,
@@ -1520,7 +1517,6 @@ def multiple_aspect_from_formatted_phonetics_audio(
             audio_load.waveform,
             phonetics=phonetics,
             vowels=vowels,
-            max_speech_rate=max_speech_rate,
             mode=mode,
             model=model,
             to_gibberish=to_gibberish,
