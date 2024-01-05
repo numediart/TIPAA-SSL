@@ -1,56 +1,51 @@
-from collections.abc import Sequence
 import math
-import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import cast
 
-import psutil
-
-print_memory_usage = lambda stage: print(
-    stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
-)
-
-print_memory_usage("RAM - start of DL_speech_tech")
 import numpy as np
 import pandas as pd
-from syllabipy.sonoripy import SonoriPy
+from Bio import pairwise2
 from linetimer import CodeTimer
 from nltk.metrics.distance import edit_distance as levenshtein_distance
 
-print_memory_usage("RAM - DL_speech_tech after external dependencies")
-from src.audio_processing import getIntonation, getIntensity, normalize
-
-print_memory_usage("RAM - DL_speech_tech after src.audio_processing")
-
+from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
+from src.audio_processing import getIntensity, getIntonation, normalize
+from src.pronunciation_dictionaries import (
+    cmu_alphabet,
+    cmu_consonants,
+    cmu_diphtongs,
+    cmu_stressed_alphabet,
+    cmu_stressed_vowels,
+    cmu_to_gibberish,
+    cmu_vowels,
+    ipa_alphabet,
+    ipa_consonants,
+    ipa_to_gibberish,
+    ipa_vowels,
+)
 from src.text_processing import (
     cmu_ensure_phonetics_consistency,
+    drop_consecutive_duplicate_elements,
+    drop_consecutive_duplicates,
+    phonetics_indexed_df_from_formatted_phonetics,
     remove_grouping_hyphens,
+    remove_stress_annots,
+    split_phonetics,
     split_phonetics_by_words,
     split_phonetics_to_phones,
     unstress,
-    split_phonetics,
-    remove_stress_annots,
-    drop_consecutive_duplicates,
-    drop_consecutive_duplicate_elements,
-    phonetics_indexed_df_from_formatted_phonetics,
 )
-
-print_memory_usage("RAM - DL_speech_tech after src.text_processing")
-from src.pronunciation_dictionaries import (
-    cmu_vowels,
-    cmu_stressed_vowels,
-    cmu_consonants,
-    cmu_to_gibberish,
-    cmu_diphtongs,
-    cmu_alphabet,
-    ipa_alphabet,
-    cmu_stressed_alphabet,
+from src.wav2vec2_frame_prediction import (
+    AudioInput,
+    AudioLoadResult,
+    AudioMode,
+    AudioStatus,
+    Wav2Vec2ForFramePrediction,
+    extract_word,
 )
-from src.pronunciation_dictionaries import ipa_vowels, ipa_consonants, ipa_to_gibberish
-
-print_memory_usage("RAM - DL_speech_tech after src.pronunciation_dictionaries")
-
-from src.text_processing import remove_stress_annots
+from syllabipy.sonoripy import SonoriPy
 
 # initialize model
 # from src.charsiu_utils import charsiu_phone_forced_aligner
@@ -65,29 +60,7 @@ for k in cmu_stressed_vowels:
 for k in cmu_consonants:
     phoneme_GT_proba_threshold_dict[k] = default_thresh
 
-# phoneme_GT_proba_threshold_dict['AO0']=0.1
-# phoneme_GT_proba_threshold_dict['AO1']=0.1
-# phoneme_GT_proba_threshold_dict['AO2']=0.1
-
-# model=pickle.load(open('model_mailabs_umap_2_gmm_300.pkl','rb'))
-
-from src.wav2vec2_frame_prediction import (
-    AudioInput,
-    AudioLoadResult,
-    AudioMode,
-    AudioStatus,
-    Wav2Vec2ForFramePrediction,
-    extract_word,
-    audio_load_and_check,
-)
-
-print_memory_usage("RAM - DL_speech_tech after wav2vec2_frame_prediction")
-
-# default_model = Wav2Vec2ForFramePrediction(cmu_alphabet)
-
 default_model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format="onnx")
-# default_model.load(name='model_mailabs_pca_0.95_knn_10_w')
-# default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
 default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
 
 
@@ -103,11 +76,6 @@ default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
 # default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
 
 # default_model=default_model_charsiu
-
-print_memory_usage("RAM - DL_speech_tech after default_model")
-
-
-MAX_PER_FOR_ACCEPTANCE = 0.8
 
 
 class StressCategory(Enum):
@@ -224,7 +192,8 @@ def intensity_to_bin(
             if len(scores) < n_max
             else np.argpartition(scores, -n_max)[-n_max:]
         )
-        for imax in imaxes:
+        for _imax in imaxes:
+            imax = cast(int, _imax)
             if scores[imax] >= threshold:
                 bin_scores[imax] = 1
     return bin_scores
@@ -296,7 +265,7 @@ def predict_phone(
 
 
 def compute_stress_score(
-    df_segmented: pd.DataFrame, audio: np.ndarray, vowels: set[str], fs: int = 16000
+    df_segmented: pd.DataFrame, audio: np.ndarray, vowels: set[str], fs: float = 16000
 ) -> np.ndarray:
     """Use df_segmented to have the timings of vowels and compute prosody features
     (intensity, pitch, ...) to compute a value by vowel representing a stress intensity
@@ -870,11 +839,6 @@ def phonetic_reference_processing(
     return split_phonetics_words, syl_GT, GT, syl_idxs
 
 
-from Bio import pairwise2
-
-from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
-
-
 def list_pairwise_alignment(LISTA, LISTB):
     """maps list elements to unicode characters to be able to use the character base pariwise alignment from bipython,
     then map back results to list elements
@@ -949,7 +913,6 @@ def post_analysis(
         return None
 
     per_aligned = levenshtein_distance(exp_aligned, pred_aligned) / len(exp_aligned)
-    # print(f"expected: {RESB}, predicted: {RESA}, error_rate: {error_rate}, per: {per_aligned}")
 
     # Perform DTW between expected phones and predicted probability matrix
     df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
@@ -963,15 +926,6 @@ def post_analysis(
     else:
         dtw_cost = -dtw_cost / len(pred_phone_list)
         df_segmented['n_frames'] = df_segmented.end_idx - df_segmented.start_idx
-        # insert a row at the dashes position by using float indexing
-        # dash_indexes = [i for i in range(len(exp_aligned)) if exp_aligned[i] == '-']
-        # for dash_idx in dash_indexes:
-        #     df_segmented.loc[dash_idx - 0.5] = np.nan
-        #     df_segmented = df_segmented.sort_index()
-        #     df_segmented = df_segmented.reset_index(drop=True)
-
-        # df_segmented['predicted_phones'] = pred_aligned
-        # df_segmented = df_segmented.reset_index(drop=True)
 
     return PostAnalysisResult(
         df_segmented,

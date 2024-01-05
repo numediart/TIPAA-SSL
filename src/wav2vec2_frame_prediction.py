@@ -18,8 +18,8 @@ from strenum import StrEnum
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
 from src.audio_processing import (
-    getIntonation,
     getIntensity,
+    getIntonation,
     read_audio_bytes,
     read_audio_file,
     read_audio_string,

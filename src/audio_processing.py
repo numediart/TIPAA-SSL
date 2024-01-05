@@ -105,7 +105,7 @@ def getIntensity(s: np.ndarray, fs: float) -> np.ndarray:
     return int_db
 
 
-def normalize(x: np.ndarray | list) -> np.ndarray | list:
+def normalize(x: np.ndarray | list) -> np.ndarray:
     """normalizes a signal between 0 and 1
 
     Args:
@@ -115,7 +115,7 @@ def normalize(x: np.ndarray | list) -> np.ndarray | list:
         numpy array: normalized signal
     """
     if len(x) == 0:
-        return x
+        return np.array([])
     x = np.array(x)
     y = x - x.min()
     ymax = y.max()
