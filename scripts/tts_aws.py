@@ -5,7 +5,12 @@ from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 from shutil import copy
 
-def remove_special_characters(sentence="Where's the best place to have coffee ?", lowercase=True, chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'):
+
+def remove_special_characters(
+    sentence="Where's the best place to have coffee ?",
+    lowercase=True,
+    chars_to_ignore_regex='[\,\?\.\!\-\;\:\"]',
+):
     """Normalize text by lowercasing (if option is True), and remove a set of punctuation characters
 
     Args:
@@ -20,116 +25,182 @@ def remove_special_characters(sentence="Where's the best place to have coffee ?"
     sentence = re.sub(chars_to_ignore_regex, '', sentence)
 
     if lowercase:
-        sentence=sentence.lower()
+        sentence = sentence.lower()
 
     # This is to make sure there will not be empty strings after a splitting. So here I split, remove Nones, and rejoin
-    sentence=' '.join(list(filter(None, sentence.split(' '))))
+    sentence = ' '.join(list(filter(None, sentence.split(' '))))
     return sentence
+
 
 def replace_with_tag(sentence, tag='emphasis', options='level="strong"'):
-    idx=0
-    tag_start=True #binary
-    idx=sentence.find('*')
-    while idx!=-1:
+    idx = 0
+    tag_start = True  # binary
+    idx = sentence.find('*')
+    while idx != -1:
         if tag_start:
-            sentence=sentence[:idx]+'<'+tag+' '+options+'>'+sentence[idx+1:]
+            sentence = (
+                sentence[:idx] + '<' + tag + ' ' + options + '>' + sentence[idx + 1 :]
+            )
         else:
-            sentence=sentence[:idx]+'</'+tag+'>'+sentence[idx+1:]
-        tag_start=not tag_start
-        idx=sentence.find('*')
+            sentence = sentence[:idx] + '</' + tag + '>' + sentence[idx + 1 :]
+        tag_start = not tag_start
+        idx = sentence.find('*')
 
-    sentence="<speak>"+sentence+"</speak>"
+    sentence = "<speak>" + sentence + "</speak>"
     return sentence
 
-def synthesize(sentence, tag='prosody', options='rate="70%" volume="+20dB"',
-                path="synth_audio",synth_technique='standard',voice_id="Joanna", name="sample", verbose=False):
+
+def synthesize(
+    sentence,
+    tag='prosody',
+    options='rate="70%" volume="+20dB"',
+    path="synth_audio",
+    synth_technique='standard',
+    voice_id="Joanna",
+    name="sample",
+    verbose=False,
+):
     # sentence=sentence.replace("'","&apos;").replace('"','&quot;')
-    text=replace_with_tag(sentence.replace("'","&apos;").replace('"','&quot;'), tag=tag, options=options)
+    text = replace_with_tag(
+        sentence.replace("'", "&apos;").replace('"', '&quot;'), tag=tag, options=options
+    )
     # reserved characters : https://docs.aws.amazon.com/polly/latest/dg/escapees.html
 
-    cmd= "aws polly synthesize-speech \
+    cmd = (
+        "aws polly synthesize-speech \
     --text-type ssml \
-    --text '"+text+"' \
+    --text '"
+        + text
+        + "' \
     --output-format mp3 \
     --region us-east-1 \
-    --voice-id "+voice_id+" \
-    --engine "+synth_technique+" \
+    --voice-id "
+        + voice_id
+        + " \
+    --engine "
+        + synth_technique
+        + " \
     --profile iam_user \
-    "+path+'/'+name+".mp3"
+    "
+        + path
+        + '/'
+        + name
+        + ".mp3"
+    )
 
-    if not verbose: cmd+="  >/dev/null 2>&1"
-    
-    if not os.path.exists(path): os.makedirs(path)
+    if not verbose:
+        cmd += "  >/dev/null 2>&1"
+
+    if not os.path.exists(path):
+        os.makedirs(path)
     # print(path+'/'+name+".mp3")
-    if not os.path.exists(path+'/'+name+".mp3"):    
+    if not os.path.exists(path + '/' + name + ".mp3"):
         os.system(cmd)
 
 
-def synthesize_list(df, voices, root_folder="synth_audio/user_texts", options='rate="70%" volume="+20dB"'):
-    
-    synth_technique='standard'
-    tag='prosody'
+def synthesize_list(
+    df, voices, root_folder="synth_audio/user_texts", options='rate="70%" volume="+20dB"'
+):
+    synth_technique = 'standard'
+    tag = 'prosody'
 
-    if not os.path.exists(root_folder):os.makedirs(root_folder)
-    records=[]
+    if not os.path.exists(root_folder):
+        os.makedirs(root_folder)
+    records = []
     print("n of iterations: ", len(df))
-    for i,r in tqdm(df.iterrows()):
-        sentence=r.text
-        name='_'.join(remove_special_characters(sentence).split(' ')).replace('*','+').replace("'",'_')
+    for i, r in tqdm(df.iterrows()):
+        sentence = r.text
+        name = (
+            '_'.join(remove_special_characters(sentence).split(' '))
+            .replace('*', '+')
+            .replace("'", '_')
+        )
         print(sentence)
         for voice in voices:
             # gender=voices[voice].split('_')[0]
             # lang_code=lang_dict[voices[voice].split('_')[1]]
-            fn=voice+'_'+voices[voice]+'__'+name
-            x=r.to_dict()
-            y={'filename':fn,'voice':voice, 'voice_type':voices[voice]}
-            record={**x, **y}
+            fn = voice + '_' + voices[voice] + '__' + name
+            x = r.to_dict()
+            y = {'filename': fn, 'voice': voice, 'voice_type': voices[voice]}
+            record = {**x, **y}
             records.append(record)
-            synthesize(sentence, tag=tag, options=options,path=root_folder,synth_technique=synth_technique,voice_id=voice,name=fn)
-    results=pd.DataFrame.from_records(records)
-    results.to_csv(root_folder+'/data.csv')
-    
+            synthesize(
+                sentence,
+                tag=tag,
+                options=options,
+                path=root_folder,
+                synth_technique=synth_technique,
+                voice_id=voice,
+                name=fn,
+            )
+    results = pd.DataFrame.from_records(records)
+    results.to_csv(root_folder + '/data.csv')
 
 
 import cmudict
 from tqdm import tqdm
-def synthesize_words(root_folder="synth_audio/cmu_words", voice_id="Joanna", spk_id="F_US", words=list(cmudict.dict().keys())):
-    
-    synth_technique='standard'
-    tag='prosody'
-    audio_path='/'.join([root_folder, synth_technique, tag, voice_id])
 
 
-    executor = ProcessPoolExecutor(max_workers=25)    
+def synthesize_words(
+    root_folder="synth_audio/cmu_words",
+    voice_id="Joanna",
+    spk_id="F_US",
+    words=list(cmudict.dict().keys()),
+):
+    synth_technique = 'standard'
+    tag = 'prosody'
+    audio_path = '/'.join([root_folder, synth_technique, tag, voice_id])
+
+    executor = ProcessPoolExecutor(max_workers=25)
     futures = []
     for w in tqdm(words):
-        name=spk_id+'_'+remove_special_characters(w, chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"\']')
+        name = (
+            spk_id
+            + '_'
+            + remove_special_characters(w, chars_to_ignore_regex='[\,\?\.\!\-\;\:\"\']')
+        )
         # synthesize(w, tag=tag, options='rate="70%" volume="+20dB"',path=audio_path,synth_technique=synth_technique,voice_id=voice_id, name=name)
 
-        futures.append(executor.submit(
-            synthesize, w, tag=tag, options='rate="70%" volume="+20dB"',path=audio_path,synth_technique=synth_technique,voice_id=voice_id, name=name))
+        futures.append(
+            executor.submit(
+                synthesize,
+                w,
+                tag=tag,
+                options='rate="70%" volume="+20dB"',
+                path=audio_path,
+                synth_technique=synth_technique,
+                voice_id=voice_id,
+                name=name,
+            )
+        )
 
     proc_list = [future.result() for future in tqdm(futures)]
 
 
 def synthesize_voices():
+    from src.pronunciation_dictionaries import (
+        get_augmented_mfa_dict,
+        lang_to_MFA_g2p_models,
+    )
 
-    from src.pronunciation_dictionaries import get_augmented_mfa_dict, lang_to_MFA_g2p_models
-    mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
+    mfa_dicts = {lang: get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 
-    root_folder="data/synth_audio/mfa_words"
+    root_folder = "data/synth_audio/mfa_words"
 
-    words=list(mfa_dicts['fr_FR'])
-    voices={"Lea":"F_FR", "Mathieu":"M_FR", "Celine":"F_FR"} # FR
+    words = list(mfa_dicts['fr_FR'])
+    voices = {"Lea": "F_FR", "Mathieu": "M_FR", "Celine": "F_FR"}  # FR
     # voices={"Ivy":"F_US", "Kevin":"M_US"} # US children
     # words=list(mfa_dicts['en_US'])
 
     # ------------- synthesize cmu words
     for k in voices:
-        voice_id=k
-        spk_id=voices[k]
+        voice_id = k
+        spk_id = voices[k]
         print(k)
-        synthesize_words(root_folder=root_folder, voice_id=voice_id, spk_id=spk_id, words=words)
+        synthesize_words(
+            root_folder=root_folder, voice_id=voice_id, spk_id=spk_id, words=words
+        )
+
 
 def use_tests():
     # from scripts.tts_aws import *
@@ -139,23 +210,23 @@ def use_tests():
     # col=df.iloc[:10,2]
     # df=pd.read_csv('../data/GE_linguistic_data_target_alternatives.csv')
     # df=pd.read_csv("data/BE_linguistic_data_target_syl_idx.csv")
-    df=pd.read_csv("data/BE_phrases_from_DB.csv")
+    df = pd.read_csv("data/BE_phrases_from_DB.csv")
 
     # path='/mnt/c/Users/noe_t/datasets/user_recordings_annotated/'
     # df=pd.read_csv(path+'/unique_sentences_data.csv')
 
-    df=pd.read_json('/data/speechocean762/text_ipa.json')
-    df=df[['text']]
+    df = pd.read_json('/data/speechocean762/text_ipa.json')
+    df = df[['text']]
 
     # col=df.text
     # root_folder="data/synth_audio/speechocean762"
-    root_folder="data/synth_audio/cmu_words"
-    synth_technique='neural' # "standard" or "neural"
+    root_folder = "data/synth_audio/cmu_words"
+    synth_technique = 'neural'  # "standard" or "neural"
     # tag=''
     # options=''
-    tag='prosody'
+    tag = 'prosody'
     # options='rate="70%" volume="+20dB" pitch="+10%"'
-    options='rate="70%" volume="+20dB"'
+    options = 'rate="70%" volume="+20dB"'
 
     # tag='emphasis'
     # options='level="strong"'
@@ -164,63 +235,74 @@ def use_tests():
 
     # voices={"Ivy":"F_US", "Justin":"M_US", "Kevin":"M_US"} # children
 
-    voices={"Lea":"F_FR"} # FR
-
+    voices = {"Lea": "F_FR"}  # FR
 
     synthesize_list(df, voices, root_folder=root_folder)
 
     # ------------- synthesize cmu words
     for k in voices:
-        voice_id=k
-        spk_id=voices[k]
+        voice_id = k
+        spk_id = voices[k]
         print(k)
         synthesize_words(root_folder=root_folder, voice_id=voice_id, spk_id=spk_id)
 
+    voices = {"Brian": "M_UK", "Matthew": "M_US"}
 
-
-    voices={"Brian":"M_UK",  "Matthew":"M_US"}
-
-    lang_dict={'US':'en-US', 'UK':'en-GB'}
+    lang_dict = {'US': 'en-US', 'UK': 'en-GB'}
     # --------------- synthesize program
-    dest_folder="synth_audio/BE_english_DB_audio/"
-    if not os.path.exists(dest_folder):os.makedirs(dest_folder)
+    dest_folder = "synth_audio/BE_english_DB_audio/"
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
 
     # path='/'.join([root_folder,synth_technique,tag,voice_id])+'/'
     # if not os.path.exists(path): os.makedirs(path)
 
-    for i,r in tqdm(df.iterrows()):
+    for i, r in tqdm(df.iterrows()):
         # name='_'.join(remove_special_characters(sentence).split(' ')).replace('*','+')
         # name=spk_id+'_'+df.iloc[i, df.columns.get_loc('id')]
-        sentence=r.text
-        N=1     
+        sentence = r.text
+        N = 1
         for voice in voices:
-            gender=voices[voice].split('_')[0]
-            lang_code=lang_dict[voices[voice].split('_')[1]]
-            fn=r.db_id+'__'+gender+str(N)+'__'+lang_code
-            synthesize(sentence, tag=tag, options=options,path=dest_folder,synth_technique=synth_technique,voice_id=voice,name=fn)
-    
+            gender = voices[voice].split('_')[0]
+            lang_code = lang_dict[voices[voice].split('_')[1]]
+            fn = r.db_id + '__' + gender + str(N) + '__' + lang_code
+            synthesize(
+                sentence,
+                tag=tag,
+                options=options,
+                path=dest_folder,
+                synth_technique=synth_technique,
+                voice_id=voice,
+                name=fn,
+            )
+
     # r=df.iloc[19]
     # r.text="Hello, am I speaking to Alex *Wong*?"
     # sentence=r.text
-    # N=1     
+    # N=1
     # for voice in voices:
     #     gender=voices[voice].split('_')[0]
     #     lang_code=lang_dict[voices[voice].split('_')[1]]
     #     fn=r.db_id+'__'+gender+str(N)+'__'+lang_code
     #     synthesize(sentence, tag=tag, options=options,path=dest_folder,synth_technique=synth_technique,voice_id=voice,name=fn)
 
-    p_ids=pd.read_csv('data/Phrase IDs of the Business English program - query_results-2022-01-25_20842.csv')
-    
-    synth_audio_path="synth_audio/BE_english/neural/prosody"
-    for i,r in tqdm(p_ids.iterrows()):
-        N=1 # I have only 1 speaker per lang per gender
+    p_ids = pd.read_csv(
+        'data/Phrase IDs of the Business English program - query_results-2022-01-25_20842.csv'
+    )
+
+    synth_audio_path = "synth_audio/BE_english/neural/prosody"
+    for i, r in tqdm(p_ids.iterrows()):
+        N = 1  # I have only 1 speaker per lang per gender
         for voice in voices:
-            gender=voices[voice].split('_')[0]
-            lang_code=lang_dict[voices[voice].split('_')[1]]
-            fn=r.database_id+'__'+gender+str(N)+'__'+lang_code
-            copy(synth_audio_path+'/'+voice+'/'+r.previous_sheet_id+'.mp3', dest_folder+'/'+fn+'.mp3')
-    
+            gender = voices[voice].split('_')[0]
+            lang_code = lang_dict[voices[voice].split('_')[1]]
+            fn = r.database_id + '__' + gender + str(N) + '__' + lang_code
+            copy(
+                synth_audio_path + '/' + voice + '/' + r.previous_sheet_id + '.mp3',
+                dest_folder + '/' + fn + '.mp3',
+            )
+
     from glob import glob
 
     for f in glob('data/*mp3'):
-        copy(f, 'data/'+f[24:])
+        copy(f, 'data/' + f[24:])

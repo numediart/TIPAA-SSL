@@ -3,6 +3,7 @@ from app_definition import app
 
 # https://stackoverflow.com/questions/61444572/ignore-all-warnings-from-a-module
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
@@ -10,11 +11,13 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # https://github.com/marshmallow-code/flask-smorest/issues/211
 from marshmallow import EXCLUDE
 from webargs.flaskparser import FlaskParser
+
 FlaskParser.DEFAULT_UNKNOWN_BY_LOCATION["files"] = EXCLUDE
 FlaskParser.DEFAULT_UNKNOWN_BY_LOCATION["form"] = EXCLUDE
 FlaskParser.DEFAULT_UNKNOWN_BY_LOCATION["json"] = EXCLUDE
 
 import pandas as pd
+
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -43,9 +46,12 @@ api = Api(app)
 api.register_blueprint(DL_modules_bp2, url_prefix='/v2')
 api.register_blueprint(DL_modules_bp2_mp, url_prefix='/v2_mp')
 
-debug=True
+debug = True
+
+
 def run_app():
     app.run(debug=debug, host='0.0.0.0', port=8001)
+
 
 if False:
     # https://github.com/jmcarp/flask-apispec/issues/16
@@ -53,7 +59,7 @@ if False:
 
     docs = FlaskApiSpec(app)
     # docs.register(prefill_from_phrase, blueprint="prefill")
-    
+
     docs.register(dl_word_stress_api_v2, blueprint="DL_modules_v2")
     docs.register(dl_sentence_stress_api_v2, blueprint="DL_modules_v2")
     docs.register(dl_vowel_contrast_api_v2, blueprint="DL_modules_v2")

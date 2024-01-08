@@ -1,4 +1,8 @@
-import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+import os, psutil
+
+print_memory_usage = lambda stage: print(
+    stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
+)
 
 import random
 import pandas as pd
@@ -8,16 +12,30 @@ import numpy as np
 print_memory_usage('RAM - exercise_words start')
 
 from utils import cmu_reducer
-from exercise_generation.auxiliary import has_a_target_phone, has_target_text_pattern, word_has_a_target_phone, cmudict_dict
+from exercise_generation.auxiliary import (
+    has_a_target_phone,
+    has_target_text_pattern,
+    word_has_a_target_phone,
+    cmudict_dict,
+)
 import exercise_generation.auxiliary as aux
+
 print_memory_usage('RAM - exercise_words ex gen deps')
 
 
 def make_useful_words():
-    words_rank_by_frequence=pd.read_csv('https://norvig.com/ngrams/count_1w.txt', header=None, sep='\t')
-    words_rank_by_frequence.columns=['word', 'occurences']
-    words_rank_by_frequence['probability']=words_rank_by_frequence['occurences']/sum(words_rank_by_frequence['occurences'])*100
-    words_rank_by_frequence['percentile']=words_rank_by_frequence['probability'].cumsum()
+    words_rank_by_frequence = pd.read_csv(
+        'https://norvig.com/ngrams/count_1w.txt', header=None, sep='\t'
+    )
+    words_rank_by_frequence.columns = ['word', 'occurences']
+    words_rank_by_frequence['probability'] = (
+        words_rank_by_frequence['occurences']
+        / sum(words_rank_by_frequence['occurences'])
+        * 100
+    )
+    words_rank_by_frequence['percentile'] = words_rank_by_frequence[
+        'probability'
+    ].cumsum()
     # # most common words
     # words_rank_by_frequence[(words_rank_by_frequence.percentile>25)&(words_rank_by_frequence.percentile<30)]
     # # first useful words
@@ -30,75 +48,133 @@ def make_useful_words():
 
     # useful words (carries info, and not too weird)
     # useful_words_freq=words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<95)]
-    useful_words_freq=words_rank_by_frequence[(words_rank_by_frequence.percentile>30)&(words_rank_by_frequence.percentile<90)]
+    useful_words_freq = words_rank_by_frequence[
+        (words_rank_by_frequence.percentile > 30)
+        & (words_rank_by_frequence.percentile < 90)
+    ]
     return useful_words_freq
 
-useful_words_freq=make_useful_words()
+
+useful_words_freq = make_useful_words()
 
 print_memory_usage('useful words norvig')
 
 
-
 def select_examples(phoneme='IH1', n=30):
-    """select words containing a phoneme
-    """
-    d={k:cmudict_dict[k] for k in useful_words_freq.word.tolist() if len(cmudict_dict[k])>0} #filter out empty entries
-    l=[k for k in d if phoneme in d[k][0]]
+    """select words containing a phoneme"""
+    d = {
+        k: cmudict_dict[k]
+        for k in useful_words_freq.word.tolist()
+        if len(cmudict_dict[k]) > 0
+    }  # filter out empty entries
+    l = [k for k in d if phoneme in d[k][0]]
     random.Random(0).shuffle(l)
     return l[:n]
 
 
-prompt_generate = lambda phone,phone_type,  n, topic: "Generate " + str(n) + " words containing the phoneme /"+phone+"/ (as in: "+', '.join(select_examples(phoneme=cmu_reducer[phone]+'1' if phone_type=="vowel" else cmu_reducer[phone] , n=5))+"), relating to the topic of \"" + topic + "\"."
-prompt_for_ipa=lambda x, examples_filtered, n_exercises, topic:  "Here is a list of words containing the IPA phoneme /"+ x +'/'+""".""" + examples_filtered + "\n" + prompt_generate(x, n_exercises*3, topic)
+prompt_generate = (
+    lambda phone, phone_type, n, topic: "Generate "
+    + str(n)
+    + " words containing the phoneme /"
+    + phone
+    + "/ (as in: "
+    + ', '.join(
+        select_examples(
+            phoneme=cmu_reducer[phone] + '1'
+            if phone_type == "vowel"
+            else cmu_reducer[phone],
+            n=5,
+        )
+    )
+    + "), relating to the topic of \""
+    + topic
+    + "\"."
+)
+prompt_for_ipa = (
+    lambda x, examples_filtered, n_exercises, topic: "Here is a list of words containing the IPA phoneme /"
+    + x
+    + '/'
+    + """."""
+    + examples_filtered
+    + "\n"
+    + prompt_generate(x, n_exercises * 3, topic)
+)
+
 
 def generate_word_candidates(ipa, examples_filtered, n_exercises, topic):
-    prompt = prompt_for_ipa(x=ipa, examples_filtered=examples_filtered, n_exercises=n_exercises, topic=topic)
-    response=aux.generate_response(prompt, frequency_penalty=0.4,presence_penalty = 0.4)
+    prompt = prompt_for_ipa(
+        x=ipa, examples_filtered=examples_filtered, n_exercises=n_exercises, topic=topic
+    )
+    response = aux.generate_response(prompt, frequency_penalty=0.4, presence_penalty=0.4)
     text = response.choices[0]['text']
     words = aux.filter(text)
     return words
 
-def words_response_to_words_with_target_phonemes(words, target_phoneme_regexes, n_exercises):
-    words=list(set(words))
+
+def words_response_to_words_with_target_phonemes(
+    words, target_phoneme_regexes, n_exercises
+):
+    words = list(set(words))
     random.Random(0).shuffle(words)
     l = []
     for element in words:
         if len(l) <= n_exercises:
-            phones=cmudict_dict[element][0]
-            has_target=sum([sum([re.search(reg,phon)!=None for phon in phones]) for reg in target_phoneme_regexes])
+            phones = cmudict_dict[element][0]
+            has_target = sum(
+                [
+                    sum([re.search(reg, phon) != None for phon in phones])
+                    for reg in target_phoneme_regexes
+                ]
+            )
             if has_target:
                 l.append(element)
     return l
 
-def generate_words(ipa_target="ɔ", phone_type="vowel", n=20, topic="biology"):
 
-    df= pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
-    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist())+'\n'
-    prompt = "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ relating to the topic of \"Business\".\n" + pick_phonetics_vc1 + "\n"+ prompt_generate(ipa_target,phone_type, n*3, topic)
-    
-    response=aux.generate_response(prompt)
+def generate_words(ipa_target="ɔ", phone_type="vowel", n=20, topic="biology"):
+    df = pd.read_csv("content_tools/content_examples_csvs/pick_phonetics.csv")
+    pick_phonetics_vc1 = '\n'.join(df['VC1'].dropna().tolist()) + '\n'
+    prompt = (
+        "Here is a list of words containing either the IPA phonemes /i:/ or /ɪ/ relating to the topic of \"Business\".\n"
+        + pick_phonetics_vc1
+        + "\n"
+        + prompt_generate(ipa_target, phone_type, n * 3, topic)
+    )
+
+    response = aux.generate_response(prompt)
     text = response.choices[0]['text']
-    
-    target_phoneme_regexes = [cmu_reducer[ipa_target]+'[012]'] if phone_type=="vowel" else [cmu_reducer[ipa_target]]
+
+    target_phoneme_regexes = (
+        [cmu_reducer[ipa_target] + '[012]']
+        if phone_type == "vowel"
+        else [cmu_reducer[ipa_target]]
+    )
     words = aux.filter(text)
-    words_filtered=words_response_to_words_with_target_phonemes(words, target_phoneme_regexes, n)
+    words_filtered = words_response_to_words_with_target_phonemes(
+        words, target_phoneme_regexes, n
+    )
 
     return words_filtered
 
-def pick_phonetics_phones(ipa_targets=["ɔ", "ow"], phone_type="vowel", n_exercises = 10, topic = 'biology'):
+
+def pick_phonetics_phones(
+    ipa_targets=["ɔ", "ow"], phone_type="vowel", n_exercises=10, topic='biology'
+):
     """
     pre: n_exercises is the number of vocabulary items generated by OpenAI.
     post: creates a JSON file with a list of dictionaries where the keys are 'target_content' and the keys are words that fit into the required category
     Example: [{"target_content": "testimony"}, {"target_content": "litigation"}, {"target_content": "agreement"}, {"target_content": "jury"}, {"target_content": "negotiations"}]
     """
 
-    exercise_words=[]
+    exercise_words = []
     for ipa_target in ipa_targets:
-        ws=generate_words(ipa_target=ipa_target, phone_type=phone_type, n=n_exercises, topic=topic)
-        exercise_words+=ws
+        ws = generate_words(
+            ipa_target=ipa_target, phone_type=phone_type, n=n_exercises, topic=topic
+        )
+        exercise_words += ws
     random.Random(0).shuffle(exercise_words)
 
-    l=[{'target_content':el} for el in exercise_words]
+    l = [{'target_content': el} for el in exercise_words]
 
     aux.jsonfile(l)
     return l
@@ -107,8 +183,12 @@ def pick_phonetics_phones(ipa_targets=["ɔ", "ow"], phone_type="vowel", n_exerci
 def use_tests():
     # /æ/ (like in 'have') and /ɑ:/
 
-    pick_phonetics_phones(ipa_targets=["ɔ", "ow"], n_exercises = 10, topic = 'biology')
-    pick_phonetics_phones(ipa_targets=["æ", "ɑ:"], n_exercises = 10, topic = 'biology')
-    pick_phonetics_phones(ipa_targets=["θ", "ð"],  phone_type="consonant", n_exercises = 10, topic = 'job interview')
-    pick_phonetics_phones(ipa_targets=["h"],  phone_type="consonant", n_exercises = 10)
-    
+    pick_phonetics_phones(ipa_targets=["ɔ", "ow"], n_exercises=10, topic='biology')
+    pick_phonetics_phones(ipa_targets=["æ", "ɑ:"], n_exercises=10, topic='biology')
+    pick_phonetics_phones(
+        ipa_targets=["θ", "ð"],
+        phone_type="consonant",
+        n_exercises=10,
+        topic='job interview',
+    )
+    pick_phonetics_phones(ipa_targets=["h"], phone_type="consonant", n_exercises=10)

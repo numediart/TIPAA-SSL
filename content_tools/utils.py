@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os, psutil;print_memory_usage=lambda stage: print(stage + ": "+ str(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2))
+import os, psutil
+
+print_memory_usage = lambda stage: print(
+    stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
+)
 
 
 import streamlit as st
@@ -20,29 +24,34 @@ import textwrap
 
 
 import sys
+
 sys.path.append('./')
 print_memory_usage('RAM - streamlit utils, before loading')
 from src.text_processing import prefill_content, prefill_for_sentence
+
 print_memory_usage('RAM - streamlit utils, after loading text_processing')
 from src.pronunciation_dictionaries import cmu_reducer, get_formatted_cmudict
+
 print_memory_usage('RAM - streamlit utils, after loading pronunciation_dictionaries')
 
 from src.audio_processing import read_audio_file
 
-formatted_cmudict_df=get_formatted_cmudict()
+formatted_cmudict_df = get_formatted_cmudict()
 print_memory_usage('RAM - streamlit utils, after formatted_cmudict_df')
 
 from DL_speech_tech import multiple_aspect_from_formatted_phonetics_audio
 
-print_memory_usage('RAM - streamlit utils, after DL_speech_tech.multiple_aspect_from_formatted_phonetics_audio')
+print_memory_usage(
+    'RAM - streamlit utils, after DL_speech_tech.multiple_aspect_from_formatted_phonetics_audio'
+)
 
 
 @st.cache_resource
 def get_model(model_type):
     from transformers import Wav2Vec2ForCTC
+
     # Create a model of the specified type
     return Wav2Vec2ForCTC.from_pretrained(model_type)
-
 
 
 def check_password():

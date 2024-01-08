@@ -35,10 +35,18 @@ def run():
     show_pages(
         [
             Page("content_tools/Hello.py", "Content tools", "🏠"),
-            Page("content_tools/my_pages/linguistic_data_extraction.py", "Linguistic Data Extraction", ":books:"),
+            Page(
+                "content_tools/my_pages/linguistic_data_extraction.py",
+                "Linguistic Data Extraction",
+                ":books:",
+            ),
             Page("content_tools/my_pages/phonetizer.py", "Phonetizer", "✏️"),
             Page("content_tools/my_pages/CMUDict_explorer.py", "CMU Dict Explorer", "📖"),
-            Page("content_tools/my_pages/Speech_Tech_demo.py", "Speech Tech Demo", ":microphone:")
+            Page(
+                "content_tools/my_pages/Speech_Tech_demo.py",
+                "Speech Tech Demo",
+                ":microphone:",
+            ),
         ]
     )
 
