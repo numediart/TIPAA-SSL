@@ -63,9 +63,9 @@ class AudioLoadResult:
         sampling rate in Hz
     speech_rate: float | None
         syllable frequency in syllables per second
-    silent_frame_ratio: float | None
+    silent_sample_ratio: float | None
         ratio of silent frames
-    pitch_frame_ratio: float | None
+    pitch_sample_ratio: float | None
         ratio of frames with pitch detected
     """
 
@@ -531,14 +531,14 @@ class Wav2Vec2ForFramePrediction:
             return audio_load, None
 
     def max_posterior_phone_df(
-        self, phone_prob_df: pd.DataFrame, proba_thresh: float = 0.5
+        self, phone_prob_matrix: np.ndarray, proba_thresh: float = 0.5
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Computes the maximum posterior probability of each phoneme from a DataFrame
         of phoneme probabilities.
 
         Args:
-        - phone_prob_df: The DataFrame of phoneme probabilities.
+        - phone_prob_matrix (np.ndarray): The probability matrix of phones.
         - proba_thresh (float): The probability threshold, by default 0.5.
 
         Returns:
@@ -548,13 +548,13 @@ class Wav2Vec2ForFramePrediction:
         - max_posterior_df_filtered_processed_threshed: The thresholded
           (remove phones with to low posterior probability) DataFrame of maximum posterior probabilities.
         """
-        max_idxs = np.argmax(phone_prob_df, axis=1)
+        max_idxs = np.argmax(phone_prob_matrix, axis=1)
 
         max_posterior_df = pd.DataFrame({"max_idx": max_idxs})
         max_posterior_df["phone"] = max_posterior_df.max_idx.apply(
             lambda x: self.alphabet_with_silence[x]
         )
-        max_posterior_df["proba"] = phone_prob_df.max(axis=1)
+        max_posterior_df["proba"] = phone_prob_matrix.max(axis=1)
 
         max_posterior_df_filtered = max_posterior_df[
             max_posterior_df.phone != self.SILENCE

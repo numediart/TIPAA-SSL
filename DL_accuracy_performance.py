@@ -1,60 +1,58 @@
-from tqdm import tqdm
-import pandas as pd
-import numpy as np
-import pickle
 import ast
-import librosa
-
-from DL_speech_tech import (
-    phonemeContrast_from_formatted_phonetics_audio,
-    stress_from_formatted_phonetics,
-    phonetic_content_analysis,
-    start_end_contrast_from_formatted_phonetics_audio,
-    default_model,
-)
-
-from src.wav2vec2_frame_prediction import audio_load_and_check
-
-
-from src.label_data_processing import (
-    actor_recordings,
-    final_s_artificial_data,
-    synth_words_data,
-)
-from src.text_processing import *
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
-
-from src.libri_phonetization_data import *
-
-from tqdm import tqdm
-
+import logging
+import pickle
 import warnings
 
-warnings.filterwarnings("ignore", category=UserWarning)
-
-import pandas as pd
-
-# disable pandas warning SettingWithCopyWarning
-pd.options.mode.chained_assignment = None  # default='warn'
-
-import seaborn as sns
+import librosa
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from scipy.stats import gaussian_kde
+from tqdm import tqdm
 
-
+from DL_speech_tech import (
+    default_model,
+    phonetic_content_analysis,
+    post_analysis,
+    start_end_contrast_from_formatted_phonetics_audio,
+)
 from performance_functions import (
     compute_predictions,
     count_values,
-    pContrast_on_synth_words,
-    pContrast_for_actor_recordings,
-    start_end_phoneme_from_audiobook_data,
     final_ed_for_actor_recordings,
-    stress_GE_performance_test,
-    final_ed_from_audiobook_data,
-    pContrast_from_audiobook_data,
-    pContrast_for_user_data,
     final_ed_for_user_data,
+    final_ed_from_audiobook_data,
+    pContrast_for_actor_recordings,
+    pContrast_for_user_data,
+    pContrast_from_audiobook_data,
+    pContrast_on_synth_words,
+    start_end_phoneme_from_audiobook_data,
+    stress_GE_performance_test,
 )
+from src.audio_processing import read_audio_file
+from src.label_data_processing import (
+    actor_recordings,
+    final_s_artificial_data,
+    load_adversarial_dataset,
+    synth_words_data,
+)
+from src.libri_phonetization_data import *
+from src.pronunciation_dictionaries import cmu_consonants, cmu_vowels
+from src.text_processing import *
+from src.wav2vec2_frame_prediction import (
+    AudioMode,
+    AudioStatus,
+    Wav2Vec2ForFramePrediction,
+)
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# disable pandas warning SettingWithCopyWarning
+# pd.options.mode.chained_assignment = None  # default='warn'
+
+
+logger = logging.getLogger(__name__)
 
 
 def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
@@ -1247,6 +1245,52 @@ def model_comparison():
         ],
         :,
     ].T
+
+
+def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_model):
+    logger.info("Loading adversarial dataset")
+    adversary_df = load_adversarial_dataset()
+
+    data = []
+
+    adversary_df['cmu_phonetics'] = adversary_df.text.apply(
+        lambda r: prefill_for_sentence(r)['phonetics'] if isinstance(r, str) else ""
+    )
+    unique_phonetics = adversary_df.cmu_phonetics.unique()
+    unique_phonetics = [el for el in unique_phonetics if el != '']
+
+    for i, row in tqdm(adversary_df.iterrows(), total=len(adversary_df)):
+        waveform, fs = read_audio_file(row.audio_file_url)
+
+        for phonetics in unique_phonetics:
+            audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+                waveform, phonetics, mode=AudioMode.NUMPY
+            )
+
+            result = {
+                'audio_load_status': audio_load.status == AudioStatus.SUCCESS,
+                'silent_sample_ratio': audio_load.silent_sample_ratio,
+                'pitch_sample_ratio': audio_load.pitch_sample_ratio,
+                'true_phonetics': row.cmu_phonetics,
+                'exp_phonetics': phonetics,
+                'n_phones': len(split_phonetics_to_phones(phonetics)),
+                'match': row.cmu_phonetics == phonetics,
+                'target': row.target,
+            }
+
+            post_result = post_analysis(phone_prob_matrix, phonetics)
+            if post_result is not None:
+                result['per_aligned'] = post_result.per_aligned
+                result['dtw_score'] = (
+                    post_result.dtw_cost if post_result.dtw_cost else 0.0
+                )
+                result['silent_frame_ratio'] = post_result.silent_frame_ratio
+                result['phone_count_ratio'] = post_result.phone_count_ratio
+
+            data.append(result)
+
+    data = pd.DataFrame(data)
+    return data
 
 
 if __name__ == "__main__":

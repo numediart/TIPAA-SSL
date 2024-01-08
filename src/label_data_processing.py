@@ -231,6 +231,14 @@ def get_errors_examples():
     return df_errors, exs_sort_by_n_errors
 
 
+def load_adversarial_dataset(
+    base_path: str = "./data/audio_recordings/adversary_example_library",
+) -> pd.DataFrame:
+    df = pd.read_csv(base_path + "/adversary_example_library.csv")
+    df["audio_file_url"] = base_path + "/" + df["audio_file_url"]
+    return df
+
+
 def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.csv"):
     df = pd.read_csv(path)
     df['path'] = os.path.split(path)[0] + '/audios/' + df.soundfiles_name
