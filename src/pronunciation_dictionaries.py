@@ -1,14 +1,17 @@
+from collections.abc import Iterable
 import os, psutil
 
 print_memory_usage = lambda stage: print(
     stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
 )
 print_memory_usage('RAM - pronunciation_dictionaries start')
+import json
+from glob import glob
+
 import cmudict
 import pandas as pd
-from glob import glob
-import json
 from tqdm import tqdm
+
 from syllabipy.sonoripy import SonoriPy
 
 
@@ -16,7 +19,7 @@ def unstress(el: str) -> str:
     return el[:-1] if (len(el) > 0 and el[-1]) in ["0", "1", "2"] else el
 
 
-def remove_stress_annots(transcription: list[str]) -> list[str]:
+def remove_stress_annots(transcription: Iterable[str]) -> list[str]:
     """Remove stress annotations from a list of CMU phones"""
     return [unstress(el) for el in transcription]
 

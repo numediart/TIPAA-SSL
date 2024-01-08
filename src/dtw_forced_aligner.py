@@ -1,3 +1,4 @@
+from typing import Sequence
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -27,7 +28,7 @@ class dtw_forced_aligner:
     Overall, the `dtw_forced_aligner` class provides a comprehensive set of tools for performing forced alignment and analyzing the results.
     """
 
-    def __init__(self, alphabet, collapse_method='mean'):
+    def __init__(self, alphabet: set[str], collapse_method='mean'):
         """
         Initialize the dtw_forced_aligner class.
 
@@ -40,7 +41,7 @@ class dtw_forced_aligner:
         self.p_to_id = {p: i for i, p in enumerate([*self.alphabet, '[SIL]'])}
         self.collapse_method = collapse_method
 
-    def labelize_phonemes(self, phonemes: list[str]) -> np.ndarray:
+    def labelize_phonemes(self, phonemes: Sequence[str]) -> np.ndarray:
         """
         Convert a list of phonemes to their corresponding ids.
 
@@ -55,8 +56,8 @@ class dtw_forced_aligner:
 
     # from phone_prob_matrix_nonsil and target_phonemes, get the most likely path (forced alignment)
     def get_forced_alignment(
-        self, phone_prob_matrix_nonsil: np.ndarray, target_phonemes: list[str]
-    ) -> tuple[bool, list[str], float | None]:
+        self, phone_prob_matrix_nonsil: np.ndarray, target_phonemes: Sequence[str]
+    ) -> tuple[list[str], float | None]:
         """
         Perform forced alignment to get the most likely path using Dynamic Time Warping.
 
@@ -76,8 +77,8 @@ class dtw_forced_aligner:
             target_phonemes (list): The list of target phonemes.
 
         Returns:
-            Tuple[bool, List[str], float]: A tuple containing a boolean indicating the
-                success of forced alignment, the list of aligned phonemes, the DTW alignment cost
+            Tuple[List[str], float | None]: A tuple containing the list of aligned phonemes,
+            the DTW alignment cost (None if failed)
         """
 
         # one_hot_matrix=np.zeros((len(self.id_to_p), len(target_phonemes)))
@@ -100,17 +101,20 @@ class dtw_forced_aligner:
                 aligned_phones_labels.insert(0, target_labels[index])
             # using the label encoder to find the phoneme
             aligned_phones = [self.id_to_p[el] for el in aligned_phones_labels]
-            return True, aligned_phones, D[-1, -1]
+            return aligned_phones, D[-1, -1]
         except ParameterError:
             # print('DTW failed, most probably the audio is too far from what is expected.')
             aligned_phones = ["[SIL]"] * len(phone_prob_matrix_nonsil)
 
-            return False, aligned_phones, None
+            return aligned_phones, None
 
     # forced alignment but with all the audio sample's frames
     def get_alignment_with_silence(
-        self, aligned_phones, silence_frames_idx, non_silence_frames_idx
-    ):
+        self,
+        aligned_phones: Sequence[str],
+        silence_frames_idx: Sequence[int],
+        non_silence_frames_idx: Sequence[int],
+    ) -> np.ndarray:
         """
         Get the alignment with silence frames.
 
@@ -130,7 +134,12 @@ class dtw_forced_aligner:
         return alignment_with_silence
 
     # compute a collapsed proba vector of every phoneme alignment
-    def predict(self, aligned_phones, phone_prob_matrix_nonsil, target_phonemes):
+    def predict(
+        self,
+        aligned_phones: Sequence[str],
+        phone_prob_matrix_nonsil: np.ndarray,
+        target_phonemes: Sequence[str],
+    ) -> tuple[list[str], list[np.ndarray]]:
         """
         Compute the collapsed probability vector of every phoneme alignment.
 
@@ -144,14 +153,17 @@ class dtw_forced_aligner:
 
         Args:
             aligned_phones (list): The list of aligned phonemes.
-            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for non-silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for
+                non-silent frames. It is of shape T x (N+1), where T is
+                the number of frames and N is the number of phonemes.
             target_phonemes (list): The list of target phonemes.
 
 
         Returns:
-            Tuple[List[str], List[np.array[float]]]: A tuple containing the list of predicted phones and the list of collapsed probability vectors.
+            Tuple[List[str], List[np.array[float]]]: A tuple containing the list of
+                predicted phones and the corresponding list of collapsed probability vectors.
         """
-        aligned_preds = list(zip(aligned_phones, phone_prob_matrix_nonsil))
+        aligned_preds = list(zip(aligned_phones, phone_prob_matrix_nonsil, strict=True))
         grouped_aligned_preds = [
             list(v) for _, v in itertools.groupby(aligned_preds, itemgetter(0))
         ]
@@ -181,12 +193,12 @@ class dtw_forced_aligner:
 
     def get_df_segmented(
         self,
-        alignment_with_silence,
-        predicted_phones,
-        phones,
-        proba_means,
-        time_per_output=0.02,
-    ):
+        alignment_with_silence: Sequence[str],
+        predicted_phones: Sequence[str],
+        phones: Sequence[str],
+        proba_means: Sequence[np.ndarray],
+        time_per_output: float = 0.02,
+    ) -> pd.DataFrame:
         """
         Convert the alignment information into a segmented DataFrame.
 
@@ -235,7 +247,9 @@ class dtw_forced_aligner:
         df_segmented['GT_proba'] = [
             df_segmented.proba_means[i][j]
             for i, j in zip(
-                range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones)
+                range(len(df_segmented)),
+                self.labelize_phonemes(df_segmented.phones),
+                strict=True,
             )
         ]
         df_segmented['pred_proba'] = [
@@ -243,6 +257,7 @@ class dtw_forced_aligner:
             for i, j in zip(
                 range(len(df_segmented)),
                 self.labelize_phonemes(df_segmented.pred_phones_audio),
+                strict=True,
             )
         ]
         df_segmented['start'] = df_segmented['start_idx'] * time_per_output
@@ -297,7 +312,9 @@ class dtw_forced_aligner:
 
         return df_segmented
 
-    def get_phone_prob_matrix_nonsil(self, phone_prob_matrix):
+    def get_phone_prob_matrix_nonsil(
+        self, phone_prob_matrix: np.ndarray
+    ) -> tuple[np.ndarray, list[int], list[int]]:
         """
         Get the columns from the probability matrix which correspond to silent and non-silent frames.
 
@@ -355,11 +372,11 @@ class dtw_forced_aligner:
             non_silence_frames_idx,
         ) = self.get_phone_prob_matrix_nonsil(phone_prob_matrix)
 
-        status, aligned_phones, dtw_cost = self.get_forced_alignment(
+        aligned_phones, dtw_cost = self.get_forced_alignment(
             phone_prob_matrix_nonsil, target_phonemes
         )
 
-        if status:
+        if dtw_cost is not None:
             if silence_frames_idx:
                 alignment_with_silence = self.get_alignment_with_silence(
                     aligned_phones, silence_frames_idx, non_silence_frames_idx
@@ -378,6 +395,5 @@ class dtw_forced_aligner:
             )
         else:
             df_segmented = pd.DataFrame()
-            dtw_cost = None
 
         return df_segmented, dtw_cost
