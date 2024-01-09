@@ -37,9 +37,11 @@ from src.label_data_processing import (
     load_adversarial_dataset,
     synth_words_data,
 )
-from src.libri_phonetization_data import *
-from src.pronunciation_dictionaries import cmu_consonants, cmu_vowels
-from src.text_processing import *
+from src.pronunciation_dictionaries import (
+    cmu_consonants,
+    cmu_vowels,
+    remove_stress_annots,
+)
 from src.wav2vec2_frame_prediction import (
     AudioMode,
     AudioStatus,
@@ -376,8 +378,6 @@ def syllable_contrast_for_actor_recordings(model=default_model):
 
     df[df.GT_overall_confidences < 0.1][['text', 'audio_file_url']]
 
-    from src.text_processing import split_phonetics, remove_stress_annots
-
     # This is to get every syllable
     all_phones_df.index = range(len(all_phones_df))
     syl_indexation_df = all_phones_df[
@@ -631,7 +631,12 @@ def start_end_consonant_clusters_on_synth_words(
 # start_end_consonant_clusters_on_synth_words(clusters=["TH_R", "P_R", "S_P_L", "S_K_R"], n=100, model=default_model_charsiu, contrast='start')
 
 
-from src.text_processing import unstress
+from src.text_processing import (
+    drop_consecutive_duplicate_elements,
+    drop_consecutive_duplicates,
+    split_phonetics,
+    unstress,
+)
 
 
 def syl_confusions_on_synth_words():

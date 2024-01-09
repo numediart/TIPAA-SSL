@@ -10,6 +10,7 @@ from Bio import pairwise2
 from linetimer import CodeTimer
 from nltk.metrics.distance import edit_distance as levenshtein_distance
 
+from performance_functions import analyze_start_end_for_synth_word
 from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
 from src.audio_processing import getIntensity, getIntonation, normalize
 from src.dtw_forced_aligner import dtw_forced_aligner
@@ -1259,40 +1260,6 @@ def phonetic_content_analysis(
         :,
     ]
     return phonetic_content
-
-
-def analyze_start_end_for_synth_word(
-    word,
-    words_selected_df,
-    target_word_idx=0,
-    target_syllable_idx=-1,
-    target_phones='Z',
-    basis=None,
-    position='end',
-    model=default_model,
-):
-    from src.audio_processing import read_audio_file
-    from src.text_processing import prefill_for_sentence
-
-    phonetics = prefill_for_sentence(word)['phonetics']
-
-    results = []
-    for i, r in words_selected_df.iterrows():
-        audio, fs = read_audio_file(r.path, fs=16000)
-        res = start_end_contrast_from_formatted_phonetics_audio(
-            audio,
-            phonetics=phonetics,
-            target_word_idx=target_word_idx,
-            target_syllable_idx=target_syllable_idx,
-            target_phones=target_phones,
-            basis=basis,
-            position=position,
-            mode=AudioMode.NUMPY,
-            model=model,
-        )
-        results.append(res)
-
-    return results
 
 
 def multiple_aspect_from_prob_matrix(

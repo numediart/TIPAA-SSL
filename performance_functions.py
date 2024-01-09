@@ -2,6 +2,7 @@ import ast
 import warnings
 from collections import Counter
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -28,18 +29,19 @@ from src.libri_phonetization_data import (
 )
 from src.pronunciation_dictionaries import (
     cmu_alphabet,
-    cmu_consonants,
-    cmu_phones,
     cmu_vowels,
+    cmudict_dict,
     ipa_alphabet,
 )
-from src.text_processing import *
-from src.text_processing import word_stress_from_cmu
+from src.text_processing import (
+    chunk_text,
+    cmu_ensure_phonetics_consistency,
+    prefill_for_sentence,
+    word_stress_from_cmu,
+)
 from src.wav2vec2_frame_prediction import AudioMode
 
 warnings.filterwarnings("ignore", category=UserWarning)
-
-import pandas as pd
 
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -953,6 +955,37 @@ def pContrast_on_synth_words(
     return result_df, d
 
 
+def analyze_start_end_for_synth_word(
+    word,
+    words_selected_df,
+    target_word_idx=0,
+    target_syllable_idx=-1,
+    target_phones='Z',
+    basis=None,
+    position='end',
+    model=default_model,
+):
+    phonetics = prefill_for_sentence(word)['phonetics']
+
+    results = []
+    for i, r in words_selected_df.iterrows():
+        audio, fs = read_audio_file(r.path, fs=16000)
+        res = start_end_contrast_from_formatted_phonetics_audio(
+            audio,
+            phonetics=phonetics,
+            target_word_idx=target_word_idx,
+            target_syllable_idx=target_syllable_idx,
+            target_phones=target_phones,
+            basis=basis,
+            position=position,
+            mode=AudioMode.NUMPY,
+            model=model,
+        )
+        results.append(res)
+
+    return results
+
+
 # to be removed
 if False:
 
@@ -1204,6 +1237,7 @@ def use_tests():
     # comment for cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
     data = load_libri_dataset_audio_timings(df_t_test)
+
     # data = load_test_dataset(df_t_test)
 
     # from tqdm import tqdm

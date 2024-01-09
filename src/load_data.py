@@ -3,14 +3,15 @@
     Returns:
         _type_: _description_: Dataframe of different speech datasets 
 """
-import pandas as pd
-from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
-from src.text_processing import remove_stress_annots
 import ast
+
 import librosa
+import pandas as pd
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+
 from src.libri_phonetization_data import libri_phonetics_data
+from src.text_processing import prefill_for_sentence, remove_stress_annots
 from src.wav2vec2_utils import instances_per_frame, instances_per_phoneme
-from src.text_processing import prefill_for_sentence
 
 
 def df_all_frames_to_X_y(df_all_frames):

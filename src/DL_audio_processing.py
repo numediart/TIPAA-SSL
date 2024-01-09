@@ -1,15 +1,16 @@
-import torch
-import numpy as np
-from glob import glob
-import librosa
-import sys
 import random
+import sys
+from glob import glob
+
+import librosa
+import numpy as np
+import pandas as pd
 import soundfile as sf
+import torch
+from scipy.io.wavfile import read
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
 from src.pronunciation_dictionaries import cmu_1_char_to_gibberish
-import pandas as pd
-from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
-from scipy.io.wavfile import read
 
 device = 'cpu'  # cuda or cpu
 

@@ -1,20 +1,25 @@
-from collections.abc import Iterable
-from typing import Sequence
+import itertools
+from collections.abc import Iterable, Sequence
+from operator import itemgetter
+
+import librosa
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
-import librosa
-import itertools
-from operator import itemgetter
-from src.text_processing import remove_stress_annots, group_consecutive_duplicates
+
+from src.text_processing import group_consecutive_duplicates, remove_stress_annots
+
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
-keep_first_last = lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
+def keep_first_last(s):
+    return s[~((s == s.shift(1)) & (s == s.shift(-1)))]
+
 
 # get the blocks of consecutive identical rows in cols
-get_blocks = lambda a, cols: a.loc[
-    (a[cols].shift() == a[cols]).any(axis=1) | (a[cols].shift(-1) == a[cols]).any(axis=1)
-]
+def get_blocks(a, cols):
+    return a.loc[
+        (a[cols].shift() == a[cols]).any(axis=1)
+        | (a[cols].shift(-1) == a[cols]).any(axis=1)
+    ]
 
 
 class dtw_forced_aligner:
