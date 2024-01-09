@@ -118,23 +118,6 @@ terminations_accepted_alternatives["T"] = [
 terminations_accepted_alternatives["D"] += terminations_accepted_alternatives["T"]
 
 
-def remove_downwards_trend(y):
-    if len(y) > 2:
-        # Remove downwards trend
-        x = range(len(y))
-        linear_f = np.polyfit(x, y, 1)
-        a = linear_f[0]
-        b = linear_f[1]
-        y = y - (a * x + b)
-
-        # normalize between 0 and 100
-        y = y - min(y)
-        y = y / max(y) * 100
-    else:
-        y = np.array(y)
-    return y.astype(int).tolist()
-
-
 def intensity_to_bin(
     scores: Sequence[float], n_max: int = 2, threshold: float = 60
 ) -> list[int]:
@@ -268,9 +251,8 @@ def compute_stress_score(
     stop_positions_samples = round(fs * filtered_df.loc[:, 'end']).astype(int).tolist()
 
     # to make sure we don t go beyond the end of the signal
-    assert stop_positions_samples[-1] < len(
-        audio
-    ), "The end of the last phoneme should be inside the signal"
+    if stop_positions_samples[-1] >= len(audio):
+        raise ValueError("The end of the last phoneme should be inside the signal")
 
     Imax, Imean, Fmax, Fmean, Dur = [], [], [], [], []
     for i in range(len(filtered_df)):
@@ -358,7 +340,7 @@ def stress_from_df_segmented_audio(
         ws = compute_stress_score(df_segmented, sound, vowels, fs=model.fs)
 
     # TODO: I think I should check for voiceness, but I don't know if I should do it for all vowels
-    if sum([el != el for el in ws]) == len(ws):
+    if np.isnan(ws).all():
         status = (
             "success: no voiced sound detected inside supposed vowels (no pitch detected)"
         )
@@ -368,19 +350,12 @@ def stress_from_df_segmented_audio(
     is_vowel = phonetics_indexed_df.apply(lambda r: unstress(r.phones) in vowels, axis=1)
     vowels_indexed_df = phonetics_indexed_df[is_vowel].copy()
 
-    # assert len(vowels_indexed_df) == len(ws), "n of vowels should be the same as length of vowel stresses"
-
     if len(vowels_indexed_df) != len(ws):
         status = "error: n of vowels should be the same as length of vowel stresses"
         print("n of vowels should be the same as length of vowel stresses")
         return StressAnalysisResult(status, [], [])
 
-    try:
-        vowels_indexed_df.loc[:, 'stress_scores'] = (100 * ws).astype(int)
-    except:
-        status = "error: n of vowels should be the same as length of vowel stresses"
-        print("n of vowels should be the same as length of vowel stresses")
-        return StressAnalysisResult(status, [], [])
+    vowels_indexed_df["stress_scores"] = (100 * ws).astype(int)
 
     word_bins = []
     word_intensities = []
@@ -394,12 +369,12 @@ def stress_from_df_segmented_audio(
     if level == StressCategory.WORD:
         return StressAnalysisResult("success", word_intensities, word_bins)
     elif level == StressCategory.SENTENCE:
-        assert (
-            n_words_by_chunk is not None
-        ), "n_words_by_chunk should be provided in 'sentence' mode"
-        assert sum(n_words_by_chunk) == len(
-            phonetics.split(' ')
-        ), 'The total number of words by chunk does not correspond to the number of words in phonetics'
+        if n_words_by_chunk is None:
+            raise ValueError("n_words_by_chunk should be provided in 'sentence' mode")
+        if sum(n_words_by_chunk) != len(phonetics.split(' ')):
+            raise ValueError(
+                "The total number of words by chunk does not correspond to the number of words in phonetics"
+            )
 
         max_word_intensities = [max(w) for w in word_intensities]
         scores_grouped_by_chunk = []
@@ -409,22 +384,17 @@ def stress_from_df_segmented_audio(
             scores_grouped_by_chunk.append(max_word_intensities[cumsum : cumsum + n])
             cumsum += n
 
-        # I tried this on General English data, and in the end, it does not seem to improve
-        # scores_grouped_by_chunk=[remove_downwards_trend(el) for el in scores_grouped_by_chunk]
-
         bins_by_chunk = []
         for chunk in scores_grouped_by_chunk:
-            bin = intensity_to_bin(chunk, n_max=math.ceil(len(chunk) / 3))
-            bins_by_chunk.append(bin)
+            intensity_bin = intensity_to_bin(chunk, n_max=math.ceil(len(chunk) / 3))
+            bins_by_chunk.append(intensity_bin)
         return StressAnalysisResult(
             "success", sum(scores_grouped_by_chunk, []), sum(bins_by_chunk, [])
         )
     else:
-        return StressAnalysisResult(
+        raise ValueError(
             f"error: {level} is not a valid level in stress_from_formatted_phonetics. "
-            "It has to be either 'word' or 'sentence'.",
-            [],
-            [],
+            "It has to be either 'word' or 'sentence'."
         )
 
 
@@ -932,8 +902,8 @@ def post_analysis(
     )
 
 
-DEFAULT_MAX_PER = 0.7
-DEFAULT_MAX_PER_ONE_SYLL = 0.8
+DEFAULT_MAX_PER = 0.8
+DEFAULT_MAX_PER_ONE_SYLL = 0.9
 
 
 def validate_recording(
