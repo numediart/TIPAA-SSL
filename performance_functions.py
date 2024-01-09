@@ -40,6 +40,7 @@ from src.text_processing import (
     word_stress_from_cmu,
 )
 from src.wav2vec2_frame_prediction import AudioMode
+from syllabipy.sonoripy import SonoriPy
 
 warnings.filterwarnings("ignore", category=UserWarning)
 

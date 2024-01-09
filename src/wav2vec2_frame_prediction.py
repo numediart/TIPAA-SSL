@@ -48,6 +48,9 @@ class AudioStatus(StrEnum):
     NO_SOUND = "success, no voiced sound detected (only 0's in waveform)"
     TOO_QUIET = "success, volume too low or no voice detected (intensity too low)"
     NO_PITCH = "success, no voiced sound detected (no pitch detected)"
+    DTW_FAILED = "success, DTW alignment failed"
+    PHONETIC_DETECTION_FAILED = "success, phonetic detection failed"
+    PHONETIC_DETECTION_SILENCE = "success, phonetic detection failed (only silence)"
     FILE_NOT_FOUND = "error, audio file not found"
 
 
@@ -250,7 +253,6 @@ class Wav2Vec2ForFramePrediction:
         - reducer (PCA): A PCA dimensionality reduction model, could be another sklearn reduction model.
         - frame_classifier (KNeighborsClassifier): By default, a K-nearest neighbors classifier for frame classification. It sould be any other sklearn mclassifier.
         """
-        self.status: AudioStatus = AudioStatus.SUCCESS
         self.fs: float = 16000
         self.time_per_output: float = 0.02
 
@@ -523,7 +525,7 @@ class Wav2Vec2ForFramePrediction:
         audio_load, phone_prob_matrix = self.audio_to_phone_prob_matrix(
             audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
         )
-        if audio_load.status == AudioStatus.SUCCESS:
+        if audio_load.status == AudioStatus.SUCCESS and phone_prob_matrix is not None:
             phone_prob_df = pd.DataFrame(phone_prob_matrix)
             phone_prob_df.columns = self.alphabet_with_silence  # type: ignore
             return audio_load, phone_prob_df

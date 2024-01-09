@@ -1,10 +1,6 @@
-import numpy as np
 import pandas as pd
 import streamlit as st
 from st_audiorec import st_audiorec
-from utils import (
-    check_password,
-)
 
 from DL_speech_tech import (
     PostAnalysisResult,

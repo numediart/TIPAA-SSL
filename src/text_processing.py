@@ -6,21 +6,22 @@ print_memory_usage = lambda stage: print(
 )
 print_memory_usage('RAM - text_processing start')
 
-import re
-from tqdm import tqdm
-import pandas as pd
-import numpy as np
 import itertools
-from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
-from src.numbers_processing import normalize_numbers
+import re
+from itertools import groupby
+
+import numpy as np
+import pandas as pd
+import unidecode
 
 # from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
-from itertools import groupby
 from num2words import num2words
-import unidecode
+from tqdm import tqdm
 
+from src.numbers_processing import normalize_numbers
 from src.phonemizer_utils import word_to_stressed_syl
+from syllabipy.sonoripy import SonoriPy, define_categories, str_to_list_of_char
 
 print_memory_usage('RAM - text_processing after external libraries')
 
@@ -1197,17 +1198,11 @@ def use_tests():
 
     db = pd.read_csv('data/query_results-2023-02-21_102331.csv')
     sentences = db.words.tolist()
-    df, df_errors = prefill_content(
-        sentences, lang='en_US', mode='CMU', output_errors=True
-    )
+    df, df_errors = prefill_content(sentences, lang='en_US', mode='CMU')
     df.to_csv('prefill_export_2023-02-21_CMU_en_US.csv')
-    df, df_errors = prefill_content(
-        sentences, lang='en_US', mode='MFA_IPA', output_errors=True
-    )
+    df, df_errors = prefill_content(sentences, lang='en_US', mode='MFA_IPA')
     df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
-    df, df_errors = prefill_content(
-        sentences, lang='en_GB', mode='MFA_IPA', output_errors=True
-    )
+    df, df_errors = prefill_content(sentences, lang='en_GB', mode='MFA_IPA')
     df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
 
     df_MFA_IPA_US = pd.read_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')

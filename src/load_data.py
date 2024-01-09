@@ -50,7 +50,7 @@ def build_df_all_frames(
 def build_df_all_phoneme_instances(
     df_t_train,
     phone_type='phone',
-    number_of_examples=None,
+    number_of_examples=100,
     model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft",
     unstressed=True,
 ):

@@ -34,7 +34,7 @@ class dtw_forced_aligner:
     Overall, the `dtw_forced_aligner` class provides a comprehensive set of tools for performing forced alignment and analyzing the results.
     """
 
-    def __init__(self, alphabet: set[str], collapse_method='mean'):
+    def __init__(self, alphabet: Sequence[str], collapse_method='mean'):
         """
         Initialize the dtw_forced_aligner class.
 
@@ -42,7 +42,7 @@ class dtw_forced_aligner:
             alphabet (list): The list of phonemes in the alphabet.
             collapse_method (str, optional): The method used to collapse probability vectors. Defaults to 'mean'.
         """
-        self.alphabet = alphabet
+        self.alphabet = set(alphabet)
         self.id_to_p = dict(enumerate([*self.alphabet, '[SIL]']))
         self.p_to_id = {p: i for i, p in enumerate([*self.alphabet, '[SIL]'])}
         self.collapse_method = collapse_method
@@ -120,7 +120,7 @@ class dtw_forced_aligner:
         aligned_phones: Sequence[str],
         silence_frames_idx: Sequence[int],
         non_silence_frames_idx: Sequence[int],
-    ) -> np.ndarray:
+    ) -> list[str]:
         """
         Get the alignment with silence frames.
 
@@ -137,7 +137,7 @@ class dtw_forced_aligner:
         )
         alignment_with_silence[silence_frames_idx] = "[SIL]"
         alignment_with_silence[non_silence_frames_idx] = aligned_phones
-        return alignment_with_silence
+        return list(alignment_with_silence)
 
     # compute a collapsed proba vector of every phoneme alignment
     def predict(
@@ -190,7 +190,7 @@ class dtw_forced_aligner:
             elif self.collapse_method == 'max':
                 collapsed_proba_vectors.append(np.max([l[1] for l in phon], axis=0))
             else:
-                raise Exception(
+                raise ValueError(
                     "collapse_method in src.dtw_forced_aligner.predict() should be 'mean' or 'max'"
                 )
         predicted_phones = [self.id_to_p[np.argmax(i)] for i in collapsed_proba_vectors]
@@ -230,7 +230,7 @@ class dtw_forced_aligner:
 
         ph_with_timings = [
             i
-            for i in list(zip(alignment_with_silence, start_idx, end_idx))
+            for i in list(zip(alignment_with_silence, start_idx, end_idx, strict=True))
             if i[0] != '[SIL]'
         ]
         grouped = [list(v) for _, v in itertools.groupby(ph_with_timings, itemgetter(0))]
@@ -296,7 +296,7 @@ class dtw_forced_aligner:
                 block_starts_ends.shift(+1) == block_starts_ends
             ].index.tolist()
 
-            for start_idx, end_idx in zip(starts, ends):
+            for start_idx, end_idx in zip(starts, ends, strict=True):
                 select = p_df_full.iloc[start_idx : end_idx + 1]
                 start = select.start.iloc[0]
                 end = select.end.iloc[-1]

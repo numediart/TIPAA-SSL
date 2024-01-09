@@ -360,9 +360,6 @@ def test_audio_file_like():
 
     decode_string = base64.b64decode(encode_string)
 
-    import soundfile as sf
-    import io
-
     sf.read(io.BytesIO(decode_string))[0]
 
     s, fs = librosa.load(io.BytesIO(decode_string), sr=fs)
@@ -373,9 +370,8 @@ def test_audio_file_like():
 
 
 def use_tests(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'):
-    from pydub import AudioSegment
-    import io
     import array
+
     from pydub import AudioSegment
     from pydub.utils import get_array_type
 
@@ -384,7 +380,6 @@ def use_tests(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a
     encoded_string = '\n'.join(encoded_string)
     decode_string = base64.b64decode(encoded_string)
 
-    audio = AudioSegment.from_file(io.BytesIO(decode_string), format="m4a")
     audio = AudioSegment.from_file(path, format="mp3")
 
     bit_depth = audio.sample_width * 8
