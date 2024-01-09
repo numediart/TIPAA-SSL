@@ -170,7 +170,8 @@ def audio_load_and_check(
         status = AudioStatus.TOO_QUIET
     elif speech_rate > max_speech_rate:
         status = AudioStatus.TOO_SHORT
-    # too tricky to have a reliable speech rate for very short audios
+    # too tricky to have a reliable speech rate for very short audios,
+    # so don't check if only one syllable
     elif speech_rate < min_speech_rate and n_syllables_tot > 1:
         status = AudioStatus.TOO_LONG
     elif pitch_sample_ratio == 0:

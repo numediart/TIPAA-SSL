@@ -239,8 +239,7 @@ def read_audio_file(
     try:
         s, orig_sr = sf.read(audio_file)
     except LibsndfileError:
-        audio = AudioSegment.from_file(audio_file)  # , format="m4a")
-        # audio = AudioSegment.from_file(path, format="m4a")
+        audio = AudioSegment.from_file(audio_file)
 
         bit_depth = audio.sample_width * 8
         array_type = get_array_type(bit_depth)
@@ -248,9 +247,9 @@ def read_audio_file(
         s = np.array(numeric_array) / 2**15
         orig_sr = audio.frame_rate
 
-    # if the signal is a 2D array, we take the first channel only to have a 1D array
-    if len(s.shape) > 1 and s.shape[-1] == 2:
-        s = s[:, 0]
+    # if the signal is a 2D array, we take the average of both channels (stereo)
+    if len(s.shape) > 1 and s.shape[-1] == 2:  # noqa: PLR2004
+        s = np.mean(s, axis=1)
     # if len(s) is 0, stop here, don't try to resample it, it will throw an error
     if len(s) == 0:
         return s, fs
@@ -283,13 +282,7 @@ def read_audio_string(
 
 def audio64_from_file(path: str, fs: float = 16000) -> bytes:
     # writing bytes of an ogg file with virtual io, then encoding with base64
-    try:
-        s, orig_sr = sf.read(path)
-        if len(s.shape) > 1 and s.shape[-1] == 2:
-            s = s[:, 0]
-        s = librosa.resample(s, orig_sr=orig_sr, target_sr=fs)
-    except:
-        s, fs = librosa.load(path, sr=fs)
+    s, fs = read_audio_file(path, fs=fs)
     with io.BytesIO() as fio:
         sf.write(fio, s, samplerate=fs, format='ogg')
         audio_string = fio.getvalue()
