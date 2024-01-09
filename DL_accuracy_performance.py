@@ -13,7 +13,6 @@ from tqdm import tqdm
 
 from DL_speech_tech import (
     default_model,
-    phonetic_content_analysis,
     post_analysis,
     start_end_contrast_from_formatted_phonetics_audio,
 )
@@ -311,7 +310,6 @@ def syllable_contrast_for_actor_recordings(model=default_model):
         s, fs = librosa.load(r.audio_file_url, sr=16000)
         # phonetic_content=charsiu.analyze_phonetic_content(s, r.cmu_phonetics)
         phonetics = r.cmu_phonetics
-        phonetic_content = phonetic_content_analysis(s, phonetics)
         # all_syl_dfs.append(syl_dfs)
 
         # phonetic_content=pd.concat(syl_dfs)

@@ -188,10 +188,6 @@ def use_tests():
     )
 
     # df_segmented=charsiu.force_and_predict(s,split_phonetics)
-    from DL_speech_tech import phonetic_content_analysis
-
-    phonetic_content = phonetic_content_analysis(s, phonetics)
-
     charsiu.predict_phone(s, phonetics, 0, 1, 'D')
 
     #  Inference with the example number N

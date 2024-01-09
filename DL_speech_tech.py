@@ -1195,77 +1195,6 @@ def start_end_contrast_from_formatted_phonetics_audio(
         to_gibberish=to_gibberish,
     )
 
-
-def phonetic_content_analysis(
-    s, phonetics, model=default_model, vowels=cmu_vowels, consonants=cmu_consonants
-):
-    phonetic_content = model.analyze_phonetic_content(s, phonetics)
-    if len(phonetic_content) == 0:
-        return phonetic_content
-
-    def syl_analysis(syl_df):
-        # inside a syllable or word, there cannot be several times the same phoneme consecutively
-        collapsed_syl = drop_consecutive_duplicates(syl_df[['pred_phones_audio']])
-
-        # one syllable in ground truth can correspond in several syllables in prediction, e.g. moved -> movED
-        # or also in "0 syllable" if there is no vowel. If that's the case,  I have to consider it is 1 syllable
-        pred_syls = SonoriPy(collapsed_syl.pred_phones_audio.tolist())[0]
-        if pred_syls == []:
-            pred_syls = [collapsed_syl.pred_phones_audio.tolist()]
-
-        # extract syllable indices for predicted syls
-        pred_syls_indxs = sum(
-            [[i] * n for i, n in enumerate([len(syl) for syl in pred_syls])], []
-        )
-
-        collapsed_syl.loc[:, 'pred_syls_indxs_inside_GT_syl'] = pred_syls_indxs
-
-        # I align the collapsed syllable to the timed one. This leads to NaNs that have to be filled
-        syl_df.loc[:, 'pred_syls_indxs_inside_GT_syl'] = collapsed_syl.loc[
-            :, 'pred_syls_indxs_inside_GT_syl'
-        ].astype(int)
-        syl_df = syl_df.fillna(method="ffill")
-
-        # in each syllable in prediction, I only keep one vowel, by majority vote, i.e. I drop all vowels except max frames in each syl
-        # for i in syl_df.pred_syls_indxs_inside_GT_syl.unique():
-        #     s=syl_df.loc[syl_df.pred_syls_indxs_inside_GT_syl==i]
-        #     v=s[s.pred_phones_audio.isin(vowels)]
-        #     if len(v)>0:
-        #         m=v.n_frames.idxmax()
-        #         l=[el for el in v.index.tolist() if el != m]
-        #         syl_df=syl_df.drop(l)
-
-        return syl_df
-
-    # reduction: we go in each syllable
-    dfs = []
-    for w_idx in range(phonetic_content.word_idx.values[-1] + 1):
-        w_df = phonetic_content[phonetic_content.word_idx == w_idx]
-        for s_idx in range(w_df.syl_idx.values[-1] + 1):
-            s_df = w_df[phonetic_content.syl_idx == s_idx]
-            syl_df = syl_analysis(s_df)
-            dfs.append(syl_df)
-    phonetic_content = pd.concat(dfs)
-
-    # post-correction : for each row when we are in a case of accepted alternative in prediction, we replace it with the GT
-    for i, r in phonetic_content.iterrows():
-        if r.phones in target_accepted_alternatives:
-            if r.pred_phones_audio in target_accepted_alternatives[r.phones]:
-                phonetic_content.loc[i, 'pred_phones_audio'] = r.phones
-
-    # phonetic_content=phonetic_content[phonetic_content.n_frames>1]
-    phonetic_content = phonetic_content[
-        phonetic_content.pred_phones_audio != model.SILENCE
-    ]
-    phonetic_content = phonetic_content.loc[
-        drop_consecutive_duplicates(
-            phonetic_content[['phones', 'pred_phones_audio']]
-        ).index,
-        :,
-    ]
-    return phonetic_content
-
-
 def multiple_aspect_from_prob_matrix(
     phone_prob_matrix,
     s,
@@ -1863,22 +1792,6 @@ def use_tests():
     s, fs = read_audio_file('data/audio_recordings/turnEED_around.mp3', fs=16000)
     # s,fs=read_audio_file('data/audio_recordings/turned_around.mp3', fs=16000)
     default_model.predict_phone_prob_matrix(s, fs).shape
-    default_model.analyze_phonetic_content(s, formatted_phonetics)
-
-    phonetic_content = phonetic_content_analysis(s, formatted_phonetics)
-    phonetic_content[
-        [
-            'phones',
-            'start_idx',
-            'end_idx',
-            'pred_phones_audio',
-            'proba_means',
-            'GT_proba',
-            'start',
-            'end',
-            'n_times',
-        ]
-    ]
 
     # syllable_contrast_from_formatted_phonetics_audio(s,phonetics=formatted_phonetics,
     #                         target_word_idx=1,
