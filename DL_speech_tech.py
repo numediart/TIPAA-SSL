@@ -10,7 +10,6 @@ from Bio import pairwise2
 from linetimer import CodeTimer
 from nltk.metrics.distance import edit_distance as levenshtein_distance
 
-from performance_functions import analyze_start_end_for_synth_word
 from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
 from src.audio_processing import getIntensity, getIntonation, normalize
 from src.dtw_forced_aligner import dtw_forced_aligner
@@ -40,6 +39,9 @@ from src.text_processing import (
     unstress,
 )
 from src.wav2vec2_frame_prediction import (
+    DEFAULT_MAX_SPEECH_RATE,
+    DEFAULT_MIN_SPEECH_RATE,
+    DEFAULT_SILENCE_THRESHOLD,
     AudioInput,
     AudioLoadResult,
     AudioMode,
@@ -1430,15 +1432,15 @@ def use_tests():
 
     word = "perhaps"
     words_selected_df = df_words[df_words.text == word]
-    analyze_start_end_for_synth_word(
-        word,
-        words_selected_df,
-        target_word_idx=0,
-        target_syllable_idx=1,
-        target_phones='HH',
-        position='start',
-        model=default_model,
-    )
+    # analyze_start_end_for_synth_word(
+    #     word,
+    #     words_selected_df,
+    #     target_word_idx=0,
+    #     target_syllable_idx=1,
+    #     target_phones='HH',
+    #     position='start',
+    #     model=default_model,
+    # )
 
     word = "ability"
     phonetics = prefill_for_sentence(word)['phonetics']

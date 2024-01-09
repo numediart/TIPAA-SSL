@@ -632,9 +632,11 @@ def start_end_consonant_clusters_on_synth_words(
 
 
 from src.text_processing import (
+    count_syllables,
     drop_consecutive_duplicate_elements,
     drop_consecutive_duplicates,
     split_phonetics,
+    split_phonetics_to_phones,
     unstress,
 )
 
@@ -1289,7 +1291,7 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
 
             if phone_prob_matrix is not None:
                 validation_result = validate_recording(phone_prob_matrix, phonetics)
-                result['rejected'] = result['rejected'] or not validation_result
+                result['rejected'] = result['rejected'] or (not validation_result)
 
                 post_result = post_analysis(
                     phone_prob_matrix,
@@ -1297,16 +1299,13 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
                 )
                 if post_result is not None:
                     result['per_aligned'] = post_result.per_aligned
-                    result['dtw_score'] = (
-                        post_result.dtw_cost if post_result.dtw_cost else 0.0
-                    )
                     result['silent_frame_ratio'] = post_result.silent_frame_ratio
                     result['phone_count_ratio'] = post_result.phone_count_ratio
                     result['detected_phones'] = post_result.df_detection.phone.tolist()
 
-                result["should_reject"] = result["target"] == 0 or (
-                    result["target"] == 1 and result["match"] == False
-                )
+            result["should_reject"] = result["target"] == 0 or (
+                result["target"] == 1 and result["match"] == False
+            )
 
             data.append(result)
 

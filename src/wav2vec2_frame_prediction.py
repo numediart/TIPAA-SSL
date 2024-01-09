@@ -159,6 +159,9 @@ def audio_load_and_check(
     silent_frames = intensity < silence_threshold
     silent_sample_ratio = silent_frames.sum() / len(s)
 
+    if silent_frames.all():
+        return AudioLoadResult(AudioStatus.TOO_QUIET, s, fs, None, None, None)
+
     # ideally we would detect the onset and the end of the
     # voiced part of the audio, and only compute the speech rate
     # on that part
@@ -171,9 +174,7 @@ def audio_load_and_check(
         ~silent_frames
     ).sum()
 
-    if silent_frames.all():
-        status = AudioStatus.TOO_QUIET
-    elif speech_rate > max_speech_rate:
+    if speech_rate > max_speech_rate:
         status = AudioStatus.TOO_SHORT
     # too tricky to have a reliable speech rate for very short audios,
     # so don't check if only one syllable

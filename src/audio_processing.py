@@ -95,6 +95,8 @@ def getIntensity(s: np.ndarray, fs: float) -> np.ndarray:
 
     # smoothing the signal power using a moving average
     intensity = smooth((s) ** 2, 20, 2 * analysis_win)
+    if len(intensity) == 0:
+        return np.array([])
 
     # convert in db
     intensity /= 4.0e-10
