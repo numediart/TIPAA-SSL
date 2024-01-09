@@ -30,7 +30,6 @@ from src.pronunciation_dictionaries import (
 from src.text_processing import (
     cmu_ensure_phonetics_consistency,
     drop_consecutive_duplicate_elements,
-    drop_consecutive_duplicates,
     phonetics_indexed_df_from_formatted_phonetics,
     remove_grouping_hyphens,
     remove_stress_annots,
@@ -47,37 +46,9 @@ from src.wav2vec2_frame_prediction import (
     Wav2Vec2ForFramePrediction,
     extract_word_from_df_segmented,
 )
-from syllabipy.sonoripy import SonoriPy
-
-# initialize model
-# from src.charsiu_utils import charsiu_phone_forced_aligner
-# default_model_charsiu = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
-# print_memory_usage("RAM - DL_speech_tech after default_model_charsiu")
-
-
-phoneme_GT_proba_threshold_dict = {}
-default_thresh = 0.2
-for k in cmu_stressed_vowels:
-    phoneme_GT_proba_threshold_dict[k] = default_thresh
-for k in cmu_consonants:
-    phoneme_GT_proba_threshold_dict[k] = default_thresh
 
 default_model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format="onnx")
 default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
-
-
-# default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet,w2v2_model_format="onnx")
-# default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
-# default_model_stressed = Wav2Vec2ForFramePrediction(cmu_stressed_alphabet,w2v2_model_format="onnx")
-# default_model_stressed.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
-
-# default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet,w2v2_model_format="onnx")
-# default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
-
-# default_model.load(name='model_mailabs_pca_99_logistic_regression')
-# default_model.load(name='model_mailabs_pca_99_knn_5_cos_w')
-
-# default_model=default_model_charsiu
 
 
 class StressCategory(Enum):
@@ -1194,6 +1165,7 @@ def start_end_contrast_from_formatted_phonetics_audio(
         consonants=consonants,
         to_gibberish=to_gibberish,
     )
+
 
 def multiple_aspect_from_prob_matrix(
     phone_prob_matrix,
