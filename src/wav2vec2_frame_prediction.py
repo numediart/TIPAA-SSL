@@ -38,6 +38,10 @@ cmu_consonants = [p[0] for p in cmu_phones_info if p[1][0] != 'vowel']
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MIN_SPEECH_RATE = 1  # syll/s
+DEFAULT_MAX_SPEECH_RATE = 8  # syll/s
+DEFAULT_SILENCE_THRESHOLD = 40  # dBFS
+
 
 # StrEnum in python 3.11
 class AudioStatus(StrEnum):
@@ -51,6 +55,7 @@ class AudioStatus(StrEnum):
     DTW_FAILED = "success, DTW alignment failed"
     PHONETIC_DETECTION_FAILED = "success, phonetic detection failed"
     PHONETIC_DETECTION_SILENCE = "success, phonetic detection failed (only silence)"
+    NO_MATCH = "success, phone error rate too high"
     FILE_NOT_FOUND = "error, audio file not found"
 
 
@@ -103,9 +108,9 @@ AudioInput = str | bytes | bytearray | np.ndarray
 def audio_load_and_check(
     audio: AudioInput,
     phonetics: str,
-    min_speech_rate: float = 1,
-    max_speech_rate: float = 8,
-    silence_threshold: float = 40,
+    min_speech_rate: float = DEFAULT_MIN_SPEECH_RATE,
+    max_speech_rate: float = DEFAULT_MAX_SPEECH_RATE,
+    silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
     mode: AudioMode = AudioMode.FILE,
     fs: float = 16000,
 ) -> AudioLoadResult:
@@ -445,9 +450,9 @@ class Wav2Vec2ForFramePrediction:
         self,
         audio: AudioInput,
         phonetics: str,
-        min_speech_rate: float = 1,
-        max_speech_rate: float = 8,
-        silence_threshold: float = 40,
+        min_speech_rate: float = DEFAULT_MIN_SPEECH_RATE,
+        max_speech_rate: float = DEFAULT_MAX_SPEECH_RATE,
+        silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
         mode: AudioMode = AudioMode.NUMPY,
     ) -> tuple[AudioLoadResult, np.ndarray | None]:
         """

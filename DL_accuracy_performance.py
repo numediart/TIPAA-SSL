@@ -12,9 +12,11 @@ from scipy.stats import gaussian_kde
 from tqdm import tqdm
 
 from DL_speech_tech import (
+    DEFAULT_POST_PROBA_THRESHOLD,
     default_model,
     post_analysis,
     start_end_contrast_from_formatted_phonetics_audio,
+    validate_recording,
 )
 from performance_functions import (
     compute_predictions,
@@ -1269,6 +1271,7 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
 
             result = {
                 'audio_load_status': audio_load.status == AudioStatus.SUCCESS,
+                'rejected': audio_load.status != AudioStatus.SUCCESS,
                 'audio_status_message': str(audio_load.status),
                 'silent_sample_ratio': audio_load.silent_sample_ratio,
                 'pitch_sample_ratio': audio_load.pitch_sample_ratio,
@@ -1285,8 +1288,12 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
             }
 
             if phone_prob_matrix is not None:
+                validation_result = validate_recording(phone_prob_matrix, phonetics)
+                result['rejected'] = result['rejected'] or not validation_result
+
                 post_result = post_analysis(
-                    phone_prob_matrix, phonetics, proba_thresh=0.6
+                    phone_prob_matrix,
+                    phonetics,
                 )
                 if post_result is not None:
                     result['per_aligned'] = post_result.per_aligned
@@ -1297,12 +1304,13 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
                     result['phone_count_ratio'] = post_result.phone_count_ratio
                     result['detected_phones'] = post_result.df_detection.phone.tolist()
 
+                result["should_reject"] = result["target"] == 0 or (
+                    result["target"] == 1 and result["match"] == False
+                )
+
             data.append(result)
 
     data = pd.DataFrame(data)
-    data["should_reject"] = (data.target == 0) | (
-        (data.target == 1) & (data.match == False)
-    )
     return data
 
 

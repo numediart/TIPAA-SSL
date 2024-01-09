@@ -39,8 +39,6 @@ from src.audio_processing import read_audio_file
 formatted_cmudict_df = get_formatted_cmudict()
 print_memory_usage('RAM - streamlit utils, after formatted_cmudict_df')
 
-from DL_speech_tech import multiple_aspect_from_formatted_phonetics_audio
-
 print_memory_usage(
     'RAM - streamlit utils, after DL_speech_tech.multiple_aspect_from_formatted_phonetics_audio'
 )

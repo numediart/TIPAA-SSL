@@ -29,6 +29,7 @@ from src.pronunciation_dictionaries import (
 )
 from src.text_processing import (
     cmu_ensure_phonetics_consistency,
+    count_syllables,
     drop_consecutive_duplicate_elements,
     phonetics_indexed_df_from_formatted_phonetics,
     remove_grouping_hyphens,
@@ -448,9 +449,13 @@ def stress_from_formatted_phonetics(
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = remove_grouping_hyphens(phonetics)
-    phoneme_list = split_phonetics_to_phones(phonetics)
+
+    if not validate_recording(phone_prob_matrix, phonetics):
+        return StressAnalysisResult(str(AudioStatus.NO_MATCH), [], [])
+
+    phoneme_list = remove_stress_annots(split_phonetics_to_phones(phonetics))
     df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
-        phone_prob_matrix, remove_stress_annots(phoneme_list)
+        phone_prob_matrix, phoneme_list
     )
 
     if dtw_cost is None:
@@ -572,6 +577,15 @@ def phonemeContrast_from_formatted_phonetics_audio(
             "gibberish_truth": '_'.join(g_t),
             "gibberish_detected": "null",
         }
+
+    if not validate_recording(phone_prob_matrix, phonetics):
+        return {
+            "status": str(AudioStatus.NO_MATCH),
+            "phonetic_detection": "null",
+            "gibberish_truth": '_'.join(g_t),
+            "gibberish_detected": "null",
+        }
+
     phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
@@ -657,6 +671,15 @@ def schwa_sound_from_formatted_phonetics_audio(
             "gibberish_truth": '_'.join(g_t),
             "gibberish_detected": "null",
         }
+
+    if not validate_recording(phone_prob_matrix, phonetics):
+        return {
+            "status": str(AudioStatus.NO_MATCH),
+            "phonetic_detection": "null",
+            "gibberish_truth": '_'.join(g_t),
+            "gibberish_detected": "null",
+        }
+
     phoneme_list = split_phonetics_to_phones(phonetics)
     df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
@@ -840,8 +863,6 @@ def list_pairwise_alignment(LISTA, LISTB):
 
 @dataclass
 class PostAnalysisResult:
-    df_segmented: pd.DataFrame | None
-    dtw_cost: float | None
     per_aligned: float
     silent_frame_ratio: float
     phone_count_ratio: float
@@ -850,11 +871,14 @@ class PostAnalysisResult:
     expected_aligned_phones: list[str]
 
 
+DEFAULT_POST_PROBA_THRESHOLD = 0.6
+
+
 def post_analysis(
     phone_prob_matrix: np.ndarray,
     phonetics: str,
     model: Wav2Vec2ForFramePrediction = default_model,
-    proba_thresh: float = 0.5,
+    proba_thresh: float = DEFAULT_POST_PROBA_THRESHOLD,
 ) -> PostAnalysisResult | None:
     """Verify matching between predicted phones and expected phones.
     Useful for rejecting recordings which do not match the assignment.
@@ -868,7 +892,7 @@ def post_analysis(
     model : Wav2Vec2ForFramePrediction, optional
         Model to use, by default default_model
     proba_thresh : float, optional
-        Probability threshold for phone prediction, by default 0.5
+        Probability threshold for phone prediction, by default 0.6
 
     Returns
     -------
@@ -896,22 +920,7 @@ def post_analysis(
 
     per_aligned = levenshtein_distance(exp_aligned, pred_aligned) / len(exp_aligned)
 
-    # Perform DTW between expected phones and predicted probability matrix
-    df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
-        phone_prob_matrix, expected_phone_list
-    )
-
-    if len(df_segmented) == 0 or dtw_cost is None:
-        # DTW failed
-        df_segmented = None
-        dtw_cost = None
-    else:
-        dtw_cost = -dtw_cost / len(pred_phone_list)
-        df_segmented['n_frames'] = df_segmented.end_idx - df_segmented.start_idx
-
     return PostAnalysisResult(
-        df_segmented,
-        dtw_cost,
         per_aligned,
         silent_frame_ratio,
         phone_count_ratio,
@@ -919,6 +928,28 @@ def post_analysis(
         pred_aligned,
         exp_aligned,
     )
+
+
+DEFAULT_MAX_PER = 0.7
+DEFAULT_MAX_PER_ONE_SYLL = 0.8
+
+
+def validate_recording(
+    phone_prob_matrix: np.ndarray,
+    phonetics: str,
+    proba_thresh: float = DEFAULT_POST_PROBA_THRESHOLD,
+    max_per: float = DEFAULT_MAX_PER,
+    max_per_one_syll: float = DEFAULT_MAX_PER_ONE_SYLL,
+) -> bool:
+    """Validate a recording based on the phone error rate computed in post_analysis"""
+    post_result = post_analysis(phone_prob_matrix, phonetics, proba_thresh=proba_thresh)
+    if post_result is None:
+        return False
+    syllable_count = count_syllables(phonetics)
+    if syllable_count == 1:
+        return post_result.per_aligned < max_per_one_syll
+    else:
+        return post_result.per_aligned < max_per
 
 
 def start_end_contrast_from_prob_matrix(
@@ -1150,6 +1181,14 @@ def start_end_contrast_from_formatted_phonetics_audio(
             "gibberish_detected": "null",
         }
 
+    if not validate_recording(phone_prob_matrix, phonetics):
+        return {
+            "status": str(AudioStatus.NO_MATCH),
+            "phonetic_detection": "null",
+            "gibberish_truth": '_'.join(g_t),
+            "gibberish_detected": "null",
+        }
+
     return start_end_contrast_from_prob_matrix(
         phone_prob_matrix,
         phonetics=phonetics,
@@ -1312,14 +1351,14 @@ def multiple_aspect_from_formatted_phonetics_audio(
     audio: AudioInput,
     phonetics: str,
     vowels: set = cmu_vowels,
-    proba_thresh: float = 0.5,
-    min_speech_rate: float = 1,
-    max_speech_rate: float = 8,
-    silence_threshold: float = 40,
+    proba_thresh: float = DEFAULT_POST_PROBA_THRESHOLD,
+    min_speech_rate: float = DEFAULT_MIN_SPEECH_RATE,
+    max_speech_rate: float = DEFAULT_MAX_SPEECH_RATE,
+    silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
     mode: AudioMode = AudioMode.FILE,
     model: Wav2Vec2ForFramePrediction = default_model,
     to_gibberish: dict[str, str] = cmu_to_gibberish,
-) -> tuple[AudioLoadResult, pd.DataFrame | None, PostAnalysisResult | None]:
+) -> tuple[AudioLoadResult, pd.DataFrame | None, PostAnalysisResult | None, bool]:
     phonetics = cmu_ensure_phonetics_consistency(phonetics)
     audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio,
@@ -1331,7 +1370,7 @@ def multiple_aspect_from_formatted_phonetics_audio(
     )
 
     if audio_load.status != AudioStatus.SUCCESS:
-        return audio_load, None, None
+        return audio_load, None, None, False
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = remove_grouping_hyphens(phonetics)
@@ -1340,8 +1379,13 @@ def multiple_aspect_from_formatted_phonetics_audio(
         post_analysis_result = post_analysis(
             phone_prob_matrix, phonetics, model=model, proba_thresh=proba_thresh
         )
+        validation_result = validate_recording(
+            phone_prob_matrix, phonetics, proba_thresh=proba_thresh
+        )
+
     else:
         post_analysis_result = None
+        validation_result = False
 
     return (
         audio_load,
@@ -1355,6 +1399,7 @@ def multiple_aspect_from_formatted_phonetics_audio(
             to_gibberish=to_gibberish,
         ),
         post_analysis_result,
+        validation_result,
     )
 
 

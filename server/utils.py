@@ -363,7 +363,8 @@ def call_stress_fn(
     mode: AudioMode = AudioMode.FILE,
 ) -> Response:
     if module == StressCategory.SENTENCE:
-        assert n_words_by_chunk is not None
+        if n_words_by_chunk is None:
+            raise ValueError("n_words_by_chunk must be provided for sentence stress")
         res = stress_from_formatted_phonetics(
             audio, phonetics, n_words_by_chunk, level=module, mode=mode
         )
@@ -382,7 +383,6 @@ def call_stress_fn(
     if "success" not in res.status:
         response = asdict(res)
         response['error'] = True
-        # res['detected']=define_detected_flag(res['status'])
         response = json.dumps(response)
         return Response(response, status=500, mimetype="application/json")
     else:
