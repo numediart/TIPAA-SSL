@@ -12,6 +12,7 @@ from nltk.metrics.distance import edit_distance as levenshtein_distance
 
 from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
 from src.audio_processing import getIntensity, getIntonation, normalize
+from src.dtw_forced_aligner import dtw_forced_aligner
 from src.pronunciation_dictionaries import (
     cmu_alphabet,
     cmu_consonants,
@@ -43,7 +44,7 @@ from src.wav2vec2_frame_prediction import (
     AudioMode,
     AudioStatus,
     Wav2Vec2ForFramePrediction,
-    extract_word,
+    extract_word_from_df_segmented,
 )
 from syllabipy.sonoripy import SonoriPy
 
@@ -200,68 +201,68 @@ def intensity_to_bin(
 
 
 def predict_phone(
-    forced_aligner,
-    df_word,
-    phonetics,
-    target_word_idx,
-    target_syllable_idx,
-    target_phones,
-    target_occurence_idx=0,
-    phoneme_set=cmu_vowels,
-    GT_proba_threshold=0.2,
-):
+    forced_aligner: dtw_forced_aligner,
+    df_word: pd.DataFrame,
+    phonetics: str,
+    target_word_idx: int,
+    target_syllable_idx: int,
+    target_phones: str,
+    target_occurence_idx: int = 0,
+    phoneme_set: set[str] = cmu_vowels,
+    GT_proba_threshold: float = 0.2,
+) -> tuple[str | None, list[str] | None]:
     """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'"""
     # phoneme_set=[p for p in remove_stress_annots(phoneme_set)]+["[SIL]"]
-    phoneme_set = [*list(phoneme_set), "[SIL]"]
+    phoneme_set = set(phoneme_set)
+    phoneme_set.add("[SIL]")
 
     # split_phonetics=[p.replace('|','_').split('_') for p in phonetics.split(' ')]
     # df_word=self.predict_word(audio, split_phonetics, target_word_idx)
 
-    if len(df_word) > 0:
-        word = phonetics.split(' ')[target_word_idx]
-        syllables = [syl.split('_') for syl in word.split('|')]
-        syllable = syllables[target_syllable_idx]
-        syl = remove_stress_annots(syllable)
-        idxs_of_target_occurences = [
-            i for i, p in enumerate(syl) if unstress(target_phones) == p
-        ]
+    if len(df_word) == 0:
+        return None, None
 
-        if target_occurence_idx < len(idxs_of_target_occurences):
-            p_idx_local = idxs_of_target_occurences[target_occurence_idx]
-        else:
-            # self.status="error: target_occurence_idx is out of bounds"
-            phonetic_detection = float('nan')
-            syl = float('nan')
-            return phonetic_detection, syl
+    word = phonetics.split(' ')[target_word_idx]
+    syllables_phones = [syl.split('_') for syl in word.split('|')]
+    syllable_phones = syllables_phones[target_syllable_idx]
+    syllable_unstressed_phones = remove_stress_annots(syllable_phones)
+    idxs_of_target_occurences = [
+        i
+        for i, p in enumerate(syllable_unstressed_phones)
+        if unstress(target_phones) == p
+    ]
 
-        len_previous_syllables = sum([len(el) for el in syllables[:target_syllable_idx]])
-        p_idx_global = len_previous_syllables + p_idx_local
-
-        phonetic_detection = df_word.iloc[p_idx_global].pred_phones_audio
-
-        phoneme_set_ids = forced_aligner.labelize_phonemes(phoneme_set)
-        proba_means = df_word.iloc[p_idx_global].proba_means
-
-        # if GT_proba is beyond the threshold, we take it as prediction
-        if df_word.iloc[p_idx_global].GT_proba > GT_proba_threshold:
-            phonetic_detection = target_phones
-        else:
-            # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
-            filtered_proba_means = [
-                0 if i not in phoneme_set_ids else el for i, el in enumerate(proba_means)
-            ]
-            # if everything is 0 in the filtered proba, then we keep the phonetic detection that was in the non-filtered proba. E.g., for the word "new", imagine we target the "Y" of "N_Y_UW", but it is pronounced the british way "N_UW"
-            # Then, there could be zero probability in consonants, and therefore, we keep the vowel that should be close to "UW"
-            if sum(filtered_proba_means) != 0:
-                phonetic_detection = forced_aligner.id_to_p[
-                    np.argmax(filtered_proba_means)
-                ]
-        syl[p_idx_local] = phonetic_detection
-
+    if target_occurence_idx < len(idxs_of_target_occurences):
+        p_idx_local = idxs_of_target_occurences[target_occurence_idx]
     else:
-        phonetic_detection = float('nan')
-        syl = float('nan')
-    return phonetic_detection, syl
+        return None, None
+
+    len_previous_syllables = sum(
+        [len(el) for el in syllables_phones[:target_syllable_idx]]
+    )
+    p_idx_global = len_previous_syllables + p_idx_local
+
+    phonetic_detection = df_word.iloc[p_idx_global].pred_phones_audio
+
+    phoneme_set_ids = forced_aligner.labelize_phonemes(phoneme_set)
+    proba_means = df_word.iloc[p_idx_global].proba_means
+
+    # if GT_proba is beyond the threshold, we take it as prediction
+    if df_word.iloc[p_idx_global].GT_proba > GT_proba_threshold:
+        phonetic_detection = target_phones
+    else:
+        # put 0 when not in phoneme_set so that we take max propa only among phoneme_set
+        filtered_proba_means = [
+            0 if i not in phoneme_set_ids else el for i, el in enumerate(proba_means)
+        ]
+        # if everything is 0 in the filtered proba, then we keep the phonetic detection that was in the non-filtered proba.
+        # E.g., for the word "new", imagine we target the "Y" of "N_Y_UW", but it is pronounced the british way "N_UW"
+        # Then, there could be zero probability in consonants, and therefore, we keep the vowel that should be close to "UW"
+        if sum(filtered_proba_means) != 0:
+            phonetic_detection = forced_aligner.id_to_p[np.argmax(filtered_proba_means)]
+    syllable_unstressed_phones[p_idx_local] = phonetic_detection
+
+    return phonetic_detection, syllable_unstressed_phones
 
 
 def compute_stress_score(
@@ -371,14 +372,6 @@ def stress_from_df_segmented_audio(
          - for sentence stress: {"status": "success", "stress_intensities": [100], "stress_binaries": [1]}
          - for word stress: {"status": "success", "stress_intensities": [[100]], "stress_binaries": [[1]]}
     """
-    if level == StressCategory.SENTENCE:
-        assert (
-            n_words_by_chunk is not None
-        ), "n_words_by_chunk should be provided in 'sentence' mode"
-        assert sum(n_words_by_chunk) == len(
-            phonetics.split(' ')
-        ), 'The total number of words by chunk does not correspond to the number of words in phonetics'
-
     vowels_df = df_segmented[df_segmented.phones.isin(vowels)]
     if len(vowels_df) == 1:
         if level == StressCategory.SENTENCE:
@@ -426,9 +419,17 @@ def stress_from_df_segmented_audio(
     if level == StressCategory.WORD:
         return StressAnalysisResult("success", word_intensities, word_bins)
     elif level == StressCategory.SENTENCE:
+        assert (
+            n_words_by_chunk is not None
+        ), "n_words_by_chunk should be provided in 'sentence' mode"
+        assert sum(n_words_by_chunk) == len(
+            phonetics.split(' ')
+        ), 'The total number of words by chunk does not correspond to the number of words in phonetics'
+
         max_word_intensities = [max(w) for w in word_intensities]
         scores_grouped_by_chunk = []
         cumsum = 0
+
         for n in n_words_by_chunk:
             scores_grouped_by_chunk.append(max_word_intensities[cumsum : cumsum + n])
             cumsum += n
@@ -466,7 +467,7 @@ def stress_from_formatted_phonetics(
     audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
-    if audio_load.status != AudioStatus.SUCCESS:
+    if audio_load.status != AudioStatus.SUCCESS or phone_prob_matrix is None:
         return StressAnalysisResult(str(audio_load.status), [], [])
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
@@ -476,7 +477,7 @@ def stress_from_formatted_phonetics(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
 
-    if model.status != AudioStatus.SUCCESS:
+    if model.status != AudioStatus.SUCCESS or audio_load.waveform is None:
         return StressAnalysisResult(str(model.status), [], [])
 
     return stress_from_df_segmented_audio(
@@ -508,7 +509,9 @@ def phonemeContrast_from_df_segmented(
     ]
 
     phones_by_words = split_phonetics_by_words(phonetics)
-    df_word = extract_word(df_segmented, phones_by_words, target_word_idx)
+    df_word = extract_word_from_df_segmented(
+        df_segmented, phones_by_words, target_word_idx
+    )
     phonetic_detection, detected_syllable = predict_phone(
         model.forced_aligner,
         df_word,
@@ -521,7 +524,7 @@ def phonemeContrast_from_df_segmented(
     )  # , GT_proba_threshold=0.2)
 
     # if it's nan
-    if detected_syllable != detected_syllable:
+    if detected_syllable is None or phonetic_detection is None:
         return {
             "status": model.status,
             "phonetic_detection": "null",
@@ -587,7 +590,7 @@ def phonemeContrast_from_formatted_phonetics_audio(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
 
-    if audio_load.status != AudioStatus.SUCCESS:
+    if audio_load.status != AudioStatus.SUCCESS or phone_prob_matrix is None:
         return {
             "status": str(audio_load.status),
             "phonetic_detection": "null",
@@ -669,7 +672,7 @@ def schwa_sound_from_formatted_phonetics_audio(
     audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
-    if audio_load.status != AudioStatus.SUCCESS:
+    if audio_load.status != AudioStatus.SUCCESS or phone_prob_matrix is None:
         return {
             "status": audio_load.status,
             "phonetic_detection": "null",
@@ -717,7 +720,7 @@ def schwa_sound_from_formatted_phonetics_audio(
         audio_load.s,
         df_segmented,
         phonetics=phonetics,
-        level="word",
+        level=StressCategory.WORD,
         model=model,
         vowels=vowels,
     )
@@ -919,7 +922,7 @@ def post_analysis(
         phone_prob_matrix, expected_phone_list
     )
 
-    if len(df_segmented) == 0:
+    if len(df_segmented) == 0 or dtw_cost is None:
         # DTW failed
         df_segmented = None
         dtw_cost = None
@@ -940,20 +943,17 @@ def post_analysis(
 
 
 def start_end_contrast_from_prob_matrix(
-    phone_prob_matrix,
-    phonetics='T_ER1_N_D ER0|AW1_N_D',
-    target_word_idx=0,
-    target_syllable_idx=None,
-    target_phones='D',
-    # basis='[UNK]_D',
-    basis=None,
-    max_speech_rate=8,
-    mode: AudioMode = AudioMode.FILE,
-    position="end",
-    model=default_model,
-    vowels=cmu_vowels,
-    consonants=cmu_consonants,
-    to_gibberish=cmu_to_gibberish,
+    phone_prob_matrix: np.ndarray,
+    phonetics: str = 'T_ER1_N_D ER0|AW1_N_D',
+    target_word_idx: int = 0,
+    target_syllable_idx: int = 0,
+    target_phones: str = 'D',
+    basis: str | None = None,
+    position: str = "end",
+    model: Wav2Vec2ForFramePrediction = default_model,
+    vowels: set[str] = cmu_vowels,
+    consonants: set[str] = cmu_consonants,
+    to_gibberish: dict[str, str] = cmu_to_gibberish,
     **kwargs,
 ):
     g_t = [
@@ -965,7 +965,7 @@ def start_end_contrast_from_prob_matrix(
     elif position == "start":
         contrast_idx = 0
     else:
-        print("contrast should be start or end")
+        raise ValueError("position should be either 'start' or 'end'")
 
     if basis is None:
         basis = target_to_basis[target_phones]
@@ -983,7 +983,9 @@ def start_end_contrast_from_prob_matrix(
     df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
-    df_word = extract_word(df_segmented, split_phonetics_by_words, target_word_idx)
+    df_word = extract_word_from_df_segmented(
+        df_segmented, split_phonetics_by_words, target_word_idx
+    )
 
     # FIXME extremely bad style
     if model.status != "success":
@@ -1038,6 +1040,8 @@ def start_end_contrast_from_prob_matrix(
             phoneme_set = consonants
         elif unstress(basis) in vowels:
             phoneme_set = vowels
+        else:
+            raise ValueError("basis should be a vowel or a consonant")
 
         phoneme_set_ids = [
             model.p_to_id[el] for el in remove_stress_annots(phoneme_set)
@@ -1162,7 +1166,7 @@ def start_end_contrast_from_formatted_phonetics_audio(
     audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
     )
-    if audio_load.status != AudioStatus.SUCCESS:
+    if audio_load.status != AudioStatus.SUCCESS or phone_prob_matrix is None:
         return {
             "status": audio_load.status,
             "phonetic_detection": "null",
@@ -1460,9 +1464,12 @@ def multiple_aspect_from_formatted_phonetics_audio(
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = remove_grouping_hyphens(phonetics)
 
-    post_analysis_result = post_analysis(
-        phone_prob_matrix, phonetics, model=model, proba_thresh=proba_thresh
-    )
+    if phone_prob_matrix is not None:
+        post_analysis_result = post_analysis(
+            phone_prob_matrix, phonetics, model=model, proba_thresh=proba_thresh
+        )
+    else:
+        post_analysis_result = None
 
     return (
         audio_load,

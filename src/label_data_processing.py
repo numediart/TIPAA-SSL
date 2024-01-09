@@ -234,7 +234,16 @@ def get_errors_examples():
 def load_adversarial_dataset(
     base_path: str = "./data/audio_recordings/adversary_example_library",
 ) -> pd.DataFrame:
-    df = pd.read_csv(base_path + "/adversary_example_library.csv")
+    df = pd.read_csv(
+        base_path + "/adversary_example_library.csv",
+        dtype={
+            "cmu_phonetics": str,
+            "alt_cmu_phonetics": str,
+            "text": str,
+            "target": bool,
+        },
+        keep_default_na=False,
+    )
     df["audio_file_url"] = base_path + "/" + df["audio_file_url"]
     return df
 

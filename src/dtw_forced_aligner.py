@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Sequence
 import numpy as np
 import pandas as pd
@@ -41,7 +42,7 @@ class dtw_forced_aligner:
         self.p_to_id = {p: i for i, p in enumerate([*self.alphabet, '[SIL]'])}
         self.collapse_method = collapse_method
 
-    def labelize_phonemes(self, phonemes: Sequence[str]) -> np.ndarray:
+    def labelize_phonemes(self, phonemes: Iterable[str]) -> np.ndarray:
         """
         Convert a list of phonemes to their corresponding ids.
 

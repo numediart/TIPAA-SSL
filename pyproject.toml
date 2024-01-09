@@ -43,12 +43,12 @@ ignore = [
   # Ignore complexity
   "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
   "EM101",
-  # Ignore f literals in excepions
-  "EM102"
+  # Ignore f literals in exceptions
+  "EM102",
+  # Supress line-too-long warnings: trust black's judgement on this one.
+  "E501",  
 ]
 unfixable = [
-  # Don't touch unused imports
-  "F401",
 ]
 
 [tool.ruff.isort]

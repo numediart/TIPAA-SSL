@@ -7,7 +7,6 @@ from utils import (
 )
 
 from DL_speech_tech import (
-    MAX_PER_FOR_ACCEPTANCE,
     PostAnalysisResult,
     multiple_aspect_from_formatted_phonetics_audio,
 )

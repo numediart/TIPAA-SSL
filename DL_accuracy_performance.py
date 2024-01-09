@@ -59,7 +59,7 @@ def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
     plt.clf()
     fig, axn = plt.subplots(1, len(results))
     fig.set_size_inches(len(results), 6)
-    cbar_ax = fig.add_axes([0.91, 0.3, 0.03, 0.4])
+    cbar_ax = fig.add_axes((0.91, 0.3, 0.03, 0.4))
     for i, k in enumerate(results):
         ax = axn.flat[i]
         #  from https://stackoverflow.com/questions/28356359/one-colorbar-for-seaborn-heatmaps-in-subplot
@@ -73,7 +73,7 @@ def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
             vmax=100,
             cbar_ax=None if i else cbar_ax,
         )
-    fig.tight_layout(rect=[0, 0, 0.9, 1])
+    fig.tight_layout(rect=(0, 0, 0.9, 1))
 
     # plt.savefig('vowel_contrast_actors_hmm.png')
     plt.savefig(name + '.png')
@@ -1253,9 +1253,6 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
 
     data = []
 
-    adversary_df['cmu_phonetics'] = adversary_df.text.apply(
-        lambda r: prefill_for_sentence(r)['phonetics'] if isinstance(r, str) else ""
-    )
     unique_phonetics = adversary_df.cmu_phonetics.unique()
     unique_phonetics = [el for el in unique_phonetics if el != '']
 
@@ -1269,27 +1266,40 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
 
             result = {
                 'audio_load_status': audio_load.status == AudioStatus.SUCCESS,
+                'audio_status_message': str(audio_load.status),
                 'silent_sample_ratio': audio_load.silent_sample_ratio,
                 'pitch_sample_ratio': audio_load.pitch_sample_ratio,
                 'true_phonetics': row.cmu_phonetics,
                 'exp_phonetics': phonetics,
                 'n_phones': len(split_phonetics_to_phones(phonetics)),
-                'match': row.cmu_phonetics == phonetics,
+                'n_syllables': count_syllables(phonetics),
+                'match': row.cmu_phonetics == phonetics
+                or phonetics == row.alt_cmu_phonetics,
                 'target': row.target,
+                'audio_file_url': row.audio_file_url,
+                'category': row.category,
+                'speaker': row.speaker,
             }
 
-            post_result = post_analysis(phone_prob_matrix, phonetics)
-            if post_result is not None:
-                result['per_aligned'] = post_result.per_aligned
-                result['dtw_score'] = (
-                    post_result.dtw_cost if post_result.dtw_cost else 0.0
+            if phone_prob_matrix is not None:
+                post_result = post_analysis(
+                    phone_prob_matrix, phonetics, proba_thresh=0.6
                 )
-                result['silent_frame_ratio'] = post_result.silent_frame_ratio
-                result['phone_count_ratio'] = post_result.phone_count_ratio
+                if post_result is not None:
+                    result['per_aligned'] = post_result.per_aligned
+                    result['dtw_score'] = (
+                        post_result.dtw_cost if post_result.dtw_cost else 0.0
+                    )
+                    result['silent_frame_ratio'] = post_result.silent_frame_ratio
+                    result['phone_count_ratio'] = post_result.phone_count_ratio
+                    result['detected_phones'] = post_result.df_detection.phone.tolist()
 
             data.append(result)
 
     data = pd.DataFrame(data)
+    data["should_reject"] = (data.target == 0) | (
+        (data.target == 1) & (data.match == False)
+    )
     return data
 
 

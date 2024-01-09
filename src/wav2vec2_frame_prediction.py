@@ -180,7 +180,7 @@ def audio_load_and_check(
     )
 
 
-def extract_word(
+def extract_word_from_df_segmented(
     df_segmented: pd.DataFrame, phonetics: list[list[str]], target_word_idx: int
 ) -> pd.DataFrame:
     """Extract a word from a df_segmented, given the phonetics and the target word index
