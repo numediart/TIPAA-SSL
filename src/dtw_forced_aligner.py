@@ -42,7 +42,7 @@ class dtw_forced_aligner:
             alphabet (list): The list of phonemes in the alphabet.
             collapse_method (str, optional): The method used to collapse probability vectors. Defaults to 'mean'.
         """
-        self.alphabet = set(alphabet)
+        self.alphabet = alphabet
         self.id_to_p = dict(enumerate([*self.alphabet, '[SIL]']))
         self.p_to_id = {p: i for i, p in enumerate([*self.alphabet, '[SIL]'])}
         self.collapse_method = collapse_method
