@@ -1,11 +1,3 @@
-import os, psutil
-
-from src.wav2vec2_frame_prediction import AudioMode
-
-print_memory_usage = lambda stage: print(
-    stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
-)
-
 import base64
 
 import pandas as pd
@@ -27,13 +19,14 @@ from performance_functions import (
 )
 from src.audio_processing import read_audio_file
 from src.label_data_processing import actor_recordings
-from src.pronunciation_dictionaries import cmu_consonants, cmu_vowels
+from src.pronunciation_dictionaries import cmu_vowels
 from src.text_processing import (
     chunk_text,
     get_augmented_mfa_dict,
     prefill_for_sentence,
     remove_stress_annots,
 )
+from src.wav2vec2_frame_prediction import AudioMode
 
 
 def a_test_pConstrast():
@@ -80,24 +73,25 @@ def DL_speech_tech_functions(model=default_model):
     # formatted_phonetics=prefill_for_sentence('During the nineteen sixties Gregory became active in civil rights')['phonetics']
 
     (
-        audio_status,
-        detection_df,
+        audio_load,
+        multiple_aspect_df,
+        df_segmented,
+        dtw_cost,
         post_analysis_results,
+        validation_result,
     ) = multiple_aspect_from_formatted_phonetics_audio(
-        encode_string,
-        phonetics=formatted_phonetics,
-        max_speech_rate=8,
-        mode=AudioMode.BASE64,
-        model=model,
+        encode_string, phonetics=formatted_phonetics, mode=AudioMode.BASE64, model=model
     )
-    assert detection_df is not None, "Detection failed"
+
+    assert multiple_aspect_df is not None, "Detection failed"
     assert (
-        sum(detection_df.phones != detection_df.detection) / len(detection_df) < 0.2
+        sum(multiple_aspect_df.phones != multiple_aspect_df.detection)
+        / len(multiple_aspect_df)
+        < 0.2
     ), "Test example has a too high phoneme error rate"
-    # assert (
-    #     post_analysis_results
-    #     and post_analysis_results.per_aligned < MAX_PER_FOR_ACCEPTANCE
-    # ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
+    assert (
+        validation_result
+    ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
 
     # try with nonsense phonetics
     # df.text[df.text.str.split(' ').apply(len)==1]
@@ -105,28 +99,29 @@ def DL_speech_tech_functions(model=default_model):
     row = df[df.text == 'it'].iloc[0]
     s, fs = read_audio_file(row.audio_file_url, fs=16000)
     formatted_phonetics = row.cmu_phonetics
+
     (
-        audio_status,
-        detection_df,
+        audio_load,
+        multiple_aspect_df,
+        df_segmented,
+        dtw_cost,
         post_analysis_results,
+        validation_result,
     ) = multiple_aspect_from_formatted_phonetics_audio(
-        s,
-        phonetics=formatted_phonetics,
-        max_speech_rate=8,
-        mode=AudioMode.NUMPY,
-        model=model,
+        s, phonetics=formatted_phonetics, mode=AudioMode.NUMPY, model=model
     )
 
     # charsiu model was too bad for this. Our pipeline works on that!
     if model == default_model:
-        assert detection_df is not None, "Detection failed"
+        assert multiple_aspect_df is not None, "Detection failed"
         assert (
-            sum(detection_df.phones != detection_df.detection) / len(detection_df) == 0
+            sum(multiple_aspect_df.phones != multiple_aspect_df.detection)
+            / len(multiple_aspect_df)
+            == 0
         ), "Test example has a too high phoneme error rate.The audio contains a native pronunciation of 'IH1_T'"
-        # assert (
-        #     post_analysis_results
-        #     and post_analysis_results.per_aligned < MAX_PER_FOR_ACCEPTANCE
-        # ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
+        assert (
+            validation_result
+        ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
 
     row = df[df.text == 'One *hundred* percent.'].iloc[0]
     s, fs = read_audio_file(row.audio_file_url, fs=16000)

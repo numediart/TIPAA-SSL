@@ -298,11 +298,13 @@ def test_actor_recordings(
 
     results_ed[results_ed.phonetic_detection != results_ed.target_phoneme]
 
-    success_rate = (
-        lambda df: len(df[df.phonetic_detection == df.target_phoneme]) / len(df)
-        if len(df) > 0
-        else float('nan')
-    )
+    def success_rate(df):
+        return (
+            len(df[df.phonetic_detection == df.target_phoneme]) / len(df)
+            if len(df) > 0
+            else float("nan")
+        )
+
     success_rate(results_ed)
     success_rate(results_v)
 
