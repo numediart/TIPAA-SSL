@@ -51,12 +51,17 @@ from src.wav2vec2_frame_prediction import (
 )
 
 default_model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format="onnx")
-default_model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH')
+default_model.load(name="model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH")
 
 
 class StressCategory(Enum):
     WORD = auto()
     SENTENCE = auto()
+
+
+DEFAULT_MAX_PER = 0.7
+DEFAULT_MAX_PER_ONE_SYLL = 0.85
+DEFAULT_POST_PROBA_THRESHOLD = 0.6
 
 
 target_accepted_alternatives = {
@@ -824,7 +829,7 @@ def list_pairwise_alignment(LISTA, LISTB):
     """
 
     LISTA__, LISTB__, LATtoHAN, HANtoLAT = words_to_unicode_chars(LISTA, LISTB)
-    alignments = pairwise2.align.globalxx(LISTA__, LISTB__)
+    alignments = pairwise2.align.globalxx(LISTA__, LISTB__)  # type: ignore
     if len(alignments) == 0:
         return None, None
     res_a, res_b = unicode_chars_to_words(
@@ -841,9 +846,6 @@ class PostAnalysisResult:
     df_detection: pd.DataFrame
     predicted_aligned_phones: list[str]
     expected_aligned_phones: list[str]
-
-
-DEFAULT_POST_PROBA_THRESHOLD = 0.6
 
 
 def post_analysis(
@@ -900,10 +902,6 @@ def post_analysis(
         pred_aligned,
         exp_aligned,
     )
-
-
-DEFAULT_MAX_PER = 0.8
-DEFAULT_MAX_PER_ONE_SYLL = 0.9
 
 
 def validate_recording(
@@ -1188,9 +1186,11 @@ def multiple_aspect_from_prob_matrix(
     to_gibberish=cmu_to_gibberish,
 ):
     phoneme_list = split_phonetics_to_phones(phonetics)
-    df_segmented, _ = model.phone_prob_matrix_segmentation(
+    df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, remove_stress_annots(phoneme_list)
     )
+    if dtw_cost is None:
+        return None, None, None
     # print('multi_aspect: df_segmented computed')
 
     stress_result = stress_from_df_segmented_audio(
@@ -1316,7 +1316,7 @@ def multiple_aspect_from_prob_matrix(
             syl_dfs.append(s_df.sort_values('position_idx'))
     final_merged_results = pd.concat(syl_dfs)
 
-    return final_merged_results
+    return final_merged_results, df_segmented, dtw_cost
 
 
 def multiple_aspect_from_formatted_phonetics_audio(
@@ -1330,7 +1330,14 @@ def multiple_aspect_from_formatted_phonetics_audio(
     mode: AudioMode = AudioMode.FILE,
     model: Wav2Vec2ForFramePrediction = default_model,
     to_gibberish: dict[str, str] = cmu_to_gibberish,
-) -> tuple[AudioLoadResult, pd.DataFrame | None, PostAnalysisResult | None, bool]:
+) -> tuple[
+    AudioLoadResult,
+    pd.DataFrame | None,
+    pd.DataFrame | None,
+    float | None,
+    PostAnalysisResult | None,
+    bool,
+]:
     phonetics = cmu_ensure_phonetics_consistency(phonetics)
     audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
         audio,
@@ -1342,7 +1349,7 @@ def multiple_aspect_from_formatted_phonetics_audio(
     )
 
     if audio_load.status != AudioStatus.SUCCESS:
-        return audio_load, None, None, False
+        return audio_load, None, None, None, None, False
 
     # this operation is done in audio_to_phone_prob_matrix, but I have to do it again here then for consistency
     phonetics = remove_grouping_hyphens(phonetics)
@@ -1355,13 +1362,7 @@ def multiple_aspect_from_formatted_phonetics_audio(
             phone_prob_matrix, phonetics, proba_thresh=proba_thresh
         )
 
-    else:
-        post_analysis_result = None
-        validation_result = False
-
-    return (
-        audio_load,
-        multiple_aspect_from_prob_matrix(
+        multiple_aspect_df, df_segmented, dtw_cost = multiple_aspect_from_prob_matrix(
             phone_prob_matrix,
             audio_load.waveform,
             phonetics=phonetics,
@@ -1369,7 +1370,18 @@ def multiple_aspect_from_formatted_phonetics_audio(
             mode=mode,
             model=model,
             to_gibberish=to_gibberish,
-        ),
+        )
+
+    else:
+        post_analysis_result = None
+        validation_result = False
+        multiple_aspect_df, df_segmented, dtw_cost = None, None, None
+
+    return (
+        audio_load,
+        multiple_aspect_df,
+        df_segmented,
+        dtw_cost,
         post_analysis_result,
         validation_result,
     )

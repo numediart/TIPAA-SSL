@@ -1277,6 +1277,7 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
                 'audio_status_message': str(audio_load.status),
                 'silent_sample_ratio': audio_load.silent_sample_ratio,
                 'pitch_sample_ratio': audio_load.pitch_sample_ratio,
+                'speech_rate': audio_load.speech_rate,
                 'true_phonetics': row.cmu_phonetics,
                 'exp_phonetics': phonetics,
                 'n_phones': len(split_phonetics_to_phones(phonetics)),

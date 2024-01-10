@@ -3,11 +3,21 @@ import streamlit as st
 from st_audiorec import st_audiorec
 
 from DL_speech_tech import (
+    DEFAULT_MAX_PER,
+    DEFAULT_MAX_PER_ONE_SYLL,
+    DEFAULT_POST_PROBA_THRESHOLD,
     PostAnalysisResult,
     multiple_aspect_from_formatted_phonetics_audio,
 )
 from src.text_processing import count_syllables, prefill_for_sentence
-from src.wav2vec2_frame_prediction import AudioLoadResult, AudioMode, AudioStatus
+from src.wav2vec2_frame_prediction import (
+    DEFAULT_MAX_SPEECH_RATE,
+    DEFAULT_MIN_SPEECH_RATE,
+    DEFAULT_SILENCE_THRESHOLD,
+    AudioLoadResult,
+    AudioMode,
+    AudioStatus,
+)
 
 st.set_page_config(page_icon="✂️", page_title="Speech Tech Demo")
 st.title("Speech Tech Demo")
@@ -15,21 +25,22 @@ st.title("Speech Tech Demo")
 
 def display_results(
     audio_load: AudioLoadResult,
-    detection_df: pd.DataFrame | None,
+    multiple_aspect_df: pd.DataFrame | None,
+    df_segmented: pd.DataFrame | None,
+    dtw_cost: float | None,
     post_analysis_results: PostAnalysisResult | None,
     max_per: float,
-    min_pitch_ratio: float,
 ):
     st.markdown("## Results")
 
     if audio_load.status == AudioStatus.SUCCESS:
         st.markdown("### Mutiple speech aspect detection")
-        st.dataframe(detection_df, hide_index=True)
+        st.dataframe(multiple_aspect_df, hide_index=True)
 
         st.markdown("### Post analysis")
         if post_analysis_results is None:
             st.error("Recording should be rejected (pairwise alignment failed)")
-        elif post_analysis_results.df_segmented is None:
+        elif df_segmented is None or dtw_cost is None:
             st.error("Recording should be rejected (DTW failed)")
         else:
             per = post_analysis_results.per_aligned
@@ -42,7 +53,7 @@ def display_results(
                 - Phone error rate (lower = better matching):
                     {per:.2f}
                 - DTW cost (higher = better matching):
-                    {post_analysis_results.dtw_cost:.2f}
+                    {-dtw_cost / len(post_analysis_results.df_detection):.2f}
                 - Phone count ratio:
                     {post_analysis_results.phone_count_ratio:.2f}
                     (ratio of number of detected phones over expected phones)
@@ -57,18 +68,13 @@ def display_results(
             )
             if per > max_per:
                 st.error("Recording should be rejected (PER too high)")
-            elif (
-                audio_load.pitch_sample_ratio
-                and audio_load.pitch_sample_ratio < min_pitch_ratio
-            ):
-                st.error("Recording should be rejected (pitch ratio too low)")
             else:
                 st.success("Recording should be accepted")
 
             st.markdown("**Max proba based detection**")
             st.dataframe(post_analysis_results.df_detection, hide_index=True)
             st.markdown("**DTW based detection**")
-            st.dataframe(post_analysis_results.df_segmented, hide_index=True)
+            st.dataframe(df_segmented, hide_index=True)
     elif audio_load.status in [AudioStatus.TOO_LONG, AudioStatus.TOO_SHORT]:
         st.error(
             "Recording should be rejected"
@@ -95,7 +101,8 @@ if True:
         formatted_phonetics_mod = st.text_input(
             "Adjust phonetics if needed:", value=formatted_phonetics
         )
-        assert formatted_phonetics_mod is not None
+        if formatted_phonetics_mod is None:
+            raise RuntimeError("Phonetics could not be retrieved")
         syll_count = count_syllables(formatted_phonetics_mod)
 
         st.markdown("Either record yourself:")
@@ -126,12 +133,11 @@ if True:
             else:
                 raise ValueError("No audio data")
 
-            min_speech_rate = 1.0
-            max_speech_rate = 8.0
-            silence_threshold = 30.0
-            proba_thresh = 0.5
-            max_per = 0.7 if syll_count > 1 else 0.8
-            min_pitch_ratio = 0.1
+            min_speech_rate = DEFAULT_MIN_SPEECH_RATE
+            max_speech_rate = DEFAULT_MAX_SPEECH_RATE
+            silence_threshold = DEFAULT_SILENCE_THRESHOLD
+            proba_thresh = DEFAULT_POST_PROBA_THRESHOLD
+            max_per = DEFAULT_MAX_PER if syll_count > 1 else DEFAULT_MAX_PER_ONE_SYLL
 
             if st.checkbox("Tune parameters"):
                 min_speech_rate = st.number_input(
@@ -161,18 +167,15 @@ if True:
                     min_value=0.0,
                     max_value=1.0,
                 )
-                min_pitch_ratio = st.number_input(
-                    "Minimum pitch frame ratio for acceptance",
-                    value=min_pitch_ratio,
-                    min_value=0.0,
-                    max_value=1.0,
-                )
 
             if st.button(f"Run Analysis (using {data_used})"):
                 (
                     audio_load,
-                    detection_df,
+                    multiple_aspect_df,
+                    df_segmented,
+                    dtw_cost,
                     post_analysis_results,
+                    validation_result,
                 ) = multiple_aspect_from_formatted_phonetics_audio(
                     wav_audio_data,
                     phonetics=formatted_phonetics_mod,
@@ -185,8 +188,9 @@ if True:
 
                 display_results(
                     audio_load,
-                    detection_df,
+                    multiple_aspect_df,
+                    df_segmented,
+                    dtw_cost,
                     post_analysis_results,
                     max_per,
-                    min_pitch_ratio,
                 )
