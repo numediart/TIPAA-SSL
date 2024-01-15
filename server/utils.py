@@ -13,7 +13,7 @@ from DL_speech_tech import (
 from src.audio_processing import audio64_from_file
 from src.pronunciation_dictionaries import cmu_vowels
 from src.text_processing import check_phonemes, chunk_text, split_phonetics
-from src.wav2vec2_frame_prediction import AudioInput, AudioMode
+from src.wav2vec2_frame_prediction import AudioInput, AudioMode, AudioStatus
 
 success_messages = {
     "success",  # --> "speech"
@@ -77,14 +77,18 @@ syl_contrast_responseSchema = Schema.from_dict(
 
 
 def define_detected_flag(status: str):
-    if status == "success":
+    if status == AudioStatus.SUCCESS:
         flag = "speech"
-    elif "not recognized" in status:
-        flag = "nonsense"
-    elif "empty" in status:
+    elif status == AudioStatus.EMPTY:
         flag = "empty_audio"
+    elif status == AudioStatus.TOO_SHORT:
+        flag = "too_short"
+    elif status == AudioStatus.TOO_LONG:
+        flag = "too_long"
+    elif status in [AudioStatus.TOO_QUIET, AudioStatus.NO_SOUND]:
+        flag = "too_quiet"
     else:
-        flag = "nospeech"
+        flag = "nonsense"
     return flag
 
 
