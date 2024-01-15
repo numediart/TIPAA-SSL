@@ -1,40 +1,33 @@
 import os, psutil
+from typing import Iterable, Sequence
 
 print_memory_usage = lambda stage: print(
     stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
 )
 print_memory_usage('RAM - text_processing start')
 
-import re
-from tqdm import tqdm
-import pandas as pd
-import numpy as np
 import itertools
-from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
-from src.numbers_processing import normalize_numbers
+import re
+from itertools import groupby
+
+import numpy as np
+import pandas as pd
+import unidecode
 
 # from g2p_en.expand import normalize_numbers
 from g2p_en import G2p
-from itertools import groupby
 from num2words import num2words
-import unidecode
+from tqdm import tqdm
 
+from src.numbers_processing import normalize_numbers
 from src.phonemizer_utils import word_to_stressed_syl
+from syllabipy.sonoripy import SonoriPy, define_categories, str_to_list_of_char
 
 print_memory_usage('RAM - text_processing after external libraries')
 
 
 g2p = G2p()
 print_memory_usage('RAM - text_processing after g2p model')
-
-drop_consecutive_duplicates = lambda df: df.loc[
-    (df.shift() != df).sum(axis=1).astype(bool)
-]
-drop_consecutive_duplicate_elements = lambda L: [key for key, _group in groupby(L)]
-split_phonetics = lambda phonetics: [
-    [s.split('_') for s in w.split('|')] for w in phonetics.split(' ')
-]
-group_consecutive_duplicates = lambda L: [(k, sum(1 for i in g)) for k, g in groupby(L)]
 
 from src.pronunciation_dictionaries import (
     unstress,
@@ -75,6 +68,60 @@ syllables_dfs = {
 }
 
 print_memory_usage('RAM - text_processing after syllables_df')
+
+
+def drop_consecutive_duplicates(df):
+    return df.loc[(df.shift() != df).sum(axis=1).astype(bool)]
+
+
+def drop_consecutive_duplicate_elements(l):
+    return [key for key, _group in groupby(l)]
+
+
+def split_phonetics(phonetics: str) -> list[list[list[str]]]:
+    """Take a formatted phonetics string (sentence) and
+    split it into words, syllables and phones.
+
+    Example:
+        >>> split_phonetics("HH_AW1 L_AH1|V_L_IY0")
+        [[['HH', 'AW1']], [['L', 'AH1'], ['V', 'L', 'IY0']]]
+    """
+    return [[s.split("_") for s in w.split("|")] for w in phonetics.split(" ")]
+
+
+def split_phonetics_by_words(phonetics: str) -> list[list[str]]:
+    """Take a formatted phonetics string (sentence) and
+    split it into words and phones.
+
+    Example:
+        >>> split_phonetics("HH_AW1 L_AH1|V_L_IY0")
+        [['HH', 'AW1'], ['L', 'AH1', 'V', 'L', 'IY0']]
+    """
+    return [w.split("_") for w in phonetics.replace("|", "_").split(" ")]
+
+
+def split_phonetics_to_phones(phonetics: str) -> list[str]:
+    """Take a formatted phonetics string (sentence) and return a list of phones
+
+    Example:
+        >>> split_phonetics_to_phones("HH_AW1 L_AH1|V_L_IY0")
+        ['HH', 'AW1', 'L', 'AH1', 'V', 'L', 'IY0']
+    """
+    return phonetics.replace(" ", "_").replace("|", "_").split("_")
+
+
+def count_syllables(phonetics: str) -> int:
+    """Take a formatted phonetics string (sentence) and return the number of syllables
+
+    Example:
+        >>> count_syllables("HH_AW1 L_AH1|V_L_IY0")
+        3
+    """
+    return sum(len(w) for w in split_phonetics(phonetics))
+
+
+def group_consecutive_duplicates(L):
+    return [(k, len(list(g))) for k, g in groupby(L)]
 
 
 def show_alternatives_distributions():
@@ -127,7 +174,9 @@ def remove_special_characters(
     return sentence
 
 
-def get_chunks(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
+def get_chunks(
+    text: str, chunking_chars: Sequence[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
+) -> list[str]:
     for c in chunking_chars:
         text = text.replace(c, chunking_chars[0])
     chunks = text.split(chunking_chars[0])
@@ -135,7 +184,20 @@ def get_chunks(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
     return chunks
 
 
-def chunk_text(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
+def chunk_text(
+    text: str, chunking_chars: Sequence[str] = (',', ';', '.', '!', '¡', '?', ':', '/')
+) -> list[int]:
+    """This function takes a text and chunks it in sentences, using a set of chunking characters.
+    It returns the number of words in each chunk.
+
+    Examples:
+        >>> chunk_text("hello")
+        [1]
+        >>> chunk_text("hello, world")
+        [1, 1]
+        >>> chunk_text("hello, world: how are you?")
+        [1, 1, 3]
+    """
     chunks = get_chunks(text, chunking_chars=chunking_chars)
     # split each chunk in words, remove empty strings, get length (to know the n of words in each chunk)
     n_words_by_chunk = [len(list(filter(None, el.split(' ')))) for el in chunks]
@@ -143,7 +205,30 @@ def chunk_text(text, chunking_chars=[',', ';', '.', '!', '¡', '?', ':', '/']):
     return n_words_by_chunk
 
 
-def phonetics_indexed_df_from_formatted_phonetics(phonetics):
+def phonetics_indexed_df_from_formatted_phonetics(phonetics: str) -> pd.DataFrame:
+    """This function takes a formatted phonetics string (sentence) and returns a dataframe
+    with the phones, the word index and the syllable index.
+
+    Parameters
+    ----------
+    phonetics : str
+        formatted phonetics string
+        Example: "HH_AW1 L_AH1|V_L_IY0" ("how lovely")
+
+    Returns
+    -------
+    pandas.DataFrame
+        dataframe with the phones, the word index and the syllable index, example:
+
+          phones  word_idx  syl_idx
+        0     HH         0        0
+        1    AW1         0        0
+        2      L         1        0
+        3    AH1         1        0
+        4      V         1        1
+        5      L         1        1
+        6    IY0         1        1
+    """
     word_split_phonetics = [p.replace('|', '_').split('_') for p in phonetics.split(' ')]
     n_phone_by_word = [len(w) for w in word_split_phonetics]
 
@@ -169,6 +254,12 @@ def phonetics_indexed_df_from_formatted_phonetics(phonetics):
     phonetics_indexed_df.apply(lambda r: r['phones'], axis=1)
 
     return phonetics_indexed_df
+
+
+def cmu_ensure_phonetics_consistency(phonetics: str) -> str:
+    """Replace CMU 'double' phones (CH, JH) by their
+    single-phone equivalents (T_SH, D_ZH)"""
+    return phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH')
 
 
 def check_phonemes(phonemes):
@@ -529,7 +620,8 @@ def extract_special_chars(norm_sent, special_chars):
     return special_chars_dict_start, special_chars_dict_end
 
 
-get_acronyms_idxs = lambda words: [w_idx for w_idx, w in enumerate(words) if w.isupper()]
+def get_acronyms_idxs(words):
+    return [w_idx for w_idx, w in enumerate(words) if w.isupper()]
 
 
 def add_special_chars(split_text, special_chars_dict_start, special_chars_dict_end):
@@ -562,6 +654,10 @@ def acronyms_to_compound(split_text, acronym_idxs):
             else:
                 split_text[i] = el.replace('{', '').replace('}', '')
     return split_text
+
+
+def remove_grouping_hyphens(phonetics: str) -> str:
+    return phonetics.replace("-", " ").replace("{", "").replace("}", "")
 
 
 def text_normalization(
@@ -968,12 +1064,12 @@ def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
                 lang=lang,
                 word_dict=word_dict,
             )
+            records.append(record)
         except:
             print('Error with sentence: ' + s)
             err = internal_error()
             err["sentence"] = s
             error_records.append(err)
-        records.append(record)
 
     df_errors = pd.DataFrame.from_records(error_records)
     # now=datetime.now()
@@ -1023,7 +1119,7 @@ print_memory_usage('RAM - text_processing after all function declarations')
 
 def use_tests():
     # from src.text_processing import *
-    prefill_for_sentence(sentence)
+    # prefill_for_sentence(sentence)
 
     sentence = "A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
 
@@ -1102,17 +1198,11 @@ def use_tests():
 
     db = pd.read_csv('data/query_results-2023-02-21_102331.csv')
     sentences = db.words.tolist()
-    df, df_errors = prefill_content(
-        sentences, lang='en_US', mode='CMU', output_errors=True
-    )
+    df, df_errors = prefill_content(sentences, lang='en_US', mode='CMU')
     df.to_csv('prefill_export_2023-02-21_CMU_en_US.csv')
-    df, df_errors = prefill_content(
-        sentences, lang='en_US', mode='MFA_IPA', output_errors=True
-    )
+    df, df_errors = prefill_content(sentences, lang='en_US', mode='MFA_IPA')
     df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')
-    df, df_errors = prefill_content(
-        sentences, lang='en_GB', mode='MFA_IPA', output_errors=True
-    )
+    df, df_errors = prefill_content(sentences, lang='en_GB', mode='MFA_IPA')
     df.to_csv('prefill_export_2023-02-21_MFA_IPA_en_GB.csv')
 
     df_MFA_IPA_US = pd.read_csv('prefill_export_2023-02-21_MFA_IPA_en_US.csv')

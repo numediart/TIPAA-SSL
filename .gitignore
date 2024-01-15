@@ -23,7 +23,6 @@ data/LibriSpeech/**
 data/MLS/**
 data/CMU_ARCTIC/**
 data/speechocean762/**
-data/flwc-recordings/**
 data/BE_english_audio_DB/**
 data/BE_english_DB_audio_old/**
 data/new_content_audio/**

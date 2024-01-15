@@ -10,6 +10,8 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer
 
 import soundfile as sf
 import sys
+from DL_speech_tech import StressCategory
+from wav2vec2_frame_prediction import AudioMode
 
 sys.path.append('./')
 from src.audio_processing import read_audio_file
@@ -676,22 +678,22 @@ def speech_tech_on_segmented_audio(segmentation_df, file_dict):
                 res = stress_from_formatted_phonetics(
                     s[int(r.start * SAMPLERATE) : int(r.end * SAMPLERATE)],
                     phonetics=formatted_phonetics,
-                    level="sentence",
+                    level=StressCategory.SENTENCE,
                     # n_words_by_chunk=[7],
                     max_speech_rate=8,
-                    mode='numpy',
+                    mode=AudioMode.NUMPY,
                 )
             else:
                 res = stress_from_formatted_phonetics(
                     s[int(r.start * SAMPLERATE) : int(r.end * SAMPLERATE)],
                     phonetics=formatted_phonetics,
-                    level="word",
+                    level=StressCategory.WORD,
                     # n_words_by_chunk=[7],
                     max_speech_rate=8,
-                    mode='numpy',
+                    mode=AudioMode.NUMPY,
                 )
-            stress_intensities.append(res['stress_intensities'])
-            stress_binaries.append(res['stress_binaries'])
+            stress_intensities.append(res.stress_intensities)
+            stress_binaries.append(res.stress_binarie)
 
         segmentation_df.loc[
             segmentation_df.audio_file == k, 'stress_intensities'

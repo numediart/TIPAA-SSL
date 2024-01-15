@@ -8,6 +8,7 @@ from marshmallow import fields, Schema, EXCLUDE
 
 import json
 from DL_speech_tech import (
+    StressCategory,
     phonemeContrast_from_formatted_phonetics_audio,
     start_end_contrast_from_formatted_phonetics_audio,
 )
@@ -25,6 +26,7 @@ from server.utils import (
     sentence_stress_responseSchema_v2,
     word_stress_responseSchema_v2,
 )
+from src.wav2vec2_frame_prediction import AudioMode
 
 bp = Blueprint(
     "DL_modules_v2", "DL_modules_v2", url_prefix="/", description="DL_modules_v2"
@@ -78,7 +80,9 @@ class dl_sentence_stress_api_v2(MethodView):
                 mimetype="application/json",
             )
         properties = ["phonetics", "audio64"]
-        return request_stress_v2(d, properties, "sentence", mode='base64')
+        return request_stress_v2(
+            d, properties, StressCategory.SENTENCE, mode=AudioMode.BASE64
+        )
 
 
 example_word_stress = {"phonetics": d["phonetics_chunks"], "audio64": d["audio64"]}
@@ -106,7 +110,9 @@ class dl_word_stress_api_v2(MethodView):
                 mimetype="application/json",
             )
         properties = ["phonetics", "audio64"]
-        return request_stress_v2(d, properties, "word", mode='base64')
+        return request_stress_v2(
+            d, properties, StressCategory.WORD, mode=AudioMode.BASE64
+        )
 
 
 example_vowel_contrast = {
@@ -140,7 +146,7 @@ class dl_vowel_contrast_api_v2(MethodView):
                 mimetype="application/json",
             )
         properties = ["phonetics", "audio64", "word_idx", "target", "syl_idx"]
-        return request_contrast(d, properties, mode='base64')
+        return request_contrast(d, properties, mode=AudioMode.BASE64)
 
 
 example_consonant_contrast = {
@@ -188,7 +194,7 @@ class dl_consonant_contrast_api_v2(MethodView):
             properties,
             target_occurence_idx,
             alternatives=cmu_consonants,
-            mode='base64',
+            mode=AudioMode.BASE64,
         )
 
 
@@ -226,7 +232,7 @@ class dl_termination_contrast_api_v2(MethodView):
             d,
             properties,
             tech_function=start_end_contrast_from_formatted_phonetics_audio,
-            mode='base64',
+            mode=AudioMode.BASE64,
             target_type="termination",
         )
 
@@ -266,7 +272,7 @@ class dl_cluster_contrast_api_v2(MethodView):
             d,
             properties,
             tech_function=start_end_contrast_from_formatted_phonetics_audio,
-            mode='base64',
+            mode=AudioMode.BASE64,
             target_type="cluster",
         )
 

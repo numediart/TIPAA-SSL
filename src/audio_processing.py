@@ -1,72 +1,28 @@
-import pyworld as pw
-import soundfile as sf
-import numpy as np
-import librosa
-import pytsmod as tsm
-
-from soundfile import LibsndfileError
-from pydub import AudioSegment
-import io
 import array
-from pydub import AudioSegment
-from pydub.utils import get_array_type
-
-from audiotsm import phasevocoder
-from audiotsm.io.wav import WavReader, WavWriter
-from scipy.interpolate import interp1d
-import uuid
-from scipy.io.wavfile import write, read
-import os
 import base64
 import io
 
-
-def load_audio(waveFileAddress, fs=16000):
-    """Load audio, remove DC and normalize waveform
-    speech_correction refers to the use of MetricGAN+. A speech enhancement system based on an adversarial loss and PESQ/STOI metrics
-    to improve audio quality.
-
-    Args:
-        waveFileAddress (string): wav file address
-    Returns:
-        numpy array, int: waveform signal and frequency of sampling
-    """
-    # fs, s = read(waveFileAddress)
-    s, fs = librosa.load(waveFileAddress, sr=fs)
-
-    # if speech_correction:
-    #     s=speech_enhancement(s)
-
-    # trim silences
-    # s, index = librosa.effects.trim(s, top_db=20)
-    # remove DC
-    s = (
-        s - s[int(0.15 * len(s)) : int(0.85 * len(s))].mean()
-    )  # we exclude 15% at each side that might contain buffer initialization/release noises
-    # normalization
-    s = 0.90 * s / max(abs(s))
-    return s, fs
-
-
-def prepare_audio_file(audio_file, fs=16000):
-    rID = str(uuid.uuid4())
-    if os.path.exists(audio_file):
-        s, fs = load_audio(audio_file, fs=fs)
-    else:
-        return "error: " + audio_file + " could not be loaded", None
-    write('./inputs/' + rID + '.wav', fs, (s * 32767).astype(np.int16))
-
-    return "success", rID
+import librosa
+import numpy as np
+import pytsmod as tsm
+import pyworld as pw
+import soundfile as sf
+from audiotsm import phasevocoder
+from audiotsm.io.wav import WavReader, WavWriter
+from pydub import AudioSegment
+from pydub.utils import get_array_type
+from scipy.interpolate import interp1d
+from soundfile import LibsndfileError
 
 
 # signal processing (pitch, instensity, normalization...)
-def getf0Samples(s, fs):
+def getf0Samples(s: np.ndarray, fs: float) -> np.ndarray:
     """Uses pyworld vocoder to extract fundamental frequency of the signal in Hz
     and converts it in semitones. And then upsample up to signal length
 
     Args:
         s (numpy array): audio waveform signal
-        fs (int): frequency of sampling
+        fs (float): frequency of sampling
 
     Returns:
         numpy array: upsampled f0 contour in semitones
@@ -74,7 +30,7 @@ def getf0Samples(s, fs):
 
     # pyin works as a replacement of pyworld, but I saw a slightly lower performance with it, so I'm not changing that for now
     # f0, voiced_flag, voiced_prob=librosa.pyin(s, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=fs)
-    f0, sp, ap = pw.wav2world(s.astype(np.float64), fs)
+    f0, sp, ap = pw.wav2world(s.astype(np.float64), fs)  # type: ignore
 
     f0 += 10**-10  # to avoid zeros going in the log, add a tiny number
 
@@ -92,7 +48,7 @@ def getf0Samples(s, fs):
     return f0Samples
 
 
-def getIntonation(s, fs):
+def getIntonation(s: np.ndarray, fs: float) -> np.ndarray:
     f0Samples = getf0Samples(s, fs)
     # replace nans with minimum value
     f0Samples = np.nan_to_num(f0Samples, nan=np.nanmin(f0Samples))
@@ -123,7 +79,7 @@ def smooth(x, beta, window_len=11):
     return y[int(window_len / 2) : -int(window_len / 2) + 1]
 
 
-def getIntensity(s, fs):
+def getIntensity(s: np.ndarray, fs: float) -> np.ndarray:
     """computes intensity of the signal (squared signal, smoothed) in dB
 
     Args:
@@ -139,6 +95,8 @@ def getIntensity(s, fs):
 
     # smoothing the signal power using a moving average
     intensity = smooth((s) ** 2, 20, 2 * analysis_win)
+    if len(intensity) == 0:
+        return np.array([])
 
     # convert in db
     intensity /= 4.0e-10
@@ -149,7 +107,7 @@ def getIntensity(s, fs):
     return int_db
 
 
-def normalize(x):
+def normalize(x: np.ndarray | list) -> np.ndarray:
     """normalizes a signal between 0 and 1
 
     Args:
@@ -158,8 +116,12 @@ def normalize(x):
     Returns:
         numpy array: normalized signal
     """
-    y = x - min(x)
-    return y / max(y)
+    if len(x) == 0:
+        return np.array([])
+    x = np.array(x)
+    y = x - x.min()
+    ymax = y.max()
+    return y / ymax if ymax > 0 else y
 
 
 def slow_down_audiotsm(
@@ -264,7 +226,9 @@ def align_audios(
     return out
 
 
-def read_audio_file(audio_file, fs=16000):
+def read_audio_file(
+    audio_file: str | io.IOBase, fs: float = 16000
+) -> tuple[np.ndarray, float]:
     """
     -audio file is a path or file-like object
     -then read that with "soundfile" when possible, else with "pydub"
@@ -277,8 +241,7 @@ def read_audio_file(audio_file, fs=16000):
     try:
         s, orig_sr = sf.read(audio_file)
     except LibsndfileError:
-        audio = AudioSegment.from_file(audio_file)  # , format="m4a")
-        # audio = AudioSegment.from_file(path, format="m4a")
+        audio = AudioSegment.from_file(audio_file)
 
         bit_depth = audio.sample_width * 8
         array_type = get_array_type(bit_depth)
@@ -286,10 +249,9 @@ def read_audio_file(audio_file, fs=16000):
         s = np.array(numeric_array) / 2**15
         orig_sr = audio.frame_rate
 
-    # if the signal is a 2D array, we take the first channel only to have a 1D array
-    if len(s.shape) > 1:
-        if s.shape[-1] == 2:
-            s = s[:, 0]
+    # if the signal is a 2D array, we take the average of both channels (stereo)
+    if len(s.shape) > 1 and s.shape[-1] == 2:  # noqa: PLR2004
+        s = np.mean(s, axis=1)
     # if len(s) is 0, stop here, don't try to resample it, it will throw an error
     if len(s) == 0:
         return s, fs
@@ -298,7 +260,9 @@ def read_audio_file(audio_file, fs=16000):
     return new_s, fs
 
 
-def read_audio_bytes(audio_bytes, fs=16000):
+def read_audio_bytes(
+    audio_bytes: bytes | bytearray, fs: float = 16000
+) -> tuple[np.ndarray, float]:
     """
     -put into a file-like object with "io",
     -then calls read_audio_file that reads with "soundfile" when possible, else with "pydub"
@@ -306,7 +270,9 @@ def read_audio_bytes(audio_bytes, fs=16000):
     return read_audio_file(io.BytesIO(audio_bytes), fs=fs)
 
 
-def read_audio_string(encoded_string, fs=16000):
+def read_audio_string(
+    encoded_string: str | bytearray | bytes, fs: float = 16000
+) -> tuple[np.ndarray, float]:
     """
     -decodes base64,
     -call read_audio_bytes
@@ -316,16 +282,9 @@ def read_audio_string(encoded_string, fs=16000):
     return s, fs
 
 
-def audio64_from_file(path, fs=16000):
+def audio64_from_file(path: str, fs: float = 16000) -> bytes:
     # writing bytes of an ogg file with virtual io, then encoding with base64
-    try:
-        s, orig_sr = sf.read(path)
-        if len(s.shape) > 1:
-            if s.shape[-1] == 2:
-                s = s[:, 0]
-        s = librosa.resample(s, orig_sr=orig_sr, target_sr=fs)
-    except:
-        s, fs = librosa.load(path, sr=fs)
+    s, fs = read_audio_file(path, fs=fs)
     with io.BytesIO() as fio:
         sf.write(fio, s, samplerate=fs, format='ogg')
         audio_string = fio.getvalue()
@@ -337,7 +296,10 @@ def test_pyin():
     path = 'data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.caf'
     s, fs = librosa.load(path, sr=16000)
     f0, voiced_flag, voiced_prob = librosa.pyin(
-        s, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=fs
+        s,
+        fmin=float(librosa.note_to_hz('C2')),
+        fmax=float(librosa.note_to_hz('C7')),
+        sr=fs,
     )
 
     f0 += 10**-10  # to avoid zeros going in the log, add a tiny number
@@ -393,9 +355,6 @@ def test_audio_file_like():
 
     decode_string = base64.b64decode(encode_string)
 
-    import soundfile as sf
-    import io
-
     sf.read(io.BytesIO(decode_string))[0]
 
     s, fs = librosa.load(io.BytesIO(decode_string), sr=fs)
@@ -406,9 +365,8 @@ def test_audio_file_like():
 
 
 def use_tests(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a'):
-    from pydub import AudioSegment
-    import io
     import array
+
     from pydub import AudioSegment
     from pydub.utils import get_array_type
 
@@ -417,7 +375,6 @@ def use_tests(path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a
     encoded_string = '\n'.join(encoded_string)
     decode_string = base64.b64decode(encoded_string)
 
-    audio = AudioSegment.from_file(io.BytesIO(decode_string), format="m4a")
     audio = AudioSegment.from_file(path, format="mp3")
 
     bit_depth = audio.sample_width * 8

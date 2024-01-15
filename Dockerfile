@@ -8,7 +8,7 @@ RUN	apt-get update && apt-get install --fix-missing --no-install-recommends -y \
     curl \
     sudo \
     git \
-    # this is for git cloning  
+    # this is for git cloning
     git-lfs \ 
     # dependencies for phonemizer
     festival \
@@ -35,14 +35,13 @@ RUN micromamba config set extract_threads 1
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER env.yml /tmp/env.yml
 RUN micromamba install -y -n base -f /tmp/env.yml \
-    # need to do this until these guys fix their requirements
-    && pip install --no-deps cmudict \
     && micromamba clean --all --yes && pip cache purge
 
 RUN python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
 RUN python -c "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')"
-RUN mkdir /home/mambauser/hf_models && \
-    curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o /home/mambauser/hf_models/last_hidden_state.quant.onnx
+# RUN mkdir /home/mambauser/hf_models && \
+#     curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o /home/mambauser/hf_models/last_hidden_state.quant.onnx
+COPY ./hf_models/last_hidden_state.quant.onnx /home/mambauser/hf_models/last_hidden_state.quant.onnx
 
 RUN mkdir -p /home/mambauser/mfa
 ENV MFA_ROOT_DIR=/home/mambauser/mfa

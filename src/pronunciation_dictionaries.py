@@ -1,20 +1,26 @@
+from collections.abc import Iterable
 import os, psutil
 
 print_memory_usage = lambda stage: print(
     stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
 )
 print_memory_usage('RAM - pronunciation_dictionaries start')
+import json
+from glob import glob
+
 import cmudict
 import pandas as pd
-from glob import glob
-import json
 from tqdm import tqdm
+
 from syllabipy.sonoripy import SonoriPy
 
-unstress = lambda el: el[:-1] if (len(el) > 0 and el[-1]) in ['0', '1', '2'] else el
+
+def unstress(el: str) -> str:
+    return el[:-1] if (len(el) > 0 and el[-1]) in ["0", "1", "2"] else el
 
 
-def remove_stress_annots(transcription=['K', 'AA1', 'F', 'IY0']):
+def remove_stress_annots(transcription: Iterable[str]) -> list[str]:
+    """Remove stress annotations from a list of CMU phones"""
     return [unstress(el) for el in transcription]
 
 
@@ -48,13 +54,14 @@ lang_to_MFA_g2p_models = {
 }
 
 
-def normalize_termination(ps=[['S', 'T', 'AA1', 'R', 'T', 'AH0', 'D']], word="started"):
-    """normalize final -ed and final -s terminations for CMU to remove the variations "AH0_D" vs "IH0_D" and "AH0_Z" vs "IH0_Z"
+def normalize_termination(ps: list[list[str]], word: str):
+    """Mormalize final -ed and final -s terminations for CMU to remove the variations "AH0_D" vs "IH0_D" and "AH0_Z" vs "IH0_Z"
     It does that on all phonetics alternatives
 
     Args:
-        ps (list, optional): _description_. Defaults to [['S', 'T', 'AA1', 'R', 'T', 'AH0', 'D']].
-        word (str, optional): _description_. Defaults to "started".
+        ps (list[list[str]]): list of phonetics alternatives for a word (e.g. cmudict_dict['started'],
+            as list of phones. Will be mutated in place!
+        word (str): the word for which we want to normalize the termination (e.g. 'started')
     """
     termination_correction_data = [
         ("ed", "AH0_D", "IH0_D"),
@@ -225,7 +232,7 @@ def differs_by_one_insertion(seq1, seq2):
             i += 1
             j += 1
 
-    if inserted_token is None:
+    if inserted_token is None or inserted_idx is None:
         inserted_token = seq2[-1]
         inserted_idx = len(seq2) - 1
     # explicit check that the only difference is the inserted token
@@ -859,18 +866,20 @@ arpabet_to_2_char_ipa['jh'] = 'dʒ'
 
 
 cmu_phones_info = cmudict.phones()
-cmu_phones = set([el[0] for el in cmu_phones_info])
-cmu_vowels = set([p[0] for p in cmu_phones_info if p[1][0] == 'vowel'])
-cmu_consonants = set([p[0] for p in cmu_phones_info if p[1][0] != 'vowel'])
+cmu_phones: set[str] = set([el[0] for el in cmu_phones_info])
+cmu_vowels: set[str] = set([p[0] for p in cmu_phones_info if p[1][0] == 'vowel'])
+cmu_consonants: set[str] = set([p[0] for p in cmu_phones_info if p[1][0] != 'vowel'])
 
-cmu_diphtongs = [
+cmu_diphtongs: set[str] = set(
     p[0] for p in cmu_phones_info if (p[1][0] == 'vowel' and p[0][-1] in cmu_consonants)
-]
+)
 
 
-cmu_stressed_vowels = set(cmudict.symbols()) - cmu_phones
+cmu_stressed_vowels: set[str] = set(cmudict.symbols()) - cmu_phones
 
-cmu_stressed_alphabet = sorted(list(cmu_stressed_vowels) + list(cmu_consonants))
+cmu_stressed_alphabet: list[str] = sorted(
+    list(cmu_stressed_vowels) + list(cmu_consonants)
+)
 
 # CMU is a subset of arpabet
 cmu_1_char = {}

@@ -35,7 +35,7 @@ def test_wav2vec2_frame_prediction(n=10):
         split_phonetics = sum(split_phonetics, [])
 
         phone_prob_matrix = model.predict_phone_prob_matrix(s, 16000)
-        df_segmented = model.phone_prob_matrix_segmentation(
+        df_segmented, _ = model.phone_prob_matrix_segmentation(
             phone_prob_matrix, remove_stress_annots(split_phonetics)
         )
         (
@@ -53,7 +53,7 @@ def test_wav2vec2_frame_prediction(n=10):
 
         phone_prob_matrix = model_stressed.predict_phone_prob_matrix(s, 16000)
         # _,_,phone_prob_df = model_stressed.audio_to_phone_prob_df(s,row.cmu_phonetics)
-        df_segmented = model_stressed.phone_prob_matrix_segmentation(
+        df_segmented, _ = model_stressed.phone_prob_matrix_segmentation(
             phone_prob_matrix, split_phonetics
         )
         (

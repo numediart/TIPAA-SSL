@@ -5,6 +5,6 @@ ls /home/mambauser/hf_models/
 sudo mkdir hf_models/
 sudo cp /home/mambauser/hf_models/last_hidden_state.quant.onnx ./hf_models/last_hidden_state.quant.onnx
 
-echo "from scripts import download_models" | sudo env "PATH=$PATH" python
+# echo "from scripts import download_models" | sudo env "PATH=$PATH" python
 
 streamlit run content_tools/Hello.py --server.port 8000 --server.enableCORS=false --server.enableXsrfProtection=false

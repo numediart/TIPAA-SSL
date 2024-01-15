@@ -1,6 +1,7 @@
 # The speech tech
 
 Download code:
+
 ```
 git clone https://github.com/flowchase/flowspeech
 cd flowspeech
@@ -12,27 +13,14 @@ cd flowspeech
 # git checkout v1.3.0
 ```
 
-Download models (charsiu and wav2vec2, you can see in the download_models.py file what is being downloaded)
-```
-git clone https://github.com/noetits/charsiu
-sudo apt-get install git-lfs
-git lfs install
-python scripts/download_models.py
-```
-
-For using the new model pipeline, you need to put a trained reducer and frame_classifier in a folder "models/" to be loaded. (Drag and drop in VS code works as these models are light)
-
-If using ONNX quantized model, you also have to drag and drop the corresponding model. 
-
-Or train a pipeline based on a phoneme frames dataset.
-
 Build docker containers then run them:
+
 ```
 docker compose build
 docker compose up -d
 ```
 
-If neither `docker compose` or `docker-compose` work, install it: 
+If neither `docker compose` or `docker-compose` work, install it:
 https://docs.docker.com/engine/install/debian/
 
 https://computingforgeeks.com/how-to-install-docker-on-debian-12-bookworm/?expand_article=1&expand_article=1
@@ -42,11 +30,13 @@ https://computingforgeeks.com/how-to-install-docker-on-debian-12-bookworm/?expan
 https://docs.docker.com/compose/install/
 
 Restart container:
+
 ```
 docker compose restart flaskapp
 ```
 
 or
+
 ```
 docker compose down
 docker compose up -d
@@ -63,23 +53,29 @@ docker compose up -d
 - run the test_DL_api.py functions from local towards the server
 
 If need to go back before git pull
+
 ```
 git reset --hard master@{"10 minutes ago"}
 ```
+
 https://stackoverflow.com/questions/1223354/undo-git-pull-how-to-bring-repos-to-old-state
 
-When you want to update the app with changes in code (no new depencies):
+When you want to update the app with changes in code (no new dependencies):
+
 ```
 git pull && docker compose restart flaskapp
 ```
 
 Rebuild and launch right away:
+
 ```
 docker compose up -d --no-deps --build flaskapp
 ```
 
 ## github actions resources
+
 https://brew.sh/
+
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
@@ -90,52 +86,45 @@ https://github.com/nektos/act
 docker compose pytest actions:
 https://github.com/villekr/github-actions-dockercompose-pytest/blob/master/.github/workflows/actions.yaml
 
-
-
 # For content-tools
 
-Same for downloading code and models. 
+Same for downloading code and models, but run `docker compose -f docker-compose_streamlit.yml build`
 
-But `docker compose -f docker-compose_streamlit.yml build`
-
-Then, install extra dependency for recording audio (if demo speech tech is present):
-```
-cd content_tools && (git clone https://github.com/stefanrmmr/streamlit_audio_recorder  2> /dev/null || (cd "streamlit_audio_recorder" && git pull && cd ..)) && cp -rvn streamlit_audio_recorder/st_audiorec . && cp -vn streamlit_audio_recorder/st_custom_components.py . && cd ..
-```
-
-Add a `.streamlit/secrets.toml` file containing `password=...`. The password is stored on 1password.
+Add a `.streamlit/secrets.toml` file containing `password="..."`. The password is stored on 1password.
 
 Then `docker compose -f docker-compose_streamlit.yml up -d`
 
-
-# Additional notes: 
+# Additional notes:
 
 To kill all containers, e.g. to restart afterwards:
+
 ```
 docker container kill $(docker ps -q)
 ```
 
 To remove all images:
+
 ```
 docker system prune -a
 ```
 
-
 If you just want to use it locally, without nginx server, you can build only flowspeech image:
+
 ```
 docker build -t flowspeech .
 docker run -d -p 8000:8000 flowspeech
 ```
 
-Connect to a bash terminal without affecting the running state. 
+Connect to a bash terminal without affecting the running state.
+
 ```
 docker exec -it flaskapp bash
 ```
 
 To show terminal output:
+
 ```
 docker logs flaskapp > docker_logs.txt # to get all history, too long if running for a while
 docker logs flaskapp --tail=100 # to print last history
 docker compose logs --tail=20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
 ```
-

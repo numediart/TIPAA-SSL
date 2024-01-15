@@ -1,18 +1,25 @@
+import itertools
+from collections.abc import Iterable, Sequence
+from operator import itemgetter
+
+import librosa
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
-import librosa
-import itertools
-from operator import itemgetter
-from src.text_processing import remove_stress_annots, group_consecutive_duplicates
+
+from src.text_processing import group_consecutive_duplicates, remove_stress_annots
+
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value
-keep_first_last = lambda s: s[~((s == s.shift(1)) & (s == s.shift(-1)))]
+def keep_first_last(s):
+    return s[~((s == s.shift(1)) & (s == s.shift(-1)))]
+
 
 # get the blocks of consecutive identical rows in cols
-get_blocks = lambda a, cols: a.loc[
-    (a[cols].shift() == a[cols]).any(axis=1) | (a[cols].shift(-1) == a[cols]).any(axis=1)
-]
+def get_blocks(a, cols):
+    return a.loc[
+        (a[cols].shift() == a[cols]).any(axis=1)
+        | (a[cols].shift(-1) == a[cols]).any(axis=1)
+    ]
 
 
 class dtw_forced_aligner:
@@ -27,7 +34,7 @@ class dtw_forced_aligner:
     Overall, the `dtw_forced_aligner` class provides a comprehensive set of tools for performing forced alignment and analyzing the results.
     """
 
-    def __init__(self, alphabet, collapse_method='mean'):
+    def __init__(self, alphabet: Sequence[str], collapse_method='mean'):
         """
         Initialize the dtw_forced_aligner class.
 
@@ -36,11 +43,11 @@ class dtw_forced_aligner:
             collapse_method (str, optional): The method used to collapse probability vectors. Defaults to 'mean'.
         """
         self.alphabet = alphabet
-        self.id_to_p = {i: p for i, p in enumerate(self.alphabet + ['[SIL]'])}
-        self.p_to_id = {p: i for i, p in enumerate(self.alphabet + ['[SIL]'])}
+        self.id_to_p = dict(enumerate([*self.alphabet, '[SIL]']))
+        self.p_to_id = {p: i for i, p in enumerate([*self.alphabet, '[SIL]'])}
         self.collapse_method = collapse_method
 
-    def labelize_phonemes(self, phonemes):
+    def labelize_phonemes(self, phonemes: Iterable[str]) -> np.ndarray:
         """
         Convert a list of phonemes to their corresponding ids.
 
@@ -54,22 +61,30 @@ class dtw_forced_aligner:
         return np.array([self.p_to_id[el] for el in phonemes])
 
     # from phone_prob_matrix_nonsil and target_phonemes, get the most likely path (forced alignment)
-    def get_forced_alignment(self, phone_prob_matrix_nonsil, target_phonemes):
+    def get_forced_alignment(
+        self, phone_prob_matrix_nonsil: np.ndarray, target_phonemes: Sequence[str]
+    ) -> tuple[list[str], float | None]:
         """
         Perform forced alignment to get the most likely path using Dynamic Time Warping.
 
-        with N phonemes + silence token, phone_prob_matrix_nonsil is of shape T x (N+1). let's call L the length of the phoneme sequence.
-        phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
-        for each phoneme of the sequence, we extract a number for each time step that is a similarity measure between the frame proba and the phoneme, i.e. a dot product divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
+        With N phonemes + silence token, phone_prob_matrix_nonsil is of shape T x (N+1).
+        Let's call L the length of the phoneme sequence.
+        phone_prob_matrix_nonsil[:,list(target_labels)]  is the juxtaposition
+        (horizontal stack) of columns coming from the prob matrix corresponding to each phoneme of the sequence, of shape T x L.
+        For each phoneme of the sequence, we extract a number for each time step that is a
+        similarity measure between the frame proba and the phoneme, i.e. a dot product
+        divided by both their norms. As here we apply that on probability vectors, it is equivalent to a dot product
         if it is a one-hot, a dot product is equivalent as just taking the element with that index from the prob vector.
 
         Args:
-            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for non-silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for
+                non-silent frames. It is of shape T x (N+1), where T is
+                the number of frames and N is the number of phonemes.
             target_phonemes (list): The list of target phonemes.
 
         Returns:
-            Tuple[bool, List[str]]: A tuple containing a boolean indicating the success of forced alignment and the list of aligned phonemes.
-
+            Tuple[List[str], float | None]: A tuple containing the list of aligned phonemes,
+            the DTW alignment cost (None if failed)
         """
 
         # one_hot_matrix=np.zeros((len(self.id_to_p), len(target_phonemes)))
@@ -92,17 +107,20 @@ class dtw_forced_aligner:
                 aligned_phones_labels.insert(0, target_labels[index])
             # using the label encoder to find the phoneme
             aligned_phones = [self.id_to_p[el] for el in aligned_phones_labels]
-            return True, aligned_phones
+            return aligned_phones, D[-1, -1]
         except ParameterError:
-            print('DTW failed, most probably the audio is too far from what is expected.')
+            # print('DTW failed, most probably the audio is too far from what is expected.')
             aligned_phones = ["[SIL]"] * len(phone_prob_matrix_nonsil)
 
-            return False, aligned_phones
+            return aligned_phones, None
 
     # forced alignment but with all the audio sample's frames
     def get_alignment_with_silence(
-        self, aligned_phones, silence_frames_idx, non_silence_frames_idx
-    ):
+        self,
+        aligned_phones: Sequence[str],
+        silence_frames_idx: Sequence[int],
+        non_silence_frames_idx: Sequence[int],
+    ) -> list[str]:
         """
         Get the alignment with silence frames.
 
@@ -119,25 +137,39 @@ class dtw_forced_aligner:
         )
         alignment_with_silence[silence_frames_idx] = "[SIL]"
         alignment_with_silence[non_silence_frames_idx] = aligned_phones
-        return alignment_with_silence
+        return list(alignment_with_silence)
 
     # compute a collapsed proba vector of every phoneme alignment
-    def predict(self, aligned_phones, phone_prob_matrix_nonsil, target_phonemes):
+    def predict(
+        self,
+        aligned_phones: Sequence[str],
+        phone_prob_matrix_nonsil: np.ndarray,
+        target_phonemes: Sequence[str],
+    ) -> tuple[list[str], list[np.ndarray]]:
         """
         Compute the collapsed probability vector of every phoneme alignment.
 
-        collapse_method is 'mean' or 'max'. It means we either use mean pooling or max pooling across time to have a probability vector
+        Given a set of frames matched to a target phone through the DTW,
+        collapse the phone probabilities of the frames to a single probability vector.
+        The collapse_method is 'mean' or 'max', ie we either use mean pooling or max
+        pooling across time.
+
+        The predicted phones are the phones with the
+        highest probability in the collapsed probability vectors.
 
         Args:
             aligned_phones (list): The list of aligned phonemes.
-            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for non-silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
+            phone_prob_matrix_nonsil (np.array[float]): The phone probability matrix for
+                non-silent frames. It is of shape T x (N+1), where T is
+                the number of frames and N is the number of phonemes.
             target_phonemes (list): The list of target phonemes.
 
 
         Returns:
-            Tuple[List[str], List[np.array[float]]]: A tuple containing the list of predicted phones and the list of collapsed probability vectors.
+            Tuple[List[str], List[np.array[float]]]: A tuple containing the list of
+                predicted phones and the corresponding list of collapsed probability vectors.
         """
-        aligned_preds = list(zip(aligned_phones, phone_prob_matrix_nonsil))
+        aligned_preds = list(zip(aligned_phones, phone_prob_matrix_nonsil, strict=True))
         grouped_aligned_preds = [
             list(v) for _, v in itertools.groupby(aligned_preds, itemgetter(0))
         ]
@@ -158,7 +190,7 @@ class dtw_forced_aligner:
             elif self.collapse_method == 'max':
                 collapsed_proba_vectors.append(np.max([l[1] for l in phon], axis=0))
             else:
-                raise Exception(
+                raise ValueError(
                     "collapse_method in src.dtw_forced_aligner.predict() should be 'mean' or 'max'"
                 )
         predicted_phones = [self.id_to_p[np.argmax(i)] for i in collapsed_proba_vectors]
@@ -167,12 +199,12 @@ class dtw_forced_aligner:
 
     def get_df_segmented(
         self,
-        alignment_with_silence,
-        predicted_phones,
-        phones,
-        proba_means,
-        time_per_output=0.02,
-    ):
+        alignment_with_silence: Sequence[str],
+        predicted_phones: Sequence[str],
+        phones: Sequence[str],
+        proba_means: Sequence[np.ndarray],
+        time_per_output: float = 0.02,
+    ) -> pd.DataFrame:
         """
         Convert the alignment information into a segmented DataFrame.
 
@@ -187,8 +219,8 @@ class dtw_forced_aligner:
             pd.DataFrame: The segmented DataFrame.
         """
 
-        print(alignment_with_silence)
-        print(phones)
+        # print(alignment_with_silence)
+        # print(phones)
 
         start_idx = []
         end_idx = []
@@ -198,7 +230,7 @@ class dtw_forced_aligner:
 
         ph_with_timings = [
             i
-            for i in list(zip(alignment_with_silence, start_idx, end_idx))
+            for i in list(zip(alignment_with_silence, start_idx, end_idx, strict=True))
             if i[0] != '[SIL]'
         ]
         grouped = [list(v) for _, v in itertools.groupby(ph_with_timings, itemgetter(0))]
@@ -211,7 +243,7 @@ class dtw_forced_aligner:
         timings = [(elem[0][0], elem[0][1], elem[-1][2]) for elem in grouped]
         timings_df = pd.DataFrame(timings)
 
-        print(timings_df)
+        # print(timings_df)
 
         df_segmented = pd.DataFrame(columns=['phones', 'start_idx', 'end_idx'])
 
@@ -221,7 +253,9 @@ class dtw_forced_aligner:
         df_segmented['GT_proba'] = [
             df_segmented.proba_means[i][j]
             for i, j in zip(
-                range(len(df_segmented)), self.labelize_phonemes(df_segmented.phones)
+                range(len(df_segmented)),
+                self.labelize_phonemes(df_segmented.phones),
+                strict=True,
             )
         ]
         df_segmented['pred_proba'] = [
@@ -229,6 +263,7 @@ class dtw_forced_aligner:
             for i, j in zip(
                 range(len(df_segmented)),
                 self.labelize_phonemes(df_segmented.pred_phones_audio),
+                strict=True,
             )
         ]
         df_segmented['start'] = df_segmented['start_idx'] * time_per_output
@@ -236,14 +271,11 @@ class dtw_forced_aligner:
 
         def collapse_consecutive_duplicates(df):
             df = df.reset_index(drop=True)
-            blocks = []
 
             groups = df.groupby([(df.phones != df.phones.shift()).cumsum()])
-            for i, g in groups:
-                r = g.iloc[0]
-                r.end = g.iloc[-1].end
-                blocks.append(r.to_dict())
-            return pd.DataFrame.from_records(blocks)
+            new_df = groups.first().reset_index(drop=True)
+            new_df["end"] = groups.last().end.reset_index(drop=True)
+            return new_df
 
         def divide_consecutive_duplicates(p_df, phone_list):
             grouped_phone_list = group_consecutive_duplicates(phone_list)
@@ -264,7 +296,7 @@ class dtw_forced_aligner:
                 block_starts_ends.shift(+1) == block_starts_ends
             ].index.tolist()
 
-            for start_idx, end_idx in zip(starts, ends):
+            for start_idx, end_idx in zip(starts, ends, strict=True):
                 select = p_df_full.iloc[start_idx : end_idx + 1]
                 start = select.start.iloc[0]
                 end = select.end.iloc[-1]
@@ -278,7 +310,6 @@ class dtw_forced_aligner:
             return p_df_full
 
         df_segmented2 = df_segmented[df_segmented.phones != '[SIL]']
-        # collapse_consecutive_duplicates(df_segmented)
         df_segmented2 = collapse_consecutive_duplicates(df_segmented2)
         if len(df_segmented) > 0:
             df_segmented = divide_consecutive_duplicates(
@@ -287,7 +318,9 @@ class dtw_forced_aligner:
 
         return df_segmented
 
-    def get_phone_prob_matrix_nonsil(self, phone_prob_matrix):
+    def get_phone_prob_matrix_nonsil(
+        self, phone_prob_matrix: np.ndarray
+    ) -> tuple[np.ndarray, list[int], list[int]]:
         """
         Get the columns from the probability matrix which correspond to silent and non-silent frames.
 
@@ -297,7 +330,6 @@ class dtw_forced_aligner:
         Returns:
             Tuple[np.array[float], list, list]: A tuple containing the phone probability matrix of non-silent frames, the list of indices of silence frames, and the list of indices of non-silence frames.
         """
-        phone_prob_matrix = [l for l in phone_prob_matrix]
 
         # Here we want to detect silence frames. The silence token is at the last index. Either we can threshold it, or maybe better: check if it's the max posterior probability
         # def condition(vect): return vect[-1]>0.8
@@ -314,18 +346,31 @@ class dtw_forced_aligner:
         return phone_prob_matrix_nonsil, silence_frames_idx, non_silence_frames_idx
 
     def probas_to_df_segmented(
-        self, phone_prob_matrix, target_phonemes, time_per_output=0.02
-    ):
+        self,
+        phone_prob_matrix: np.ndarray,
+        target_phonemes: list[str],
+        time_per_output: float = 0.02,
+    ) -> tuple[pd.DataFrame, float | None]:
         """
         Convert probability matrix to a segmented DataFrame.
 
-        Args:
-            phone_prob_matrix (np.array[float]): The phone probability matrix possibly contanining silent frames. It is of shape T x (N+1), where T is the number of frames and N is the number of phonemes.
-            target_phonemes (list): The list of target phonemes.
-            time_per_output (float, optional): The time per output. Defaults to 0.02.
+        Parameters
+        ----------
+        phone_prob_matrix (np.array[float]):
+            The phone probability matrix possibly contanining silent frames.
+            It is of shape T x (N+1), where T is the number of frames and N is the number of phones.
+            (N+1) because we include the silent sound.
+        target_phonemes (list):
+            The list of target phonemes.
+        time_per_output (float, optional):
+            The time between frames in seconds. Defaults to 0.02.
 
         Returns:
-            pd.DataFrame: The segmented DataFrame.
+        --------
+        pd.DataFrame:
+            The segmented DataFrame.
+        float:
+            the DTW aligment cost value
         """
         (
             phone_prob_matrix_nonsil,
@@ -333,11 +378,11 @@ class dtw_forced_aligner:
             non_silence_frames_idx,
         ) = self.get_phone_prob_matrix_nonsil(phone_prob_matrix)
 
-        status, aligned_phones = self.get_forced_alignment(
+        aligned_phones, dtw_cost = self.get_forced_alignment(
             phone_prob_matrix_nonsil, target_phonemes
         )
 
-        if status:
+        if dtw_cost is not None:
             if silence_frames_idx:
                 alignment_with_silence = self.get_alignment_with_silence(
                     aligned_phones, silence_frames_idx, non_silence_frames_idx
@@ -357,4 +402,4 @@ class dtw_forced_aligner:
         else:
             df_segmented = pd.DataFrame()
 
-        return df_segmented
+        return df_segmented, dtw_cost

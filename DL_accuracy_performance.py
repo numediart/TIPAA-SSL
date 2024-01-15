@@ -1,66 +1,68 @@
-from tqdm import tqdm
-import pandas as pd
-import pickle
 import ast
-import librosa
-
-from DL_speech_tech import (
-    phonemeContrast_from_formatted_phonetics_audio,
-    stress_from_formatted_phonetics,
-    phonetic_content_analysis,
-    start_end_contrast_from_formatted_phonetics_audio,
-    default_model,
-)
-
-from src.wav2vec2_frame_prediction import audio_load_and_check
-
-
-from src.label_data_processing import (
-    actor_recordings,
-    final_s_artificial_data,
-    synth_words_data,
-)
-from src.text_processing import *
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
-
-from src.libri_phonetization_data import *
-
-from tqdm import tqdm
-
+import logging
+import pickle
 import warnings
 
-warnings.filterwarnings("ignore", category=UserWarning)
-
-import pandas as pd
-
-# disable pandas warning SettingWithCopyWarning
-pd.options.mode.chained_assignment = None  # default='warn'
-
-import seaborn as sns
+import librosa
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from scipy.stats import gaussian_kde
+from tqdm import tqdm
 
-
+from DL_speech_tech import (
+    DEFAULT_POST_PROBA_THRESHOLD,
+    default_model,
+    post_analysis,
+    start_end_contrast_from_formatted_phonetics_audio,
+    validate_recording,
+)
 from performance_functions import (
     compute_predictions,
     count_values,
-    pContrast_on_synth_words,
-    pContrast_for_actor_recordings,
-    start_end_phoneme_from_audiobook_data,
     final_ed_for_actor_recordings,
-    stress_GE_performance_test,
-    final_ed_from_audiobook_data,
-    pContrast_from_audiobook_data,
-    pContrast_for_user_data,
     final_ed_for_user_data,
+    final_ed_from_audiobook_data,
+    pContrast_for_actor_recordings,
+    pContrast_for_user_data,
+    pContrast_from_audiobook_data,
+    pContrast_on_synth_words,
+    start_end_phoneme_from_audiobook_data,
+    stress_GE_performance_test,
 )
+from src.audio_processing import read_audio_file
+from src.label_data_processing import (
+    actor_recordings,
+    final_s_artificial_data,
+    load_adversarial_dataset,
+    synth_words_data,
+)
+from src.pronunciation_dictionaries import (
+    cmu_consonants,
+    cmu_vowels,
+    remove_stress_annots,
+)
+from src.wav2vec2_frame_prediction import (
+    AudioMode,
+    AudioStatus,
+    Wav2Vec2ForFramePrediction,
+)
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# disable pandas warning SettingWithCopyWarning
+# pd.options.mode.chained_assignment = None  # default='warn'
+
+
+logger = logging.getLogger(__name__)
 
 
 def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
     plt.clf()
     fig, axn = plt.subplots(1, len(results))
     fig.set_size_inches(len(results), 6)
-    cbar_ax = fig.add_axes([0.91, 0.3, 0.03, 0.4])
+    cbar_ax = fig.add_axes((0.91, 0.3, 0.03, 0.4))
     for i, k in enumerate(results):
         ax = axn.flat[i]
         #  from https://stackoverflow.com/questions/28356359/one-colorbar-for-seaborn-heatmaps-in-subplot
@@ -74,7 +76,7 @@ def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
             vmax=100,
             cbar_ax=None if i else cbar_ax,
         )
-    fig.tight_layout(rect=[0, 0, 0.9, 1])
+    fig.tight_layout(rect=(0, 0, 0.9, 1))
 
     # plt.savefig('vowel_contrast_actors_hmm.png')
     plt.savefig(name + '.png')
@@ -171,115 +173,6 @@ def GT_proba_distribution_analysis(
     for v in cmu_vowels:
         plot_vowel_distributions(v, all_phones_df, basename=basename)
         print(np.histogram(all_phones_df[all_phones_df.phones == v].GT_proba))
-
-
-def error_rate_match_mismatch_distribution_analysis(n=100):
-    """This function studies the false acceptances of audio containing a completely different content than what is expected"""
-    from src.label_data_processing import actor_recordings
-    from src.audio_processing import read_audio_file
-    from src.text_processing import remove_stress_annots
-    from DL_speech_tech import post_analysis
-
-    df = actor_recordings()
-
-    df_sample = df.sample(n, random_state=0)
-
-    from src.pronunciation_dictionaries import cmu_alphabet, cmu_stressed_alphabet
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-
-    # --------------- Inference demo --------------------
-    model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format="onnx")
-    model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
-
-    row = df_sample[df_sample.phrase_id == "jqjxmugqnq"].iloc[0]
-
-    error_rates_match = []
-    error_rates_mismatch = []
-    random_phonetics_list = []
-    true_phonetics_list = []
-    audio_status = []
-    for i, row in df_sample.iterrows():
-        s, fs = read_audio_file(row.audio_file_url, fs=16000)
-
-        # split_phonetics=sum([p.replace('|','_').split('_') for p in row.cmu_phonetics.split(' ')], [])
-        split_phonetics = [
-            p.replace('|', '_').split('_') for p in row.cmu_phonetics.split(' ')
-        ]
-        split_phonetics = sum(split_phonetics, [])
-
-        phone_prob_matrix = model.predict_phone_prob_matrix(s, 16000)
-        df_segmented = model.phone_prob_matrix_segmentation(
-            phone_prob_matrix, remove_stress_annots(split_phonetics)
-        )
-        (
-            max_posterior_df,
-            max_posterior_df_filtered_processed,
-            max_posterior_df_filtered_processed_threshed,
-        ) = model.max_posterior_phone_df(phone_prob_matrix, proba_thresh=0.7)
-        # df_segmented = model.predict_with_timings(s, remove_stress_annots(split_phonetics))
-        print('model without stress df_segmented', df_segmented)
-        print('model without stress max_posterior_df', max_posterior_df)
-        print(
-            'model without stress max_posterior_df_filtered_processed_threshed',
-            max_posterior_df_filtered_processed_threshed,
-        )
-
-        df_segmented_full, error_rate = post_analysis(
-            phone_prob_matrix, phonetics=row.cmu_phonetics, model=model
-        )
-
-        # take a random phrase's phonetics, that is not the original one
-        random_phonetics = (
-            df_sample[df_sample.cmu_phonetics != row.cmu_phonetics]
-            .sample(n=1)
-            .cmu_phonetics.values[0]
-        )
-        # This is a test
-        # random_phonetics=df_sample[df_sample.cmu_phonetics.str.startswith('AA1_R Y_UW1 P_EY1|IH0_NG W_IH1_DH')].cmu_phonetics.values[0]
-
-        status, s = audio_load_and_check(
-            s, random_phonetics, max_speech_rate=8, mode='numpy', fs=fs
-        )
-
-        df_segmented_full_mismatch, error_rate_mismatch = post_analysis(
-            phone_prob_matrix, phonetics=random_phonetics, model=model
-        )
-
-        audio_status.append(status)
-
-        error_rates_match.append(error_rate)
-        error_rates_mismatch.append(error_rate_mismatch)
-
-        true_phonetics_list.append(row.cmu_phonetics)
-        random_phonetics_list.append(random_phonetics)
-
-    data = pd.DataFrame(
-        [
-            error_rates_match,
-            error_rates_mismatch,
-            true_phonetics_list,
-            random_phonetics_list,
-            audio_status,
-        ]
-    ).T
-    data.columns = [
-        'match',
-        'mismatch',
-        'true_phonetics_list',
-        'random_phonetics_list',
-        'audio_status',
-    ]
-
-    # Here I filter out examples that would already be rejected thanks to the check of audio length compared to
-    data = data[~data.audio_status.str.contains('too short')]
-
-    data.match
-    data_to_plot = pd.DataFrame(columns=['label', 'error'])
-    data_to_plot['error'] = data.match.tolist() + data.mismatch.tolist()
-    data_to_plot['label'] = ['match'] * len(data) + ['mismatch'] * len(data)
-
-    sns.histplot(data=data_to_plot, x="error", hue="label", multiple="stack")
-    plt.savefig('plots/match_mismatch_distribution.png')
 
 
 def syllable_contrast_for_actor_recordings(model=default_model):
@@ -419,7 +312,6 @@ def syllable_contrast_for_actor_recordings(model=default_model):
         s, fs = librosa.load(r.audio_file_url, sr=16000)
         # phonetic_content=charsiu.analyze_phonetic_content(s, r.cmu_phonetics)
         phonetics = r.cmu_phonetics
-        phonetic_content = phonetic_content_analysis(s, phonetics)
         # all_syl_dfs.append(syl_dfs)
 
         # phonetic_content=pd.concat(syl_dfs)
@@ -486,8 +378,6 @@ def syllable_contrast_for_actor_recordings(model=default_model):
 
     df[df.GT_overall_confidences < 0.1][['text', 'audio_file_url']]
 
-    from src.text_processing import split_phonetics, remove_stress_annots
-
     # This is to get every syllable
     all_phones_df.index = range(len(all_phones_df))
     syl_indexation_df = all_phones_df[
@@ -550,7 +440,7 @@ def phoneme_confusions(
         print('phoneme')
         print(results[p])
 
-    plot_confusion_results(results, name=name + '_' + accent)
+    plot_confusion_results(results, name=name + '_' + (accent or "allAccents"))
 
     return results
 
@@ -741,7 +631,14 @@ def start_end_consonant_clusters_on_synth_words(
 # start_end_consonant_clusters_on_synth_words(clusters=["TH_R", "P_R", "S_P_L", "S_K_R"], n=100, model=default_model_charsiu, contrast='start')
 
 
-from src.text_processing import unstress
+from src.text_processing import (
+    count_syllables,
+    drop_consecutive_duplicate_elements,
+    drop_consecutive_duplicates,
+    split_phonetics,
+    split_phonetics_to_phones,
+    unstress,
+)
 
 
 def syl_confusions_on_synth_words():
@@ -1054,30 +951,30 @@ def h_sound_artificial_data(model=default_model):
 
 
 def final_ed_s_confusions_on_synth_words():
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from src.charsiu_utils import charsiu_phone_forced_aligner
 
-    default_model_charsiu = charsiu_phone_forced_aligner(
-        aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
-    )
+    # default_model_charsiu = charsiu_phone_forced_aligner(
+    #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
+    # )
     from datetime import datetime
 
     now = datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
-    final_ed_confusions_on_synth_words(
-        n=100,
-        model=default_model_charsiu,
-        name='plots/final_ed_synth_words_charsiu_' + date_time,
-    )
+    # final_ed_confusions_on_synth_words(
+    #     n=100,
+    #     model=default_model_charsiu,
+    #     name='plots/final_ed_synth_words_charsiu_' + date_time,
+    # )
     final_ed_confusions_on_synth_words(
         n=100,
         model=default_model,
         name='plots/final_ed_synth_words_pipeline_onnx_' + date_time,
     )
-    final_s_confusions_on_synth_words(
-        n=100,
-        model=default_model_charsiu,
-        name='plots/final_s_synth_words_charsiu_' + date_time,
-    )
+    # final_s_confusions_on_synth_words(
+    #     n=100,
+    #     model=default_model_charsiu,
+    #     name='plots/final_s_synth_words_charsiu_' + date_time,
+    # )
     final_s_confusions_on_synth_words(
         n=100,
         model=default_model,
@@ -1265,14 +1162,14 @@ def model_comparison():
         }
         return stats
 
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from src.charsiu_utils import charsiu_phone_forced_aligner
 
-    default_model_charsiu = charsiu_phone_forced_aligner(
-        aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
-    )
-    stats_prod = stats_pronunciation_aspects(default_model_charsiu)
-    with open('stats_prod_target_to_basis', 'w') as f:
-        f.write(stats_prod.__str__())
+    # default_model_charsiu = charsiu_phone_forced_aligner(
+    #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
+    # )
+    # stats_prod = stats_pronunciation_aspects(default_model_charsiu)
+    # with open('stats_prod_target_to_basis', 'w') as f:
+    #     f.write(stats_prod.__str__())
 
     stats_pipeline = {}
     for m in models:
@@ -1357,7 +1254,67 @@ def model_comparison():
     ].T
 
 
-def use_tests():
+def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_model):
+    logger.info("Loading adversarial dataset")
+    adversary_df = load_adversarial_dataset()
+
+    data = []
+
+    unique_phonetics = adversary_df.cmu_phonetics.unique()
+    unique_phonetics = [el for el in unique_phonetics if el != '']
+
+    for i, row in tqdm(adversary_df.iterrows(), total=len(adversary_df)):
+        waveform, fs = read_audio_file(row.audio_file_url)
+
+        for phonetics in unique_phonetics:
+            audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+                waveform, phonetics, mode=AudioMode.NUMPY
+            )
+
+            result = {
+                'audio_load_status': audio_load.status == AudioStatus.SUCCESS,
+                'rejected': audio_load.status != AudioStatus.SUCCESS,
+                'audio_status_message': str(audio_load.status),
+                'silent_sample_ratio': audio_load.silent_sample_ratio,
+                'pitch_sample_ratio': audio_load.pitch_sample_ratio,
+                'speech_rate': audio_load.speech_rate,
+                'true_phonetics': row.cmu_phonetics,
+                'exp_phonetics': phonetics,
+                'n_phones': len(split_phonetics_to_phones(phonetics)),
+                'n_syllables': count_syllables(phonetics),
+                'match': row.cmu_phonetics == phonetics
+                or phonetics == row.alt_cmu_phonetics,
+                'target': row.target,
+                'audio_file_url': row.audio_file_url,
+                'category': row.category,
+                'speaker': row.speaker,
+            }
+
+            if phone_prob_matrix is not None:
+                validation_result = validate_recording(phone_prob_matrix, phonetics)
+                result['rejected'] = result['rejected'] or (not validation_result)
+
+                post_result = post_analysis(
+                    phone_prob_matrix,
+                    phonetics,
+                )
+                if post_result is not None:
+                    result['per_aligned'] = post_result.per_aligned
+                    result['silent_frame_ratio'] = post_result.silent_frame_ratio
+                    result['phone_count_ratio'] = post_result.phone_count_ratio
+                    result['detected_phones'] = post_result.df_detection.phone.tolist()
+
+            result["should_reject"] = result["target"] == 0 or (
+                result["target"] == 1 and result["match"] == False
+            )
+
+            data.append(result)
+
+    data = pd.DataFrame(data)
+    return data
+
+
+if __name__ == "__main__":
     final_ed_s_confusions_on_synth_words()
 
     from datetime import datetime
@@ -1365,32 +1322,31 @@ def use_tests():
     now = datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
 
-    _, results = phoneme_confusions(
+    results = phoneme_confusions(
         phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100
     )
     plot_confusion_results(
         results, name='plots/vowel_confusions_on_synth_words_' + date_time
     )
 
-    # from DL_accuracy_performance import *
-    pContrast_for_actor_recordings(target_phones='AO1')
+    # pContrast_for_actor_recordings(target_phones='AO1')
 
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from src.charsiu_utils import charsiu_phone_forced_aligner
 
-    default_model_charsiu = charsiu_phone_forced_aligner(
-        aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
-    )
-    pContrast_for_actor_recordings(target_phones='AO1', model=default_model_charsiu)
+    # default_model_charsiu = charsiu_phone_forced_aligner(
+    #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
+    # )
+    # pContrast_for_actor_recordings(target_phones='AO1', model=default_model_charsiu)
 
-    start_end_phoneme_from_audiobook_data(phoneme='HH')
-    start_end_phoneme_from_audiobook_data(phoneme='S', basis='S', position="end")
-    start_end_phoneme_from_audiobook_data(phoneme='Z', basis='Z', position="end")
+    # start_end_phoneme_from_audiobook_data(phoneme='HH')
+    # start_end_phoneme_from_audiobook_data(phoneme='S', basis='S', contrast="end")
+    # start_end_phoneme_from_audiobook_data(phoneme='Z', basis='Z', contrast="end")
 
-    r = final_ed_for_actor_recordings()
-    r = final_ed_for_actor_recordings('T')
-    r = final_ed_for_actor_recordings("IH0_D")
+    # r = final_ed_for_actor_recordings()
+    # r = final_ed_for_actor_recordings('T')
+    # r = final_ed_for_actor_recordings("IH0_D")
 
-    pContrast_for_actor_recordings(target_phones='AO1')
+    # pContrast_for_actor_recordings(target_phones='AO1')
 
     stress_GE_performance_test(level='word')
     stress_GE_performance_test(level='sentence')

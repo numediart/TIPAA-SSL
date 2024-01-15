@@ -34,7 +34,7 @@ def phonetize(word, lang="en_GB"):
     backend = backend_dict[lang]
 
     # separate phones by a space and ignoring words boundaries
-    separator = Separator(phone='_', word=None)
+    separator = Separator(phone='_', word="")
     # the strip is weirdly, if you do this without the strip, it can sometimes start with an underscore:   phonetize('e',"fr_FR") -> "_ˈə"  phonetize('y',"fr_FR") -> "i_ɡ_ʁ_ˈɛ_k"
     return backend.phonemize([word], separator=separator, strip=True)[0].strip('_')
 
@@ -83,7 +83,7 @@ def words_to_lexicon(words, lang="en"):
     backend = EspeakBackend(lang, with_stress=True)
 
     # separate phones by a space and ignoring words boundaries
-    separator = Separator(phone='', word=None)
+    separator = Separator(phone='', word="")
     phonetize_word = lambda word: backend.phonemize(
         [word], separator=separator, strip=True
     )[0]

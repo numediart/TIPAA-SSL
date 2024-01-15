@@ -2,6 +2,7 @@ import os
 from tqdm import tqdm
 from glob import glob
 import shutil
+from pathlib import Path
 
 # from src.libri_phonetization_data import get_all_phone_with_timings
 import textgrid
@@ -55,14 +56,17 @@ def get_all_phone_with_timings(
 
 
 def prepare_files(root_path, wav_paths, texts, mfa_path, fs):
-    if not os.path.exists(mfa_path):
-        os.makedirs(mfa_path)
+    root_path = Path(root_path)
+    mfa_path = Path(mfa_path)
+    wav_paths = [Path(p) for p in wav_paths]
+    mfa_path.mkdir(parents=True, exist_ok=True)
     print('Preparing files for alignment')
     for text, wav_path in tqdm(zip(texts, wav_paths)):
-        fp = '/'.join([root_path, wav_path])
-        fn = '_'.join(wav_path.split('/'))
-        wav_fp = os.path.join(mfa_path, fn).split(".")[0] + '.wav'
-        text_fp = os.path.join(mfa_path, fn).split(".")[0] + '.txt'
+        fp = root_path / wav_path
+        fn = Path("_".join(wav_path.parts))
+        out_path = mfa_path / fn.stem
+        wav_fp = str(out_path) + '.wav'
+        text_fp = str(out_path) + '.txt'
         s, fs = librosa.load(fp, sr=fs)
         sf.write(wav_fp, s, fs)
         with open(text_fp, 'w') as f:

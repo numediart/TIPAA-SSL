@@ -1,42 +1,115 @@
-import pandas as pd
-import numpy as np
-import pickle
+import logging
 import os
-import torch
-import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.decomposition import PCA
-
-# from umap.umap_ import UMAP
-
-
+import pickle
+from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import Enum
 from time import time
+from typing import cast
+
+import numpy as np
+import pandas as pd
+import torch
+from linetimer import CodeTimer
+from sklearn.base import ClassifierMixin, TransformerMixin
+from sklearn.decomposition import PCA
+from sklearn.neighbors import KNeighborsClassifier
+from strenum import StrEnum
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
-# from src.metrics import compute_PER, plot_cf_matrix
+from src.audio_processing import (
+    getIntensity,
+    getIntonation,
+    read_audio_bytes,
+    read_audio_file,
+    read_audio_string,
+)
 from src.dtw_forced_aligner import dtw_forced_aligner
 from src.pronunciation_dictionaries import (
     cmu_alphabet,
-    ipa_alphabet,
-    cmu_phones_info,
-    cmu_reducer,
     cmu_stressed_alphabet,
+    ipa_alphabet,
 )
+from src.text_processing import remove_grouping_hyphens
 
-from src.text_processing import group_consecutive_duplicates
+logger = logging.getLogger(__name__)
 
-global cmu_vowels
-# cmu_phones=[el[0] for el in cmu_phones_info]
-cmu_vowels = [p[0] for p in cmu_phones_info if p[1][0] == 'vowel']
-cmu_consonants = [p[0] for p in cmu_phones_info if p[1][0] != 'vowel']
-
-import soundfile as sf
-from scipy.io.wavfile import read
-from src.audio_processing import getIntonation, read_audio_string, read_audio_bytes
-from linetimer import CodeTimer
+DEFAULT_MIN_SPEECH_RATE = 1  # syll/s
+DEFAULT_MAX_SPEECH_RATE = 8  # syll/s
+DEFAULT_SILENCE_THRESHOLD = 40  # dBFS
 
 
-def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16000):
+# StrEnum in python 3.11
+class AudioStatus(StrEnum):
+    SUCCESS = "success"
+    EMPTY = "success, audio is empty (has zero sample)"
+    TOO_SHORT = "success, audio is too short compared to the expected number of syllables"
+    TOO_LONG = "success, audio is too long compared to the expected number of syllables"
+    NO_SOUND = "success, no voiced sound detected (only 0's in waveform)"
+    TOO_QUIET = "success, volume too low or no voice detected (intensity too low)"
+    NO_PITCH = "success, no voiced sound detected (no pitch detected)"
+    DTW_FAILED = "success, DTW alignment failed"
+    PHONETIC_DETECTION_FAILED = "success, phonetic detection failed"
+    PHONETIC_DETECTION_SILENCE = "success, phonetic detection failed (only silence)"
+    NO_MATCH = "success, phone error rate too high"
+    FILE_NOT_FOUND = "error, audio file not found"
+
+
+@dataclass
+class AudioLoadResult:
+    """Result of loading audio, with status, waveform, sampling rate, and pitch frame ratio
+
+    status: AudioStatus
+        status of the file loading and checking
+    waveform: np.ndarray | None
+        waveform
+    sampling_rate: float | None
+        sampling rate in Hz
+    speech_rate: float | None
+        syllable frequency in syllables per second
+    silent_sample_ratio: float | None
+        ratio of silent frames
+    pitch_sample_ratio: float | None
+        ratio of frames with pitch detected
+    """
+
+    status: AudioStatus
+    waveform: np.ndarray | None
+    sampling_rate: float | None
+    speech_rate: float | None
+    silent_sample_ratio: float | None
+    pitch_sample_ratio: float | None
+
+
+class AudioMode(Enum):
+    """Mode of audio input
+
+    FILE: file path
+    BASE64: base64 encoded string
+    BYTES: raw bytes
+    NUMPY: numpy array of waveform
+    """
+
+    FILE = 0
+    BASE64 = 1
+    BYTES = 2
+    NUMPY = 3
+
+
+# File path, or raw bytes, or base64 encoded string, or numpy array
+# Depending on the mode (AudioMode)
+AudioInput = str | bytes | bytearray | np.ndarray
+
+
+def audio_load_and_check(
+    audio: AudioInput,
+    phonetics: str,
+    min_speech_rate: float = DEFAULT_MIN_SPEECH_RATE,
+    max_speech_rate: float = DEFAULT_MAX_SPEECH_RATE,
+    silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
+    mode: AudioMode = AudioMode.FILE,
+    fs: float = 16000,
+) -> AudioLoadResult:
     """Load audio with modes: from a "file", from "base64" encoding, from "bytes", or directly a "numpy" array
     Then check duration to see if it's plausible
 
@@ -47,64 +120,89 @@ def audio_load_and_check(audio, phonetics, max_speech_rate=8, mode='file', fs=16
     """
     n_syllables_tot = sum([len(el.split('|')) for el in phonetics.split(' ')])
 
-    # TODO: change this by the use of src.audio_processing.read_audio_file
-    if mode == 'file':
+    if mode == AudioMode.FILE:
+        if not isinstance(audio, str):
+            raise TypeError(f"audio must be of type str, not {type(audio)}")
         try:
-            f = sf.SoundFile('./inputs/' + audio + '.wav')
+            s, fs = read_audio_file(audio, fs=fs)
         except FileNotFoundError:
-            return "error: audio file not found", None
-        if f.frames == 0:
-            return "success: audio is empty (has zero sample)", None
-        duration = f.frames / f.samplerate
-        speech_rate = n_syllables_tot / duration
-        if speech_rate > max_speech_rate:
-            return (
-                "success: audio is too short compared to the expected number of syllables",
-                None,
+            return AudioLoadResult(
+                AudioStatus.FILE_NOT_FOUND, None, None, None, None, None
             )
-        try:
-            fs, s = read('./inputs/' + audio + '.wav')
-            s = s / 32767
-        except FileNotFoundError:
-            return "error: audio file not found", None
-
-    elif mode == 'base64' or mode == 'bytes' or mode == "numpy":
-        if mode == 'base64':
-            s, fs = read_audio_string(audio, fs=fs)
-        elif mode == 'bytes':
-            s, fs = read_audio_bytes(audio, fs=fs)
-        elif mode == "numpy":
-            s = audio
-
-        if len(s) == 0:
-            return "success: audio is empty (has zero sample)", None
-        duration = len(s) / fs
-        speech_rate = n_syllables_tot / duration
-        if speech_rate > max_speech_rate:
-            return (
-                "success: audio is too short compared to the expected number of syllables",
-                None,
-            )
+    elif mode == AudioMode.BASE64:
+        if isinstance(audio, np.ndarray):
+            raise TypeError(f"audio must be of type str or bytes, not {type(audio)}")
+        s, fs = read_audio_string(audio, fs=fs)
+    elif mode == AudioMode.BYTES:
+        if not isinstance(audio, bytes | bytearray):
+            raise TypeError(f"audio must be of type bytes, not {type(audio)}")
+        s, fs = read_audio_bytes(audio, fs=fs)
+    elif mode == AudioMode.NUMPY:
+        if not isinstance(audio, np.ndarray):
+            raise TypeError(f"audio must be of type np.ndarray, not {type(audio)}")
+        s: np.ndarray = audio
     else:
-        return (
-            "error: mode for audio_load_and_check() must be file, base64, bytes or numpy",
-            None,
-        )
+        raise ValueError(f"Unknown audio mode {mode}")
+
+    if len(s) == 0:
+        return AudioLoadResult(AudioStatus.EMPTY, None, None, None, None, None)
 
     if np.abs(s).sum() == 0:
-        return "success: no voiced sound detected (only 0's in waveform)", None
+        return AudioLoadResult(AudioStatus.NO_SOUND, s, fs, None, None, None)
 
-    f0Samples = getIntonation(s, fs)
-    if sum([el != el for el in f0Samples]) == len(f0Samples):
-        return "success: no voiced sound detected (no pitch detected)", None
-    return "success", s
+    # detect silent frames using intensity
+    intensity = getIntensity(s, fs)
+    silent_frames = intensity < silence_threshold
+    silent_sample_ratio = silent_frames.sum() / len(s)
+
+    if silent_frames.all():
+        return AudioLoadResult(AudioStatus.TOO_QUIET, s, fs, None, None, None)
+
+    # ideally we would detect the onset and the end of the
+    # voiced part of the audio, and only compute the speech rate
+    # on that part
+    nonsilent_duration = (~silent_frames).sum() / fs
+    speech_rate = n_syllables_tot / nonsilent_duration
+
+    f0_samples = getIntonation(s, fs)
+    # pitch frame ratio: ratio of nonsilent frames with pitch detected
+    pitch_sample_ratio = ((f0_samples > 0) & ~silent_frames).sum() / (
+        ~silent_frames
+    ).sum()
+
+    if speech_rate > max_speech_rate:
+        status = AudioStatus.TOO_SHORT
+    # too tricky to have a reliable speech rate for very short audios,
+    # so don't check if only one syllable
+    elif speech_rate < min_speech_rate and n_syllables_tot > 1:
+        status = AudioStatus.TOO_LONG
+    elif pitch_sample_ratio == 0:
+        status = AudioStatus.NO_PITCH
+    else:
+        status = AudioStatus.SUCCESS
+
+    return AudioLoadResult(
+        status, s, fs, speech_rate, silent_sample_ratio, pitch_sample_ratio
+    )
 
 
-# processing functions of df_segmented, which is the output of prediction and forced alignment
-def extract_word(df_segmented, phonetics, target_word_idx):
+def extract_word_from_df_segmented(
+    df_segmented: pd.DataFrame, phonetics: list[list[str]], target_word_idx: int
+) -> pd.DataFrame:
+    """Extract a word from a df_segmented, given the phonetics and the target word index
+
+    Arguments
+    ---------
+    df_segmented : pd.DataFrame
+        The output of prediction and forced alignment
+    phonetics : list[list[str]]
+        The phonetic transcription of the audio, as a list of lists of phones
+    target_word_idx : int
+        The index of the target word in the phonetic transcription
+    """
     start_idx = sum([len(p) for p in phonetics][:target_word_idx])
     end_idx = sum([len(p) for p in phonetics][: target_word_idx + 1])
-    df_word = df_segmented[start_idx:end_idx]
+    df_word = df_segmented[start_idx:end_idx].copy()
     return df_word
 
 
@@ -136,15 +234,17 @@ class Wav2Vec2ForFramePrediction:
     - phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list): Performs forced alignment segmentation on a probability matrix of phonemes.
     """
 
+    SILENCE = "[SIL]"
+
     def __init__(
         self,
-        alphabet,
-        collapse_method='mean',
-        w2v2_model_path="hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft",
-        w2v2_model_format="torch",
-        reducer=PCA(n_components=0.95, random_state=42),
-        frame_classifier=KNeighborsClassifier(10),
-    ):  # , phoneme_classifier=None):
+        alphabet: Sequence[str],
+        collapse_method: str = "mean",
+        w2v2_model_path: str = "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft",
+        w2v2_model_format: str = "torch",
+        reducer: TransformerMixin | None = None,
+        frame_classifier: ClassifierMixin | None = None,
+    ):
         """
         Initializes the Wav2Vec2ForFramePrediction object with the specified attributes.
 
@@ -156,10 +256,8 @@ class Wav2Vec2ForFramePrediction:
         - reducer (PCA): A PCA dimensionality reduction model, could be another sklearn reduction model.
         - frame_classifier (KNeighborsClassifier): By default, a K-nearest neighbors classifier for frame classification. It sould be any other sklearn mclassifier.
         """
-        self.status = 'success'
-        self.pred_phones_audio = []
-        self.fs = 16000
-        self.time_per_output = 0.02
+        self.fs: float = 16000
+        self.time_per_output: float = 0.02
 
         self.alphabet = alphabet
         self.collapse_method = collapse_method
@@ -167,11 +265,12 @@ class Wav2Vec2ForFramePrediction:
             alphabet, collapse_method=collapse_method
         )
 
-        self.id_to_p = {i: p for i, p in enumerate(self.alphabet + ['[SIL]'])}
-        self.p_to_id = {p: i for i, p in enumerate(self.alphabet + ['[SIL]'])}
+        self.alphabet_with_silence = self.add_silence(alphabet)
+        self.id_to_p = dict(enumerate(self.alphabet_with_silence))
+        self.p_to_id = {p: i for i, p in enumerate(self.alphabet_with_silence)}
 
-        self.reducer = reducer
-        self.frame_classifier = frame_classifier
+        self.reducer = reducer or PCA(n_components=0.95, random_state=42)
+        self.frame_classifier = frame_classifier or KNeighborsClassifier(10)
 
         # import Wav2Vec2 feature extractor
         self.w2v2_model_format = w2v2_model_format
@@ -193,7 +292,19 @@ class Wav2Vec2ForFramePrediction:
             )
 
         self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-        # self.processor = Wav2Vec2Processor.from_pretrained("hf_models/facebook/wav2vec2-base-960h")
+
+    @classmethod
+    def add_silence(cls, alphabet: Sequence[str]) -> Sequence[str]:
+        """
+        Adds the silence token to the alphabet.
+
+        Args:
+        - alphabet (list): A list of phone labels.
+
+        Returns:
+        - The alphabet with the silence token.
+        """
+        return [*alphabet, cls.SILENCE]
 
     def save(self, out_path='models', name='model_mailabs_pca_0.95_knn_10_w'):
         """
@@ -239,7 +350,7 @@ class Wav2Vec2ForFramePrediction:
 
         if self.w2v2_model_format == "torch":
             with torch.no_grad():
-                return self.model(input_values).hidden_states[-1]
+                return self.model(input_values).hidden_states[-1]  # type: ignore
         else:
             onnx_outputs = self.session.run(
                 None, {self.session.get_inputs()[0].name: input_values.numpy()}
@@ -257,7 +368,7 @@ class Wav2Vec2ForFramePrediction:
         Returns:
         - The reduced last hidden state output.
         """
-        return self.reducer.transform(lhs[0])
+        return self.reducer.transform(lhs[0])  # type: ignore
 
     def fit(self, X, y):
         """
@@ -274,15 +385,15 @@ class Wav2Vec2ForFramePrediction:
 
         self.y_train = [self.p_to_id[el] for el in y]
 
-        print('fit frame reducer...')
-        self.reducer.fit(self.X_train)
-        print('reduce training data')
-        self.X_train_reduced = self.reducer.transform(self.X_train)
-        print('fit frame classifier...')
-        self.frame_classifier.fit(self.X_train_reduced, self.y_train)
+        logger.info('fit frame reducer...')
+        self.reducer.fit(self.X_train)  # type: ignore
+        logger.info('reduce training data')
+        self.X_train_reduced = self.reducer.transform(self.X_train)  # type: ignore
+        logger.info('fit frame classifier...')
+        self.frame_classifier.fit(self.X_train_reduced, self.y_train)  # type: ignore
 
     # from an audio sample, computes the probability matrix of each frame corresponding to every phoneme
-    def predict_phone_prob_matrix(self, s, fs):
+    def predict_phone_prob_matrix(self, s: np.ndarray, fs: float) -> np.ndarray:
         """
         Computes the probability matrix of each frame corresponding to every phoneme for an audio sample.
 
@@ -303,7 +414,9 @@ class Wav2Vec2ForFramePrediction:
         self.timestamps.append(time() - start)
 
         start = time()
-        phone_prob_matrix = self.frame_classifier.predict_proba(self.reduced_lhs)
+        phone_prob_matrix = cast(
+            np.ndarray, self.frame_classifier.predict_proba(self.reduced_lhs)  # type: ignore
+        )
         self.timestamps.append(time() - start)
 
         # if during training, the classifier has not seen some of the labels, it won't be in the possible labels, and the proba matrix will have a reduced shape
@@ -311,7 +424,7 @@ class Wav2Vec2ForFramePrediction:
         ids_to_add = [
             el
             for el in range(len(self.id_to_p))
-            if el not in self.frame_classifier.classes_
+            if el not in self.frame_classifier.classes_  # type: ignore
         ]
 
         for i in ids_to_add:
@@ -324,131 +437,181 @@ class Wav2Vec2ForFramePrediction:
                 axis=1,
             )
 
-        # we defined the silence as the last token, we remove it here.
-        # Silence will be deteted in the forced aligner by checking that the sum of the remaining probablities are not close to 1 (<0.2)
-        # phone_prob_matrix = phone_prob_matrix[:,:-1]
-        self.phone_prob_matrix = phone_prob_matrix
-
-        print(
-            'times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba'
+        logger.debug(
+            "Times of get_last_hidden_state, reduce_lhs_dimension, classifier predict_proba:"
         )
-        print(self.timestamps)
+        logger.debug(self.timestamps)
         return phone_prob_matrix
 
     def audio_to_phone_prob_matrix(
-        self, audio, phonetics, max_speech_rate=8, mode="numpy"
-    ):
+        self,
+        audio: AudioInput,
+        phonetics: str,
+        min_speech_rate: float = DEFAULT_MIN_SPEECH_RATE,
+        max_speech_rate: float = DEFAULT_MAX_SPEECH_RATE,
+        silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
+        mode: AudioMode = AudioMode.NUMPY,
+    ) -> tuple[AudioLoadResult, np.ndarray | None]:
         """
         Converts an audio sample to a probability matrix of phonemes.
 
-        Args:
-        - audio: The audio sample.
-        - phonetics: The phonetic transcription of the audio.
-        - max_speech_rate (float): The maximum accepted speech rate in seconds per phoneme.
-        This act as a detector of abnormally short audio sample compared to the number of phonemes to detect very short audios with nothing usefule in them.
-        - mode (str): The mode of the audio data ("numpy" or "file" or "bytes").
+        Parameters
+        ----------
+        audio : AudioInput
+            The audio sample.
+        phonetics : str
+            The phonetic transcription of the audio.
+        min_speech_rate : float
+            The minimum accepted speech rate in syllables per second.
+        max_speech_rate : float
+            The maximum accepted speech rate in syllables per second.
+            This acts as a detector of abnormally short audio sample compared to the
+            number of phonemes to detect very short audios with nothing useful in them.
+        silence_threshold : float
+            The threshold of silence in dBFS.
+        mode : AudioMode
+            The mode of the audio data.
 
-        Returns:
-        - audio_status (str): The status of the audio conversion ("success" or "failure").
-        - s: The processed audio sample.
-        - phone_prob_matrix: The probability matrix of phonemes.
+        Returns
+        -------
+        audio_load : AudioLoadResult
+            The status of the audio loading and check
+        phone_prob_matrix : np.ndarray
+            The probability matrix of phonemes.
         """
-        phonetics = phonetics.replace('-', ' ').replace('{', '').replace('}', '')
-        with CodeTimer('load audio'):
-            audio_status, s = audio_load_and_check(
-                audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
+        phonetics = remove_grouping_hyphens(phonetics)
+        with CodeTimer('load audio', silent=True):
+            audio_load = audio_load_and_check(
+                audio,
+                phonetics,
+                min_speech_rate=min_speech_rate,
+                max_speech_rate=max_speech_rate,
+                silence_threshold=silence_threshold,
+                mode=mode,
+                fs=self.fs,
             )
-        if audio_status == "success":
-            with CodeTimer('phone_prob_matrix prediction'):
-                phone_prob_matrix = self.predict_phone_prob_matrix(s, self.fs)
-            return audio_status, s, phone_prob_matrix
+        if audio_load.status == AudioStatus.SUCCESS:
+            with CodeTimer('phone_prob_matrix prediction', silent=True):
+                if audio_load.waveform is None:
+                    raise ValueError("phone_prob_matrix is None")
+                phone_prob_matrix = self.predict_phone_prob_matrix(
+                    audio_load.waveform, self.fs
+                )
+            return audio_load, phone_prob_matrix
         else:
-            return audio_status, s, None
+            return audio_load, None
 
-    def audio_to_phone_prob_df(self, audio, phonetics, max_speech_rate=8, mode="numpy"):
+    def audio_to_phone_prob_df(
+        self, audio, phonetics, max_speech_rate=8, mode: AudioMode = AudioMode.NUMPY
+    ):
         """
         Converts an audio sample to a DataFrame of phoneme probabilities.
-        It uses the function above, and put colomns names as the alphabet for claeity and readability.
 
-        Args:
-        - audio: The audio sample.
-        - phonetics: The phonetic transcription of the audio.
-        - max_speech_rate (float): The maximum speech rate in seconds per phoneme.
-        - mode (str): The mode of the audio data ("numpy" or "torch").
+        Parameters
+        ----------
+        audio : type
+            The audio sample.
+        phonetics : str
+            The phonetic transcription of the audio.
+        max_speech_rate : float
+            The maximum accepted speech rate in syllables per second.
+        mode : AudioMode
+            The mode of the audio data.
 
-        Returns:
-        - audio_status (str): The status of the audio conversion ("success" or "failure").
-        - s: The processed audio sample.
-        - phone_prob_df: The DataFrame of phoneme probabilities.
+        Returns
+        -------
+        audio_load : AudioLoadResult
+            The status of the audio loading and check.
+        phone_prob_df : type
+            The DataFrame of phoneme probabilities.
         """
-        audio_status, s, phone_prob_matrix = self.audio_to_phone_prob_matrix(
+        audio_load, phone_prob_matrix = self.audio_to_phone_prob_matrix(
             audio, phonetics, max_speech_rate=max_speech_rate, mode=mode
         )
-        if audio_status == "success":
+        if audio_load.status == AudioStatus.SUCCESS and phone_prob_matrix is not None:
             phone_prob_df = pd.DataFrame(phone_prob_matrix)
-            phone_prob_df.columns = self.alphabet + ["[SIL]"]
-            return audio_status, s, phone_prob_df
+            phone_prob_df.columns = self.alphabet_with_silence  # type: ignore
+            return audio_load, phone_prob_df
         else:
-            return audio_status, s, None
+            return audio_load, None
 
-    def max_posterior_phone_df(self, phone_prob_df, proba_thresh=0.5):
+    def max_posterior_phone_df(
+        self, phone_prob_matrix: np.ndarray, proba_thresh: float = 0.5
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Computes the maximum posterior probability of each phoneme from a DataFrame of phoneme probabilities.
+        Computes the maximum posterior probability of each phoneme from a DataFrame
+        of phoneme probabilities.
 
         Args:
-        - phone_prob_df: The DataFrame of phoneme probabilities.
-        - proba_thresh (float): The probability threshold.
+        - phone_prob_matrix (np.ndarray): The probability matrix of phones.
+        - proba_thresh (float): The probability threshold, by default 0.5.
 
         Returns:
         - max_posterior_df: The DataFrame of maximum posterior probabilities.
-        - max_posterior_df_filtered_processed: The processed (no silences, collapsed per phoneme instead of per frame) DataFrame of maximum posterior probabilities.
-        - max_posterior_df_filtered_processed_threshed: The thresholded (remove phones with to low posterior probability) DataFrame of maximum posterior probabilities.
+        - max_posterior_df_filtered_processed: The processed (no silences, collapsed
+            per phoneme instead of per frame) DataFrame of maximum posterior probabilities.
+        - max_posterior_df_filtered_processed_threshed: The thresholded
+          (remove phones with to low posterior probability) DataFrame of maximum posterior probabilities.
         """
-        phone_prob_df.max(axis=1)
-        max_idxs = np.argmax(phone_prob_df, axis=1)
-        phone_prob_df.argmax(axis=1)
+        max_idxs = np.argmax(phone_prob_matrix, axis=1)
 
-        alphabet = self.alphabet + ['[SIL]']
+        max_posterior_df = pd.DataFrame({"max_idx": max_idxs})
+        max_posterior_df["phone"] = max_posterior_df.max_idx.apply(
+            lambda x: self.alphabet_with_silence[x]
+        )
+        max_posterior_df["proba"] = phone_prob_matrix.max(axis=1)
 
-        max_posterior_df = pd.DataFrame()
-        max_posterior_df['phone'] = [alphabet[i] for i in max_idxs]
-        max_posterior_df['proba'] = phone_prob_df.max(axis=1)
+        max_posterior_df_filtered = max_posterior_df[
+            max_posterior_df.phone != self.SILENCE
+        ].copy()
 
-        max_posterior_df_filtered = max_posterior_df[max_posterior_df.phone != "[SIL]"]
+        # group consecutive duplicates
+        max_posterior_df_filtered["idx_for_merging"] = (
+            max_posterior_df_filtered["max_idx"].diff().ne(0).cumsum()
+        )
 
-        groups = group_consecutive_duplicates(max_posterior_df_filtered.phone)
-        n_frame_per_phoneme = [el[-1] for el in groups]
-        cumsum = np.cumsum(n_frame_per_phoneme)
+        def merging(x):
+            d = {}
+            d["phone"] = x["phone"].iloc[0]
+            d["max_idx"] = x["max_idx"].iloc[0]
+            d["n_frames"] = len(x)
+            d["probas"] = x["proba"].tolist()
+            d["max_proba"] = x["proba"].max()
+            d["mean_proba"] = np.mean(d["probas"])
+            return pd.Series(d)
 
-        start = 0
-        records = []
-        for end in cumsum:
-            phone_df = max_posterior_df_filtered[start:end]
-            phone = phone_df.phone.iloc[0]
-
-            assert (
-                len(phone_df.phone.unique()) == 1
-            ), "We grouped the dataframe per duplicate phones, so this dataframe should be of length 1"
-
-            probas = phone_df.proba.tolist()
-            record = {
-                'phone': phone,
-                'n_frames': len(phone_df),
-                'probas': probas,
-                'max_proba': max(probas),
-                'mean_proba': np.mean(probas),
-            }
-            records.append(record)
-
-            start = end
-        max_posterior_df_filtered_processed = pd.DataFrame(records)
-        # max_posterior_df_filtered=max_posterior_df[max_posterior_df.proba>proba_thresh][max_posterior_df.phone!="[SIL]"]
-        # max_posterior_df_filtered_collapsed=max_posterior_df_filtered.sort_values('proba', ascending=False).drop_duplicates('phone').sort_index()
+        max_posterior_df_filtered_processed = (
+            max_posterior_df_filtered.groupby("idx_for_merging")
+            .apply(merging)
+            .reset_index(drop=True)
+        )
+        max_posterior_df_filtered.drop(columns="idx_for_merging", inplace=True)
 
         max_posterior_df_filtered_processed_threshed = (
             max_posterior_df_filtered_processed[
                 max_posterior_df_filtered_processed.max_proba > proba_thresh
-            ]
+            ].copy()
+        )
+
+        # regroup once more, since after thresholding we may once again have duplicates
+        max_posterior_df_filtered_processed_threshed["idx_for_merging"] = (
+            max_posterior_df_filtered_processed_threshed["max_idx"].diff().ne(0).cumsum()
+        )
+
+        def merging2(x):
+            d = {}
+            d["phone"] = x["phone"].iloc[0]
+            d["n_frames"] = x["n_frames"].sum()
+            d["probas"] = sum(x["probas"], [])
+            d["max_proba"] = x["max_proba"].max()
+            # do a weighted average by number of frames from the previous grouping
+            d["mean_proba"] = np.mean(x["n_frames"] * x["mean_proba"]) / d["n_frames"]
+            return pd.Series(d)
+
+        max_posterior_df_filtered_processed_threshed = (
+            max_posterior_df_filtered_processed_threshed.groupby("idx_for_merging")
+            .apply(merging2)
+            .reset_index(drop=True)
         )
 
         return (
@@ -457,27 +620,42 @@ class Wav2Vec2ForFramePrediction:
             max_posterior_df_filtered_processed_threshed,
         )
 
-    def phone_prob_matrix_segmentation(self, phone_prob_matrix, phoneme_list):
+    def phone_prob_matrix_segmentation(
+        self, phone_prob_matrix: np.ndarray, phone_list: list[str]
+    ) -> tuple[pd.DataFrame, float | None]:
         """
-        Performs forced alignment segmentation on a probability matrix of phonemes.
+        Performs forced alignment segmentation on a probability matrix of phones.
+
+        Given a phone probability matrix of shape T x (N+1), where T is the number
+        of frames and N the number of target phones, and a list of M target phones,
+        return a dataframe with M rows, where the phone matrix has been segmented
+        according to the DTW path.
 
         Args:
-        - phone_prob_matrix: The probability matrix of phonemes.
-        - phoneme_list: The list of phonemes.
+        - phone_prob_matrix: The predicted probability matrix of phones.
+        - phone_list: The target list of phones.
 
         Returns:
-        - df_segmented: The segmented DataFrame.
+        - df_segmented: The segmented DataFrame, with columns:
+            - phones: the expected phones that the alignment was done to
+            - start_idx: the starting frame index of the phone
+            - end_idx: the ending frame index of the phone
+            - pred_phones_audio: predicted phone for each aligned group
+                (= the phone with the max. probability after pooling)
+            - proba_means: the phone probability vectors pooled across
+                the frames of the aligned group
+            - GT_proba: the ground truth phone probability from the pooled vector
+            - pred_proba: the probability value of the predicted phone
+            - start: the start time of the phone in seconds
+            - end: the end time of the phone in seconds
+            - n_times: the number of duplicates collapsed
+        - dtw_cost: The final DTW alignment cost value (or None if alignment failed)
         """
-        with CodeTimer('DTW'):
-            df_segmented = self.forced_aligner.probas_to_df_segmented(
-                phone_prob_matrix, phoneme_list, time_per_output=self.time_per_output
+        with CodeTimer('DTW', silent=True):
+            df_segmented, dtw_cost = self.forced_aligner.probas_to_df_segmented(
+                phone_prob_matrix, phone_list, time_per_output=self.time_per_output
             )
-            if len(df_segmented) > 0:
-                self.pred_phones_audio = list(df_segmented.pred_phones_audio.values)
-            else:
-                self.pred_phones_audio = []
-                # TODO: declare model.status to be that nothing expected was detected and use that in calls of this function, among other things in pronunciation aspect functions
-        return df_segmented
+        return df_segmented, dtw_cost
 
 
 def train_Wav2Vec2ForFramePrediction_model():
@@ -650,7 +828,7 @@ def inference_demo():
 
     # phoneme predictions on a single audio sample with forced alignment
     phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, data.cmu_phones.iloc[0]
     )
 
@@ -662,7 +840,7 @@ def inference_demo():
     )
     model.load(name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w')
     phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
-    df_segmented = model.phone_prob_matrix_segmentation(
+    df_segmented, _ = model.phone_prob_matrix_segmentation(
         phone_prob_matrix, data.phone_df.iloc[0].phone.tolist()
     )
 
@@ -686,7 +864,7 @@ def inference_demo():
     # phoneme predictions on a single audio sample with forced alignment
     prob_matrix = model.predict_phone_prob_matrix(s, 16000)
 
-    latentogram = model.reducer.transform(model.lhs[0])
+    latentogram = model.reducer.transform(model.lhs[0])  # type: ignore
     df_segmented.start_idx.tolist()
 
     # to have horizontal line in white in the heatmap at the phone starts, I put a 6

@@ -1,37 +1,32 @@
-import os, psutil
-
-print_memory_usage = lambda stage: print(
-    stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
-)
-
-from performance_functions import (
-    pContrast_on_synth_words,
-    final_ed_from_audiobook_data,
-    final_s_from_audiobook_data,
-    stress_GE_performance_test,
-)
-from DL_speech_tech import (
-    default_model,
-    stress_from_formatted_phonetics,
-    phonemeContrast_from_formatted_phonetics_audio,
-    start_end_contrast_from_formatted_phonetics_audio,
-    compute_stress_score,
-    multiple_aspect_from_formatted_phonetics_audio,
-)
-
-from src.audio_processing import prepare_audio_file, read_audio_file
-from src.text_processing import (
-    prefill_for_sentence,
-    get_augmented_mfa_dict,
-    chunk_text,
-    remove_stress_annots,
-)
-from src.label_data_processing import actor_recordings
 import base64
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
-from linetimer import CodeTimer
 
 import pandas as pd
+from linetimer import CodeTimer
+
+from DL_speech_tech import (
+    StressCategory,
+    compute_stress_score,
+    default_model,
+    multiple_aspect_from_formatted_phonetics_audio,
+    start_end_contrast_from_formatted_phonetics_audio,
+    stress_from_formatted_phonetics,
+)
+from performance_functions import (
+    final_ed_from_audiobook_data,
+    final_s_from_audiobook_data,
+    pContrast_on_synth_words,
+    stress_GE_performance_test,
+)
+from src.audio_processing import read_audio_file
+from src.label_data_processing import actor_recordings
+from src.pronunciation_dictionaries import cmu_vowels
+from src.text_processing import (
+    chunk_text,
+    get_augmented_mfa_dict,
+    prefill_for_sentence,
+    remove_stress_annots,
+)
+from src.wav2vec2_frame_prediction import AudioMode
 
 
 def a_test_pConstrast():
@@ -65,28 +60,38 @@ def DL_speech_tech_functions(model=default_model):
     res = stress_from_formatted_phonetics(
         encode_string,
         phonetics=formatted_phonetics,
-        level="sentence",
+        level=StressCategory.SENTENCE,
         n_words_by_chunk=[7],
         max_speech_rate=8,
-        mode='base64',
+        mode=AudioMode.BASE64,
         model=model,
     )
-    assert res['stress_binaries'][2] == 1, "Stress detection failed"
+    assert res.stress_binaries[2] == 1, "Stress detection failed"
 
     # path='data/During the nineteen sixties Gregory became active in civil rights.wav'
     # encode_string = base64.b64encode(open(path, "rb").read())
     # formatted_phonetics=prefill_for_sentence('During the nineteen sixties Gregory became active in civil rights')['phonetics']
 
-    detection_df = multiple_aspect_from_formatted_phonetics_audio(
-        encode_string,
-        phonetics=formatted_phonetics,
-        max_speech_rate=8,
-        mode='base64',
-        model=model,
+    (
+        audio_load,
+        multiple_aspect_df,
+        df_segmented,
+        dtw_cost,
+        post_analysis_results,
+        validation_result,
+    ) = multiple_aspect_from_formatted_phonetics_audio(
+        encode_string, phonetics=formatted_phonetics, mode=AudioMode.BASE64, model=model
     )
+
+    assert multiple_aspect_df is not None, "Detection failed"
     assert (
-        sum(detection_df.phones != detection_df.detection) / len(detection_df) < 0.2
+        sum(multiple_aspect_df.phones != multiple_aspect_df.detection)
+        / len(multiple_aspect_df)
+        < 0.2
     ), "Test example has a too high phoneme error rate"
+    assert (
+        validation_result
+    ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
 
     # try with nonsense phonetics
     # df.text[df.text.str.split(' ').apply(len)==1]
@@ -94,17 +99,30 @@ def DL_speech_tech_functions(model=default_model):
     row = df[df.text == 'it'].iloc[0]
     s, fs = read_audio_file(row.audio_file_url, fs=16000)
     formatted_phonetics = row.cmu_phonetics
-    detection_df = multiple_aspect_from_formatted_phonetics_audio(
-        s, phonetics=formatted_phonetics, max_speech_rate=8, mode='numpy', model=model
+
+    (
+        audio_load,
+        multiple_aspect_df,
+        df_segmented,
+        dtw_cost,
+        post_analysis_results,
+        validation_result,
+    ) = multiple_aspect_from_formatted_phonetics_audio(
+        s, phonetics=formatted_phonetics, mode=AudioMode.NUMPY, model=model
     )
 
     # charsiu model was too bad for this. Our pipeline works on that!
     if model == default_model:
+        assert multiple_aspect_df is not None, "Detection failed"
         assert (
-            sum(detection_df.phones != detection_df.detection) / len(detection_df) == 0
+            sum(multiple_aspect_df.phones != multiple_aspect_df.detection)
+            / len(multiple_aspect_df)
+            == 0
         ), "Test example has a too high phoneme error rate.The audio contains a native pronunciation of 'IH1_T'"
+        assert (
+            validation_result
+        ), "Test example has a too high phoneme error rate compared to acceptance cutoff"
 
-    df[df.text == 'One *hundred* percent.'].text
     row = df[df.text == 'One *hundred* percent.'].iloc[0]
     s, fs = read_audio_file(row.audio_file_url, fs=16000)
 
@@ -112,20 +130,22 @@ def DL_speech_tech_functions(model=default_model):
     res = stress_from_formatted_phonetics(
         s,
         phonetics=formatted_phonetics,
-        level="sentence",
+        level=StressCategory.SENTENCE,
         n_words_by_chunk=[3],
         max_speech_rate=8,
-        mode='numpy',
+        mode=AudioMode.NUMPY,
         model=model,
     )
-    assert res['stress_binaries'][1] == 1, "Stress detection failed"
+    assert (
+        res.stress_binaries is not None and res.stress_binaries[1] == 1
+    ), "Stress detection failed"
     res = start_end_contrast_from_formatted_phonetics_audio(
         s,
         phonetics=formatted_phonetics,
         target_word_idx=1,
         target_phones='D',
         basis='IH0_D',
-        mode="numpy",
+        mode=AudioMode.NUMPY,
         model=model,
     )
 
@@ -140,7 +160,7 @@ def DL_speech_tech_functions(model=default_model):
         target_phones='HH',
         basis='HH',
         position="start",
-        mode="numpy",
+        mode=AudioMode.NUMPY,
         model=model,
     )
     assert res['phonetic_detection'] == "HH", "/h/ sound detection failed"
@@ -182,8 +202,8 @@ def test_particular_cases():
         s,
         phonetics=row.cmu_phonetics,
         n_words_by_chunk=n_words_by_chunk,
-        level='word',
-        mode="numpy",
+        level=StressCategory.WORD,
+        mode=AudioMode.NUMPY,
     )
 
     # model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
@@ -199,17 +219,17 @@ def test_particular_cases():
     with CodeTimer('whole phone prediction'):
         # df_segmented = default_model.predict_with_timings(s, remove_stress_annots(split_phonetics))
         phone_prob_matrix = default_model.predict_phone_prob_matrix(s, default_model.fs)
-        df_segmented = default_model.phone_prob_matrix_segmentation(
+        df_segmented, _ = default_model.phone_prob_matrix_segmentation(
             phone_prob_matrix, remove_stress_annots(split_phonetics)
         )
 
     # with CodeTimer('stress extraction'): ws=model.compute_stress_score(s,phonetics)
     with CodeTimer('stress extraction'):
-        ws = compute_stress_score(df_segmented, s, fs=default_model.fs)
+        ws = compute_stress_score(df_segmented, s, vowels=cmu_vowels, fs=default_model.fs)
 
 
 def a_test_stress_detection():
-    stress_GE_performance_test(level='word')
+    stress_GE_performance_test(level=StressCategory.WORD)
 
 
 def test_prefill():

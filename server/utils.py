@@ -1,20 +1,19 @@
-from marshmallow import fields
-from functools import wraps
-from flask import current_app, abort
-from marshmallow import Schema, fields
 import json
-import ast
+from dataclasses import asdict
+from functools import wraps
+
+from flask import Response, abort, current_app
+from marshmallow import EXCLUDE, Schema, fields
+
 from DL_speech_tech import (
+    StressCategory,
     phonemeContrast_from_formatted_phonetics_audio,
     stress_from_formatted_phonetics,
 )
-from src.text_processing import check_phonemes, chunk_text, split_phonetics
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
-from flask import Response
 from src.audio_processing import audio64_from_file
-
-from marshmallow import fields, Schema, EXCLUDE
-
+from src.pronunciation_dictionaries import cmu_vowels
+from src.text_processing import check_phonemes, chunk_text, split_phonetics
+from src.wav2vec2_frame_prediction import AudioInput, AudioMode
 
 success_messages = {
     "success",  # --> "speech"
@@ -77,7 +76,7 @@ syl_contrast_responseSchema = Schema.from_dict(
 )
 
 
-def define_detected_flag(status):
+def define_detected_flag(status: str):
     if status == "success":
         flag = "speech"
     elif "not recognized" in status:
@@ -188,7 +187,11 @@ def access_property_error(content, property):
 
 
 # TODO: I think I should add "numpy" here, and in the default_example() function to put the waveform signal as numpy array. maybe I should get rid of the rID
-audio_property_dict = {'file': 'rID', 'base64': 'audio64', 'bytes': 'audio'}
+audio_property_dict = {
+    AudioMode.FILE: 'rID',
+    AudioMode.BASE64: 'audio64',
+    AudioMode.BYTES: 'audio',
+}
 
 
 def check_request(d, properties):
@@ -253,7 +256,7 @@ def request_contrast(
     target_occurence_idx=0,
     tech_function=phonemeContrast_from_formatted_phonetics_audio,
     alternatives=cmu_vowels,
-    mode='file',
+    mode: AudioMode = AudioMode.FILE,
     target_type="phone",
 ):
     """
@@ -325,7 +328,7 @@ def request_contrast(
         mode=mode,
     )
 
-    if res['status'].split(':')[0] == 'error':
+    if "success" not in str(res['status']):
         res['error'] = True
         # res['detected']=define_detected_flag(res['status'])
         response = json.dumps(res)
@@ -337,7 +340,13 @@ def request_contrast(
         return Response(response, status=200, mimetype="application/json")
 
 
-def group_by_chunk(scores, n_words_by_chunk):
+def group_by_chunk(scores: list, n_words_by_chunk: list[int]) -> list[list]:
+    """Group list of scores by chunks
+
+    Examples:
+        >>> group_by_chunk([1,2,3,4,5,6,7,8,9,10], [3, 3, 4])
+        [[1, 2, 3], [4, 5, 6], [7, 8, 9, 10]]
+    """
     scores_grouped_by_chunk = []
     cumsum = 0
     for n in n_words_by_chunk:
@@ -346,53 +355,47 @@ def group_by_chunk(scores, n_words_by_chunk):
     return scores_grouped_by_chunk
 
 
-def call_stress_fn(audio, p, module, n_words_by_chunk=[], mode='file', version='v1'):
-    if module == 'sentence':
+def call_stress_fn(
+    audio: AudioInput,
+    phonetics: str,
+    module: StressCategory,
+    n_words_by_chunk: list[int] | None = None,
+    mode: AudioMode = AudioMode.FILE,
+) -> Response:
+    if module == StressCategory.SENTENCE:
+        if n_words_by_chunk is None:
+            raise ValueError("n_words_by_chunk must be provided for sentence stress")
         res = stress_from_formatted_phonetics(
-            audio, p, n_words_by_chunk, level=module, mode=mode
+            audio, phonetics, n_words_by_chunk, level=module, mode=mode
         )
-        if version == 'v2':
-            if res['status'] == "success":
-                res['stress_intensities'] = group_by_chunk(
-                    res['stress_intensities'], n_words_by_chunk
-                )
-                res['stress_binaries'] = group_by_chunk(
-                    res['stress_binaries'], n_words_by_chunk
-                )
+        if res.status == "success":
+            res.stress_intensities = group_by_chunk(
+                res.stress_intensities, n_words_by_chunk
+            )
+            res.stress_binaries = group_by_chunk(res.stress_binaries, n_words_by_chunk)
 
-    elif module == 'word':
-        res = stress_from_formatted_phonetics(audio, p, level=module, mode=mode)
+    elif module == StressCategory.WORD:
+        res = stress_from_formatted_phonetics(audio, phonetics, level=module, mode=mode)
     else:
-        res = {"status": "error: no such module"}
+        res = {"status": "error: no such stress module"}
         return Response(json.dumps(res), status=500, mimetype="application/json")
 
-    if res['status'].split(':')[0] == 'error':
-        res['error'] = True
-        # res['detected']=define_detected_flag(res['status'])
-        response = json.dumps(res)
+    if "success" not in res.status:
+        response = asdict(res)
+        response['error'] = True
+        response = json.dumps(response)
         return Response(response, status=500, mimetype="application/json")
     else:
-        res['error'] = False
-        res['detected'] = define_detected_flag(res['status'])
-        response = json.dumps(res)
+        response = asdict(res)
+        response['error'] = False
+        response['detected'] = define_detected_flag(res.status)
+        response = json.dumps(response)
         return Response(response, status=200, mimetype="application/json")
 
 
-# def request_stress(d, properties, module, mode='file'):
-#     err=check_request(d, properties)
-#     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
-#     err=check_phonetics(d['phonetics'])
-#     if err is not None: return Response(json.dumps({"status":err, "error":True }),status=400,mimetype="application/json")
-
-#     p=d['phonetics']
-#     n_words_by_chunk=chunk_text(d['text'])
-
-#     audio=d[audio_property_dict[mode]]
-
-#     return call_stress_fn(audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode)
-
-
-def request_stress_v2(d, properties, module, mode='file'):
+def request_stress_v2(
+    d, properties, module: StressCategory, mode: AudioMode = AudioMode.FILE
+):
     err = check_request(d, properties)
     if err is not None:
         return Response(
@@ -401,10 +404,10 @@ def request_stress_v2(d, properties, module, mode='file'):
             mimetype="application/json",
         )
 
-    p = d['phonetics']
-    n_words_by_chunk = [len(c.split(' ')) for c in p]
-    p = ' '.join(p)
-    err = check_phonetics(p)
+    phonetics = d['phonetics']
+    n_words_by_chunk = [len(c.split(' ')) for c in phonetics]
+    phonetics = ' '.join(phonetics)
+    err = check_phonetics(phonetics)
     if err is not None:
         return Response(
             json.dumps({"status": err, "error": True}),
@@ -414,67 +417,9 @@ def request_stress_v2(d, properties, module, mode='file'):
 
     audio = d[audio_property_dict[mode]]
 
-    if module == 'sentence':
+    if module == StressCategory.SENTENCE:
         return call_stress_fn(
-            audio, p, module, n_words_by_chunk=n_words_by_chunk, mode=mode, version='v2'
+            audio, phonetics, module, n_words_by_chunk=n_words_by_chunk, mode=mode
         )
     else:
-        return call_stress_fn(audio, p, module, mode=mode, version='v2')
-
-
-# to be removed
-if False:
-    from DL_speech_tech import (
-        phonemeContrast_from_formatted_phonetics_audio,
-        stress_from_formatted_phonetics,
-        syllable_contrast_from_formatted_phonetics_audio,
-    )
-
-    def request_syl_contrast(
-        d,
-        properties,
-        tech_function=syllable_contrast_from_formatted_phonetics_audio,
-        mode='file',
-    ):
-        err = check_request(d, properties)
-        if err is not None:
-            return Response(
-                json.dumps({"status": err, "error": True}),
-                status=400,
-                mimetype="application/json",
-            )
-        err = check_phonetics(d['phonetics'])
-        if err is not None:
-            return Response(
-                json.dumps({"status": err, "error": True}),
-                status=400,
-                mimetype="application/json",
-            )
-
-        word_idx = int(d['word_idx'])
-        syl_idx = int(d['syl_idx'])
-
-        if word_idx >= len(d['phonetics'].split(' ')):
-            res = {"status": "error: word_idx >= n of words"}
-            res['error'] = True
-            # res['detected']=define_detected_flag(res['status'])
-            response = json.dumps(res)
-            return Response(response, status=400, mimetype="application/json")
-        res = tech_function(
-            d['audio64'],
-            phonetics=d['phonetics'],
-            target_word_idx=word_idx,
-            target_syllable_idx=syl_idx,
-            mode=mode,
-        )
-
-        if res['status'].split(':')[0] == 'error':
-            res['error'] = True
-            # res['detected']=define_detected_flag(res['status'])
-            response = json.dumps(res)
-            return Response(response, status=500, mimetype="application/json")
-        else:
-            res['error'] = False
-            res['detected'] = define_detected_flag(res['status'])
-            response = json.dumps(res)
-            return Response(response, status=200, mimetype="application/json")
+        return call_stress_fn(audio, phonetics, module, mode=mode)

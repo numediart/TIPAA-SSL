@@ -1,51 +1,48 @@
-from cProfile import label
-from src.libri_phonetization_data import build_librispeech_words_df
-from src.libri_phonetization_data import phonetics_for_row, select_libri
-from tqdm import tqdm
-import pandas as pd
 import ast
+import warnings
 from collections import Counter
 
-from src.label_data_processing import build_user_data_df
-
-# exercise_data=pd.read_csv('data/flwc-recordings/QueryResultsForNoe-2021-12-23_120638.csv')
-
-from DL_speech_tech import (
-    schwa_sound_from_formatted_phonetics_audio,
-    phonemeContrast_from_formatted_phonetics_audio,
-    stress_from_formatted_phonetics,
-    start_end_contrast_from_formatted_phonetics_audio,
-    default_model,
-)  # , default_model_charsiu
-
-from src.audio_processing import read_audio_file
-
-from src.audio_processing import prepare_audio_file
-
-from src.label_data_processing import (
-    get_data_stressed_content,
-    actor_recordings,
-    synth_words_data,
-)
-from src.text_processing import *
-from src.text_processing import word_stress_from_cmu
-from src.pronunciation_dictionaries import (
-    cmu_vowels,
-    cmu_consonants,
-    cmu_phones,
-    cmu_alphabet,
-    ipa_alphabet,
-)
-
-from src.libri_phonetization_data import *
-
+import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
-import warnings
+from DL_speech_tech import (
+    StressCategory,
+    default_model,
+    phonemeContrast_from_formatted_phonetics_audio,
+    schwa_sound_from_formatted_phonetics_audio,
+    start_end_contrast_from_formatted_phonetics_audio,
+    stress_from_formatted_phonetics,
+)
+from src.audio_processing import read_audio_file
+from src.label_data_processing import (
+    actor_recordings,
+    build_user_data_df,
+    get_data_stressed_content,
+    synth_words_data,
+)
+from src.libri_phonetization_data import (
+    build_librispeech_words_df,
+    phonetics_for_row,
+    select_libri,
+    selection_with_and_without_s,
+)
+from src.pronunciation_dictionaries import (
+    cmu_alphabet,
+    cmu_vowels,
+    cmudict_dict,
+    ipa_alphabet,
+)
+from src.text_processing import (
+    chunk_text,
+    cmu_ensure_phonetics_consistency,
+    prefill_for_sentence,
+    word_stress_from_cmu,
+)
+from src.wav2vec2_frame_prediction import AudioMode
+from syllabipy.sonoripy import SonoriPy
 
 warnings.filterwarnings("ignore", category=UserWarning)
-
-import pandas as pd
 
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -102,7 +99,7 @@ def count_values(phonetic_detections):
     d = Counter(phonetic_detections)
     d = pd.DataFrame.from_dict(d, orient='index')
     if len(d) > 0:
-        d = d.sort_values(by=0, ascending=False)
+        d = d.sort_values(by=0, ascending=False)  # type: ignore
         d = d / d.sum() * 100
     return d
 
@@ -133,12 +130,6 @@ def compute_predictions(
                 target_syllable_idx = r.target_syllable_indexes
             try:
                 s, fs = read_audio_file(r.fpath, fs=16000)
-            except Exception as e:
-                print('error in reading audio in compute_predictions')
-                print('row information')
-                print(r)
-                print(e)
-            try:
                 # this is only for start_end_contrasts, I am putting a default if does not exist
                 contrast = r.contrast if 'contrast' in r else 'end'
                 res = tech_function(
@@ -151,7 +142,7 @@ def compute_predictions(
                     basis=basis,
                     contrast=contrast,
                     alternatives=alternatives,
-                    mode='numpy',
+                    mode=AudioMode.NUMPY,
                     model=model,
                     **kwargs,
                 )
@@ -177,7 +168,7 @@ def compute_predictions(
     return result_df
 
 
-def stress_GE_performance_test(level='sentence'):
+def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
     df = get_data_stressed_content()
     stress_intensities = []
     stress_binaries = []
@@ -195,11 +186,11 @@ def stress_GE_performance_test(level='sentence'):
             phonetics=row.phonetics,
             n_words_by_chunk=n_words_by_chunk,
             level=level,
-            mode="numpy",
+            mode=AudioMode.NUMPY,
         )
         print(res)
-        stress_intensities.append(res['stress_intensities'])
-        stress_binaries.append(res['stress_binaries'])
+        stress_intensities.append(res.stress_intensities)
+        stress_binaries.append(res.stress_binaries)
     df['stress_intensities'] = stress_intensities
     df['stress_binaries'] = stress_binaries
 
@@ -267,7 +258,7 @@ def stress_GE_performance_test(level='sentence'):
             p.replace('|', '_').split('_') for p in phonetics.split(' ')
         ]
 
-        df.index = range(len(df))
+        df.index = range(len(df))  # type: ignore
         word_stress_binaries = df.phonetics.apply(
             lambda r: [word_stress_from_cmu(p) for p in split_phonetics(r)]
         )
@@ -329,7 +320,7 @@ def stress_GE_performance_test(level='sentence'):
         print([len(el) for el in preds_by_len])
 
         for l, (GT, pred) in enumerate(zip(GT_by_len, preds_by_len)):
-            error_rate = sum(sum(np.abs(np.array(GT) - np.array(pred)))) / np.prod(
+            error_rate = sum(sum(np.abs(np.array(GT) - np.array(pred)))) / np.prod(  # type: ignore
                 np.array(pred).shape
             )
             print('words of len ' + str(l + 1) + ' error rate:' + str(error_rate))
@@ -500,7 +491,7 @@ def pContrast_from_audiobook_data(
     )
 
     selection['cmu_phonetics'] = selection.apply(
-        lambda r: r.cmu_phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH'), axis=1
+        lambda r: cmu_ensure_phonetics_consistency(r.cmu_phonetics), axis=1
     )
     df = selection
     df_words = df.apply(
@@ -543,6 +534,8 @@ def start_end_phoneme_from_audiobook_data(
         idx = 0
     elif contrast == "end":
         idx = -1
+    else:
+        raise ValueError("contrast must be 'start' or 'end'")
 
     words_in_p = [el for el in cmudict_dict.keys() if cmudict_dict[el][0][idx] == phoneme]
     words_in_p = set(words_in_p)
@@ -571,7 +564,7 @@ def start_end_phoneme_from_audiobook_data(
         target_phones=target_phones,
         tech_function=start_end_contrast_from_formatted_phonetics_audio,
         basis=basis,
-        contrast=contrast,
+        # contrast=contrast,
         model=model,
     )
     phonetic_detections = result_df.phonetic_detection
@@ -790,7 +783,7 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_mode
     # result_df[result_df.gibberish_truth!=result_df.gibberish_detected].iloc[-1]
     # print(success_rate)
 
-    selections = selections.reset_index(drop=True)
+    # selections = selections.reset_index(drop=True)
     # result_df['cmu_phonetics']=selections['cmu_phonetics']
     # result_df['fpath']=selections['fpath']
 
@@ -803,7 +796,7 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_mode
 def final_ed_fake_mistakes(n=100):
     df = synth_words_data()
     df['phonetics'] = df.apply(
-        lambda r: r.phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH'), axis=1
+        lambda r: cmu_ensure_phonetics_consistency(r.phonetics), axis=1
     )
 
     df['target_word_indexes'] = 0
@@ -835,7 +828,7 @@ def final_ed_fake_mistakes(n=100):
         target_phones='IH0_D',
         basis='D_D',
         contrast='end',
-        mode='numpy',
+        mode=AudioMode.NUMPY,
         model=default_model_charsiu,
     )
 
@@ -961,6 +954,37 @@ def pContrast_on_synth_words(
         d = pd.DataFrame([np.nan])
 
     return result_df, d
+
+
+def analyze_start_end_for_synth_word(
+    word,
+    words_selected_df,
+    target_word_idx=0,
+    target_syllable_idx=-1,
+    target_phones='Z',
+    basis=None,
+    position='end',
+    model=default_model,
+):
+    phonetics = prefill_for_sentence(word)['phonetics']
+
+    results = []
+    for i, r in words_selected_df.iterrows():
+        audio, fs = read_audio_file(r.path, fs=16000)
+        res = start_end_contrast_from_formatted_phonetics_audio(
+            audio,
+            phonetics=phonetics,
+            target_word_idx=target_word_idx,
+            target_syllable_idx=target_syllable_idx,
+            target_phones=target_phones,
+            basis=basis,
+            position=position,
+            mode=AudioMode.NUMPY,
+            model=model,
+        )
+        results.append(res)
+
+    return results
 
 
 # to be removed
@@ -1214,16 +1238,17 @@ def use_tests():
     # comment for cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
     data = load_libri_dataset_audio_timings(df_t_test)
+
     # data = load_test_dataset(df_t_test)
 
-    from tqdm import tqdm
+    # from tqdm import tqdm
 
-    preds = [model.predict_with_timings(r.s, r.phones) for i, r in tqdm(data.iterrows())]
-    preds2 = [
-        default_model.predict_with_timings(r.s, r.phones)
-        for i, r in tqdm(data.iterrows())
-    ]
+    # preds = [model.predict_with_timings(r.s, r.phones) for i, r in tqdm(data.iterrows())]
+    # preds2 = [
+    #     default_model.predict_with_timings(r.s, r.phones)
+    #     for i, r in tqdm(data.iterrows())
+    # ]
 
-    preds_df = pd.concat(preds)
-    preds_df2 = pd.concat(preds2)
-    sum(preds_df.pred_phones_audio == preds_df2.pred_phones_audio) / len(preds_df)
+    # preds_df = pd.concat(preds)
+    # preds_df2 = pd.concat(preds2)
+    # sum(preds_df.pred_phones_audio == preds_df2.pred_phones_audio) / len(preds_df)

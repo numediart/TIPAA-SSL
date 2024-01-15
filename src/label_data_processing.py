@@ -1,21 +1,15 @@
-import pandas as pd
-import numpy as np
-import pdb
+import ast
+import os
 from glob import glob
-from src.text_processing import (
-    remove_special_characters,
-    remove_stress_annots,
-    prefill_content,
-    prefill_for_sentence,
-)
 
-from syllabipy.sonoripy import SonoriPy
+import pandas as pd
 
 from src.pronunciation_dictionaries import cmudict_dict
-
-import itertools
-import os
-import ast
+from src.text_processing import (
+    cmu_ensure_phonetics_consistency,
+    prefill_content,
+)
+from syllabipy.sonoripy import SonoriPy
 
 target_to_alternatives = {
     "DH": ["DH", "TH"],
@@ -230,6 +224,23 @@ def get_errors_examples():
     return df_errors, exs_sort_by_n_errors
 
 
+def load_adversarial_dataset(
+    base_path: str = "./data/audio_recordings/adversary_example_library",
+) -> pd.DataFrame:
+    df = pd.read_csv(
+        base_path + "/adversary_example_library.csv",
+        dtype={
+            "cmu_phonetics": str,
+            "alt_cmu_phonetics": str,
+            "text": str,
+            "target": bool,
+        },
+        keep_default_na=False,
+    )
+    df["audio_file_url"] = base_path + "/" + df["audio_file_url"]
+    return df
+
+
 def final_s_artificial_data(path="data/Final s - voices for test/exercises_test.csv"):
     df = pd.read_csv(path)
     df['path'] = os.path.split(path)[0] + '/audios/' + df.soundfiles_name
@@ -267,7 +278,7 @@ def select_accent(df, accent=None):
         elif accent == "US":
             df = df[df.path.apply(lambda r: '_US_' in r.split('/')[-1])]
         else:
-            raise "accent must be US or UK or None"
+            raise ValueError("accent must be US or UK or None")
     return df
 
 
@@ -294,7 +305,7 @@ def synth_words_data(
         df['phonetics'] = df.progress_apply(
             lambda r: phonetic_dict[r.text] if r.text in phonetic_dict else float('nan'),
             axis=1,
-        )
+        )  # type: ignore
 
         df = df.dropna()
 
@@ -318,7 +329,7 @@ def synth_words_data(
     df = df.dropna()
     df = select_accent(df, accent=accent)
     df['phonetics'] = df.apply(
-        lambda r: r.phonetics.replace('CH', 'T_SH').replace('JH', 'D_ZH'), axis=1
+        lambda r: cmu_ensure_phonetics_consistency(r.phonetics), axis=1
     )
     # recompute syl_p, because I modified phonetics with CH and JH
     df['syl_p'] = df.phonetics.str.split('|').apply(
