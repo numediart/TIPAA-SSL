@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 from st_audiorec import st_audiorec
 
+from content_tools.utils import check_password
 from DL_speech_tech import (
     DEFAULT_MAX_PER,
     DEFAULT_MAX_PER_ONE_SYLL,
@@ -84,8 +85,7 @@ def display_results(
         st.error(f"Recording should be rejected ({audio_load.status!s})")
 
 
-# if check_password():
-if True:
+if check_password():
     st.markdown(
         """
     Enter a sentence you want to practice and have your speech analyzed,

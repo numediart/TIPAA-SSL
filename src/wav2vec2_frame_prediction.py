@@ -27,14 +27,10 @@ from src.audio_processing import (
 from src.dtw_forced_aligner import dtw_forced_aligner
 from src.pronunciation_dictionaries import (
     cmu_alphabet,
-    cmu_phones_info,
     cmu_stressed_alphabet,
     ipa_alphabet,
 )
 from src.text_processing import remove_grouping_hyphens
-
-cmu_vowels = [p[0] for p in cmu_phones_info if p[1][0] == 'vowel']
-cmu_consonants = [p[0] for p in cmu_phones_info if p[1][0] != 'vowel']
 
 logger = logging.getLogger(__name__)
 

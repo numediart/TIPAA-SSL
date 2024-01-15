@@ -13,21 +13,6 @@ cd flowspeech
 # git checkout v1.3.0
 ```
 
-Download models (charsiu and wav2vec2, you can see in the download_models.py file what is being downloaded)
-
-```
-git clone https://github.com/noetits/charsiu
-sudo apt-get install git-lfs
-git lfs install
-python scripts/download_models.py
-```
-
-For using the new model pipeline, you need to put a trained reducer and frame_classifier in a folder "models/" to be loaded. (Drag and drop in VS code works as these models are light)
-
-If using ONNX quantized model, you also have to drag and drop the corresponding model.
-
-Or train a pipeline based on a phoneme frames dataset.
-
 Build docker containers then run them:
 
 ```
@@ -75,7 +60,7 @@ git reset --hard master@{"10 minutes ago"}
 
 https://stackoverflow.com/questions/1223354/undo-git-pull-how-to-bring-repos-to-old-state
 
-When you want to update the app with changes in code (no new depencies):
+When you want to update the app with changes in code (no new dependencies):
 
 ```
 git pull && docker compose restart flaskapp

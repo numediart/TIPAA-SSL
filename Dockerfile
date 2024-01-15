@@ -8,7 +8,7 @@ RUN	apt-get update && apt-get install --fix-missing --no-install-recommends -y \
     curl \
     sudo \
     git \
-    # this is for git cloning  
+    # this is for git cloning
     git-lfs \ 
     # dependencies for phonemizer
     festival \

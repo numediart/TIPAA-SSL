@@ -34,62 +34,62 @@ Please see [this documentation file](/DEPLOYMENT.md).
 
 ```
 git clone https://github.com/flowchase/flowspeech
-cd flowspeech
-git clone https://github.com/noetits/charsiu
-sudo apt-get install git-lfs
-git lfs install
-python scripts/download_models.py
 ```
 
-These will clone necessary repositories and install git-lfs (lfs stand for large file storage) in order to download some open source deep learning models.
+At the root of the flowspeech repository, create a folder named `models`, and drop in it the folder `model_mailabs_pca_0.95_knn_10_w` that is in [Flowchase's drive storage](https://drive.google.com/drive/folders/1drAmLjPOsl1QrfEuOybmiv-R-Sxd-yFC?usp=share_link).
+These are the dimensionality reduction and frame classifiers that run on top of the base wav2vec2 model.
 
-At the root of the "flowspeech" repository, create a folder named "models", and drop in it the folder "model_mailabs_pca_0.95_knn_10_w" that is in [Flowchase's drive storage](https://drive.google.com/drive/folders/1drAmLjPOsl1QrfEuOybmiv-R-Sxd-yFC?usp=share_link)
-
-After executing the `scripts/download_models.py` script, you should have a few pretrained models inside "hf_models" folder.
-The Flowchase drive folder above contains a file named `last_hidden_state.quant.onnx`. This is a compressed version of a pretrained huggingface model, and should go into the corresponding folder which is "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"
+The Flowchase drive folder above contains a file named `last_hidden_state.quant.onnx`.
+This is a compressed version of a pretrained wav2vec2 model from hugginface.
+Create a folder `hf_models` and download that file into it.
 
 ### Install micromamba and python dependencies
 
-<!-- ```
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh
+First install all necessary packages listed in [./Dockerfile](/Dockerfile#L12):
+
+```bash
+sudo apt-get install git-lfs espeak-ng festival
+git lfs install
 ```
-Then follow instructions and open a new terminal, conda will be activated
 
-```
-conda create -n flowspeech python=3
-conda activate flowspeech
-``` -->
-
-<!-- Basically follow the same installation commands described in the Dockerfile, but directly on your linux machine -->
-
-First install all necessary apt packages listed in [./Dockerfile](/Dockerfile#L6)
-
-(Last time I tried, on a WSL Ubuntu, I just needed to apt install g++ festival espeak-ng)
-
-To setup the micromamba environment, you first have to install it.
-Install micromamba:
-https://mamba.readthedocs.io/en/latest/micromamba-installation.html
+To setup the micromamba environment, you first have to install micromamba: https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html
 
 ```
 "${SHELL}" <(curl -L micro.mamba.pm/install.sh)
 ```
 
 ```
-micromamba create -n flowspeech_mm
+micromamba create -n flowspeech_mm -f env.yml
 micromamba activate flowspeech_mm
 ```
 
-Then you can proceed to install dependencies. It is easier to install the conda package of montreal-forced-aligner rather than pursuing the same commands as in the Dockerfile. But it takes more space on your disk (which is not a big deal for a local installation but it is of the docker image).
+### Notes for MacOS and Apple M1/... chips
 
-```
-micromamba install kaldi=*=*cpu* montreal-forced-aligner
+A few adjustments are needed to be able to run on Apple Silicon, as some of the dependencies
+on conda are not available for ARM architectures.
+
+Install basic dependencies:
+
+```bash
+brew install git-lfs micromamba
 ```
 
-Once MFA is installed you can install the rest of this repository dependencies.
+Install homebrew for x86 and install dependencies:
 
+```bash
+arch -x86_64 zsh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install espeak
+exit
 ```
-micromamba install -y -n flowspeech_mm -f env.yml
+
+Setup the conda environment for x86:
+
+```bash
+CONDA_SUBDIR=osx-64 micromamba create -n flowspeech_mm -f env.yml
+micromamba activate flowspeech_mm
+conda env config vars set PHONEMIZER_ESPEAK_PATH=/usr/local/bin/espeak
+conda env config vars set PHONEMIZER_ESPEAK_LIBRARY=/usr/local/lib/libespeak.dylib
 ```
 
 ## Test modules
@@ -97,7 +97,18 @@ micromamba install -y -n flowspeech_mm -f env.yml
 The unit tests should work after these step
 
 ```
+
 pytest test_DL_modules.py
 pytest test_DL_api.py
 pytest test_models.py
+
+```
+
+## Download datasets
+
+To test the tech's performance, develop new features, ..., you will need speech datasets.
+Have a look at this page for instructions to obtain them: https://www.notion.so/flowchase/Speech-datasets-818af2e4ea1749469194642f7226c0ff
+
+```
+
 ```
