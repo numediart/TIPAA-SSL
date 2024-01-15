@@ -36,12 +36,10 @@ Please see [this documentation file](/DEPLOYMENT.md).
 git clone https://github.com/flowchase/flowspeech
 ```
 
-At the root of the flowspeech repository, create a folder named `models`, and drop in it the folder `model_mailabs_pca_0.95_knn_10_w` that is in [Flowchase's drive storage](https://drive.google.com/drive/folders/1drAmLjPOsl1QrfEuOybmiv-R-Sxd-yFC?usp=share_link).
-These are the dimensionality reduction and frame classifiers that run on top of the base wav2vec2 model.
-
-The Flowchase drive folder above contains a file named `last_hidden_state.quant.onnx`.
+The [Flowchase drive folder](https://drive.google.com/drive/folders/1drAmLjPOsl1QrfEuOybmiv-R-Sxd-yFC?usp=share_link) contains a file named `last_hidden_state.quant.onnx`.
 This is a compressed version of a pretrained wav2vec2 model from hugginface.
 Create a folder `hf_models` and download that file into it.
+Note: the folder also contains a backup of the dimensionality reduction and frame classifiers that run on top of the base wav2vec2 model, but they are now commited in this repository in [models](./models).
 
 ### Install micromamba and python dependencies
 
