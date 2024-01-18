@@ -37,6 +37,7 @@ from server.DL_modules_v2 import bp as DL_modules_bp2
 from server.DL_modules_v2_mp import *
 from server.DL_modules_v2_mp import bp as DL_modules_bp2_mp
 
+from server.content_tools import bp as content_tools_bp
 
 from flask_smorest import Api
 
@@ -45,6 +46,7 @@ api = Api(app)
 # api.register_blueprint(prefill_bp)
 api.register_blueprint(DL_modules_bp2, url_prefix='/v2')
 api.register_blueprint(DL_modules_bp2_mp, url_prefix='/v2_mp')
+api.register_blueprint(content_tools_bp)
 
 debug = True
 

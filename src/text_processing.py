@@ -1034,7 +1034,9 @@ from src.code_utils import internal_error
 from datetime import datetime
 
 
-def prefill_content(sentences, syl_sep='|', lang='en_US', mode='CMU'):
+def prefill_content(
+    sentences: Sequence[str], syl_sep: str = '|', lang: str = 'en_US', mode: str = 'CMU'
+):
     """This function extract information of syllabified texts and phonetics using prefill_for_sentence on a list of sentences.
     The result is saved in a DataFrame.
 
