@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from flowspeech.audio_processing import read_audio_file
 from flowspeech.DL_speech_tech import (
     StressCategory,
     default_model,
@@ -14,32 +15,31 @@ from flowspeech.DL_speech_tech import (
     start_end_contrast_from_formatted_phonetics_audio,
     stress_from_formatted_phonetics,
 )
-from src.audio_processing import read_audio_file
-from src.label_data_processing import (
+from flowspeech.label_data_processing import (
     actor_recordings,
     build_user_data_df,
     get_data_stressed_content,
     synth_words_data,
 )
-from src.libri_phonetization_data import (
+from flowspeech.libri_phonetization_data import (
     build_librispeech_words_df,
     phonetics_for_row,
     select_libri,
     selection_with_and_without_s,
 )
-from src.pronunciation_dictionaries import (
+from flowspeech.pronunciation_dictionaries import (
     cmu_alphabet,
     cmu_vowels,
     cmudict_dict,
     ipa_alphabet,
 )
-from src.text_processing import (
+from flowspeech.text_processing import (
     chunk_text,
     cmu_ensure_phonetics_consistency,
     prefill_for_sentence,
     word_stress_from_cmu,
 )
-from src.wav2vec2_frame_prediction import AudioMode
+from flowspeech.wav2vec2_frame_prediction import AudioMode
 from syllabipy.sonoripy import SonoriPy
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -104,7 +104,7 @@ def count_values(phonetic_detections):
     return d
 
 
-from src.code_utils import internal_error
+from flowspeech.code_utils import internal_error
 
 
 def compute_predictions(
@@ -814,7 +814,7 @@ def final_ed_fake_mistakes(n=100):
     r = selection.iloc[0]
     s, fs = read_audio_file(r.path, fs=16000)
 
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     default_model_charsiu = charsiu_phone_forced_aligner(
         aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
@@ -920,7 +920,7 @@ def pContrast_on_synth_words(
 
     # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
     # target_phones='y'
-    # from src.pronunciation_dictionaries import ipa_vowels
+    # from flowspeech.pronunciation_dictionaries import ipa_vowels
     # alternatives=ipa_vowels
 
     df = synth_words_data(accent=accent)
@@ -999,7 +999,7 @@ if False:
 
         # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
         # target_phones='y'
-        # from src.pronunciation_dictionaries import ipa_vowels
+        # from flowspeech.pronunciation_dictionaries import ipa_vowels
         # alternatives=ipa_vowels
 
         df = synth_words_data(accent=accent)
@@ -1027,7 +1027,7 @@ if False:
 
 
 def use_tests():
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet)
     default_model_ipa.load(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')
@@ -1042,7 +1042,7 @@ def use_tests():
         results_df, d = pContrast_on_synth_words(target_phones=p, n=100)
         ds_baseline.append(d)
 
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     prod_model = charsiu_phone_forced_aligner(
         aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
@@ -1069,7 +1069,7 @@ def use_tests():
         )
         ds_actor_F1_prod.append(d)
 
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     default_model_charsiu = charsiu_phone_forced_aligner(
         aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
@@ -1083,7 +1083,7 @@ def use_tests():
     final_ed_for_user_data(target_phones='D', n=100, model=default_model_charsiu)
     final_ed_for_user_data(target_phones='D', n=100, model=default_model)
 
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     model_cv_lda = Wav2Vec2ForFramePrediction(cmu_alphabet)
     model_cv_lda.load(name='model_commonvoice_pca_99_lda')
@@ -1176,7 +1176,7 @@ def use_tests():
         results_df, d = pContrast_on_synth_words(target_phones=p, n=100)
         ds.append(d)
 
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
     from sklearn.neighbors import KNeighborsClassifier
 
     model = Wav2Vec2ForFramePrediction(
@@ -1232,7 +1232,7 @@ def use_tests():
 
     # sum(results_df.phonetic_detection==results_df2.phonetic_detection)/len(results_df)
 
-    from src.load_data import load_libri_dataset, load_libri_dataset_audio_timings
+    from flowspeech.load_data import load_libri_dataset, load_libri_dataset_audio_timings
 
     # phoneme predictions on a train dataset with forced alignment
     # comment for cmu or ipa

@@ -11,12 +11,19 @@ import seaborn as sns
 from scipy.stats import gaussian_kde
 from tqdm import tqdm
 
+from flowspeech.audio_processing import read_audio_file
 from flowspeech.DL_speech_tech import (
     DEFAULT_POST_PROBA_THRESHOLD,
     default_model,
     post_analysis,
     start_end_contrast_from_formatted_phonetics_audio,
     validate_recording,
+)
+from flowspeech.label_data_processing import (
+    actor_recordings,
+    final_s_artificial_data,
+    load_adversarial_dataset,
+    synth_words_data,
 )
 from flowspeech.performance_functions import (
     compute_predictions,
@@ -31,19 +38,12 @@ from flowspeech.performance_functions import (
     start_end_phoneme_from_audiobook_data,
     stress_GE_performance_test,
 )
-from src.audio_processing import read_audio_file
-from src.label_data_processing import (
-    actor_recordings,
-    final_s_artificial_data,
-    load_adversarial_dataset,
-    synth_words_data,
-)
-from src.pronunciation_dictionaries import (
+from flowspeech.pronunciation_dictionaries import (
     cmu_consonants,
     cmu_vowels,
     remove_stress_annots,
 )
-from src.wav2vec2_frame_prediction import (
+from flowspeech.wav2vec2_frame_prediction import (
     AudioMode,
     AudioStatus,
     Wav2Vec2ForFramePrediction,
@@ -631,7 +631,7 @@ def start_end_consonant_clusters_on_synth_words(
 # start_end_consonant_clusters_on_synth_words(clusters=["TH_R", "P_R", "S_P_L", "S_K_R"], n=100, model=default_model_charsiu, contrast='start')
 
 
-from src.text_processing import (
+from flowspeech.text_processing import (
     count_syllables,
     drop_consecutive_duplicate_elements,
     drop_consecutive_duplicates,
@@ -798,7 +798,7 @@ def h_sound_artificial_data(model=default_model):
     sheets_dict = pd.read_excel(root_path + 'h_sound_annotations.xlsx', sheet_name=None)
     df_correct = sheets_dict['target']
     df_incorrect = sheets_dict['bad pron to train errors']
-    from src.text_processing import prefill_for_sentence, remove_special_characters
+    from flowspeech.text_processing import prefill_for_sentence, remove_special_characters
 
     df_correct['fpath'] = (
         '/'.join(
@@ -951,7 +951,7 @@ def h_sound_artificial_data(model=default_model):
 
 
 def final_ed_s_confusions_on_synth_words():
-    # from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     # default_model_charsiu = charsiu_phone_forced_aligner(
     #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
@@ -1113,8 +1113,8 @@ def pronunciation_aspects_from_audiobook_data(
 
 
 def model_comparison():
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    from src.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.pronunciation_dictionaries import cmu_alphabet, ipa_alphabet
 
     model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format='onnx')
 
@@ -1127,7 +1127,7 @@ def model_comparison():
         # 'model_mailabs_pca_0.95_knn_10_w_US',
     ]
 
-    # from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
     # prod_model = charsiu_phone_forced_aligner(aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu')
 
     def stats_pronunciation_aspects(model):
@@ -1162,7 +1162,7 @@ def model_comparison():
         }
         return stats
 
-    # from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     # default_model_charsiu = charsiu_phone_forced_aligner(
     #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
@@ -1331,7 +1331,7 @@ if __name__ == "__main__":
 
     # pContrast_for_actor_recordings(target_phones='AO1')
 
-    # from src.charsiu_utils import charsiu_phone_forced_aligner
+    # from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     # default_model_charsiu = charsiu_phone_forced_aligner(
     #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
