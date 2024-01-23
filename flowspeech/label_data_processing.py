@@ -4,8 +4,8 @@ from glob import glob
 
 import pandas as pd
 
-from src.pronunciation_dictionaries import cmudict_dict
-from src.text_processing import (
+from flowspeech.pronunciation_dictionaries import cmudict_dict
+from flowspeech.text_processing import (
     cmu_ensure_phonetics_consistency,
     prefill_content,
 )

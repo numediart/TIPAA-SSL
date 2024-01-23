@@ -9,9 +9,9 @@ import librosa
 import pandas as pd
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
-from src.libri_phonetization_data import libri_phonetics_data
-from src.text_processing import prefill_for_sentence, remove_stress_annots
-from src.wav2vec2_utils import instances_per_frame, instances_per_phoneme
+from flowspeech.libri_phonetization_data import libri_phonetics_data
+from flowspeech.text_processing import prefill_for_sentence, remove_stress_annots
+from flowspeech.wav2vec2_utils import instances_per_frame, instances_per_phoneme
 
 
 def df_all_frames_to_X_y(df_all_frames):

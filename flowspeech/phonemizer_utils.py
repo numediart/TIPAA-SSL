@@ -4,12 +4,13 @@ print_memory_usage = lambda stage: print(
     stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
 )
 print_memory_usage('RAM - phonemizer_utils start')
+import numpy as np
 from phonemizer.backend import EspeakBackend
 from phonemizer.punctuation import Punctuation
 from phonemizer.separator import Separator
-from src.pronunciation_dictionaries import cmudict_dict
+
+from flowspeech.pronunciation_dictionaries import cmudict_dict
 from syllabipy.sonoripy import SonoriPy
-import numpy as np
 
 # https://bootphon.github.io/phonemizer/python_examples.html
 

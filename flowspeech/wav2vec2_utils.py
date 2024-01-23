@@ -1,29 +1,28 @@
-from tqdm import tqdm
-from transformers import (
-    Wav2Vec2Processor,
-    Wav2Vec2ForCTC,
-    Wav2Vec2FeatureExtractor,
-    Wav2Vec2Model,
-)
+import math
+
+# from flowspeech.phonetization import stress, unstress
+import os
+from itertools import groupby
 
 # from datasets import load_dataset
 import librosa
+import numpy as np
+import pandas as pd
 import torch
 
-
-import math
-import numpy as np
-
-# from src.phonetization import MAILABS_data, MLS_data
+# from flowspeech.phonetization import MAILABS_data, MLS_data
 from jiwer import wer
+from tqdm import tqdm
+from transformers import (
+    Wav2Vec2FeatureExtractor,
+    Wav2Vec2ForCTC,
+    Wav2Vec2Model,
+    Wav2Vec2Processor,
+)
 
-# from src.phonetization import stress, unstress
-import os
-import pandas as pd
-from src.text_processing import remove_stress_annots
-from itertools import groupby
+from flowspeech.text_processing import remove_stress_annots
 
-# from src.layer_extraction import get_last_hidden_state
+# from flowspeech.layer_extraction import get_last_hidden_state
 
 
 def get_last_hidden_state(s, fs, processor, model):
@@ -359,7 +358,7 @@ def use_tests():
         "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", output_hidden_states=True
     )
 
-    from src.libri_phonetization_data import libri_phonetics_data
+    from flowspeech.libri_phonetization_data import libri_phonetics_data
 
     df_t, df = libri_phonetics_data(data_set='dev-clean')
 
@@ -443,8 +442,8 @@ def use_tests():
     df_sample = compute_predictions_and_PER(df_sample)
 
     # -----------------------------
-    from src.wav2vec2_utils import instances_per_phoneme, plot_reduction
-    from src.libri_phonetization_data import libri_phonetics_data
+    from flowspeech.wav2vec2_utils import instances_per_phoneme, plot_reduction
+    from flowspeech.libri_phonetization_data import libri_phonetics_data
     from transformers import (
         Wav2Vec2Processor,
         Wav2Vec2ForCTC,

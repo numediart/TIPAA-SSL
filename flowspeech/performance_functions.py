@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from DL_speech_tech import (
+from flowspeech.DL_speech_tech import (
     StressCategory,
     default_model,
     phonemeContrast_from_formatted_phonetics_audio,

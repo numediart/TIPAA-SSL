@@ -5,15 +5,15 @@ from functools import wraps
 from flask import Response, abort, current_app
 from marshmallow import EXCLUDE, Schema, fields
 
-from DL_speech_tech import (
+from flowspeech.audio_processing import audio64_from_file
+from flowspeech.DL_speech_tech import (
     StressCategory,
     phonemeContrast_from_formatted_phonetics_audio,
     stress_from_formatted_phonetics,
 )
-from src.audio_processing import audio64_from_file
-from src.pronunciation_dictionaries import cmu_vowels
-from src.text_processing import check_phonemes, chunk_text, split_phonetics
-from src.wav2vec2_frame_prediction import AudioInput, AudioMode, AudioStatus
+from flowspeech.pronunciation_dictionaries import cmu_vowels
+from flowspeech.text_processing import check_phonemes, chunk_text, split_phonetics
+from flowspeech.wav2vec2_frame_prediction import AudioInput, AudioMode, AudioStatus
 
 success_messages = {
     "success",  # --> "speech"

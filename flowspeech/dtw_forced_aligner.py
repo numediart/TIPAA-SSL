@@ -6,7 +6,7 @@ import librosa
 import numpy as np
 import pandas as pd
 
-from src.text_processing import group_consecutive_duplicates, remove_stress_annots
+from flowspeech.text_processing import group_consecutive_duplicates, remove_stress_annots
 
 
 # https://stackoverflow.com/questions/51269456/pandas-delete-consecutive-duplicates-but-keep-the-first-and-last-value

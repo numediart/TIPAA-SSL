@@ -3,7 +3,7 @@ import streamlit as st
 from st_audiorec import st_audiorec
 
 from content_tools.utils import check_password
-from DL_speech_tech import (
+from flowspeech.DL_speech_tech import (
     DEFAULT_MAX_PER,
     DEFAULT_MAX_PER_ONE_SYLL,
     DEFAULT_POST_PROBA_THRESHOLD,

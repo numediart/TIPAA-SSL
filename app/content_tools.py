@@ -2,7 +2,7 @@ from flask.views import MethodView
 from flask_smorest import Blueprint
 from marshmallow import Schema, fields, validate
 
-from src.text_processing import prefill_content
+from flowspeech.text_processing import prefill_content
 
 bp = Blueprint(
     "content-tools", "content-tools", url_prefix="/content", description="content tools"

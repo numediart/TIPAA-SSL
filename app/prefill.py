@@ -13,8 +13,12 @@ from marshmallow import Schema, fields
 
 # from flask_apispec import marshal_with, doc, use_kwargs
 
-from src.text_processing import generate_prefill_csv, prefill_for_sentence, syllables_dfs
-from server.utils import kwargs_def, check_schema, debug_only, access_property_error
+from flowspeech.text_processing import (
+    generate_prefill_csv,
+    prefill_for_sentence,
+    syllables_dfs,
+)
+from app.utils import kwargs_def, check_schema, debug_only, access_property_error
 
 # from server.upload import upload_path
 upload_path = "./upload_files/"

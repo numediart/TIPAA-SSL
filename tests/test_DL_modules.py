@@ -3,7 +3,8 @@ import base64
 import pandas as pd
 from linetimer import CodeTimer
 
-from DL_speech_tech import (
+from flowspeech.audio_processing import read_audio_file
+from flowspeech.DL_speech_tech import (
     StressCategory,
     compute_stress_score,
     default_model,
@@ -11,22 +12,21 @@ from DL_speech_tech import (
     start_end_contrast_from_formatted_phonetics_audio,
     stress_from_formatted_phonetics,
 )
-from performance_functions import (
+from flowspeech.label_data_processing import actor_recordings
+from flowspeech.performance_functions import (
     final_ed_from_audiobook_data,
     final_s_from_audiobook_data,
     pContrast_on_synth_words,
     stress_GE_performance_test,
 )
-from src.audio_processing import read_audio_file
-from src.label_data_processing import actor_recordings
-from src.pronunciation_dictionaries import cmu_vowels
-from src.text_processing import (
+from flowspeech.pronunciation_dictionaries import cmu_vowels
+from flowspeech.text_processing import (
     chunk_text,
     get_augmented_mfa_dict,
     prefill_for_sentence,
     remove_stress_annots,
 )
-from src.wav2vec2_frame_prediction import AudioMode
+from flowspeech.wav2vec2_frame_prediction import AudioMode
 
 
 def a_test_pConstrast():
@@ -46,7 +46,7 @@ def a_test_termination_contrast():
 
 
 def DL_speech_tech_functions(model=default_model):
-    from src.label_data_processing import actor_recordings
+    from flowspeech.label_data_processing import actor_recordings
 
     df = actor_recordings()
 
@@ -173,7 +173,7 @@ def test_DL_speech_tech_functions_pipeline():
 # does not work if not charsiu model and/or repo not cloned (therfore, not working on gihub action)
 def a_test_DL_speech_tech_functions_charsiu():
     # initialize model
-    from src.charsiu_utils import charsiu_phone_forced_aligner
+    from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     default_model_charsiu = charsiu_phone_forced_aligner(
         aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'

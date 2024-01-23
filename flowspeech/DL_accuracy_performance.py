@@ -11,14 +11,14 @@ import seaborn as sns
 from scipy.stats import gaussian_kde
 from tqdm import tqdm
 
-from DL_speech_tech import (
+from flowspeech.DL_speech_tech import (
     DEFAULT_POST_PROBA_THRESHOLD,
     default_model,
     post_analysis,
     start_end_contrast_from_formatted_phonetics_audio,
     validate_recording,
 )
-from performance_functions import (
+from flowspeech.performance_functions import (
     compute_predictions,
     count_values,
     final_ed_for_actor_recordings,

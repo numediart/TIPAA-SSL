@@ -1,32 +1,36 @@
-from flask import request
+import json
+import sys
+import traceback
 
 # from flask_apispec import marshal_with, doc, use_kwargs
-from flask import Response  # , Blueprint
-from flask_smorest import Blueprint
+from flask import (
+    Response,  # , Blueprint
+    request,
+)
 from flask.views import MethodView
-from marshmallow import fields, Schema, EXCLUDE
+from flask_smorest import Blueprint
+from marshmallow import EXCLUDE, Schema, fields
 
-import json
-from DL_speech_tech import (
+from flowspeech.DL_speech_tech import (
     StressCategory,
     phonemeContrast_from_formatted_phonetics_audio,
     start_end_contrast_from_formatted_phonetics_audio,
 )
-from src.pronunciation_dictionaries import cmu_vowels, cmu_consonants
+from flowspeech.pronunciation_dictionaries import cmu_consonants, cmu_vowels
+from flowspeech.wav2vec2_frame_prediction import AudioMode
 
 # from app_definition import app
-from server.utils import (
-    kwargs_def,
+from app.utils import (
     check_schema,
+    contrast_responseSchema,
     default_example,
+    kwargs_def,
     request_contrast,
     request_stress_v2,
-    contrast_responseSchema,
-    syl_contrast_responseSchema,
     sentence_stress_responseSchema_v2,
+    syl_contrast_responseSchema,
     word_stress_responseSchema_v2,
 )
-from src.wav2vec2_frame_prediction import AudioMode
 
 bp = Blueprint(
     "DL_modules_v2", "DL_modules_v2", url_prefix="/", description="DL_modules_v2"
@@ -34,9 +38,6 @@ bp = Blueprint(
 
 
 d = default_example()
-
-
-import sys, traceback
 
 
 @bp.app_errorhandler(500)

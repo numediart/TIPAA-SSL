@@ -1,19 +1,19 @@
-from src.pronunciation_dictionaries import cmu_alphabet, cmu_stressed_alphabet
+from flowspeech.pronunciation_dictionaries import cmu_alphabet, cmu_stressed_alphabet
 import os
 import numpy as np
 
-from src.audio_processing import read_audio_file
-from src.text_processing import remove_stress_annots
+from flowspeech.audio_processing import read_audio_file
+from flowspeech.text_processing import remove_stress_annots
 
 
 def test_wav2vec2_frame_prediction(n=10):
-    from src.label_data_processing import actor_recordings
+    from flowspeech.label_data_processing import actor_recordings
 
     df = actor_recordings()
 
     df_sample = df.sample(n, random_state=0)
 
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     # --------------- Inference demo --------------------
     model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format="onnx")
@@ -77,7 +77,7 @@ def test_mfa_align(
     fs=16000,
     out_json='data/align_test.json',
 ):
-    from src.label_data_processing import actor_recordings
+    from flowspeech.label_data_processing import actor_recordings
     from scripts.mfa_utils import prepare_files, launch_mfa
     import shutil
     import ast

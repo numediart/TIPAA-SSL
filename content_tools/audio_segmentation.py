@@ -10,7 +10,7 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer
 
 import soundfile as sf
 import sys
-from DL_speech_tech import StressCategory
+from flowspeech.DL_speech_tech import StressCategory
 from wav2vec2_frame_prediction import AudioMode
 
 sys.path.append('./')
@@ -645,7 +645,7 @@ def analyze_files_and_build_transcripts(
 
 
 def speech_tech_on_segmented_audio(segmentation_df, file_dict):
-    from DL_speech_tech import stress_from_formatted_phonetics
+    from flowspeech.DL_speech_tech import stress_from_formatted_phonetics
     from src.text_processing import prefill_for_sentence
 
     audio_files = [el for el in file_dict if not el.endswith('.xlsx')]

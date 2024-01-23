@@ -7,11 +7,11 @@ import pandas as pd
 import requests
 from tqdm import tqdm
 
-from DL_accuracy_performance import count_values, plot_confusion_results
-from flask_server import app
-from src.audio_processing import audio64_from_file
-from src.label_data_processing import actor_recordings, build_user_data_df
-from src.text_processing import chunk_text, prefill_for_sentence
+from flowspeech.audio_processing import audio64_from_file
+from flowspeech.DL_accuracy_performance import count_values, plot_confusion_results
+from flowspeech.label_data_processing import actor_recordings, build_user_data_df
+from flowspeech.text_processing import chunk_text, prefill_for_sentence
+from app import app
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -379,7 +379,7 @@ def test_audio64(
     base_url='http://localhost:8000',
     client=app.test_client(),
 ):
-    from src.text_processing import prefill_for_sentence
+    from flowspeech.text_processing import prefill_for_sentence
 
     text = "I would love to go to ireland"
     r = {}
@@ -395,7 +395,7 @@ def test_audio64(
 
 
 def test_empty(base_url='http://localhost:8000', client=app.test_client()):
-    from src.text_processing import prefill_for_sentence
+    from flowspeech.text_processing import prefill_for_sentence
 
     import io
 
@@ -586,12 +586,12 @@ def use_tests():
     df_sentence_stress[l > 50].text.iloc[0]
     df_sentence_stress[l > 50].iloc[0]
 
-    from src.audio_processing import audio64_from_file
+    from flowspeech.audio_processing import audio64_from_file
 
     df_sentence_stress[l > 50].iloc[0].cmu_phonetics
     audio64 = audio64_from_file(df_sentence_stress[l > 50].iloc[0].audio_file_url)
 
-    # from src.text_processing import chunk_text
+    # from flowspeech.text_processing import chunk_text
     r = df_sentence_stress[l > 50].iloc[0]
 
     route = '/v2/w2v/stress/'
