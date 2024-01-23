@@ -11,8 +11,7 @@ from flask.views import MethodView
 from flask_smorest import Blueprint
 from marshmallow import Schema, fields
 
-# from app_definition import app
-from utils import (
+from app.utils import (
     check_schema,
     contrast_responseSchema,
     default_example,
@@ -23,7 +22,6 @@ from utils import (
     syl_contrast_responseSchema,
     word_stress_responseSchema_v2,
 )
-
 from flowspeech.DL_speech_tech import (
     StressCategory,
     phonemeContrast_from_formatted_phonetics_audio,

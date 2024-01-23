@@ -11,17 +11,16 @@ from flowspeech.audio_processing import audio64_from_file
 from flowspeech.DL_accuracy_performance import count_values, plot_confusion_results
 from flowspeech.label_data_processing import actor_recordings, build_user_data_df
 from flowspeech.text_processing import chunk_text, prefill_for_sentence
-from app import app
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def call_prefill_for_sentence(
     sentence,
+    client,
     mode="CMU",
     lang="en_US",
     base_url='http://localhost:8000',
-    client=app.test_client(),
 ):
     url = base_url + "/prefill_from_phrase"
     data = {"phrase": sentence, "mode": mode, "lang": lang}
@@ -375,9 +374,9 @@ def test_stress_detection(
 
 
 def test_audio64(
+    client,
     path='data/audio_recordings/SS_1_i_would_love_to_go_to_ireland.m4a',
     base_url='http://localhost:8000',
-    client=app.test_client(),
 ):
     from flowspeech.text_processing import prefill_for_sentence
 
@@ -394,7 +393,7 @@ def test_audio64(
     assert res.status_code == 200
 
 
-def test_empty(base_url='http://localhost:8000', client=app.test_client()):
+def test_empty(client, base_url='http://localhost:8000'):
     from flowspeech.text_processing import prefill_for_sentence
 
     import io

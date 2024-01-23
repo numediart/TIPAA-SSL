@@ -10,10 +10,9 @@ from Bio import pairwise2
 from linetimer import CodeTimer
 from nltk.metrics.distance import edit_distance as levenshtein_distance
 
-from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
-from src.audio_processing import getIntensity, getIntonation, normalize
-from src.dtw_forced_aligner import dtw_forced_aligner
-from src.pronunciation_dictionaries import (
+from flowspeech.audio_processing import getIntensity, getIntonation, normalize
+from flowspeech.dtw_forced_aligner import dtw_forced_aligner
+from flowspeech.pronunciation_dictionaries import (
     cmu_alphabet,
     cmu_consonants,
     cmu_diphtongs,
@@ -26,7 +25,7 @@ from src.pronunciation_dictionaries import (
     ipa_to_gibberish,
     ipa_vowels,
 )
-from src.text_processing import (
+from flowspeech.text_processing import (
     cmu_ensure_phonetics_consistency,
     count_syllables,
     drop_consecutive_duplicate_elements,
@@ -38,7 +37,7 @@ from src.text_processing import (
     split_phonetics_to_phones,
     unstress,
 )
-from src.wav2vec2_frame_prediction import (
+from flowspeech.wav2vec2_frame_prediction import (
     DEFAULT_MAX_SPEECH_RATE,
     DEFAULT_MIN_SPEECH_RATE,
     DEFAULT_SILENCE_THRESHOLD,
@@ -49,6 +48,7 @@ from src.wav2vec2_frame_prediction import (
     Wav2Vec2ForFramePrediction,
     extract_word_from_df_segmented,
 )
+from scripts.mfa_utils import unicode_chars_to_words, words_to_unicode_chars
 
 default_model = Wav2Vec2ForFramePrediction(cmu_alphabet, w2v2_model_format="onnx")
 default_model.load(name="model_mailabs_equilibrated_pca_95_knn_10_w_no_CH_JH")
@@ -1390,10 +1390,10 @@ def multiple_aspect_from_formatted_phonetics_audio(
 def use_tests():
     # from DL_speech_tech import *
 
-    from src.audio_processing import read_audio_file
-    from src.label_data_processing import actor_recordings, synth_words_data
-    from src.text_processing import prefill_for_sentence, remove_stress_annots
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.audio_processing import read_audio_file
+    from flowspeech.label_data_processing import actor_recordings, synth_words_data
+    from flowspeech.text_processing import prefill_for_sentence, remove_stress_annots
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     default_model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet, w2v2_model_format="onnx")
     default_model_ipa.load(name='model_mailabs_pca_95_knn_10_w_ipa')
@@ -1404,7 +1404,7 @@ def use_tests():
         name='model_mailabs_equilibrated_stressed_pca_95_knn_10_cos_w'
     )
 
-    from src.label_data_processing import (
+    from flowspeech.label_data_processing import (
         actor_recordings,
         final_s_artificial_data,
         synth_words_data,
@@ -1447,7 +1447,10 @@ def use_tests():
         to_gibberish=cmu_to_gibberish,
     )
 
-    from src.pronunciation_dictionaries import get_augmented_mfa_dict, mfa_to_display_ipa
+    from flowspeech.pronunciation_dictionaries import (
+        get_augmented_mfa_dict,
+        mfa_to_display_ipa,
+    )
 
     mfa_gb = get_augmented_mfa_dict("en_GB")
     mfa_us = get_augmented_mfa_dict("en_US")
@@ -1804,7 +1807,7 @@ def use_tests():
 
     prefill_for_sentence('expected', mode='MFA_IPA')['cmu_phonetics']
 
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     model_ipa = Wav2Vec2ForFramePrediction(ipa_alphabet)
     model_ipa.load(name='model_mailabs_pca_0.95_knn_10_cos_w_UK_US_FR_ES')

@@ -11,14 +11,6 @@ from flask.views import MethodView
 from flask_smorest import Blueprint
 from marshmallow import EXCLUDE, Schema, fields
 
-from flowspeech.DL_speech_tech import (
-    StressCategory,
-    phonemeContrast_from_formatted_phonetics_audio,
-    start_end_contrast_from_formatted_phonetics_audio,
-)
-from flowspeech.pronunciation_dictionaries import cmu_consonants, cmu_vowels
-from flowspeech.wav2vec2_frame_prediction import AudioMode
-
 # from app_definition import app
 from app.utils import (
     check_schema,
@@ -31,6 +23,13 @@ from app.utils import (
     syl_contrast_responseSchema,
     word_stress_responseSchema_v2,
 )
+from flowspeech.DL_speech_tech import (
+    StressCategory,
+    phonemeContrast_from_formatted_phonetics_audio,
+    start_end_contrast_from_formatted_phonetics_audio,
+)
+from flowspeech.pronunciation_dictionaries import cmu_consonants, cmu_vowels
+from flowspeech.wav2vec2_frame_prediction import AudioMode
 
 bp = Blueprint(
     "DL_modules_v2", "DL_modules_v2", url_prefix="/", description="DL_modules_v2"

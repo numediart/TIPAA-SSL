@@ -1,20 +1,21 @@
+import ast
+import csv
 import os
-from tqdm import tqdm
-from glob import glob
 import shutil
+from glob import glob
 from pathlib import Path
+
+import librosa
+import numpy as np
+import pandas as pd
+import soundfile as sf
 
 # from src.libri_phonetization_data import get_all_phone_with_timings
 import textgrid
-import numpy as np
-import librosa
-from src.text_processing import unstress
-from src.text_processing import remove_stress_annots
-import pandas as pd
-import csv
-import ast
-import soundfile as sf
 from Bio import pairwise2
+from tqdm import tqdm
+
+from flowspeech.text_processing import remove_stress_annots, unstress
 
 
 def get_all_phone_with_timings(
