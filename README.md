@@ -4,20 +4,22 @@ Flowchase's speech tech
 
 ## Structure of the repository
 
-- DL_speech_tech is the "center" of the repo and contains the pronunciation aspect function with intermediary steps that are common between different pronunciation aspects
-  - It depends on "src/" folder which contains the part of the code that is used "online" (used in production behind the API). It contains:
-    - text and phonetics processing, pronunciation dictionaries, audio processing, ...
-    - wav2vec2_frame_prediction that contins a class that wraps the model pipeline of wav2vec2 finetuned model, dimension reduction, frame classification, and dtw forced alignment (itself defined in another class)
-    - some data processing and loading functions and other utilities
-- server folder contains the definition of the API endpoints that call the DL_speech_tech functions
-- nginx is a docker image of a server making the link between flask and the internet (just for deployment)
-- data folder containing different sets of data tha has to be populated (see instructions below)
-- scripts folder contains scripts that are used "offline", i.e. not used behind the API endpoints. E.g. script for
+- The `flowspeech` package contains the actual implementation of the tech:
+  - `DL_speech_tech` contains the pronunciation aspect function with intermediary steps that are common between different pronunciation aspects
+  - text and phonetics processing, pronunciation dictionaries, audio processing, ...
+  - `wav2vec2_frame_prediction` that contains a class that wraps the model pipeline of wav2vec2 finetuned model, dimension reduction, frame classification, and dtw forced alignment (itself defined in another class)
+  - some data processing and loading functions and other utilities
+- `app` contains the definition of the API endpoints that call the `DL_speech_tech` functions
+- `nginx` contains the configuration and Docker files for the deployment server
+- `data` contains different datasets, and also has to be populated after cloning the repository (see [here](https://www.notion.so/flowchase/Speech-datasets-818af2e4ea1749469194642f7226c0ff))
+- `models` contains trained model checkpoints for the part of the processing pipeline which we train ourselves (dimensionality reduction + frame classifier)
+- `syllabipy` contains a tweaked version of the syllabipy package, used to syllabify sentences
+- `scripts` folder contains scripts that are used "offline", i.e. not used behind the API endpoints. E.g. script for
   - download pretrained models
   - extract forced alignments, i.e. time-aligned phonetic transcriptions, thanks to "Montreal Forced Aligner" (MFA)
   - experiment different frame reduction and frame classifiers (where a frame is an output vector of the wav2vec2 model)
   - ...
-- content_tools contains web apps related to exploring phonetic dictionaries, using linguistic data extraction (phonetization + syllabification in text and phonetics) and other related content processing tools
+- `content_tools` contains a simple streamlit-based web interface related to exploring phonetic dictionaries, using linguistic data extraction (phonetization + syllabification in text and phonetics) and other related content processing tools
 
 ## Web service
 
@@ -59,6 +61,7 @@ To setup the micromamba environment, you first have to install micromamba: https
 ```
 micromamba create -n flowspeech_mm -f env.yml
 micromamba activate flowspeech_mm
+pip install -e .
 ```
 
 ### Notes for MacOS and Apple M1/... chips

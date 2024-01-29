@@ -53,5 +53,7 @@ RUN mfa model download acoustic english_us_arpa &&\
 
 WORKDIR /home/mambauser/code
 
+RUN pip install -e .
+
 CMD ["bash", "run_server.sh"]
 EXPOSE 8000
