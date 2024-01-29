@@ -28,14 +28,13 @@ RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> \
 /etc/sudoers
 
 USER mambauser
+RUN micromamba config set extract_threads 1
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 WORKDIR $HOME
 
-RUN micromamba config set extract_threads 1
-
-COPY --chown=$MAMBA_USER:$MAMBA_USER env.yml /tmp/env.yml
-RUN micromamba install -y -n base -f /tmp/env.yml \
-    && micromamba clean --all --yes && pip cache purge
+COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml /tmp/conda-lock.yml
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    micromamba install -y -n base -f /tmp/conda-lock.yml
 
 RUN python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
 RUN python -c "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')"
@@ -51,9 +50,11 @@ RUN mfa model download acoustic english_us_arpa &&\
     mfa model download g2p spanish_latin_america_mfa && \
     mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
 
+# now we copy the app code
 WORKDIR /home/mambauser/code
+COPY . .
 
 RUN pip install -e .
 
-CMD ["bash", "run_server.sh"]
-EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "/bin/bash"]
+CMD ["run_server.sh"]

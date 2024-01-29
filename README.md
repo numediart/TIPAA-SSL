@@ -95,21 +95,9 @@ conda env config vars set PHONEMIZER_ESPEAK_LIBRARY=/usr/local/lib/libespeak.dyl
 
 ## Test modules
 
-The unit tests should work after these step
-
-```
-
-pytest test_DL_modules.py
-pytest test_DL_api.py
-pytest test_models.py
-
-```
+The unit tests should work after these step: just run `pytest`
 
 ## Download datasets
 
 To test the tech's performance, develop new features, ..., you will need speech datasets.
 Have a look at this page for instructions to obtain them: https://www.notion.so/flowchase/Speech-datasets-818af2e4ea1749469194642f7226c0ff
-
-```
-
-```

@@ -128,3 +128,14 @@ docker logs flaskapp > docker_logs.txt # to get all history, too long if running
 docker logs flaskapp --tail=100 # to print last history
 docker compose logs --tail=20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
 ```
+
+# Bootstrap the environment
+
+The environment is locked to ensure reproducibility. In other to start from scratch using the base `env.yml`, run the following:
+
+```
+docker run --rm --user 0 -v "$(pwd):/tmp" \
+   mambaorg/micromamba:1.5.6 /bin/bash -c "\
+     apt-get update && apt-get install --no-install-recommends -y pipx && \
+     pipx run conda-lock -p osx-64 -p linux-64 -f env.yml --without-cuda"
+```
