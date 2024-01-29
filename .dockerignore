@@ -1,8 +1,12 @@
+.vscode/**
+.*/**
+*.png
+*.csv*
+.streamlit/**
 librispeech_alignments/**
 __pycache__/**
 scripts/__pycache__/**
 scripts/synth_audio/**
-.vscode/**
 audio_recordings/edAnalysis/**
 @REM audio_recordings/**
 file_selection/**
@@ -21,12 +25,11 @@ results/**
 @REM data/**
 data/*/**
 syllabipy/__pycache__/**
-.*/**
 pretrained_models/**
 bin/**
 utils/__pycache__/**
 nltk_data/**
 non_v2/**
-*.png
-*.csv*
-.streamlit/**
+hf_models/**
+flowspeech/__pycache__/**
+models/**

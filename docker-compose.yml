@@ -6,10 +6,8 @@ services:
     platform: linux/amd64
     build: ./
     volumes:
-      # Just specify a path and let the Engine create a volume
       - ./:/home/mambauser/code
     container_name: flaskapp
-    # network_mode: host
     init: true
     tty: true
     ports:
@@ -22,7 +20,6 @@ services:
     environment:
       - SERVER_NAME=0.0.0.0
     restart: always
-    # network_mode: host
     init: true
     tty: true
     ports:

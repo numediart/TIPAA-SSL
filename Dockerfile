@@ -29,26 +29,26 @@ RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> \
 
 USER mambauser
 RUN micromamba config set extract_threads 1
+# make sure the conda env is active for RUN commands
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
-WORKDIR $HOME
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml /tmp/conda-lock.yml
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     micromamba install -y -n base -f /tmp/conda-lock.yml
 
-RUN python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
-RUN python -c "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')"
-# RUN mkdir /home/mambauser/hf_models && \
-#     curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o /home/mambauser/hf_models/last_hidden_state.quant.onnx
-COPY ./hf_models/last_hidden_state.quant.onnx /home/mambauser/hf_models/last_hidden_state.quant.onnx
-
 RUN mkdir -p /home/mambauser/mfa
 ENV MFA_ROOT_DIR=/home/mambauser/mfa
 RUN mfa model download acoustic english_us_arpa &&\
     mfa model download dictionary english_us_arpa &&\
-    mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa &&\
-    mfa model download g2p spanish_latin_america_mfa && \
     mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
+# RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa &&\
+#     mfa model download g2p spanish_latin_america_mfa
+
+RUN python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
+RUN python -c "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')"
+# RUN mkdir /home/mambauser/hf_models && \
+#     curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o /home/mambauser/hf_models/last_hidden_state.quant.onnx
+# COPY ./hf_models/last_hidden_state.quant.onnx /home/mambauser/hf_models/last_hidden_state.quant.onnx
 
 # now we copy the app code
 WORKDIR /home/mambauser/code
@@ -56,5 +56,5 @@ COPY . .
 
 RUN pip install -e .
 
-ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "/bin/bash"]
-CMD ["run_server.sh"]
+# no entrypoint, we use micromamba's one to activate the conda env
+CMD ["/bin/bash", "run_server.sh"]
