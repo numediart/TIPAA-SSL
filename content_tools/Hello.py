@@ -27,7 +27,7 @@ from utils import check_password
 import streamlit as st
 
 # with st.echo("below"):
-from st_pages import Page, add_page_title, show_pagesheck_password
+from st_pages import Page, add_page_title, show_pages
 
 
 def run():
