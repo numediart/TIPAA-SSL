@@ -58,6 +58,9 @@ To setup the micromamba environment, you first have to install micromamba: https
 "${SHELL}" <(curl -L micro.mamba.pm/install.sh)
 ```
 
+Then, create the environment (this will install all dependencies),
+activate it, and finally install the project.
+
 ```
 micromamba create -n flowspeech_mm -f env.yml
 micromamba activate flowspeech_mm
@@ -120,3 +123,5 @@ The following have not yet been implemented but should be:
 - Use [pre-commit](https://pre-commit.com/) to automatically run the linter and formatter whenever a commit is done (to avoid relying on the VSCode extensions).
   The difficulty is that `pre-commit` needs to be installed, and `git commit` always be ran where `pre-commit` is installed.
 - Perhaps using a tool such as [poetry](https://python-poetry.org/) for dependency management, but this [doesn't play super nice with conda](https://stackoverflow.com/questions/70851048/does-it-make-sense-to-use-conda-poetry).
+- The code often assumes that modules are imported or scripts are from the project's root folder. If not, files under `data/` or `models/` will not be found.
+  It should be easy to make it independent of the location by finding the root folder of the installed `flowspeech` package.

@@ -13,6 +13,8 @@ cd flowspeech
 # git checkout v1.3.0
 ```
 
+Make sure the quantized ONNX model is located in `./hf_models`.
+
 Build docker containers then run them:
 
 ```

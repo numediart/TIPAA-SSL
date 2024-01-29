@@ -1,7 +1,9 @@
 version: "3"
 
+name: content-tools
+
 services:
-  flowspeech-ct:
+  flaskapp:
     # this is needed to run the app on apple silicon
     platform: linux/amd64
     build: ./
@@ -15,11 +17,10 @@ services:
     restart: on-failure
     command: ["bash", "content_tools/run_content_tools.sh"]
 
-  nginx-ct:
+  nginx:
     build:
       context: ./nginx
       dockerfile: ./Dockerfile_streamlit
-    container_name: nginx-ct
     environment:
       - SERVER_NAME=0.0.0.0
     restart: always
