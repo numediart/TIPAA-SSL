@@ -32,7 +32,7 @@ https://docs.docker.com/compose/install/
 Restart container:
 
 ```
-docker compose restart flaskapp
+docker compose restart flowspeech
 ```
 
 or
@@ -63,13 +63,13 @@ https://stackoverflow.com/questions/1223354/undo-git-pull-how-to-bring-repos-to-
 When you want to update the app with changes in code (no new dependencies):
 
 ```
-git pull && docker compose restart flaskapp
+git pull && docker compose restart flowspeech
 ```
 
 Rebuild and launch right away:
 
 ```
-docker compose up -d --no-deps --build flaskapp
+docker compose up -d --no-deps --build flowspeech
 ```
 
 ## github actions resources
@@ -92,7 +92,8 @@ Same for downloading code and models, but run `docker compose -f docker-compose_
 
 Add a `.streamlit/secrets.toml` file containing `password="..."`. The password is stored on 1password.
 
-Then `docker compose -f docker-compose_streamlit.yml up -d`
+Then `docker compose -f docker-compose_streamlit.yml up -d`. The streamlit app will be reachable locally
+as [http://localhost:8001].
 
 # Additional notes:
 
@@ -108,11 +109,10 @@ To remove all images:
 docker system prune -a
 ```
 
-If you just want to use it locally, without nginx server, you can build only flowspeech image:
+If you just want to use it locally, without nginx server, you can build and run only the flowspeech image:
 
 ```
-docker build -t flowspeech .
-docker run -d -p 8000:8000 flowspeech
+docker compose up --build -d flowspeech
 ```
 
 Connect to a bash terminal without affecting the running state.
@@ -124,8 +124,8 @@ docker exec -it flaskapp bash
 To show terminal output:
 
 ```
-docker logs flaskapp > docker_logs.txt # to get all history, too long if running for a while
-docker logs flaskapp --tail=100 # to print last history
+docker logs flowspeech > docker_logs.txt # to get all history, too long if running for a while
+docker logs flowspeech --tail=100 # to print last history
 docker compose logs --tail=20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
 ```
 

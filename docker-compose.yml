@@ -1,13 +1,14 @@
 version: "3"
 
 services:
-  flaskapp:
+  flowspeech:
     # this is needed to run the app on apple silicon
     platform: linux/amd64
     build: ./
     volumes:
       - ./:/home/mambauser/code
-    container_name: flaskapp
+    image: flowspeech
+    container_name: flowspeech
     init: true
     tty: true
     ports:

@@ -34,9 +34,9 @@ from flowspeech.text_processing import remove_grouping_hyphens
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MIN_SPEECH_RATE = 1  # syll/s
-DEFAULT_MAX_SPEECH_RATE = 8  # syll/s
-DEFAULT_SILENCE_THRESHOLD = 40  # dBFS
+DEFAULT_MIN_SPEECH_RATE = 1.0  # syll/s
+DEFAULT_MAX_SPEECH_RATE = 8.0  # syll/s
+DEFAULT_SILENCE_THRESHOLD = 40.0  # dBFS
 
 
 # StrEnum in python 3.11

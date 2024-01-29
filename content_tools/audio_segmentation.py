@@ -14,7 +14,7 @@ from flowspeech.DL_speech_tech import StressCategory
 from wav2vec2_frame_prediction import AudioMode
 
 sys.path.append('./')
-from src.audio_processing import read_audio_file
+from flowspeech.audio_processing import read_audio_file
 
 from tqdm import tqdm
 import json
@@ -646,7 +646,7 @@ def analyze_files_and_build_transcripts(
 
 def speech_tech_on_segmented_audio(segmentation_df, file_dict):
     from flowspeech.DL_speech_tech import stress_from_formatted_phonetics
-    from src.text_processing import prefill_for_sentence
+    from flowspeech.text_processing import prefill_for_sentence
 
     audio_files = [el for el in file_dict if not el.endswith('.xlsx')]
     xlsx_files = [el for el in file_dict if el.endswith('.xlsx')]

@@ -1,9 +1,9 @@
-import streamlit as st
+import io
+
 import pandas as pd
-
-
-from utils import formatted_cmudict_df as df
+import streamlit as st
 from utils import check_password
+from utils import formatted_cmudict_df as df
 
 filters_df = pd.DataFrame(columns=['Column', 'Operation', 'Value'])
 
@@ -18,9 +18,6 @@ def apply_filters(df, filters_df):
             mask = ~mask
         df = df[mask]
     return df
-
-
-import io
 
 
 # Create a main function

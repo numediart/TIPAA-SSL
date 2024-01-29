@@ -23,12 +23,11 @@ from utils import check_password
 # from audio_segmentation import *
 # from process_data_entry_interface_output import *
 
-from pathlib import Path
 
 import streamlit as st
 
 # with st.echo("below"):
-from st_pages import Page, add_page_title, show_pages
+from st_pages import Page, add_page_title, show_pagesheck_password
 
 
 def run():

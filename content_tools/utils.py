@@ -11,37 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os, psutil
-
-print_memory_usage = lambda stage: print(
-    stage + ": " + str(psutil.Process(os.getpid()).memory_info().rss / 1024**2)
-)
-
-
-import streamlit as st
 import inspect
 import textwrap
 
+import streamlit as st
 
-import sys
-
-sys.path.append('./')
-print_memory_usage('RAM - streamlit utils, before loading')
-from src.text_processing import prefill_content, prefill_for_sentence
-
-print_memory_usage('RAM - streamlit utils, after loading text_processing')
-from src.pronunciation_dictionaries import cmu_reducer, get_formatted_cmudict
-
-print_memory_usage('RAM - streamlit utils, after loading pronunciation_dictionaries')
-
-from src.audio_processing import read_audio_file
+from flowspeech.audio_processing import read_audio_file
+from flowspeech.pronunciation_dictionaries import cmu_reducer, get_formatted_cmudict
+from flowspeech.text_processing import prefill_content, prefill_for_sentence
 
 formatted_cmudict_df = get_formatted_cmudict()
-print_memory_usage('RAM - streamlit utils, after formatted_cmudict_df')
-
-print_memory_usage(
-    'RAM - streamlit utils, after DL_speech_tech.multiple_aspect_from_formatted_phonetics_audio'
-)
 
 
 @st.cache_resource

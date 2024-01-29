@@ -1,20 +1,20 @@
-import streamlit as st
+import os
+import shutil
+import uuid
+import zipfile
+from datetime import datetime
+from glob import glob
 
-st.set_page_config(page_icon="✂️", page_title="Audio Segmentation")
 import pandas as pd
+import streamlit as st
 from audio_segmentation import (
     analyze_files_and_build_transcripts,
     extract_zip_to_dict,
     reconstruct_zip_from_dict,
 )
-from glob import glob
-import zipfile, os
-
-from datetime import datetime
-import uuid
-import shutil
-
 from utils import check_password, get_model
+
+st.set_page_config(page_icon="✂️", page_title="Audio Segmentation")
 
 model_name = "hf_models/facebook/wav2vec2-base-960h"
 
