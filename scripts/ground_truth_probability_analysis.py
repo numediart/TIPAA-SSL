@@ -3,10 +3,11 @@
 import argparse
 import logging
 from pathlib import Path
-import numpy as np
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
+import sklearn.metrics
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -67,12 +68,12 @@ def plot_posterior_proba_distributions(model, results_df, output_folder="probas_
 
     annot_labels = np.vectorize(lambda x: f"{x:.1f}" if x > 0.2 else "")(proba_matrix)
 
-    fig, ax = plt.subplots(figsize=(15, 15))
-    sns.heatmap(proba_matrix, ax=ax, annot=annot_labels, fmt="")
+    fig, ax = plt.subplots(figsize=(12, 12))
+    sns.heatmap(proba_matrix, ax=ax, annot=annot_labels, fmt="", linewidth=0.5)
 
     ax.set_xticks(np.arange(n_phones) + 0.5, model.alphabet_with_silence)
-    ax.set_yticks(np.arange(n_phones) + 0.5, model.alphabet_with_silence)
     ax.set_xlabel("Detected phone")
+    ax.set_yticks(np.arange(n_phones - 1) + 0.5, model.alphabet)
     ax.set_ylabel("True phone")
 
     fig.savefig(output_folder + "/proba_matrix.png")
@@ -90,6 +91,32 @@ def plot_ground_truth_proba_distribution(results_df, output_folder="probas_actor
             kind="hist",
         )
         g.savefig(output_folder + f"/GT_proba_distribution_{label}.png")
+
+
+def plot_phone_detection_confusion_matrix(
+    model, results_df, output_folder="probas_actors"
+):
+    confusion_matrix = sklearn.metrics.confusion_matrix(
+        results_df.phones,
+        results_df.pred_phones_audio,
+        normalize="true",
+        labels=model.alphabet_with_silence,
+    )
+    # remove the [SIL] token from the true labels
+    confusion_matrix = confusion_matrix[:-1, :]
+
+    n_phones = len(model.p_to_id)
+    annot_labels = np.vectorize(lambda x: f"{x:.1f}" if x > 0.2 else "")(confusion_matrix)
+
+    fig, ax = plt.subplots(figsize=(12, 12))
+    sns.heatmap(confusion_matrix, ax=ax, annot=annot_labels, fmt="", linewidth=0.5)
+
+    ax.set_xticks(np.arange(n_phones) + 0.5, model.alphabet_with_silence)
+    ax.set_xlabel("Detected phone")
+    ax.set_yticks(np.arange(n_phones - 1) + 0.5, model.alphabet)
+    ax.set_ylabel("True phone")
+
+    fig.savefig(output_folder + "/confusion_matrix.png")
 
 
 def main():
@@ -124,7 +151,11 @@ def main():
 
     # plot_ground_truth_proba_distribution(results_df, output_folder=str(output_folder))
 
-    plot_posterior_proba_distributions(
+    # plot_posterior_proba_distributions(
+    #     model, results_df, output_folder=str(output_folder)
+    # )
+
+    plot_phone_detection_confusion_matrix(
         model, results_df, output_folder=str(output_folder)
     )
 
