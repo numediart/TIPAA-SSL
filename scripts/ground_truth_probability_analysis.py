@@ -11,6 +11,7 @@ import seaborn as sns
 import sklearn.metrics
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 from flowspeech.DL_speech_tech import default_model, validate_recording
 from flowspeech.label_data_processing import actor_recordings, synth_words_data
@@ -30,7 +31,8 @@ from flowspeech.wav2vec2_frame_prediction import (
     Wav2Vec2ForFramePrediction,
 )
 
-logger = logging.getLogger(__name__)
+logging.basicConfig()
+logger = logging.getLogger("ground_truth_probability_analysis")
 logger.setLevel(logging.INFO)
 
 # mute warnings
@@ -38,7 +40,7 @@ warnings.filterwarnings("ignore")
 
 
 class DataLoader:
-    """Utiliy class to load and preprocess data for performanceanalysis
+    """Utility class to load and preprocess data for performance analysis
 
     TODO: improve and refactor to performance code
     """
@@ -56,6 +58,9 @@ class DataLoader:
                 self._getter = self._get_audiobook
             case "synth_words":
                 self._getter = self._get_synth_words
+
+    def _getter(self) -> pd.DataFrame:
+        raise NotImplementedError
 
     def _get_actors(self) -> pd.DataFrame:
         df = actor_recordings()
@@ -78,28 +83,32 @@ def compute_predictions(
     df: pd.DataFrame, model: Wav2Vec2ForFramePrediction = default_model
 ) -> pd.DataFrame:
     pred_dfs = []
-    for _, r in tqdm(df.iterrows(), total=len(df)):
-        phonetics = cmu_ensure_phonetics_consistency(r.phonetics)
-        audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
-            r.fpath, phonetics, mode=AudioMode.FILE
-        )
+    with logging_redirect_tqdm():
+        for _, r in tqdm(df.iterrows(), total=len(df)):
+            phonetics = cmu_ensure_phonetics_consistency(r.phonetics)
 
-        if audio_load.status != AudioStatus.SUCCESS or phone_prob_matrix is None:
-            logger.debug(f"Failed to process {r.audio_file_url} for {phonetics}")
-            continue
+            logger.debug(f"Processing {r.fpath} for {phonetics}")
 
-        if not validate_recording(phone_prob_matrix, phonetics):
-            logger.debug(f"Failed to validate {r.audio_file_url} for {phonetics}")
-            continue
+            audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+                r.fpath, phonetics, mode=AudioMode.FILE
+            )
 
-        phoneme_list = remove_stress_annots(split_phonetics_to_phones(phonetics))
-        df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
-            phone_prob_matrix, phoneme_list
-        )
-        if dtw_cost is None:
-            logger.debug(f"Failed to segment {r.audio_file_url} for {phonetics}")
+            if audio_load.status != AudioStatus.SUCCESS or phone_prob_matrix is None:
+                logger.debug(f"Failed to process {r.fpath} for {phonetics}")
+                continue
 
-        pred_dfs.append(df_segmented)
+            if not validate_recording(phone_prob_matrix, phonetics):
+                logger.debug(f"Failed to validate {r.fpath} for {phonetics}")
+                continue
+
+            phoneme_list = remove_stress_annots(split_phonetics_to_phones(phonetics))
+            df_segmented, dtw_cost = model.phone_prob_matrix_segmentation(
+                phone_prob_matrix, phoneme_list
+            )
+            if dtw_cost is None:
+                logger.debug(f"Failed to segment {r.fpath} for {phonetics}")
+
+            pred_dfs.append(df_segmented)
 
     return pd.concat(pred_dfs)
 
@@ -120,7 +129,7 @@ def plot_posterior_proba_distributions(
 
     annot_labels = np.vectorize(lambda x: f"{x:.1f}" if x > 0.2 else "")(proba_matrix)
 
-    fig, ax = plt.subplots(figsize=(12, 12))
+    fig, ax = plt.subplots(figsize=(14, 14))
     sns.heatmap(proba_matrix, ax=ax, annot=annot_labels, fmt="", linewidth=0.5)
 
     ax.set_xticks(np.arange(n_phones) + 0.5, model.alphabet_with_silence)
@@ -164,7 +173,7 @@ def plot_phone_detection_confusion_matrix(
     n_phones = len(model.p_to_id)
     annot_labels = np.vectorize(lambda x: f"{x:.1f}" if x > 0.2 else "")(confusion_matrix)
 
-    fig, ax = plt.subplots(figsize=(12, 12))
+    fig, ax = plt.subplots(figsize=(14, 14))
     sns.heatmap(confusion_matrix, ax=ax, annot=annot_labels, fmt="", linewidth=0.5)
 
     ax.set_xticks(np.arange(n_phones) + 0.5, model.alphabet_with_silence)
@@ -216,21 +225,26 @@ def main():
         logger.info(f"Processing {data_type}")
 
         data = DataLoader(data_type)
+        logger.info("Loading data")
         df = data.get(n=args.nmax)
 
+        logger.info("Processing data")
         results_df = compute_predictions(df, model=model)
 
+        logger.info("Plotting ground truth posterior distributions")
         plot_ground_truth_proba_distribution(
             results_df,
             output_name=str(output_folder / f"GT_proba_distribution_{data_type}"),
         )
 
+        logger.info("Plotting posterior probability matrix")
         plot_posterior_proba_distributions(
             model,
             results_df,
             output_name=str(output_folder / f"posterior_proba_matrix_{data_type}"),
         )
 
+        logger.info("Plotting confusion matrix")
         plot_phone_detection_confusion_matrix(
             model,
             results_df,

@@ -33,7 +33,8 @@ from flowspeech.performance_functions import (
 )
 from flowspeech.pronunciation_dictionaries import cmu_consonants, cmu_vowels
 
-logger = logging.getLogger(__name__)
+logging.basicConfig()
+logger = logging.getLogger("run_legacy_performance_evaluations")
 logger.setLevel(logging.INFO)
 
 
