@@ -1,21 +1,16 @@
-import ast
 import logging
 import os
-import pickle
 import warnings
-from pathlib import Path
 
 import librosa
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import gaussian_kde
 from tqdm import tqdm
 
 from flowspeech.audio_processing import read_audio_file
 from flowspeech.DL_speech_tech import (
-    DEFAULT_POST_PROBA_THRESHOLD,
     default_model,
     post_analysis,
     start_end_contrast_from_formatted_phonetics_audio,
@@ -38,7 +33,6 @@ from flowspeech.performance_functions import (
     pContrast_from_audiobook_data,
     pContrast_on_synth_words,
     start_end_phoneme_from_audiobook_data,
-    stress_GE_performance_test,
 )
 from flowspeech.pronunciation_dictionaries import (
     cmu_consonants,
@@ -85,98 +79,6 @@ def plot_confusion_results(
     # plt.savefig('vowel_contrast_actors_hmm.png')
     plt.savefig(name + '.png')
     # plt.savefig('vowel_contrast_users_w2v.png')
-
-
-def distrib(l):
-    n_points = 1000
-    x = np.linspace(0, 1, n_points)
-    if (
-        len(set(l)) == 1
-    ):  # all the values are the same means infinite density on this value, and 0 for the rest
-        y = np.zeros(len(x))
-        idx = int(list(l)[0] * n_points)
-        y[idx] = np.inf
-    else:
-        kde = gaussian_kde(l, bw_method=0.5)
-        y = kde(x)
-    return x, y
-
-
-def GT_proba_distribution_analysis(
-    model=default_model, basename='probas_actors_logistic'
-):
-    # user_data=build_user_data_df()
-    # selection=user_data[user_data.target_phoneme==target_phones]
-    # df_users=selection
-
-    # from DL_accuracy_performance import *
-    df = actor_recordings()
-    # df_actors=df[df.target_phoneme==target_phones]
-
-    def compute_predictions(df_pContrast, n_examples=None, model=default_model):
-        # contrast on all phones with force_and_predict (i.e. predict based on frames allocated to a phoneme)
-        pred_dfs = []
-        # phonetic_contents=[]
-        print(len(df_pContrast))
-        means = []
-        medians = []
-        for i, r in tqdm(df_pContrast[:n_examples].iterrows()):
-            s, fs = librosa.load(r.audio_file_url, sr=16000)
-            split_phonetics = sum(
-                [p.replace('|', '_').split('_') for p in r.cmu_phonetics.split(' ')], []
-            )
-            try:
-                _, p_df, phonetic_content = model.align_phones(
-                    audio=s, phones=split_phonetics
-                )
-            except AttributeError:
-                p_df = model.predict_with_timings(s, split_phonetics)
-            # p_df=charsiu.force_and_predict(s, split_phonetics)
-            pred_dfs.append(p_df)
-            # phonetic_contents.append(phonetic_content)
-            # phonetic_content.GT_proba_means.median()
-            means.append(p_df[p_df.phones != '[SIL]'].GT_proba.mean())
-            medians.append(p_df[p_df.phones != '[SIL]'].GT_proba.median())
-        # correct_proba_means=np.histogram(means)
-        # correct_proba_medians=np.histogram(medians)
-
-        return pred_dfs, means, medians
-
-    def plot_vowel_distributions(target, all_phones_df, basename='probas'):
-        p_idx = p_to_id(target)
-        plt.cla()
-        for v in cmu_vowels:
-            l = all_phones_df[all_phones_df.phones == v].apply(
-                lambda r: r.proba_means[p_idx], axis=1
-            )
-            if len(l) > 0:
-                x, y = distrib(l)
-                if y[0] < 10 or v == target:
-                    plt.plot(x, y, label=v)
-                else:
-                    print('vowel', v)
-                    print('max is', max(y))
-        plt.legend()
-        plt.title("Proba distributions for " + target)
-        plt.savefig(basename + '_' + target + '.png')
-
-    pred_dfs, means, medians = compute_predictions(df, n_examples=100, model=model)
-
-    all_phones_df = pd.concat(pred_dfs)
-
-    x, kde1_x = distrib(means)
-    plt.plot(x, kde1_x)
-    plt.savefig('gkde_logistic.png')
-
-    # try:
-    #     p_to_id=lambda p: model.charsiu_processor.mapping_phone2id(p)
-    # except:
-    p_to_id = lambda p: model.p_to_id[p]
-    # target='IH'
-
-    for v in cmu_vowels:
-        plot_vowel_distributions(v, all_phones_df, basename=basename)
-        print(np.histogram(all_phones_df[all_phones_df.phones == v].GT_proba))
 
 
 def syllable_contrast_for_actor_recordings(model=default_model):

@@ -175,7 +175,7 @@ def predict_phone(
     GT_proba_threshold: float = 0.2,
 ) -> tuple[str | None, list[str] | None]:
     """phonetics must be formatted phonetics as a string, e.g.: 'EH1_N|D_IH0_D'"""
-    # phoneme_set=[p for p in remove_stress_annots(phoneme_set)]+["[SIL]"]
+
     phoneme_set = set(phoneme_set)
     phoneme_set.add("[SIL]")
 

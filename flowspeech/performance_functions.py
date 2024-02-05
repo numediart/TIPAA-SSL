@@ -124,7 +124,6 @@ def compute_predictions(
     model=default_model,
     **kwargs,
 ):
-    phonetic_detections = []
     records = []
     errors_data = []
     print('number of examples:', len(selection))
@@ -154,7 +153,6 @@ def compute_predictions(
                     model=model,
                     **kwargs,
                 )
-                phonetic_detections.append(res['phonetic_detection'])
                 records.append(res)
             except Exception as e:
                 print('error in the tech_function in compute_predictions')
