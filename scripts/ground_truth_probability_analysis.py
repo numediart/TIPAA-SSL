@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +13,8 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from flowspeech.DL_speech_tech import default_model, validate_recording
-from flowspeech.label_data_processing import actor_recordings
+from flowspeech.label_data_processing import actor_recordings, synth_words_data
+from flowspeech.libri_phonetization_data import build_librispeech_words_df
 from flowspeech.pronunciation_dictionaries import (
     cmu_consonants,
     cmu_vowels,
@@ -22,18 +24,64 @@ from flowspeech.text_processing import (
     cmu_ensure_phonetics_consistency,
     split_phonetics_to_phones,
 )
-from flowspeech.wav2vec2_frame_prediction import AudioMode, AudioStatus
+from flowspeech.wav2vec2_frame_prediction import (
+    AudioMode,
+    AudioStatus,
+    Wav2Vec2ForFramePrediction,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# mute warnings
+warnings.filterwarnings("ignore")
 
-def compute_predictions(df, model=default_model):
+
+class DataLoader:
+    """Utiliy class to load and preprocess data for performanceanalysis
+
+    TODO: improve and refactor to performance code
+    """
+
+    CHOICES = ("actor_recordings", "audiobook_data", "synth_words")
+
+    def __init__(self, data_type: str):
+        if data_type not in self.CHOICES:
+            raise ValueError(f"Invalid data type {data_type}")
+        self.data_type = data_type
+        match data_type:
+            case "actor_recordings":
+                self._getter = self._get_actors
+            case "audiobook_data":
+                self._getter = self._get_audiobook
+            case "synth_words":
+                self._getter = self._get_synth_words
+
+    def _get_actors(self) -> pd.DataFrame:
+        df = actor_recordings()
+        df["phonetics"] = df.cmu_phonetics
+        df["fpath"] = df.audio_file_url
+        return df
+
+    def _get_audiobook(self) -> pd.DataFrame:
+        # FIXME this needs to be implemented
+        return build_librispeech_words_df()
+
+    def _get_synth_words(self) -> pd.DataFrame:
+        return synth_words_data()
+
+    def get(self, n: int | None = None) -> pd.DataFrame:
+        return self._getter().sample(n, random_state=42)
+
+
+def compute_predictions(
+    df: pd.DataFrame, model: Wav2Vec2ForFramePrediction = default_model
+) -> pd.DataFrame:
     pred_dfs = []
     for _, r in tqdm(df.iterrows(), total=len(df)):
-        phonetics = cmu_ensure_phonetics_consistency(r.cmu_phonetics)
+        phonetics = cmu_ensure_phonetics_consistency(r.phonetics)
         audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
-            r.audio_file_url, phonetics, mode=AudioMode.FILE
+            r.fpath, phonetics, mode=AudioMode.FILE
         )
 
         if audio_load.status != AudioStatus.SUCCESS or phone_prob_matrix is None:
@@ -56,7 +104,11 @@ def compute_predictions(df, model=default_model):
     return pd.concat(pred_dfs)
 
 
-def plot_posterior_proba_distributions(model, results_df, output_folder="probas_actors"):
+def plot_posterior_proba_distributions(
+    model: Wav2Vec2ForFramePrediction,
+    results_df: pd.DataFrame,
+    output_name: str,
+) -> np.ndarray:
     results_df["phone_id"] = results_df.phones.apply(lambda x: model.p_to_id[x])
     n_phones = len(model.p_to_id)
     proba_matrix = np.zeros((n_phones, n_phones))
@@ -76,10 +128,12 @@ def plot_posterior_proba_distributions(model, results_df, output_folder="probas_
     ax.set_yticks(np.arange(n_phones - 1) + 0.5, model.alphabet)
     ax.set_ylabel("True phone")
 
-    fig.savefig(output_folder + "/proba_matrix.png")
+    fig.savefig(output_name)
+
+    return proba_matrix
 
 
-def plot_ground_truth_proba_distribution(results_df, output_folder="probas_actors"):
+def plot_ground_truth_proba_distribution(results_df: pd.DataFrame, output_name: str):
     phone_df = results_df[["phones", "GT_proba"]]
 
     for label, phone_set in [("vowels", cmu_vowels), ("consonants", cmu_consonants)]:
@@ -90,12 +144,14 @@ def plot_ground_truth_proba_distribution(results_df, output_folder="probas_actor
             col_wrap=4,
             kind="hist",
         )
-        g.savefig(output_folder + f"/GT_proba_distribution_{label}.png")
+        g.savefig(output_name + f"_{label}.png")
 
 
 def plot_phone_detection_confusion_matrix(
-    model, results_df, output_folder="probas_actors"
-):
+    model: Wav2Vec2ForFramePrediction,
+    results_df: pd.DataFrame,
+    output_name: str,
+) -> np.ndarray:
     confusion_matrix = sklearn.metrics.confusion_matrix(
         results_df.phones,
         results_df.pred_phones_audio,
@@ -116,7 +172,9 @@ def plot_phone_detection_confusion_matrix(
     ax.set_yticks(np.arange(n_phones - 1) + 0.5, model.alphabet)
     ax.set_ylabel("True phone")
 
-    fig.savefig(output_folder + "/confusion_matrix.png")
+    fig.savefig(output_name)
+
+    return confusion_matrix
 
 
 def main():
@@ -125,6 +183,15 @@ def main():
     )
     parser.add_argument(
         "-o", "--output", type=str, default="./plots", help="Output folder for plots"
+    )
+    parser.add_argument(
+        "-d",
+        "--data",
+        type=str,
+        choices=DataLoader.CHOICES,
+        default=DataLoader.CHOICES,
+        nargs="+",
+        help="Datasets to process",
     )
     parser.add_argument(
         "-n",
@@ -145,19 +212,30 @@ def main():
 
     model = default_model
 
-    df = actor_recordings().sample(n=args.nmax, random_state=42)
+    for data_type in args.data:
+        logger.info(f"Processing {data_type}")
 
-    results_df = compute_predictions(df, model=model)
+        data = DataLoader(data_type)
+        df = data.get(n=args.nmax)
 
-    # plot_ground_truth_proba_distribution(results_df, output_folder=str(output_folder))
+        results_df = compute_predictions(df, model=model)
 
-    # plot_posterior_proba_distributions(
-    #     model, results_df, output_folder=str(output_folder)
-    # )
+        plot_ground_truth_proba_distribution(
+            results_df,
+            output_name=str(output_folder / f"GT_proba_distribution_{data_type}"),
+        )
 
-    plot_phone_detection_confusion_matrix(
-        model, results_df, output_folder=str(output_folder)
-    )
+        plot_posterior_proba_distributions(
+            model,
+            results_df,
+            output_name=str(output_folder / f"posterior_proba_matrix_{data_type}"),
+        )
+
+        plot_phone_detection_confusion_matrix(
+            model,
+            results_df,
+            output_name=str(output_folder / f"confusion_matrix_{data_type}"),
+        )
 
 
 if __name__ == "__main__":
