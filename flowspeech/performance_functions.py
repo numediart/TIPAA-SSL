@@ -1,6 +1,8 @@
 import ast
+import logging
 import warnings
 from collections import Counter
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -42,13 +44,22 @@ from flowspeech.text_processing import (
 from flowspeech.wav2vec2_frame_prediction import AudioMode
 from syllabipy.sonoripy import SonoriPy
 
+logger = logging.getLogger(__name__)
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # disable pandas warning SettingWithCopyWarning
 pd.options.mode.chained_assignment = None  # default='warn'
 
 
-def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
+def formatted_audiobook_data(
+    selection: pd.DataFrame,
+    libri_words_df: pd.DataFrame,
+    target_phones: str | None = None,
+) -> pd.DataFrame:
+    if len(selection) == 0:
+        return selection
+
     # retrieve phonetics by word thanks to 'phonetics_fot_row'
     selection['split_phonetics'] = selection.apply(
         lambda r: [p.split(' ') for p in phonetics_for_row(r, libri_words_df)], axis=1
@@ -95,13 +106,10 @@ def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
     return selection
 
 
-def count_values(phonetic_detections):
-    d = Counter(phonetic_detections)
-    d = pd.DataFrame.from_dict(d, orient='index')
-    if len(d) > 0:
-        d = d.sort_values(by=0, ascending=False)  # type: ignore
-        d = d / d.sum() * 100
-    return d
+def count_values(phonetic_detections: pd.Series) -> pd.DataFrame:
+    """Count the values in a Series and return a DataFrame with the frequencies in percentage."""
+    c = 100 * phonetic_detections.value_counts(normalize=True)
+    return pd.DataFrame(c)
 
 
 from flowspeech.code_utils import internal_error
@@ -155,7 +163,6 @@ def compute_predictions(
                 print(e)
                 print(internal_error())
                 error_data = internal_error()
-                # import pdb;pdb.set_trace()
                 errors_data.append(error_data)
 
         result_df = pd.DataFrame.from_records(records)
@@ -168,7 +175,9 @@ def compute_predictions(
     return result_df
 
 
-def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
+def stress_GE_performance_test(
+    level: StressCategory = StressCategory.SENTENCE, model=default_model
+):
     df = get_data_stressed_content()
     stress_intensities = []
     stress_binaries = []
@@ -186,6 +195,7 @@ def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
             phonetics=row.phonetics,
             n_words_by_chunk=n_words_by_chunk,
             level=level,
+            model=model,
             mode=AudioMode.NUMPY,
         )
         print(res)
@@ -416,8 +426,11 @@ def final_ed_for_actor_recordings(target_phones='D', model=default_model):
 
 
 def pContrast_for_actor_recordings(
-    target_phones='AO1', speakers=None, model=default_model
-):
+    target_phones: str = 'AO1',
+    alternatives: Iterable[str] = cmu_vowels,
+    speakers: Iterable[str] | None = None,
+    model=default_model,
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     df = actor_recordings()
     # those who don't have NaN in target
     df_pContrast = df.loc[df.target_phoneme.dropna().index]
@@ -444,7 +457,7 @@ def pContrast_for_actor_recordings(
         # selection['audio_file_idx']=selection.fk_audio_recording_id
 
         result_df = compute_predictions(
-            selection, target_phones=target_phones, model=model
+            selection, target_phones=target_phones, alternatives=alternatives, model=model
         )
         phonetic_detections = result_df.phonetic_detection
 
@@ -458,12 +471,12 @@ def pContrast_for_actor_recordings(
 
 
 def pContrast_from_audiobook_data(
-    data_set='test-other',
-    target_phones='AO1',
-    n=None,
-    alternatives=cmu_vowels,
+    data_set: str = 'test-other',
+    target_phones: str = 'AO1',
+    n: int | None = None,
+    alternatives: Iterable[str] = cmu_vowels,
     model=default_model,
-):
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     libri_words_df = build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df = libri_words_df[
@@ -489,6 +502,11 @@ def pContrast_from_audiobook_data(
     selection = formatted_audiobook_data(
         selection, libri_words_df, target_phones=target_phones
     )
+    if len(selection) == 0:
+        logger.warning(
+            f"Audiobook selection for {data_set}, n={n} and target_phones={target_phones} is empty"
+        )
+        return None, None
 
     selection['cmu_phonetics'] = selection.apply(
         lambda r: cmu_ensure_phonetics_consistency(r.cmu_phonetics), axis=1
@@ -504,6 +522,11 @@ def pContrast_from_audiobook_data(
             | df_words.str.contains('_' + target_phones + '_')
         )
     ]
+    if len(df_target) == 0:
+        logger.warning(
+            f"Audiobook target df for {data_set}, n={n} and target_phones={target_phones} is empty"
+        )
+        return None, None
 
     result_df = compute_predictions(
         df_target, target_phones=target_phones, alternatives=alternatives, model=model
@@ -778,19 +801,21 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_mode
     )
     phonetic_detections_z = result_df_z.phonetic_detection
 
-    # success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
-    # print('errors:',result_df[result_df.gibberish_truth!=result_df.gibberish_detected])
-    # result_df[result_df.gibberish_truth!=result_df.gibberish_detected].iloc[-1]
-    # print(success_rate)
+    success_rate = len(
+        result_df[result_df.gibberish_truth == result_df.gibberish_detected]
+    ) / len(result_df)
+    print('errors:', result_df[result_df.gibberish_truth != result_df.gibberish_detected])
+    result_df[result_df.gibberish_truth != result_df.gibberish_detected].iloc[-1]
+    print(success_rate)
 
-    # selections = selections.reset_index(drop=True)
-    # result_df['cmu_phonetics']=selections['cmu_phonetics']
-    # result_df['fpath']=selections['fpath']
+    selections = selections.reset_index(drop=True)
+    result_df['cmu_phonetics'] = selections['cmu_phonetics']
+    result_df['fpath'] = selections['fpath']
 
-    # d=count_values(phonetic_detections)
-    # d_s=count_values(phonetic_detections_s)
+    d = count_values(phonetic_detections)
+    d_s = count_values(phonetic_detections_s)
 
-    # return phonetic_detections, phonetic_detections_s, d, d_s
+    return phonetic_detections, phonetic_detections_s, d, d_s
 
 
 def final_ed_fake_mistakes(n=100):
@@ -914,8 +939,12 @@ def final_ed_on_synth_words(
 
 
 def pContrast_on_synth_words(
-    target_phones='AO1', n=None, alternatives=cmu_vowels, accent=None, model=default_model
-):
+    target_phones: str = 'AO1',
+    n: int | None = None,
+    alternatives: Iterable[str] = cmu_vowels,
+    accent: str | None = None,
+    model=default_model,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     # ex for fr_FR, as in "rue" or "lu":
 
     # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')

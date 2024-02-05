@@ -1,7 +1,9 @@
 import ast
 import logging
+import os
 import pickle
 import warnings
+from pathlib import Path
 
 import librosa
 import matplotlib.pyplot as plt
@@ -58,13 +60,15 @@ warnings.filterwarnings("ignore", category=UserWarning)
 logger = logging.getLogger(__name__)
 
 
-def plot_confusion_results(results, name='vowel_contrast_actors_w2v'):
+def plot_confusion_results(
+    results: dict[str, pd.DataFrame], name: str = 'vowel_contrast_actors_w2v'
+):
     plt.clf()
     fig, axn = plt.subplots(1, len(results))
     fig.set_size_inches(len(results), 6)
     cbar_ax = fig.add_axes((0.91, 0.3, 0.03, 0.4))
     for i, k in enumerate(results):
-        ax = axn.flat[i]
+        ax = axn.flat[i] if len(results) > 1 else axn
         #  from https://stackoverflow.com/questions/28356359/one-colorbar-for-seaborn-heatmaps-in-subplot
         sns.heatmap(
             results[k],
@@ -420,11 +424,11 @@ def syllable_contrast_for_actor_recordings(model=default_model):
 
 
 def phoneme_confusions(
+    model=default_model,
     phonemes=cmu_vowels,
     performance_function=pContrast_on_synth_words,
-    n=None,
-    accent=None,
     name='plots/vowels_confusions_on_synth_words',
+    **kwargs,
 ):
     results = {}
     predictions = {}
@@ -432,15 +436,17 @@ def phoneme_confusions(
         if p in cmu_vowels:
             p += '1'
         preds, rates = performance_function(
-            target_phones=p, n=n, alternatives=phonemes, accent=accent
+            model=model, target_phones=p, alternatives=phonemes, **kwargs
         )
-        # _, predictions[v].to_csv('performance_results/vowel_accuracies_'+v+'.csv')
-        results[p] = rates
-        predictions[p] = preds
-        print('phoneme')
-        print(results[p])
+        print(f'phoneme: {p}')
+        print(rates)
+        if preds is not None and rates is not None:
+            results[p] = rates
+            predictions[p] = preds
 
-    plot_confusion_results(results, name=name + '_' + (accent or "allAccents"))
+    plot_confusion_results(
+        results, name=name + '_' + (kwargs.get("accent") or "allAccents")
+    )
 
     return results
 
@@ -533,26 +539,30 @@ def vowels_consonants_confusions_from_audiobook_data(n=100, data_set='test-other
     return predictions, results
 
 
-def final_ed_confusions_from_audiobook_data(n=100, data_set='dev-clean'):
+def final_ed_confusions_from_audiobook_data(
+    model=default_model, n=100, data_set='dev-clean'
+):
     eds = ['T', 'D', 'IH0_D']
 
     predictions = {}
     results = {}
     for p in tqdm(eds):
         predictions[p], rates = final_ed_from_audiobook_data(
-            data_set=data_set, target_phones=p, n=n
+            model=model, data_set=data_set, target_phones=p, n=n
         )
         results[p] = rates
     return predictions, results
 
 
-def final_ed_confusions_for_actor_recordings():
+def final_ed_confusions_for_actor_recordings(model=default_model):
     eds = ['T', 'D', 'IH0_D']
 
     predictions = {}
     results = {}
     for p in tqdm(eds):
-        predictions[p], rates = final_ed_for_actor_recordings(target_phones=p)
+        predictions[p], rates = final_ed_for_actor_recordings(
+            model=model, target_phones=p
+        )
         results[p] = rates
     return predictions, results
 
@@ -570,10 +580,9 @@ target_to_basis = {
 
 
 def compute_start_end_confusions_from_selections(selections, model=default_model):
-    targets = selections.keys()
     result_dfs = {}
     results = {}
-    for t in targets:
+    for t, selection in selections.items():
         selection = selections[t]
         selection['cmu_phonetics'] = selection['phonetics']
         basis = target_to_basis[t] if t in target_to_basis else t
@@ -586,7 +595,7 @@ def compute_start_end_confusions_from_selections(selections, model=default_model
         )
         result_dfs[t] = result_df
 
-    for t in targets:
+    for t in selections.keys():
         phonetic_detections = result_dfs[t].phonetic_detection
         d = count_values(phonetic_detections)
         d.columns = [t]
@@ -597,7 +606,11 @@ def compute_start_end_confusions_from_selections(selections, model=default_model
 
 # pronunciation aspect: Initial consonant clusters (e.g.: thr-, pr-, spl-, scr-…)
 def start_end_consonant_clusters_on_synth_words(
-    clusters=['P_TH', 'M_P_T', 'N_TH_S'], contrast='end', n=100, model=default_model
+    clusters=['P_TH', 'M_P_T', 'N_TH_S'],
+    contrast='end',
+    n=100,
+    model=default_model,
+    output_folder='plots',
 ):
     # clusters=["TH_R", "P_R", "S_P_L", "S_K_R"]
     #
@@ -624,7 +637,9 @@ def start_end_consonant_clusters_on_synth_words(
         selections, model=model
     )
 
-    plot_confusion_results(results, name='plots/' + contrast + '_clusters')
+    plot_confusion_results(
+        results, name=os.path.join(output_folder, contrast + '_clusters')
+    )
 
 
 # start_end_consonant_clusters_on_synth_words(clusters=['P_TH', 'M_P_T', 'N_TH_S'], n=100, model=default_model_charsiu, contrast='end')
@@ -748,49 +763,46 @@ def h_sound_confusions_on_synth_words(
     df['fpath'] = df['path']
 
     df_h = df[df.phonetics.str.startswith('HH') & df.text.str.startswith('h')]
+
     df_no_h_sound = df[
         ~df.phonetics.str.startswith('HH')
         & ~df.phonetics.str.startswith('EY1_CH')
         & ~df.phonetics.str.startswith('EY2_CH')
         & ~df.phonetics.str.startswith('EY1|CH')
-        & ~df.phonetics.str.startswith('EY2\|CH')
+        & ~df.phonetics.str.startswith('EY2|CH')
         & df.text.str.startswith('h')
     ]
 
-    df_h_in = df[df.phonetics.str.contains('\|HH')]
-
-    words_no_h_candidates = list(df_h.text.str[1:])
-    df_no_h_letter_sound = df[df.text.isin(words_no_h_candidates)]
-
     selections = {
-        # '':df_no_s.sample(frac=1, random_state=0)[:n],
         'HH': df_h.sample(frac=1, random_state=0)[:n],
-        '': df_no_h_sound.sample(frac=1, random_state=0)[:n],
+        # FIXME empty target does not work
+        # '': df_no_h_sound.sample(frac=1, random_state=0)[:n],
     }
     results, result_dfs = compute_start_end_confusions_from_selections(
         selections, model=model
     )
 
     # fake mistakes
+    # FIXME get running again
 
-    # I remove the "HH" from ground truth phonetics to simumate a word not starting with "h" but with a "HH" sound in audio
-    df_fake_added_h = df_h.sample(frac=1, random_state=0)[:n]
-    df_fake_added_h.phonetics = df_fake_added_h.phonetics.str[3:]
+    # # I remove the "HH" from ground truth phonetics to simumate a word not starting with "h" but with a "HH" sound in audio
+    # df_fake_added_h = df_h.sample(frac=1, random_state=0)[:n]
+    # df_fake_added_h.phonetics = df_fake_added_h.phonetics.str[3:]
 
-    # I take words without "h" sound, and add "HH" in the ground truth to simulate words with a missing "HH"
-    df_fake_missing_h = df_no_h_sound.sample(frac=1, random_state=0)[:n]
-    df_fake_missing_h.phonetics = "HH_" + df_fake_missing_h.phonetics
+    # # I take words without "h" sound, and add "HH" in the ground truth to simulate words with a missing "HH"
+    # df_fake_missing_h = df_no_h_sound.sample(frac=1, random_state=0)[:n]
+    # df_fake_missing_h.phonetics = "HH_" + df_fake_missing_h.phonetics
 
-    selections = {
-        'HH': df_fake_missing_h,
-        # '':df_fake_added_h
-    }
+    # selections = {
+    #     'HH': df_fake_missing_h,
+    #     '':df_fake_added_h
+    # }
 
-    results, result_dfs = compute_start_end_confusions_from_selections(
-        selections, model=model
-    )
+    # results, result_dfs = compute_start_end_confusions_from_selections(
+    #     selections, model=model
+    # )
 
-    # plot_confusion_results(results, name=name)
+    plot_confusion_results(results, name=name)
 
 
 def h_sound_artificial_data(model=default_model):
@@ -950,7 +962,9 @@ def h_sound_artificial_data(model=default_model):
     df_incorrect.to_csv(root_path + "/df_incorrect.csv")
 
 
-def final_ed_s_confusions_on_synth_words():
+def final_ed_s_confusions_on_synth_words(
+    model=default_model, n: int = 100, output_folder: str = "./plots/"
+):
     # from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
 
     # default_model_charsiu = charsiu_phone_forced_aligner(
@@ -966,9 +980,11 @@ def final_ed_s_confusions_on_synth_words():
     #     name='plots/final_ed_synth_words_charsiu_' + date_time,
     # )
     final_ed_confusions_on_synth_words(
-        n=100,
-        model=default_model,
-        name='plots/final_ed_synth_words_pipeline_onnx_' + date_time,
+        n=n,
+        model=model,
+        name=os.path.join(
+            output_folder, 'final_ed_synth_words_pipeline_onnx_' + date_time
+        ),
     )
     # final_s_confusions_on_synth_words(
     #     n=100,
@@ -976,9 +992,11 @@ def final_ed_s_confusions_on_synth_words():
     #     name='plots/final_s_synth_words_charsiu_' + date_time,
     # )
     final_s_confusions_on_synth_words(
-        n=100,
-        model=default_model,
-        name='plots/final_s_synth_words_pipeline_onnx_' + date_time,
+        n=n,
+        model=model,
+        name=os.path.join(
+            output_folder, 'final_s_synth_words_pipeline_onnx_' + date_time
+        ),
     )
 
 
@@ -1075,41 +1093,42 @@ def pronunciation_aspects_from_audiobook_data(
         phoneme='Z', basis='Z', position="end", n=n, data_set=data_set, model=model
     )
 
-    from datetime import datetime
+    # NOTE: commented out for now, do not repeat the vowel/consonant cluster analysis
+    # from datetime import datetime
 
-    now = datetime.now()
-    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
-    _, results = vowels_consonants_confusions_from_audiobook_data(n=n, data_set=data_set)
+    # now = datetime.now()
+    # date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    # _, results = vowels_consonants_confusions_from_audiobook_data(n=n, data_set=data_set)
 
-    results_consonants = {el: results[el] for el in results if el in cmu_consonants}
-    results_consonants = {el: results_consonants[el] for el in sorted(results_consonants)}
-    results_vowels = {el: results[el] for el in results if el in cmu_vowels}
-    results_vowels = {el: results_vowels[el] for el in sorted(results_vowels)}
+    # results_consonants = {el: results[el] for el in results if el in cmu_consonants}
+    # results_consonants = {el: results_consonants[el] for el in sorted(results_consonants)}
+    # results_vowels = {el: results[el] for el in results if el in cmu_vowels}
+    # results_vowels = {el: results_vowels[el] for el in sorted(results_vowels)}
 
-    plot_confusion_results(
-        results_vowels,
-        name='plots/vowels_contrast_audiobook_w2v'
-        + data_set
-        + '_n_'
-        + str(n)
-        + '_'
-        + date_time,
-    )
-    plot_confusion_results(
-        results_consonants,
-        name='plots/consonant_contrast_audiobook_w2v'
-        + data_set
-        + '_n_'
-        + str(n)
-        + '_'
-        + date_time,
-    )
+    # plot_confusion_results(
+    #     results_vowels,
+    #     name='plots/vowels_contrast_audiobook_w2v'
+    #     + data_set
+    #     + '_n_'
+    #     + str(n)
+    #     + '_'
+    #     + date_time,
+    # )
+    # plot_confusion_results(
+    #     results_consonants,
+    #     name='plots/consonant_contrast_audiobook_w2v'
+    #     + data_set
+    #     + '_n_'
+    #     + str(n)
+    #     + '_'
+    #     + date_time,
+    # )
 
-    with open(
-        'vowels_consonant_contrast_audiobook_w2v' + data_set + '_n_' + str(n) + '.pickle',
-        'wb',
-    ) as handle:
-        pickle.dump(results, handle)
+    # with open(
+    #     'vowels_consonant_contrast_audiobook_w2v' + data_set + '_n_' + str(n) + '.pickle',
+    #     'wb',
+    # ) as handle:
+    #     pickle.dump(results, handle)
 
 
 def model_comparison():
@@ -1312,123 +1331,3 @@ def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_mod
 
     data = pd.DataFrame(data)
     return data
-
-
-if __name__ == "__main__":
-    final_ed_s_confusions_on_synth_words()
-
-    from datetime import datetime
-
-    now = datetime.now()
-    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
-
-    results = phoneme_confusions(
-        phonemes=cmu_vowels, performance_function=pContrast_on_synth_words, n=100
-    )
-    plot_confusion_results(
-        results, name='plots/vowel_confusions_on_synth_words_' + date_time
-    )
-
-    # pContrast_for_actor_recordings(target_phones='AO1')
-
-    # from flowspeech.charsiu_utils import charsiu_phone_forced_aligner
-
-    # default_model_charsiu = charsiu_phone_forced_aligner(
-    #     aligner='hf_models/charsiu/en_w2v2_fc_10ms', device='cpu'
-    # )
-    # pContrast_for_actor_recordings(target_phones='AO1', model=default_model_charsiu)
-
-    # start_end_phoneme_from_audiobook_data(phoneme='HH')
-    # start_end_phoneme_from_audiobook_data(phoneme='S', basis='S', contrast="end")
-    # start_end_phoneme_from_audiobook_data(phoneme='Z', basis='Z', contrast="end")
-
-    # r = final_ed_for_actor_recordings()
-    # r = final_ed_for_actor_recordings('T')
-    # r = final_ed_for_actor_recordings("IH0_D")
-
-    # pContrast_for_actor_recordings(target_phones='AO1')
-
-    stress_GE_performance_test(level='word')
-    stress_GE_performance_test(level='sentence')
-
-    results = vowels_confusions_user_recordings(frac=0.01)
-
-    target_phones = 'AO1'
-    df = actor_recordings()
-    # those who don't have NaN in target
-    df_pContrast = df.loc[df.target_phoneme.dropna().index]
-    selection = df_pContrast[df_pContrast.target_phoneme == target_phones]
-
-    selection['split_phonetics'] = selection.apply(
-        lambda r: [p.replace('|', '_').split('_') for p in r.cmu_phonetics.split(' ')],
-        axis=1,
-    )
-    selection['fpath'] = selection.audio_file_url
-
-    r = selection.iloc[24]
-
-    s, fs = librosa.load(r.fpath, sr=16000)
-
-    target_word_idx = ast.literal_eval(r.target_word_indexes)[0]
-    target_syllable_idx = ast.literal_eval(r.target_syllable_indexes)[0]
-    df_word = default_model.predict_word(s, r.split_phonetics, target_word_idx)
-
-    word = r.cmu_phonetics.split(' ')[target_word_idx]
-
-    syllables = [syl.split('_') for syl in word.split('|')]
-    syllable = syllables[target_syllable_idx]
-
-    import cmudict
-
-    phone_df = pd.DataFrame(cmudict.phones())
-    vowels = (
-        phone_df[phone_df.apply(lambda r: r.iloc[1][0], axis=1) == 'vowel']
-        .iloc[:, 0]
-        .tolist()
-    )
-
-    from time import time
-
-    start = time()
-    _, results = vowels_consonants_confusions_from_audiobook_data(n=None)
-    duration = time() - start
-
-    data_set = 'test-other'
-    n = 100
-    _, results = vowels_consonants_confusions_from_audiobook_data(n=n, data_set=data_set)
-    plot_confusion_results(
-        results,
-        name='vowels_consonant_contrast_audiobook_w2v' + data_set + '_n_' + str(n),
-    )
-
-    plot_confusion_results(
-        results, name='vowels_consonant_contrast_audiobook_test-other_w2v_n_10'
-    )
-
-    # data_set='dev-clean'
-    data_set = 'test-other'
-    n = 300
-    _, results = final_ed_confusions_from_audiobook_data(n=n, data_set=data_set)
-    plot_confusion_results(
-        results,
-        name='termination_contrast_audiobook_no_D_T_dis_' + data_set + '_w2v_n_' + str(n),
-    )
-
-    predictions, results = final_ed_confusions_for_actor_recordings()
-    plot_confusion_results(
-        results,
-        name='plots/termination_confusions_for_actor_recordings_D_T_dis_w2v_AH_D_post_corr',
-    )
-
-    results = vowels_confusions_actor_recordings()
-    # plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v_mm_thresh_1_model_mailabs_umap_2_gmm_300')
-    # plot_confusion_results(results, name='vowel_contrast_proba_means_actors_w2v_mm_thresh_1_model_mailabs_umap_2_bgmm_300')
-    plot_confusion_results(
-        results,
-        name='plots/vowel_contrast_proba_means_actors_w2v_gmm_model_mailabs_umap_neighbors_30_2_gmm_300',
-    )
-
-    results = vowels_confusions_user_recordings(frac=0.01)
-    plot_confusion_results(
-        results, name='plots/vowel_contrast_proba_means_user_data_w2v_thresh_0.2'
-    )
