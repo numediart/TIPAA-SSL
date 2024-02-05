@@ -3,6 +3,7 @@
 import argparse
 import logging
 from pathlib import Path
+import numpy as np
 
 import pandas as pd
 import seaborn as sns
@@ -54,6 +55,29 @@ def compute_predictions(df, model=default_model):
     return pd.concat(pred_dfs)
 
 
+def plot_posterior_proba_distributions(model, results_df, output_folder="probas_actors"):
+    results_df["phone_id"] = results_df.phones.apply(lambda x: model.p_to_id[x])
+    n_phones = len(model.p_to_id)
+    proba_matrix = np.zeros((n_phones, n_phones))
+    for _, r in results_df.iterrows():
+        proba_matrix[r.phone_id] += r.proba_means
+
+    # normalize row wise to have probabilities again
+    proba_matrix = proba_matrix / proba_matrix.sum(axis=1, keepdims=True)
+
+    annot_labels = np.vectorize(lambda x: f"{x:.1f}" if x > 0.2 else "")(proba_matrix)
+
+    fig, ax = plt.subplots(figsize=(15, 15))
+    sns.heatmap(proba_matrix, ax=ax, annot=annot_labels, fmt="")
+
+    ax.set_xticks(np.arange(n_phones) + 0.5, model.alphabet_with_silence)
+    ax.set_yticks(np.arange(n_phones) + 0.5, model.alphabet_with_silence)
+    ax.set_xlabel("Detected phone")
+    ax.set_ylabel("True phone")
+
+    fig.savefig(output_folder + "/proba_matrix.png")
+
+
 def plot_ground_truth_proba_distribution(results_df, output_folder="probas_actors"):
     phone_df = results_df[["phones", "GT_proba"]]
 
@@ -94,11 +118,15 @@ def main():
 
     model = default_model
 
-    df = actor_recordings()
+    df = actor_recordings().sample(n=args.nmax, random_state=42)
 
-    results_df = compute_predictions(df.iloc[: args.nmax], model=model)
+    results_df = compute_predictions(df, model=model)
 
-    plot_ground_truth_proba_distribution(results_df, output_folder=str(output_folder))
+    # plot_ground_truth_proba_distribution(results_df, output_folder=str(output_folder))
+
+    plot_posterior_proba_distributions(
+        model, results_df, output_folder=str(output_folder)
+    )
 
 
 if __name__ == "__main__":
