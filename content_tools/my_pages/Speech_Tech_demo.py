@@ -3,15 +3,17 @@ import streamlit as st
 from st_audiorec import st_audiorec
 
 from content_tools.utils import check_password
-from DL_speech_tech import (
+
+# TODO this triggers slow imports again, we should only do that once
+from flowspeech.DL_speech_tech import (
     DEFAULT_MAX_PER,
     DEFAULT_MAX_PER_ONE_SYLL,
     DEFAULT_POST_PROBA_THRESHOLD,
     PostAnalysisResult,
     multiple_aspect_from_formatted_phonetics_audio,
 )
-from src.text_processing import count_syllables, prefill_for_sentence
-from src.wav2vec2_frame_prediction import (
+from flowspeech.text_processing import count_syllables, prefill_for_sentence
+from flowspeech.wav2vec2_frame_prediction import (
     DEFAULT_MAX_SPEECH_RATE,
     DEFAULT_MIN_SPEECH_RATE,
     DEFAULT_SILENCE_THRESHOLD,

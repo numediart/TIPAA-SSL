@@ -17,26 +17,26 @@ from sklearn.neighbors import KNeighborsClassifier
 from strenum import StrEnum
 from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
-from src.audio_processing import (
+from flowspeech.audio_processing import (
     getIntensity,
     getIntonation,
     read_audio_bytes,
     read_audio_file,
     read_audio_string,
 )
-from src.dtw_forced_aligner import dtw_forced_aligner
-from src.pronunciation_dictionaries import (
+from flowspeech.dtw_forced_aligner import dtw_forced_aligner
+from flowspeech.pronunciation_dictionaries import (
     cmu_alphabet,
     cmu_stressed_alphabet,
     ipa_alphabet,
 )
-from src.text_processing import remove_grouping_hyphens
+from flowspeech.text_processing import remove_grouping_hyphens
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MIN_SPEECH_RATE = 1  # syll/s
-DEFAULT_MAX_SPEECH_RATE = 8  # syll/s
-DEFAULT_SILENCE_THRESHOLD = 40  # dBFS
+DEFAULT_MIN_SPEECH_RATE = 1.0  # syll/s
+DEFAULT_MAX_SPEECH_RATE = 8.0  # syll/s
+DEFAULT_SILENCE_THRESHOLD = 40.0  # dBFS
 
 
 # StrEnum in python 3.11
@@ -664,7 +664,7 @@ def train_Wav2Vec2ForFramePrediction_model():
         LinearDiscriminantAnalysis,
     )
     from sklearn.linear_model import LogisticRegression
-    from src.load_data import df_all_frames_to_X_y
+    from flowspeech.load_data import df_all_frames_to_X_y
 
     df_all_instances_select_with_silences = pd.read_pickle(
         'df_all_instances_select_with_silences.pkl'
@@ -809,8 +809,8 @@ def train_Wav2Vec2ForFramePrediction_model():
 
 
 def inference_demo():
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
-    from src.load_data import load_libri_dataset, load_libri_dataset_audio_timings
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.load_data import load_libri_dataset, load_libri_dataset_audio_timings
 
     # --------------- Inference demo --------------------
 
@@ -824,7 +824,7 @@ def inference_demo():
     # model.load(name='model_mailabs_pca_0.95_knn_10_w')
     model.load(name='model_mailabs_equilibrated_pca_95_knn_10_w')
 
-    from src.text_processing import remove_stress_annots
+    from flowspeech.text_processing import remove_stress_annots
 
     # phoneme predictions on a single audio sample with forced alignment
     phone_prob_matrix = model.predict_phone_prob_matrix(data.s.iloc[0], 16000)
@@ -844,9 +844,9 @@ def inference_demo():
         phone_prob_matrix, data.phone_df.iloc[0].phone.tolist()
     )
 
-    # from src.label_data_processing import synth_words_data
-    from src.audio_processing import read_audio_file
-    from src.text_processing import prefill_for_sentence
+    # from flowspeech.label_data_processing import synth_words_data
+    from flowspeech.audio_processing import read_audio_file
+    from flowspeech.text_processing import prefill_for_sentence
 
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -900,13 +900,13 @@ def use_tests():
     # elif reducer == "pca":
     #     self.reducer = PCA(n_components=target_dim, random_state=42)
 
-    from src.load_data import (
+    from flowspeech.load_data import (
         load_dataset_MAILABS,
         load_dataset_commonvoice,
         build_df_all_frames,
         df_all_frames_to_X_y,
     )
-    from src.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
+    from flowspeech.wav2vec2_frame_prediction import Wav2Vec2ForFramePrediction
 
     from scripts.frame_classifiers_experiments import (
         build_frame_dataset,
@@ -962,7 +962,7 @@ def use_tests():
     df_all_frames_all = build_df_all_frames(df_t_train_all, 'phone')
     df_all_frames_all.to_pickle('df_all_frames_MAILABS_UK_US_FR_ES_train_ipa.pkl')
 
-    from src.wav2vec2_utils import plot_reduction
+    from flowspeech.wav2vec2_utils import plot_reduction
 
     df_all_frames_all['average_vector'] = df_all_frames_all['vector']
     df_all_frames_all.sample(frac=1, random_state=1)
@@ -1048,7 +1048,7 @@ def use_tests():
         'df_all_frames_MAILABS_UK_US_FR_ES_train_ipa_w2v_xlsr_no_ft.pkl'
     )
 
-    from src.wav2vec2_utils import plot_reduction
+    from flowspeech.wav2vec2_utils import plot_reduction
 
     df_all_frames['average_vector'] = df_all_frames['vector']
     plot_reduction(

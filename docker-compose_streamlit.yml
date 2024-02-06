@@ -1,30 +1,29 @@
 version: "3"
 
+name: content-tools
+
 services:
   flaskapp:
     # this is needed to run the app on apple silicon
     platform: linux/amd64
     build: ./
     volumes:
-      # Just specify a path and let the Engine create a volume
       - ./:/home/mambauser/code
-    container_name: flaskapp
-    # network_mode: host
+    image: flowspeech
+    container_name: content-tools
     ports:
-      - "8000:8000"
+      - "8001:8001"
     init: true
     restart: on-failure
     command: ["bash", "content_tools/run_content_tools.sh"]
 
   nginx:
-    build: #./nginx
+    build:
       context: ./nginx
       dockerfile: ./Dockerfile_streamlit
-    container_name: nginx
     environment:
       - SERVER_NAME=0.0.0.0
     restart: always
-    # network_mode: host
     init: true
     ports:
       - "80:80"

@@ -10,7 +10,7 @@ import torch
 from scipy.io.wavfile import read
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
-from src.pronunciation_dictionaries import cmu_1_char_to_gibberish
+from flowspeech.pronunciation_dictionaries import cmu_1_char_to_gibberish
 
 device = 'cpu'  # cuda or cpu
 

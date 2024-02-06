@@ -19,8 +19,8 @@ from g2p_en import G2p
 from num2words import num2words
 from tqdm import tqdm
 
-from src.numbers_processing import normalize_numbers
-from src.phonemizer_utils import word_to_stressed_syl
+from flowspeech.numbers_processing import normalize_numbers
+from flowspeech.phonemizer_utils import word_to_stressed_syl
 from syllabipy.sonoripy import SonoriPy, define_categories, str_to_list_of_char
 
 print_memory_usage('RAM - text_processing after external libraries')
@@ -29,7 +29,7 @@ print_memory_usage('RAM - text_processing after external libraries')
 g2p = G2p()
 print_memory_usage('RAM - text_processing after g2p model')
 
-from src.pronunciation_dictionaries import (
+from flowspeech.pronunciation_dictionaries import (
     unstress,
     remove_stress_annots,
     differs_by_one_insertion,
@@ -37,7 +37,7 @@ from src.pronunciation_dictionaries import (
 
 
 print_memory_usage('RAM - text_processing after lambda functions')
-from src.pronunciation_dictionaries import (
+from flowspeech.pronunciation_dictionaries import (
     get_augmented_mfa_dict,
     cmudict_dict,
     lang_to_MFA_g2p_models,
@@ -50,7 +50,7 @@ from src.pronunciation_dictionaries import (
 print_memory_usage('RAM - text_processing after pronunciation_dictionaries')
 # mfa_dicts={lang:get_augmented_mfa_dict(lang) for lang in lang_to_MFA_g2p_models}
 # print_memory_usage('RAM - text_processing after mfa_dicts')
-from src.syllables_processing import syllabified_text, n_vowels
+from flowspeech.syllables_processing import syllabified_text, n_vowels
 
 print_memory_usage('RAM - text_processing after syllable_processsing')
 
@@ -1030,7 +1030,7 @@ def prefill_for_sentence(
 # records = [future.result() for future in concurrent.futures.as_completed(futures)]
 
 
-from src.code_utils import internal_error
+from flowspeech.code_utils import internal_error
 from datetime import datetime
 
 
@@ -1120,7 +1120,7 @@ print_memory_usage('RAM - text_processing after all function declarations')
 
 
 def use_tests():
-    # from src.text_processing import *
+    # from flowspeech.text_processing import *
     # prefill_for_sentence(sentence)
 
     sentence = "A las 22 en punto, tengo una *reunión* con el CEO, Indya, y un ingeniero de una empresa emergente de 30000 dólares en etapa inicial, ¡luego con el CTO!"
@@ -1261,7 +1261,7 @@ def use_tests():
         0
     ].used_method_for_syl_text
 
-    from src.label_data_processing import actor_recordings
+    from flowspeech.label_data_processing import actor_recordings
 
     df_phrases = actor_recordings()
     df_phrases = df_phrases.loc[df_phrases.phrase_id.drop_duplicates().index]
@@ -1321,7 +1321,10 @@ def use_tests():
 
     # ' '.join(['|'.join(['_'.join([arpabet_to_2_char_ipa[unstress(p).lower()] for p in syl]) for syl in word]) for word in split_phonetics('AE0|D_V_ER1|T_AH0|Z_M_AH0_N_T')])
 
-    from src.pronunciation_dictionaries import arpabet_to_2_char_ipa, mfa_to_display_ipa
+    from flowspeech.pronunciation_dictionaries import (
+        arpabet_to_2_char_ipa,
+        mfa_to_display_ipa,
+    )
 
     import unicodedata
 

@@ -1,8 +1,9 @@
-import streamlit as st
-import exercise_generation.exercises as ex
-import re
 import ast
+import re
+
 import exercise_generation.auxiliary as aux
+import exercise_generation.exercises as ex
+import streamlit as st
 from utils import check_password
 
 

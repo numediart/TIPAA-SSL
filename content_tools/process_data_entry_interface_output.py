@@ -1,17 +1,13 @@
 import json
-import pandas as pd
 from copy import deepcopy
 
+import pandas as pd
 
-import sys
-
-sys.path.append('./')
-from src.text_processing import (
+from flowspeech.text_processing import (
     group_consecutive_duplicates,
     prefill_content,
     remove_special_characters,
 )
-
 
 param_to_name = {
     'module_title': 'Module title',

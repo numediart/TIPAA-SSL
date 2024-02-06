@@ -2,7 +2,7 @@ import pandas as pd
 from syllabipy.sonoripy import SonoriPy, str_to_list_of_char, define_categories
 import os
 from tqdm import tqdm
-from src.pronunciation_dictionaries import cmudict_dict
+from flowspeech.pronunciation_dictionaries import cmudict_dict
 
 unstress = lambda el: el[:-1] if el[-1] in str([0, 1, 2]) else el
 
@@ -13,8 +13,8 @@ def n_syl_SonoriPy(phonetics=['K', 'AA1', 'F', 'IY0'], mode='CMU'):
 
 
 def syllables_data_fr(syl_sep='|'):
-    # from src.pronunciation_dictionaries import mfa_dicts
-    from src.pronunciation_dictionaries import (
+    # from flowspeech.pronunciation_dictionaries import mfa_dicts
+    from flowspeech.pronunciation_dictionaries import (
         get_augmented_mfa_dict,
         lang_to_MFA_g2p_models,
     )
@@ -266,7 +266,7 @@ def syllables_data(syl_sep='|'):
 
 
 # syllables_data()
-from src.phonemizer_utils import phonetize
+from flowspeech.phonemizer_utils import phonetize
 import librosa
 import numpy as np
 import pandas as pd
@@ -502,7 +502,7 @@ def n_vowels(word="coffee", lang="en_GB"):
 
 
 def use_tests():
-    from src.pronunciation_dictionaries import (
+    from flowspeech.pronunciation_dictionaries import (
         get_augmented_mfa_dict,
         lang_to_MFA_g2p_models,
     )

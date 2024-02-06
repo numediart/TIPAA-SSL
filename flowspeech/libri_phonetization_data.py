@@ -1,16 +1,13 @@
-import cmudict
-from pandas.io import pickle
-import textgrid
+import os
+from glob import glob
 
 # doc: https://github.com/kylebgorman/textgrid
 from itertools import compress
 
-from tqdm import tqdm
+import cmudict
 import pandas as pd
-import os
-from glob import glob
-
-from src.text_processing import remove_stress_annots
+import textgrid
+from tqdm import tqdm
 
 
 def get_phone_timings(
