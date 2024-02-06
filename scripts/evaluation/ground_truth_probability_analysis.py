@@ -230,6 +230,8 @@ def main():
 
         logger.info("Processing data")
         results_df = compute_predictions(df, model=model)
+        logging.info("Saving results to parquet file")
+        results_df.to_parquet(output_folder / f"results_{data_type}.parquet")
 
         logger.info("Plotting ground truth posterior distributions")
         plot_ground_truth_proba_distribution(
