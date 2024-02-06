@@ -9,17 +9,13 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 
-from flowspeech.audio_processing import read_audio_file
 from flowspeech.DL_speech_tech import (
     default_model,
-    post_analysis,
     start_end_contrast_from_formatted_phonetics_audio,
-    validate_recording,
 )
 from flowspeech.label_data_processing import (
     actor_recordings,
     final_s_artificial_data,
-    load_adversarial_dataset,
     synth_words_data,
 )
 from flowspeech.performance_functions import (
@@ -38,11 +34,6 @@ from flowspeech.pronunciation_dictionaries import (
     cmu_consonants,
     cmu_vowels,
     remove_stress_annots,
-)
-from flowspeech.wav2vec2_frame_prediction import (
-    AudioMode,
-    AudioStatus,
-    Wav2Vec2ForFramePrediction,
 )
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -549,11 +540,9 @@ def start_end_consonant_clusters_on_synth_words(
 
 
 from flowspeech.text_processing import (
-    count_syllables,
     drop_consecutive_duplicate_elements,
     drop_consecutive_duplicates,
     split_phonetics,
-    split_phonetics_to_phones,
     unstress,
 )
 
@@ -1173,63 +1162,3 @@ def model_comparison():
         ],
         :,
     ].T
-
-
-def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_model):
-    logger.info("Loading adversarial dataset")
-    adversary_df = load_adversarial_dataset()
-
-    data = []
-
-    unique_phonetics = adversary_df.cmu_phonetics.unique()
-    unique_phonetics = [el for el in unique_phonetics if el != '']
-
-    for i, row in tqdm(adversary_df.iterrows(), total=len(adversary_df)):
-        waveform, fs = read_audio_file(row.audio_file_url)
-
-        for phonetics in unique_phonetics:
-            audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
-                waveform, phonetics, mode=AudioMode.NUMPY
-            )
-
-            result = {
-                'audio_load_status': audio_load.status == AudioStatus.SUCCESS,
-                'rejected': audio_load.status != AudioStatus.SUCCESS,
-                'audio_status_message': str(audio_load.status),
-                'silent_sample_ratio': audio_load.silent_sample_ratio,
-                'pitch_sample_ratio': audio_load.pitch_sample_ratio,
-                'speech_rate': audio_load.speech_rate,
-                'true_phonetics': row.cmu_phonetics,
-                'exp_phonetics': phonetics,
-                'n_phones': len(split_phonetics_to_phones(phonetics)),
-                'n_syllables': count_syllables(phonetics),
-                'match': row.cmu_phonetics == phonetics
-                or phonetics == row.alt_cmu_phonetics,
-                'target': row.target,
-                'audio_file_url': row.audio_file_url,
-                'category': row.category,
-                'speaker': row.speaker,
-            }
-
-            if phone_prob_matrix is not None:
-                validation_result = validate_recording(phone_prob_matrix, phonetics)
-                result['rejected'] = result['rejected'] or (not validation_result)
-
-                post_result = post_analysis(
-                    phone_prob_matrix,
-                    phonetics,
-                )
-                if post_result is not None:
-                    result['per_aligned'] = post_result.per_aligned
-                    result['silent_frame_ratio'] = post_result.silent_frame_ratio
-                    result['phone_count_ratio'] = post_result.phone_count_ratio
-                    result['detected_phones'] = post_result.df_detection.phone.tolist()
-
-            result["should_reject"] = result["target"] == 0 or (
-                result["target"] == 1 and result["match"] == False
-            )
-
-            data.append(result)
-
-    data = pd.DataFrame(data)
-    return data

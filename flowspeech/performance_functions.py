@@ -1,7 +1,6 @@
 import ast
 import logging
 import warnings
-from collections import Counter
 from collections.abc import Iterable
 
 import numpy as np
@@ -13,14 +12,17 @@ from flowspeech.DL_speech_tech import (
     StressCategory,
     default_model,
     phonemeContrast_from_formatted_phonetics_audio,
+    post_analysis,
     schwa_sound_from_formatted_phonetics_audio,
     start_end_contrast_from_formatted_phonetics_audio,
     stress_from_formatted_phonetics,
+    validate_recording,
 )
 from flowspeech.label_data_processing import (
     actor_recordings,
     build_user_data_df,
     get_data_stressed_content,
+    load_adversarial_dataset,
     synth_words_data,
 )
 from flowspeech.libri_phonetization_data import (
@@ -38,10 +40,16 @@ from flowspeech.pronunciation_dictionaries import (
 from flowspeech.text_processing import (
     chunk_text,
     cmu_ensure_phonetics_consistency,
+    count_syllables,
     prefill_for_sentence,
+    split_phonetics_to_phones,
     word_stress_from_cmu,
 )
-from flowspeech.wav2vec2_frame_prediction import AudioMode
+from flowspeech.wav2vec2_frame_prediction import (
+    AudioMode,
+    AudioStatus,
+    Wav2Vec2ForFramePrediction,
+)
 from syllabipy.sonoripy import SonoriPy
 
 logger = logging.getLogger(__name__)
@@ -1014,6 +1022,79 @@ def analyze_start_end_for_synth_word(
     return results
 
 
+def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_model):
+    logger.info("Loading adversarial dataset")
+    adversary_df = load_adversarial_dataset()
+
+    data = []
+
+    unique_phonetics = adversary_df.cmu_phonetics.unique()
+    unique_phonetics = [el for el in unique_phonetics if el != ""]
+
+    for _, row in tqdm(adversary_df.iterrows(), total=len(adversary_df)):
+        waveform, _ = read_audio_file(row.audio_file_url)
+
+        for phonetics in tqdm(unique_phonetics, leave=False):
+            audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+                waveform, phonetics, mode=AudioMode.NUMPY
+            )
+
+            result = {
+                "audio_load_status": audio_load.status == AudioStatus.SUCCESS,
+                "rejected": audio_load.status != AudioStatus.SUCCESS,
+                "audio_status_message": str(audio_load.status),
+                "silent_sample_ratio": audio_load.silent_sample_ratio,
+                "pitch_sample_ratio": audio_load.pitch_sample_ratio,
+                "speech_rate": audio_load.speech_rate,
+                "true_phonetics": row.cmu_phonetics,
+                "exp_phonetics": phonetics,
+                "n_phones": len(split_phonetics_to_phones(phonetics)),
+                "n_syllables": count_syllables(phonetics),
+                "match": phonetics in (row.cmu_phonetics, row.alt_cmu_phonetics),
+                "target": row.target,
+                "audio_file_url": row.audio_file_url,
+                "category": row.category,
+                "speaker": row.speaker,
+            }
+
+            if phone_prob_matrix is not None:
+                validation_result = validate_recording(phone_prob_matrix, phonetics)
+                result["rejected"] = result["rejected"] or (not validation_result)
+
+                post_result = post_analysis(
+                    phone_prob_matrix,
+                    phonetics,
+                )
+                if post_result is not None:
+                    result["per_aligned"] = post_result.per_aligned
+                    result["silent_frame_ratio"] = post_result.silent_frame_ratio
+                    result["phone_count_ratio"] = post_result.phone_count_ratio
+                    result["detected_phones"] = post_result.df_detection.phone.tolist()
+
+            result["should_reject"] = result["target"] == 0 or (
+                result["target"] == 1 and not result["match"]
+            )
+
+            data.append(result)
+
+    data = pd.DataFrame(data)
+    return data
+
+    # data = load_test_dataset(df_t_test)
+
+    # from tqdm import tqdm
+
+    # preds = [model.predict_with_timings(r.s, r.phones) for i, r in tqdm(data.iterrows())]
+    # preds2 = [
+    #     default_model.predict_with_timings(r.s, r.phones)
+    #     for i, r in tqdm(data.iterrows())
+    # ]
+
+    # preds_df = pd.concat(preds)
+    # preds_df2 = pd.concat(preds2)
+    # sum(preds_df.pred_phones_audio == preds_df2.pred_phones_audio) / len(preds_df)
+
+
 # to be removed
 if False:
 
@@ -1265,17 +1346,3 @@ def use_tests():
     # comment for cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
     data = load_libri_dataset_audio_timings(df_t_test)
-
-    # data = load_test_dataset(df_t_test)
-
-    # from tqdm import tqdm
-
-    # preds = [model.predict_with_timings(r.s, r.phones) for i, r in tqdm(data.iterrows())]
-    # preds2 = [
-    #     default_model.predict_with_timings(r.s, r.phones)
-    #     for i, r in tqdm(data.iterrows())
-    # ]
-
-    # preds_df = pd.concat(preds)
-    # preds_df2 = pd.concat(preds2)
-    # sum(preds_df.pred_phones_audio == preds_df2.pred_phones_audio) / len(preds_df)

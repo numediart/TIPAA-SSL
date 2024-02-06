@@ -40,13 +40,13 @@ def count_occurrences(lst):
 ##### Data processing
 import os
 
-from src.load_data import (
+from flowspeech.load_data import (
     load_dataset_MAILABS,
     build_df_all_frames,
     build_df_all_phoneme_instances,
     load_dataset_commonvoice,
 )
-from src.text_processing import remove_stress_annots
+from flowspeech.text_processing import remove_stress_annots
 
 
 def build_frame_dataset(
@@ -453,10 +453,10 @@ if False:
     reducer = PCA(n_components=0.95, random_state=42)
     X_reduced = reducer.fit_transform(X)
 
-    df_all_phoneme_instances_sample[
-        'reduced_vector_sequence'
-    ] = df_all_phoneme_instances_sample.apply(
-        lambda r: reducer.transform(r.vector_sequence), axis=1
+    df_all_phoneme_instances_sample['reduced_vector_sequence'] = (
+        df_all_phoneme_instances_sample.apply(
+            lambda r: reducer.transform(r.vector_sequence), axis=1
+        )
     )
     lengths = df_all_phoneme_instances_sample.reduced_vector_sequence.apply(len).tolist()
 
