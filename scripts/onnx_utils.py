@@ -1,20 +1,15 @@
 # --- from https://github.com/ccoreilly/wav2vec2-service/blob/master/convert_torch_to_onnx.py ----
 # MIT License
-from onnxruntime.quantization.quantize import quantize
-from transformers import Wav2Vec2ForCTC
-import torch
 import argparse
+from collections import defaultdict
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
 import torch.onnx
 
-import torch
-from collections import defaultdict
-
 # Original transformer model
-from transformers import Wav2Vec2Model, Wav2Vec2Processor, Wav2Vec2Config
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Model
 
 w2v2_model_path = "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft"
 
@@ -25,17 +20,14 @@ class LastHiddenStateModel(torch.nn.Module):
         super().__init__()
         self.model = model
 
-    def forward(self, input):
-        # output = self.model(input)
-        # return output[-1]
-        # input_values = self.processor(torch.tensor(s), sampling_rate=fs, return_tensors="pt").input_values.to('cpu')
+    def forward(self, inputs):
         with torch.no_grad():
-            return self.model(input).hidden_states[-1]
+            return self.model(inputs).hidden_states[-1]
 
 
 def extract_linear_weights(model):
     linear_weights = []
-    for name, module in model.named_children():
+    for _, module in model.named_children():
         if isinstance(module, torch.nn.Linear):
             linear_weights.append(module.weight.data)
         linear_weights.extend(extract_linear_weights(module))
@@ -44,19 +36,16 @@ def extract_linear_weights(model):
 
 def extract_linear_bias(model):
     linear_bias = []
-    for name, module in model.named_children():
+    for _, module in model.named_children():
         if isinstance(module, torch.nn.Linear):
             linear_bias.append(module.bias.data)
         linear_bias.extend(extract_linear_bias(module))
     return linear_bias
 
 
-# weights = extract_linear_weights(model)
-
-
 def extract_linear_layers(model):
     linear_layers = []
-    for name, module in model.named_children():
+    for _, module in model.named_children():
         if isinstance(module, torch.nn.Linear):
             linear_layers.append((module, 'weight'))
         linear_layers.extend(extract_linear_layers(module))
@@ -69,7 +58,7 @@ def extract_linear_layers(model):
 def prune_model(model, sparsity=0.7):
     linear_layers = extract_linear_layers(model)
 
-    import torch.nn.utils.prune as prune
+    from torch.nn.utils import prune
     from torch.nn.utils.prune import remove
 
     for l in linear_layers:
@@ -90,7 +79,7 @@ def explore_model_parameters(model):
     module_types = defaultdict(int)
 
     def count_parameters(model):
-        for name, module in model.named_children():
+        for _, module in model.named_children():
             module_type = type(module).__name__
             module_types[module_type] += sum(p.numel() for p in module.parameters())
             count_parameters(module)
@@ -152,7 +141,7 @@ def convert_to_onnx(model_id_or_path, onnx_model_name):
 
 def quantize_onnx_model(onnx_model_path, quantized_model_path):
     print("Starting quantization...")
-    from onnxruntime.quantization import quantize_dynamic, QuantType
+    from onnxruntime.quantization import QuantType, quantize_dynamic
 
     quantize_dynamic(onnx_model_path, quantized_model_path, weight_type=QuantType.QUInt8)
 
