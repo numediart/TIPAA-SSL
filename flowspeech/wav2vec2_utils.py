@@ -257,15 +257,18 @@ def instances_per_frame(
     unstressed=True,
 ):
     vectors = []
-    if number_of_examples == None:
+
+    if df_t is None or len(df_t) == 0:
+        return pd.DataFrame()
+
+    if number_of_examples is None:
         number_of_examples = len(df_t)
 
     for i in tqdm(range(number_of_examples)):
-        # Obtain the information about the start and end of the sentence
-        df_segmented = pd.DataFrame.from_records(df_t.iloc[i].phone_df)
-        s, fs = librosa.load(df_t.iloc[i].wav_path, sr=16000)
-
-        # new_df=phone_concat_vectors(s, fs, df_segmented, processor, model, time_per_output=time_per_output, phone_type=phone_type, extractor_function=extractor_function)
+        if df_t.iloc[i] is not None and df_t.iloc[i].phone_df is not None:
+            # Obtain the information about the start and end of the sentence
+            df_segmented = pd.DataFrame.from_records(df_t.iloc[i].phone_df)
+            s, fs = librosa.load(df_t.iloc[i].wav_path, sr=16000)
         new_df = phone_concat_vectors_with_silence(
             s,
             fs,
@@ -277,7 +280,6 @@ def instances_per_frame(
             extractor_function=extractor_function,
             unstressed=unstressed,
         )
-
         if 'language_code' in df_t.iloc[i].keys():
             new_df['language_code'] = df_t.iloc[i]['language_code']
         if 'genre' in df_t.iloc[i].keys():
@@ -287,6 +289,8 @@ def instances_per_frame(
         if 'filename' in df_t.iloc[i].keys():
             new_df['filename'] = df_t.iloc[i]['filename']
         vectors.append(new_df)
+
+    df_all_frames = pd.concat(vectors)
 
     df_all_frames = pd.concat(vectors)
     return df_all_frames
