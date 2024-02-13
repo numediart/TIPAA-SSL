@@ -153,6 +153,40 @@ def align_common_voice(
     return df
 
 
+def align_edacc(
+    root='/home/mambauser/code/data/edacc_v1.0',
+    split='linguistic_background',
+    mfa_model='english_mfa',
+    mfa_path='mfa_data',
+    mfa_result_path='mfa_result',
+    fs=16000,
+    out_json='home/mambauser/code/data/align_edacc_en_train_mfa.json',
+):
+    if os.path.exists(mfa_path):
+        shutil.rmtree(mfa_path)
+    if os.path.exists(mfa_result_path):
+        shutil.rmtree(mfa_result_path)
+
+    df = pd.read_csv(
+        '/home/mambauser/code/data/edacc_v1.0/test/text_edited',
+        sep='[;,\\t]',
+        engine='python',
+        header=None,
+        names=['path', 'sentence'],
+    )
+    path = '/'.join([root, 'Data_Test'])
+    texts = df.sentence.tolist()
+    prepare_files(path, wav_paths=df.path.tolist(), texts=texts, mfa_path=mfa_path, fs=fs)
+    textgrids_df, failures = launch_mfa(
+        mfa_path, mfa_result_path, dictionary=mfa_model, acoustic_model=mfa_model
+    )
+    textgrids_df.to_json(out_json)
+    shutil.rmtree(mfa_path)
+    shutil.rmtree(mfa_result_path)
+
+    return df
+
+
 def align_synth_speech(
     path='data/synth_audio/speechocean762',
     mfa_path='mfa_data',

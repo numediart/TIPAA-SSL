@@ -3,6 +3,7 @@
     Returns:
         _type_: _description_: Dataframe of different speech datasets 
 """
+
 import ast
 
 import librosa
@@ -105,6 +106,42 @@ def load_dataset_commonvoice(
             path + '/' + lang_code + '/clips/' + df_temp_metadata.path
         )
         df = pd.concat([df, df_temp_metadata])
+
+    return df
+
+
+def load_dataset_edacc(
+    path='/home/mambauser/code/data/edacc_v1.0', split="dev", phone_set='CMU'
+):
+    """phone_set: 'CMU' or 'MFA_IPA'"""
+    df = pd.DataFrame()
+    df_temp = pd.read_json('/home/mambauser/code/data/align_edacc_en_train_mfa.json')
+    df_temp_metadata = pd.read_csv(
+        '/home/mambauser/code/data/edacc_v1.0/test/text_edited_new_2',
+        sep='[;,\\t]',
+        engine='python',
+        header=None,
+        names=['path', 'sentence'],
+    )
+
+    df_temp_metadata = df_temp_metadata.loc[
+        df_temp_metadata.path.isin(df_temp.filename + '.wav')
+    ]
+
+    map = df_temp.set_index('filename').to_dict()['phone_df']
+
+    df_temp_metadata['phone_df'] = df_temp_metadata.apply(
+        lambda r: map[r.path.split('.')[0]], axis=1
+    )
+
+    for i, row in df_temp_metadata.iterrows():
+        # df_temp.at[i, "path"] = '.'+row.path.split('flowchase')[1].replace('datasets', 'data')
+        if type(row.phone_df) == str:
+            res = ast.literal_eval(row.phone_df)
+            df_temp_metadata.at[i, "phone_df"] = res
+
+    df_temp_metadata['wav_path'] = path + '/Data_Test/' + df_temp_metadata.path
+    df = pd.concat([df, df_temp_metadata])
 
     return df
 
