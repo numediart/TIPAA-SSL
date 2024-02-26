@@ -122,6 +122,17 @@ terminations_accepted_alternatives["T"] = [
 # As in target_accepted_alternatives, we want to accept ['D','T'] for 'D', we should do the same when there is a superfluous phoneme, therefore:
 terminations_accepted_alternatives["D"] += terminations_accepted_alternatives["T"]
 
+target_to_basis = {
+    "HH": "HH",
+    '': 'HH',
+    'D': 'IH0_D',
+    'IH0_D': 'IH0_D',
+    'T': 'IH0_T',
+    'S': 'IH0_S',
+    'Z': 'IH0_Z',
+    'IH0_Z': 'IH0_Z',
+}
+
 
 def intensity_to_bin(
     scores: Sequence[float], n_max: int = 2, threshold: float = 60
@@ -748,18 +759,6 @@ def schwa_sound_from_formatted_phonetics_audio(
             "stress_intensities_word": stress_intensities_word,
             "target_vowel": detected_target_vowel,
         }
-
-
-target_to_basis = {
-    "HH": "HH",
-    '': 'HH',
-    'D': 'IH0_D',
-    'IH0_D': 'IH0_D',
-    'T': 'IH0_T',
-    'S': 'IH0_S',
-    'Z': 'IH0_Z',
-    'IH0_Z': 'IH0_Z',
-}
 
 
 def phonetic_reference_processing(

@@ -1,9 +1,9 @@
 import ffmpeg
-import IPython
+from IPython import display
 from ipywebrtc import AudioRecorder, CameraStream
 from numpy import ndarray
 
-from src.audio_processing import read_audio_file
+from flowspeech.audio_processing import read_audio_file
 
 
 def record_audio():
@@ -17,8 +17,8 @@ def record_audio():
 
 
 def get_recording(
-    recorder: AudioRecorder, output: str = "recording.wav", sr: int = 16_000
-) -> tuple[ndarray, int]:
+    recorder: AudioRecorder, output: str = "recording.wav", sr: float = 16_000
+) -> tuple[ndarray, float]:
     """From a recording, return the audio signal and the sample rate.
     Also write it to a file if specified.
 
@@ -31,7 +31,7 @@ def get_recording(
     return sig, sr
 
 
-def play_audio(path_or_sound: str | ndarray, sr: int = 16_000) -> IPython.display.Audio:
+def play_audio(path_or_sound: str | ndarray, sr: float = 16_000):
     """Play audio in a notebook using a widget.
 
     Args:
@@ -42,4 +42,4 @@ def play_audio(path_or_sound: str | ndarray, sr: int = 16_000) -> IPython.displa
         sound, sr = read_audio_file(path_or_sound, sr)
     else:
         sound = path_or_sound
-    return IPython.display.Audio(data=sound, rate=sr)
+    return display.Audio(data=sound, rate=sr)
