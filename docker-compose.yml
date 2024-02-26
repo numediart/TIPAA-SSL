@@ -13,14 +13,12 @@ services:
     tty: true
     ports:
       - "8000:8000"
-    restart: on-failure
 
   nginx:
     build: ./nginx
     container_name: nginx
     environment:
       - SERVER_NAME=0.0.0.0
-    restart: always
     depends_on: flowspeech
     init: true
     tty: true
