@@ -2,6 +2,7 @@
 .*/**
 *.png
 *.csv*
+*.env
 .streamlit/**
 librispeech_alignments/**
 __pycache__/**
