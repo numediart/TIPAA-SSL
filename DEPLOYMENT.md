@@ -124,8 +124,8 @@ To show terminal output:
 
 ```
 docker logs flowspeech > docker_logs.txt # to get all history, too long if running for a while
-docker logs flowspeech --tail=100 # to print last history
-docker compose logs --tail=20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
+docker logs flowspeech --tail 100 # to print last history
+docker compose logs --tail 20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
 ```
 
 # Bootstrap the environment and manage dependencies
@@ -139,10 +139,30 @@ docker run --rm --user 0 -v "$(pwd):/tmp" \
      pipx run conda-lock -p osx-64 -p linux-64 -f env.yml --without-cuda"
 ```
 
-The Dockerfile then uses `conda-lock.yml` to install the conda environment.
+The Dockerfile will then use `conda-lock.yml` to install the conda environment.
 
 If you need to lock the environment after having made minor changes to it, just do:
 
 ```
 docker exec -it flowspeech pipx run conda-lock -p osx-64 -p linux-64 -f env.yml --without-cuda"
 ```
+
+# Run a Jupyter notebook on a remote machine
+
+If you want to keep a notebook running as a service on a remote machine (e.g. one equipped with GPUs), this is for you.
+
+Create a `.env` file containing:
+```
+JUPYTER_TOKEN=your login password
+JUPYTER_PORT=the port you want to use, e.g. 7878
+```
+
+If you cannot store large datasets in the same place where the repository is cloned (`data/` folder),
+you can create another docker-compose file `jupyter_myMachine.yml` following the example of `jupyter_hal.yml`.
+
+Then, simply run:
+```
+docker compose -f docker-compose_jupyter.yml [-f jupyter_myMachine.yml] up -d
+```
+
+And point your browser to `http://<IP of the machine>:<used port>/lab`.
