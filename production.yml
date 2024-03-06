@@ -1,7 +1,7 @@
 services:
   flowspeech:
-    restart: on-failure
-  nginx:
     environment:
       - NUM_WORKERS=2
+    restart: on-failure
+  nginx:
     restart: always

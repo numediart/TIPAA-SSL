@@ -1,0 +1,9 @@
+services:
+  jupyter:
+    extends:
+      file: docker-compose_jupyter.yml
+      service: jupyter
+    volumes:
+      - /data2/flowchase/LibriSpeech:/home/mambauser/code/data/LibriSpeech
+      - /data2/flowchase/librispeech_alignments:/home/mambauser/code/data/librispeech_alignments
+      - /data2/flowchase/synth_audio:/home/mambauser/code/data/synth_audio
