@@ -178,7 +178,7 @@ def synthesize_words(
 
 
 def synthesize_voices():
-    from src.pronunciation_dictionaries import (
+    from flowspeech.pronunciation_dictionaries import (
         get_augmented_mfa_dict,
         lang_to_MFA_g2p_models,
     )

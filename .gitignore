@@ -44,6 +44,7 @@ Documents/**
 .streamlit/**
 *.pkl
 *.bash
+*.env
 # *.onnx
 # models/**
 content_tools/uploaded/**

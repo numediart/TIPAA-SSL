@@ -3,11 +3,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
 # packages list. The --no-install-recommends avoids installing recommended packages that are not necessary for a tiny docker image: https://phoenixnap.com/kb/docker-image-size
-RUN	apt-get update && apt-get install --fix-missing --no-install-recommends -y \
+RUN apt-get update && apt-get install --fix-missing --no-install-recommends -y \
     gawk \
     curl \
     sudo \
     git \
+    pipx \
     # this is for git cloning
     git-lfs \ 
     # dependencies for phonemizer

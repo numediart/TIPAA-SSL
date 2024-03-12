@@ -18,8 +18,8 @@ Make sure the quantized ONNX model is located in `./hf_models`.
 Build docker containers then run them:
 
 ```
-docker compose build
-docker compose up -d
+docker compose -f docker-compose.yml -f production.yml build
+docker compose -f docker-compose.yml -f production.yml up -d
 ```
 
 If neither `docker compose` or `docker-compose` work, install it:
@@ -41,15 +41,12 @@ or
 
 ```
 docker compose down
-docker compose up -d
+docker compose -f docker-compose.yml -f production.yml up -d
 ```
 
 ## Process for updating code on server
 
 - Do a pytest locally
-<!-- - docker compose build containers locally
-- docker compose up it locally, to check that it runs, and use test_DL_api.py on localhost -->
-- ask Filipe to redirect traffic elsewhere to work freely
 - On the web server: ssh to it, then, git pull (or git fetch + git merge) and build flaskapp, then up
 - check on swagger ui that the default examples work
 - run the test_DL_api.py functions from local towards the server
@@ -71,7 +68,7 @@ git pull && docker compose restart flowspeech
 Rebuild and launch right away:
 
 ```
-docker compose up -d --no-deps --build flowspeech
+docker compose -f docker-compose.yml -f production.yml up -d --no-deps --build flowspeech
 ```
 
 ## github actions resources
@@ -120,15 +117,15 @@ docker compose up --build -d flowspeech
 Connect to a bash terminal without affecting the running state.
 
 ```
-docker exec -it flaskapp bash
+docker exec -it flowspeech bash
 ```
 
 To show terminal output:
 
 ```
 docker logs flowspeech > docker_logs.txt # to get all history, too long if running for a while
-docker logs flowspeech --tail=100 # to print last history
-docker compose logs --tail=20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
+docker logs flowspeech --tail 100 # to print last history
+docker compose logs --tail 20 --follow # to attach to all containers in docker compose and get what's following. Change tail=10 to have 10 last events
 ```
 
 # Bootstrap the environment and manage dependencies
@@ -142,4 +139,30 @@ docker run --rm --user 0 -v "$(pwd):/tmp" \
      pipx run conda-lock -p osx-64 -p linux-64 -f env.yml --without-cuda"
 ```
 
-The Dockerfile then uses `conda-lock.yml` to install the conda environment.
+The Dockerfile will then use `conda-lock.yml` to install the conda environment.
+
+If you need to lock the environment after having made minor changes to it, just do:
+
+```
+docker exec -it flowspeech pipx run conda-lock -p osx-64 -p linux-64 -f env.yml --without-cuda"
+```
+
+# Run a Jupyter notebook on a remote machine
+
+If you want to keep a notebook running as a service on a remote machine (e.g. one equipped with GPUs), this is for you.
+
+Create a `.env` file containing:
+```
+JUPYTER_TOKEN=your login password
+JUPYTER_PORT=the port you want to use, e.g. 7878
+```
+
+If you cannot store large datasets in the same place where the repository is cloned (`data/` folder),
+you can create another docker-compose file `jupyter_myMachine.yml` following the example of `jupyter_hal.yml`.
+
+Then, simply run:
+```
+docker compose -f docker-compose_jupyter.yml [-f jupyter_myMachine.yml] up -d
+```
+
+And point your browser to `http://<IP of the machine>:<used port>/lab`.

@@ -1,6 +1,7 @@
 import ast
+import logging
 import warnings
-from collections import Counter
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -11,14 +12,17 @@ from flowspeech.DL_speech_tech import (
     StressCategory,
     default_model,
     phonemeContrast_from_formatted_phonetics_audio,
+    post_analysis,
     schwa_sound_from_formatted_phonetics_audio,
     start_end_contrast_from_formatted_phonetics_audio,
     stress_from_formatted_phonetics,
+    validate_recording,
 )
 from flowspeech.label_data_processing import (
     actor_recordings,
     build_user_data_df,
     get_data_stressed_content,
+    load_adversarial_dataset,
     synth_words_data,
 )
 from flowspeech.libri_phonetization_data import (
@@ -36,11 +40,19 @@ from flowspeech.pronunciation_dictionaries import (
 from flowspeech.text_processing import (
     chunk_text,
     cmu_ensure_phonetics_consistency,
+    count_syllables,
     prefill_for_sentence,
+    split_phonetics_to_phones,
     word_stress_from_cmu,
 )
-from flowspeech.wav2vec2_frame_prediction import AudioMode
+from flowspeech.wav2vec2_frame_prediction import (
+    AudioMode,
+    AudioStatus,
+    Wav2Vec2ForFramePrediction,
+)
 from syllabipy.sonoripy import SonoriPy
+
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -48,7 +60,14 @@ warnings.filterwarnings("ignore", category=UserWarning)
 pd.options.mode.chained_assignment = None  # default='warn'
 
 
-def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
+def formatted_audiobook_data(
+    selection: pd.DataFrame,
+    libri_words_df: pd.DataFrame,
+    target_phones: str | None = None,
+) -> pd.DataFrame:
+    if len(selection) == 0:
+        return selection
+
     # retrieve phonetics by word thanks to 'phonetics_fot_row'
     selection['split_phonetics'] = selection.apply(
         lambda r: [p.split(' ') for p in phonetics_for_row(r, libri_words_df)], axis=1
@@ -95,13 +114,10 @@ def formatted_audiobook_data(selection, libri_words_df, target_phones=None):
     return selection
 
 
-def count_values(phonetic_detections):
-    d = Counter(phonetic_detections)
-    d = pd.DataFrame.from_dict(d, orient='index')
-    if len(d) > 0:
-        d = d.sort_values(by=0, ascending=False)  # type: ignore
-        d = d / d.sum() * 100
-    return d
+def count_values(phonetic_detections: pd.Series) -> pd.DataFrame:
+    """Count the values in a Series and return a DataFrame with the frequencies in percentage."""
+    c = 100 * phonetic_detections.value_counts(normalize=True)
+    return pd.DataFrame(c)
 
 
 from flowspeech.code_utils import internal_error
@@ -116,7 +132,6 @@ def compute_predictions(
     model=default_model,
     **kwargs,
 ):
-    phonetic_detections = []
     records = []
     errors_data = []
     print('number of examples:', len(selection))
@@ -146,7 +161,6 @@ def compute_predictions(
                     model=model,
                     **kwargs,
                 )
-                phonetic_detections.append(res['phonetic_detection'])
                 records.append(res)
             except Exception as e:
                 print('error in the tech_function in compute_predictions')
@@ -155,7 +169,6 @@ def compute_predictions(
                 print(e)
                 print(internal_error())
                 error_data = internal_error()
-                # import pdb;pdb.set_trace()
                 errors_data.append(error_data)
 
         result_df = pd.DataFrame.from_records(records)
@@ -168,7 +181,9 @@ def compute_predictions(
     return result_df
 
 
-def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
+def stress_GE_performance_test(
+    level: StressCategory = StressCategory.SENTENCE, model=default_model
+):
     df = get_data_stressed_content()
     stress_intensities = []
     stress_binaries = []
@@ -186,6 +201,7 @@ def stress_GE_performance_test(level: StressCategory = StressCategory.SENTENCE):
             phonetics=row.phonetics,
             n_words_by_chunk=n_words_by_chunk,
             level=level,
+            model=model,
             mode=AudioMode.NUMPY,
         )
         print(res)
@@ -416,8 +432,11 @@ def final_ed_for_actor_recordings(target_phones='D', model=default_model):
 
 
 def pContrast_for_actor_recordings(
-    target_phones='AO1', speakers=None, model=default_model
-):
+    target_phones: str = 'AO1',
+    alternatives: Iterable[str] = cmu_vowels,
+    speakers: Iterable[str] | None = None,
+    model=default_model,
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     df = actor_recordings()
     # those who don't have NaN in target
     df_pContrast = df.loc[df.target_phoneme.dropna().index]
@@ -444,7 +463,7 @@ def pContrast_for_actor_recordings(
         # selection['audio_file_idx']=selection.fk_audio_recording_id
 
         result_df = compute_predictions(
-            selection, target_phones=target_phones, model=model
+            selection, target_phones=target_phones, alternatives=alternatives, model=model
         )
         phonetic_detections = result_df.phonetic_detection
 
@@ -458,12 +477,12 @@ def pContrast_for_actor_recordings(
 
 
 def pContrast_from_audiobook_data(
-    data_set='test-other',
-    target_phones='AO1',
-    n=None,
-    alternatives=cmu_vowels,
+    data_set: str = 'test-other',
+    target_phones: str = 'AO1',
+    n: int | None = None,
+    alternatives: Iterable[str] = cmu_vowels,
     model=default_model,
-):
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     libri_words_df = build_librispeech_words_df(data_set=data_set, n=n)
     # there is a tag <unk> when a word is unknown. I filter out the files corresponding to these before performance test
     libri_words_df = libri_words_df[
@@ -489,6 +508,11 @@ def pContrast_from_audiobook_data(
     selection = formatted_audiobook_data(
         selection, libri_words_df, target_phones=target_phones
     )
+    if len(selection) == 0:
+        logger.warning(
+            f"Audiobook selection for {data_set}, n={n} and target_phones={target_phones} is empty"
+        )
+        return None, None
 
     selection['cmu_phonetics'] = selection.apply(
         lambda r: cmu_ensure_phonetics_consistency(r.cmu_phonetics), axis=1
@@ -504,6 +528,11 @@ def pContrast_from_audiobook_data(
             | df_words.str.contains('_' + target_phones + '_')
         )
     ]
+    if len(df_target) == 0:
+        logger.warning(
+            f"Audiobook target df for {data_set}, n={n} and target_phones={target_phones} is empty"
+        )
+        return None, None
 
     result_df = compute_predictions(
         df_target, target_phones=target_phones, alternatives=alternatives, model=model
@@ -778,19 +807,21 @@ def final_s_from_audiobook_data(data_set='dev-clean', n=None, model=default_mode
     )
     phonetic_detections_z = result_df_z.phonetic_detection
 
-    # success_rate=len(result_df[result_df.gibberish_truth==result_df.gibberish_detected])/len(result_df)
-    # print('errors:',result_df[result_df.gibberish_truth!=result_df.gibberish_detected])
-    # result_df[result_df.gibberish_truth!=result_df.gibberish_detected].iloc[-1]
-    # print(success_rate)
+    success_rate = len(
+        result_df[result_df.gibberish_truth == result_df.gibberish_detected]
+    ) / len(result_df)
+    print('errors:', result_df[result_df.gibberish_truth != result_df.gibberish_detected])
+    result_df[result_df.gibberish_truth != result_df.gibberish_detected].iloc[-1]
+    print(success_rate)
 
-    # selections = selections.reset_index(drop=True)
-    # result_df['cmu_phonetics']=selections['cmu_phonetics']
-    # result_df['fpath']=selections['fpath']
+    selections = selections.reset_index(drop=True)
+    result_df['cmu_phonetics'] = selections['cmu_phonetics']
+    result_df['fpath'] = selections['fpath']
 
-    # d=count_values(phonetic_detections)
-    # d_s=count_values(phonetic_detections_s)
+    d = count_values(phonetic_detections)
+    d_s = count_values(phonetic_detections_s)
 
-    # return phonetic_detections, phonetic_detections_s, d, d_s
+    return phonetic_detections, phonetic_detections_s, d, d_s
 
 
 def final_ed_fake_mistakes(n=100):
@@ -914,8 +945,12 @@ def final_ed_on_synth_words(
 
 
 def pContrast_on_synth_words(
-    target_phones='AO1', n=None, alternatives=cmu_vowels, accent=None, model=default_model
-):
+    target_phones: str = 'AO1',
+    n: int | None = None,
+    alternatives: Iterable[str] = cmu_vowels,
+    accent: str | None = None,
+    model=default_model,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     # ex for fr_FR, as in "rue" or "lu":
 
     # df=synth_words_data(path="data/synth_audio/mfa_words/standard/prosody/fr_FR", phonetic_dict=mfa_dicts['fr_FR'], mode='MFA_IPA')
@@ -985,6 +1020,79 @@ def analyze_start_end_for_synth_word(
         results.append(res)
 
     return results
+
+
+def check_acceptance_adversaries(model: Wav2Vec2ForFramePrediction = default_model):
+    logger.info("Loading adversarial dataset")
+    adversary_df = load_adversarial_dataset()
+
+    data = []
+
+    unique_phonetics = adversary_df.cmu_phonetics.unique()
+    unique_phonetics = [el for el in unique_phonetics if el != ""]
+
+    for _, row in tqdm(adversary_df.iterrows(), total=len(adversary_df)):
+        waveform, _ = read_audio_file(row.audio_file_url)
+
+        for phonetics in tqdm(unique_phonetics, leave=False):
+            audio_load, phone_prob_matrix = model.audio_to_phone_prob_matrix(
+                waveform, phonetics, mode=AudioMode.NUMPY
+            )
+
+            result = {
+                "audio_load_status": audio_load.status == AudioStatus.SUCCESS,
+                "rejected": audio_load.status != AudioStatus.SUCCESS,
+                "audio_status_message": str(audio_load.status),
+                "silent_sample_ratio": audio_load.silent_sample_ratio,
+                "pitch_sample_ratio": audio_load.pitch_sample_ratio,
+                "speech_rate": audio_load.speech_rate,
+                "true_phonetics": row.cmu_phonetics,
+                "exp_phonetics": phonetics,
+                "n_phones": len(split_phonetics_to_phones(phonetics)),
+                "n_syllables": count_syllables(phonetics),
+                "match": phonetics in (row.cmu_phonetics, row.alt_cmu_phonetics),
+                "target": row.target,
+                "audio_file_url": row.audio_file_url,
+                "category": row.category,
+                "speaker": row.speaker,
+            }
+
+            if phone_prob_matrix is not None:
+                validation_result = validate_recording(phone_prob_matrix, phonetics)
+                result["rejected"] = result["rejected"] or (not validation_result)
+
+                post_result = post_analysis(
+                    phone_prob_matrix,
+                    phonetics,
+                )
+                if post_result is not None:
+                    result["per_aligned"] = post_result.per_aligned
+                    result["silent_frame_ratio"] = post_result.silent_frame_ratio
+                    result["phone_count_ratio"] = post_result.phone_count_ratio
+                    result["detected_phones"] = post_result.df_detection.phone.tolist()
+
+            result["should_reject"] = result["target"] == 0 or (
+                result["target"] == 1 and not result["match"]
+            )
+
+            data.append(result)
+
+    data = pd.DataFrame(data)
+    return data
+
+    # data = load_test_dataset(df_t_test)
+
+    # from tqdm import tqdm
+
+    # preds = [model.predict_with_timings(r.s, r.phones) for i, r in tqdm(data.iterrows())]
+    # preds2 = [
+    #     default_model.predict_with_timings(r.s, r.phones)
+    #     for i, r in tqdm(data.iterrows())
+    # ]
+
+    # preds_df = pd.concat(preds)
+    # preds_df2 = pd.concat(preds2)
+    # sum(preds_df.pred_phones_audio == preds_df2.pred_phones_audio) / len(preds_df)
 
 
 # to be removed
@@ -1238,17 +1346,3 @@ def use_tests():
     # comment for cmu or ipa
     df_t_train, df_t_test = load_libri_dataset()
     data = load_libri_dataset_audio_timings(df_t_test)
-
-    # data = load_test_dataset(df_t_test)
-
-    # from tqdm import tqdm
-
-    # preds = [model.predict_with_timings(r.s, r.phones) for i, r in tqdm(data.iterrows())]
-    # preds2 = [
-    #     default_model.predict_with_timings(r.s, r.phones)
-    #     for i, r in tqdm(data.iterrows())
-    # ]
-
-    # preds_df = pd.concat(preds)
-    # preds_df2 = pd.concat(preds2)
-    # sum(preds_df.pred_phones_audio == preds_df2.pred_phones_audio) / len(preds_df)

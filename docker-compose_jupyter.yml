@@ -1,0 +1,18 @@
+version: "3"
+
+services:
+  jupyter:
+    # this is needed to run the app on apple silicon
+    platform: linux/amd64
+    build: ./
+    volumes:
+      - ./:/home/mambauser/code
+    image: flowspeech
+    init: true
+    tty: true
+    ports:
+     - ${JUPYTER_PORT}:8888
+    env_file: .env
+    restart: "no"
+    user: "root"
+    command: ["/bin/bash", "-c", "jupyter lab --no-browser --ip=0.0.0.0 --port=8888 --allow-root"]
