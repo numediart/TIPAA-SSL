@@ -128,6 +128,8 @@ Have a look at the helpers in [here](./flowspeech/notebook_utils.py) for recordi
 
 The following have not yet been implemented but should be:
 
+- Manage production and developments environments separately. The production one could be much leaner. E.g. use conda-lock [categories](https://conda.github.io/conda-lock/src_environment_yml/#categories)
+  and Docker multi-stage builds.
 - Specify the major/minor versions of all dependencies in the [env.yml] environment file. This would make it easier to regenerate a lock file whenever we want to update a dependency.
 - Use [pre-commit](https://pre-commit.com/) to automatically run the linter and formatter whenever a commit is done (to avoid relying on the VSCode extensions).
   The difficulty is that `pre-commit` needs to be installed, and `git commit` always be ran where `pre-commit` is installed.
