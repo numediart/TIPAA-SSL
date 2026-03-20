@@ -38,7 +38,7 @@ Please see [this documentation file](/DEPLOYMENT.md).
 git clone https://github.com/flowchase/flowspeech
 ```
 
-A script is available to build the `last_hidden_state.quant.onnx` in `scripts/onnx_utils.py`.
+A script is available to build the `last_hidden_state.quant.onnx` in [scripts/onnx_utils.py](./scripts/onnx_utils.py).
 This makes a compressed version of a pretrained wav2vec2 model from hugginface.
 Create a folder `hf_models` and put that file into it.
 Note: the dimensionality reduction and frame classifiers that run on top of the base wav2vec2 model are stored in this repository in [models](./models).
