@@ -1,6 +1,6 @@
 # Flowspeech
 
-Flowchase's speech tech
+Structured Machine Learning pipeline combining self-supervised representations, intermediate linguistic structure, and alignment for real-world applications 
 
 ## Structure of the repository
 
@@ -11,7 +11,7 @@ Flowchase's speech tech
   - some data processing and loading functions and other utilities
 - `app` contains the definition of the API endpoints that call the `DL_speech_tech` functions
 - `nginx` contains the configuration and Docker files for the deployment server
-- `data` contains different datasets, and also has to be populated after cloning the repository (see [here](https://www.notion.so/flowchase/Speech-datasets-818af2e4ea1749469194642f7226c0ff))
+- `data` contains different datasets: syllables, phonetics, and some audio files
 - `models` contains trained model checkpoints for the part of the processing pipeline which we train ourselves (dimensionality reduction + frame classifier)
 - `syllabipy` contains a tweaked version of the syllabipy package, used to syllabify sentences
 - `scripts` folder contains scripts that are used "offline", i.e. not used behind the API endpoints. E.g. script for
@@ -35,7 +35,7 @@ Please see [this documentation file](/DEPLOYMENT.md).
 ### Download codes and models
 
 ```
-git clone https://github.com/flowchase/flowspeech
+git clone https://github.com/numediart/flowspeech
 ```
 
 A script is available to build the `last_hidden_state.quant.onnx` in [scripts/onnx_utils.py](./scripts/onnx_utils.py).
@@ -103,7 +103,8 @@ The unit tests should work after these step: just run `pytest`
 ## Download datasets
 
 To test the tech's performance, develop new features, ..., you will need speech datasets.
-Have a look at this page for instructions to obtain them: https://www.notion.so/flowchase/Speech-datasets-818af2e4ea1749469194642f7226c0ff
+Example:
+[M-AILABS](https://github.com/i-celeste-aurora/m-ailabs-dataset)
 
 ## Best practices
 
