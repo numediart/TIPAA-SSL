@@ -1,6 +1,19 @@
-# Flowspeech
+# TIPAA-SSL and MUST&amp;P-SRL implementations
 
-Structured Machine Learning pipeline combining self-supervised representations, intermediate linguistic structure, and alignment for real-world applications 
+This repo is a structured Machine Learning pipeline combining self-supervised representations, intermediate linguistic structure, and alignment for real-world applications. It implements the following papers:
+
+- Text-Independent Phone-to-Audio Alignment Leveraging SSL (TIPAA-SSL) Pre-Trained Model Latent Representation and Knowledge Transfer
+    - https://www.mdpi.com/2624-599X/6/3/42
+    - Algorithm: [flowspeech/wav2vec2_frame_prediction.py](https://github.com/numediart/TIPAA-SSL/blob/main/flowspeech/wav2vec2_frame_prediction.py)
+
+- MUST&amp;P-SRL: Multi-lingual and Unified Syllabification in Text and Phonetic Domains for Speech Representation Learning
+    - Published at EMNLP 2023: https://aclanthology.org/2023.emnlp-industry.8/
+    - Algorithm: function "prefill_for_sentence" in [flowspeech/text_processing.py](https://github.com/numediart/TIPAA-SSL/blob/main/flowspeech/text_processing.py#L797)
+
+A talk about this work at [ISCA SIG-SLATE](https://sites.google.com/view/sigslate) webinars covering the 2 papers:
+
+[![Alt text](https://img.youtube.com/vi/7_pQ0aQwg-w/0.jpg)](https://www.youtube.com/watch?v=7_pQ0aQwg-w&ab_channel=ISCASIGSLaTE)
+
 
 ## Structure of the repository
 
