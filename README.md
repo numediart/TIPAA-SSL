@@ -48,7 +48,7 @@ Please see [this documentation file](/DEPLOYMENT.md).
 ### Download codes and models
 
 ```
-git clone https://github.com/numediart/flowspeech
+git clone https://github.com/numediart/TIPAA-SSL
 ```
 
 A script is available to build the `last_hidden_state.quant.onnx` in [scripts/onnx_utils.py](./scripts/onnx_utils.py).
