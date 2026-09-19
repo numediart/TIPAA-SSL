@@ -7,7 +7,6 @@ name = "flowspeech"
 dynamic = ["version"]
 description = "Implementation of the speech tech for Flowchase"
 readme = "README.md"
-license = ""
 requires-python = ">=3.10"
 authors = [
     { name = "Flowchase" },
