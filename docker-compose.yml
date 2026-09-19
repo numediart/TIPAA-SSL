@@ -19,7 +19,8 @@ services:
     container_name: nginx
     environment:
       - SERVER_NAME=0.0.0.0
-    depends_on: flowspeech
+    depends_on:
+      - flowspeech
     init: true
     tty: true
     ports:
