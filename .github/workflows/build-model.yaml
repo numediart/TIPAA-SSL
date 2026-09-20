@@ -20,10 +20,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Add swap space
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - name: Prepare model directory
         run: |
-          mkdir -p hf_models
-          chmod 777 hf_models
+          mkdir -p hf_models/facebook
+          chmod -R 777 hf_models
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -32,21 +40,26 @@ jobs:
         run: |
           docker buildx create --use --driver=docker-container
           docker buildx bake \
-            --set '*.cache-to=type=gha,mode=max' \
+            --set '*.cache-to=type=gha,mode=min' \
             --set '*.cache-from=type=gha' \
             --load
 
-      - name: Start Docker Compose services
-        env:
-          COMPOSE_INTERACTIVE_NO_CLI: 1
-        run: docker compose up -d
-
       - name: Download required Hugging Face models
+        run: |
+          git lfs install
+
+          if [ ! -d "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft" ]; then
+            GIT_LFS_SKIP_SMUDGE=1 git clone \
+              https://huggingface.co/facebook/wav2vec2-xlsr-53-espeak-cv-ft \
+              hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft
+          fi
+
+          git -C hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft lfs pull
+
+      - name: Start Docker Compose service
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
-        run: |
-          docker compose exec -u root -T flowspeech \
-            micromamba run -n base python scripts/download_models.py
+        run: docker compose up -d flowspeech
 
       - name: Generate quantized XLS-R ONNX last-hidden-state model
         env:
