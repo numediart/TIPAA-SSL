@@ -1,6 +1,5 @@
 import os
 
-import onnx
 import torch
 from onnxruntime.quantization import QuantType, quantize_dynamic
 from torch import nn
@@ -53,10 +52,6 @@ def convert_lhs_model_to_quant_onnx(
                 "output": {1: "output_len"},
             },
         )
-
-    # Validate the exported graph before attempting quantization. This turns a
-    # later, less actionable quantizer error into an immediate export error.
-    onnx.checker.check_model(onnx_model_path)
 
     quantized_model_name = os.path.splitext(os.path.basename(onnx_model_name))[0]
     quantized_model_path = os.path.join(
