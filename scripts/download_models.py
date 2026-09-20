@@ -28,8 +28,12 @@ hf_rep = 'charsiu'
 # download_hf_model(hf_path_base=hf_path_base, hf_rep=hf_rep, hf_model='tokenizer_zh_pinyin')
 # download_hf_model(hf_path_base=hf_path_base, hf_rep="speechbrain", hf_model="metricgan-plus-voicebank")
 
-# download_hf_model(hf_path_base=hf_path_base, hf_rep="facebook", hf_model="wav2vec2-xlsr-53-espeak-cv-ft")
 # download_hf_model(hf_path_base=hf_path_base, hf_rep="facebook", hf_model="wav2vec2-large-xlsr-53")
+download_hf_model(
+    hf_path_base=hf_path_base,
+    hf_rep="facebook",
+    hf_model="wav2vec2-xlsr-53-espeak-cv-ft",
+)
 download_hf_model(
     hf_path_base=hf_path_base, hf_rep="facebook", hf_model="wav2vec2-base-960h"
 )
