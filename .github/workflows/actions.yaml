@@ -77,23 +77,20 @@ jobs:
         run: |
           docker compose exec -T flowspeech \
             micromamba run -n base \
-            bash -lc "ls -lah"
+            bash -lc '
+              cd /home/mambauser/code
+              echo "Current directory: $(pwd)"
+              find . -maxdepth 3 -type f \( -name "test_*.py" -o -name "*_test.py" \) | sort
 
-          docker compose exec -T flowspeech \
-            micromamba run -n base \
-            bash -lc "ls -lah .."
+              TESTS=$(find . -maxdepth 3 -type f \( -name "test_*.py" -o -name "*_test.py" \) | sort)
 
-          docker compose exec -T flowspeech \
-            micromamba run -n base \
-            bash -lc "ls -lah hf_models"
-
-          docker compose exec -T flowspeech \
-            micromamba run -n base \
-            pytest \
-              -p no:cacheprovider \
-              test_DL_api.py \
-              test_DL_modules.py \
-              test_models.py
+              if [ -n "$TESTS" ]; then
+                pytest -p no:cacheprovider $TESTS
+              else
+                echo "No pytest files found under /home/mambauser/code"
+                exit 5
+              fi
+            '
 
       - name: Stop Docker Compose services
         if: always()
