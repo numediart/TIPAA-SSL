@@ -46,14 +46,16 @@ jobs:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: |
           docker compose exec -T flowspeech \
-            /bin/bash -lc "python scripts/download_models.py"
+            micromamba run -n base \
+            python scripts/download_models.py
 
       - name: Verify downloaded models
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: |
           docker compose exec -T flowspeech \
-            /bin/bash -lc "test -d hf_models && ls -lah hf_models"
+            micromamba run -n base \
+            bash -lc "test -d hf_models && ls -lah hf_models"
 
       - name: Set permissions
         run: |
@@ -64,12 +66,25 @@ jobs:
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: |
-          docker compose exec -T flowspeech /bin/bash -lc "ls -lah"
-          docker compose exec -T flowspeech /bin/bash -lc "ls -lah .."
-          docker compose exec -T flowspeech /bin/bash -lc "ls -lah hf_models"
           docker compose exec -T flowspeech \
-            /bin/bash -lc \
-            "pytest -p no:cacheprovider test_DL_api.py test_DL_modules.py test_models.py"
+            micromamba run -n base \
+            bash -lc "ls -lah"
+
+          docker compose exec -T flowspeech \
+            micromamba run -n base \
+            bash -lc "ls -lah .."
+
+          docker compose exec -T flowspeech \
+            micromamba run -n base \
+            bash -lc "ls -lah hf_models"
+
+          docker compose exec -T flowspeech \
+            micromamba run -n base \
+            pytest \
+              -p no:cacheprovider \
+              test_DL_api.py \
+              test_DL_modules.py \
+              test_models.py
 
       - name: Stop Docker Compose services
         if: always()
