@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install --fix-missing --no-install-recommends -y \
     git \
     pipx \
     # this is for git cloning
-    git-lfs \ 
+    git-lfs \
     # dependencies for phonemizer
     festival \
     espeak-ng \
@@ -19,14 +19,11 @@ RUN apt-get update && apt-get install --fix-missing --no-install-recommends -y \
     && git lfs install
 
 
-# https://dev.to/emmanuelnk/using-sudo-without-password-prompt-as-non-root-docker-user-52bg
-#  Add new user docker to sudo group
+# https://dev.to/emmanuelnk/using-sudo-without-password-prompt-as-docker-user-52bg
+# Add new user docker to sudo group
 RUN adduser mambauser sudo
-# Ensure sudo group users are not 
-# asked for a password when using 
-# sudo command by ammending sudoers file
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> \
-/etc/sudoers
+# Ensure sudo group users are not asked for a password when using sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 USER mambauser
 RUN micromamba config set extract_threads 1
@@ -35,13 +32,15 @@ ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml /tmp/conda-lock.yml
 RUN --mount=type=cache,target=/opt/conda/pkgs \
-    micromamba install -y -n base -f /tmp/conda-lock.yml
+    micromamba install -y -n base -f /tmp/conda-lock.yml \
+    && micromamba install -y -n base onnx \
+    && python -c "import onnx, onnxruntime; print('onnx', onnx.__version__, 'onnxruntime', onnxruntime.__version__)"
 
 RUN mkdir -p /home/mambauser/mfa
 ENV MFA_ROOT_DIR=/home/mambauser/mfa
 RUN mfa model download acoustic english_us_arpa &&\
     mfa model download dictionary english_us_arpa &&\
-    mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa  
+    mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa
 # RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa &&\
 #     mfa model download g2p spanish_latin_america_mfa
 
