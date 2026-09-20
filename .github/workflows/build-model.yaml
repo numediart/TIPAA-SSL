@@ -1,0 +1,70 @@
+name: Build XLS-R ONNX model
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/onnx_utils.py"
+      - "scripts/download_models.py"
+      - ".github/workflows/build-model.yaml"
+
+jobs:
+  build-onnx-model:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker buildx create --use --driver=docker-container
+          docker buildx bake \
+            --set '*.cache-to=type=gha,mode=max' \
+            --set '*.cache-from=type=gha' \
+            --load
+
+      - name: Start Docker Compose services
+        env:
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+        run: docker compose up -d
+
+      - name: Download required Hugging Face models
+        env:
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+        run: |
+          docker compose exec -T flowspeech \
+            /bin/bash -lc "python scripts/download_models.py"
+
+      - name: Generate quantized XLS-R ONNX last-hidden-state model
+        env:
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+        run: |
+          docker compose exec -T flowspeech \
+            /bin/bash -lc \
+            "python -c 'from scripts.onnx_utils import convert_lhs_model_to_quant_onnx; convert_lhs_model_to_quant_onnx(\"hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft\", \"last_hidden_state.onnx\")'"
+
+          mkdir -p hf_models
+          mv \
+            hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft/last_hidden_state.quant.onnx \
+            hf_models/last_hidden_state.quant.onnx
+
+      - name: Verify generated model exists
+        run: |
+          test -s hf_models/last_hidden_state.quant.onnx
+          ls -lh hf_models/last_hidden_state.quant.onnx
+          sha256sum hf_models/last_hidden_state.quant.onnx
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-hidden-state-quantized-onnx
+          path: hf_models/last_hidden_state.quant.onnx
+          retention-days: 90
