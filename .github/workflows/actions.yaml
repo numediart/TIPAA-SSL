@@ -39,6 +39,20 @@ jobs:
         if: always()
         run: docker compose logs flowspeech
 
+      # Ensure the mounted repo directory is writable before downloading models.
+      - name: Prepare model directory
+        env:
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+        run: |
+          docker compose exec -T -u root flowspeech \
+            bash -lc '
+              mkdir -p /home/mambauser/code/hf_models
+              if id -u mambauser >/dev/null 2>&1; then
+                chown -R mambauser:mambauser /home/mambauser/code/hf_models
+              fi
+              chmod -R u+rwX /home/mambauser/code/hf_models
+            '
+
       # The test suite expects models under /home/mambauser/code/hf_models.
       # The repository is mounted at that location by docker-compose.yml.
       - name: Download Hugging Face models
@@ -56,11 +70,6 @@ jobs:
           docker compose exec -T flowspeech \
             micromamba run -n base \
             bash -lc "test -d hf_models && ls -lah hf_models"
-
-      - name: Set permissions
-        run: |
-          chmod 777 ./
-          chown -R "$(id -u):$(id -g)" ./
 
       - name: Run pytest
         env:
