@@ -41,15 +41,15 @@ jobs:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: |
           docker compose exec -T flowspeech \
-            /bin/bash -lc "python scripts/download_models.py"
+            micromamba run -n base python scripts/download_models.py
 
       - name: Generate quantized XLS-R ONNX last-hidden-state model
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: |
           docker compose exec -T flowspeech \
-            /bin/bash -lc \
-            "python -c 'from scripts.onnx_utils import convert_lhs_model_to_quant_onnx; convert_lhs_model_to_quant_onnx(\"hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft\", \"last_hidden_state.onnx\")'"
+            micromamba run -n base python -c \
+            'from scripts.onnx_utils import convert_lhs_model_to_quant_onnx; convert_lhs_model_to_quant_onnx("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", "last_hidden_state.onnx")'
 
           mkdir -p hf_models
           mv \
