@@ -62,9 +62,10 @@ def quantize_onnx_model(model_path, quantized_model_path):
     log_memory("after ONNX quantization")
 
 
-def convert_lhs_model_to_quant_onnx(
+def export_lhs_model_to_onnx(
     w2v2_model_path, onnx_model_name="last_hidden_state.onnx"
 ):
+    """Export the last-hidden-state model to an unquantized ONNX file."""
     logger.info("Loading Wav2Vec2 model from %s", w2v2_model_path)
     log_memory("before model loading")
     model = Wav2Vec2Model.from_pretrained(
@@ -99,20 +100,38 @@ def convert_lhs_model_to_quant_onnx(
                 "output": {1: "output_len"},
             },
         )
-    log_memory("after ONNX export")
-    logger.info("Unquantized ONNX size: %.1f MiB", os.path.getsize(onnx_model_path) / 2**20)
 
-    # The PyTorch model is no longer needed and can otherwise compete with
-    # onnxruntime for memory during quantization.
+    log_memory("after ONNX export")
+    logger.info(
+        "Unquantized ONNX size: %.1f MiB",
+        os.path.getsize(onnx_model_path) / 2**20,
+    )
+
+    # Release PyTorch objects before a caller starts ONNX quantization.
     del x, last_hidden_state_model, model
     gc.collect()
     log_memory("after releasing PyTorch model")
 
+    return onnx_model_path
+
+
+def convert_lhs_model_to_quant_onnx(
+    w2v2_model_path, onnx_model_name="last_hidden_state.onnx"
+):
+    """Export and quantize in one process for backwards compatibility."""
+    onnx_model_path = export_lhs_model_to_onnx(
+        w2v2_model_path,
+        onnx_model_name,
+    )
+
     quantized_model_name = os.path.splitext(os.path.basename(onnx_model_name))[0]
     quantized_model_path = os.path.join(
-        w2v2_model_path, f"{quantized_model_name}.quant.onnx"
+        w2v2_model_path,
+        f"{quantized_model_name}.quant.onnx",
     )
     quantize_onnx_model(onnx_model_path, quantized_model_path)
     logger.info(
-        "Quantized ONNX size: %.1f MiB", os.path.getsize(quantized_model_path) / 2**20
+        "Quantized ONNX size: %.1f MiB",
+        os.path.getsize(quantized_model_path) / 2**20,
     )
+    return quantized_model_path
