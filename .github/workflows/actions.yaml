@@ -40,7 +40,6 @@ jobs:
           ls -lh hf_models/last_hidden_state.quant.onnx
           sha256sum hf_models/last_hidden_state.quant.onnx
 
-      # Cache Docker layers.
       - name: Expose GitHub Runtime
         uses: crazy-max/ghaction-github-runtime@v2
 
@@ -93,15 +92,16 @@ jobs:
           docker compose exec -T flowspeech \
             micromamba run -n base \
             bash -lc '
-              cd /home/mambauser/code
+              set -e
 
+              cd /home/mambauser/code
               echo "Current directory: $(pwd)"
 
               TESTS=$(find . -maxdepth 3 -type f \
                 \( -name "test_*.py" -o -name "*_test.py" \) | sort)
 
               if [ -n "$TESTS" ]; then
-                pytest -p no:cacheprovider $TESTS
+                python -m pytest -p no:cacheprovider $TESTS
               else
                 echo "No pytest files found under /home/mambauser/code"
                 exit 5

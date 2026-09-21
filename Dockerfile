@@ -1,60 +1,60 @@
 FROM mambaorg/micromamba:1.5.1-bookworm-slim
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
-# packages list. The --no-install-recommends avoids installing recommended packages that are not necessary for a tiny docker image: https://phoenixnap.com/kb/docker-image-size
+
 RUN apt-get update && apt-get install --fix-missing --no-install-recommends -y \
     gawk \
     curl \
     sudo \
     git \
     pipx \
-    # this is for git cloning
     git-lfs \
-    # dependencies for phonemizer
     festival \
     espeak-ng \
-    # clean up apt cache to save space
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install
 
-
-# https://dev.to/emmanuelnk/using-sudo-without-password-prompt-as-docker-user-52bg
-# Add new user docker to sudo group
 RUN adduser mambauser sudo
-# Ensure sudo group users are not asked for a password when using sudo
+
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 USER mambauser
+
 RUN micromamba config set extract_threads 1
-# make sure the conda env is active for RUN commands
+
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml /tmp/conda-lock.yml
+
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     micromamba install -y -n base -f /tmp/conda-lock.yml \
-    && micromamba run -n base python -m pip install --no-cache-dir "onnx==1.16.1" \
-    && micromamba run -n base python -c "import onnx, onnxruntime; print('onnx', onnx.__version__, 'onnxruntime', onnxruntime.__version__)"
+    && micromamba run -n base python -m pip install --no-cache-dir \
+         "onnx==1.16.1" \
+         pytest \
+    && micromamba run -n base python -c \
+         "import onnx, onnxruntime; print('onnx', onnx.__version__, 'onnxruntime', onnxruntime.__version__)"
 
 RUN mkdir -p /home/mambauser/mfa
+
 ENV MFA_ROOT_DIR=/home/mambauser/mfa
-RUN mfa model download acoustic english_us_arpa &&\
-    mfa model download dictionary english_us_arpa &&\
-    mfa model download g2p english_uk_mfa && mfa model download g2p english_us_mfa
-# RUN mfa model download g2p french_mfa && mfa model download g2p spanish_spain_mfa &&\
-#     mfa model download g2p spanish_latin_america_mfa
 
-RUN python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
-RUN python -c "from transformers import Wav2Vec2Processor;processor = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')"
-# RUN mkdir /home/mambauser/hf_models && \
-#     curl https://flwc-public-assets.s3.fr-par.scw.cloud/speech-models_last_hidden_state.quant.onnx -o /home/mambauser/hf_models/last_hidden_state.quant.onnx
-# COPY ./hf_models/last_hidden_state.quant.onnx /home/mambauser/hf_models/last_hidden_state.quant.onnx
+RUN mfa model download acoustic english_us_arpa && \
+    mfa model download dictionary english_us_arpa && \
+    mfa model download g2p english_uk_mfa && \
+    mfa model download g2p english_us_mfa
 
-# now we copy the app code
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger')"
+
+RUN python -c \
+    "from transformers import Wav2Vec2Processor; \
+     Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-base-960h')"
+
 WORKDIR /home/mambauser/code
+
 COPY . .
 
-RUN pip install -e .
+RUN python -m pip install -e .
 
-# no entrypoint, we use micromamba's one to activate the conda env
 CMD ["/bin/bash", "run_server.sh"]
