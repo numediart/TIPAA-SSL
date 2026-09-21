@@ -48,6 +48,18 @@ jobs:
 
           git -C hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft lfs pull
 
+      - name: Add swap space
+        run: |
+          set -eux
+          free -h
+          if [ ! -f /swapfile ]; then
+            sudo fallocate -l 8G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+          fi
+          sudo swapon /swapfile
+          free -h
+
       - name: Start Docker Compose service
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
@@ -56,9 +68,16 @@ jobs:
       - name: Generate quantized XLS-R ONNX last-hidden-state model
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
+          OMP_NUM_THREADS: 1
+          MKL_NUM_THREADS: 1
+          OPENBLAS_NUM_THREADS: 1
+          TOKENIZERS_PARALLELISM: "false"
         run: |
           docker compose exec -u root -T flowspeech \
-            micromamba run -n base python -c \
+            micromamba run -n base \
+            env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+            TOKENIZERS_PARALLELISM=false \
+            python -c \
             'from scripts.onnx_utils import convert_lhs_model_to_quant_onnx; convert_lhs_model_to_quant_onnx("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", "last_hidden_state.onnx")'
 
           mv \
