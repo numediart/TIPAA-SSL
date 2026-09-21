@@ -1,19 +1,44 @@
+name: CI
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
+      contents: read
+      actions: read
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Download latest successful XLS-R ONNX artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: build-model.yaml
+          workflow_conclusion: success
+          branch: main
+          name: last-hidden-state-quantized-onnx
+          path: hf_models
+          repo: ${{ github.repository }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify XLS-R ONNX artifact
+        run: |
+          set -eux
+
+          test -s hf_models/last_hidden_state.quant.onnx
+          ls -lh hf_models/last_hidden_state.quant.onnx
+          sha256sum hf_models/last_hidden_state.quant.onnx
 
       # Cache Docker layers.
       - name: Expose GitHub Runtime
@@ -39,37 +64,27 @@ jobs:
         if: always()
         run: docker compose logs flowspeech
 
-      # Ensure the mounted repo directory is writable before downloading models.
-      - name: Prepare model directory
-        env:
-          COMPOSE_INTERACTIVE_NO_CLI: 1
+      - name: Verify model inside container
         run: |
+          set -eux
+
           docker compose exec -T -u root flowspeech \
             bash -lc '
-              mkdir -p /home/mambauser/code/hf_models
+              test -s /home/mambauser/code/hf_models/last_hidden_state.quant.onnx
+              ls -lh /home/mambauser/code/hf_models/last_hidden_state.quant.onnx
+            '
+
+      - name: Prepare model directory
+        run: |
+          set -eux
+
+          docker compose exec -T -u root flowspeech \
+            bash -lc '
               if id -u mambauser >/dev/null 2>&1; then
                 chown -R mambauser:mambauser /home/mambauser/code/hf_models
               fi
               chmod -R u+rwX /home/mambauser/code/hf_models
             '
-
-      # The test suite expects models under /home/mambauser/code/hf_models.
-      # The repository is mounted at that location by docker-compose.yml.
-      - name: Download Hugging Face models
-        env:
-          COMPOSE_INTERACTIVE_NO_CLI: 1
-        run: |
-          docker compose exec -T flowspeech \
-            micromamba run -n base \
-            python scripts/download_models.py
-
-      - name: Verify downloaded models
-        env:
-          COMPOSE_INTERACTIVE_NO_CLI: 1
-        run: |
-          docker compose exec -T flowspeech \
-            micromamba run -n base \
-            bash -lc "test -d hf_models && ls -lah hf_models"
 
       - name: Run pytest
         env:
@@ -79,10 +94,11 @@ jobs:
             micromamba run -n base \
             bash -lc '
               cd /home/mambauser/code
-              echo "Current directory: $(pwd)"
-              find . -maxdepth 3 -type f \( -name "test_*.py" -o -name "*_test.py" \) | sort
 
-              TESTS=$(find . -maxdepth 3 -type f \( -name "test_*.py" -o -name "*_test.py" \) | sort)
+              echo "Current directory: $(pwd)"
+
+              TESTS=$(find . -maxdepth 3 -type f \
+                \( -name "test_*.py" -o -name "*_test.py" \) | sort)
 
               if [ -n "$TESTS" ]; then
                 pytest -p no:cacheprovider $TESTS
