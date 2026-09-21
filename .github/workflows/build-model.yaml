@@ -51,6 +51,7 @@ jobs:
       - name: Add swap space
         run: |
           set -eux
+
           free -h
 
           if ! sudo swapon --show=NAME --noheadings | grep -Fxq /swapfile; then
@@ -72,20 +73,45 @@ jobs:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: docker compose up -d flowspeech
 
-      - name: Generate quantized XLS-R ONNX last-hidden-state model
+      - name: Export unquantized XLS-R ONNX model
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
           OMP_NUM_THREADS: 1
           MKL_NUM_THREADS: 1
           OPENBLAS_NUM_THREADS: 1
+          NUMEXPR_NUM_THREADS: 1
           TOKENIZERS_PARALLELISM: "false"
         run: |
           docker compose exec -u root -T flowspeech \
             micromamba run -n base \
-            env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
-            TOKENIZERS_PARALLELISM=false \
+            env \
+              OMP_NUM_THREADS=1 \
+              MKL_NUM_THREADS=1 \
+              OPENBLAS_NUM_THREADS=1 \
+              NUMEXPR_NUM_THREADS=1 \
+              TOKENIZERS_PARALLELISM=false \
             python -c \
-            'from scripts.onnx_utils import convert_lhs_model_to_quant_onnx; convert_lhs_model_to_quant_onnx("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", "last_hidden_state.onnx")'
+            'from scripts.onnx_utils import export_lhs_model_to_onnx; export_lhs_model_to_onnx("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft", "last_hidden_state.onnx")'
+
+      - name: Quantize ONNX model
+        env:
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+          OMP_NUM_THREADS: 1
+          MKL_NUM_THREADS: 1
+          OPENBLAS_NUM_THREADS: 1
+          NUMEXPR_NUM_THREADS: 1
+          TOKENIZERS_PARALLELISM: "false"
+        run: |
+          docker compose exec -u root -T flowspeech \
+            micromamba run -n base \
+            env \
+              OMP_NUM_THREADS=1 \
+              MKL_NUM_THREADS=1 \
+              OPENBLAS_NUM_THREADS=1 \
+              NUMEXPR_NUM_THREADS=1 \
+              TOKENIZERS_PARALLELISM=false \
+            python -c \
+            'from scripts.onnx_utils import quantize_onnx_model; quantize_onnx_model("hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft/last_hidden_state.onnx", "hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft/last_hidden_state.quant.onnx")'
 
           mv \
             hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft/last_hidden_state.quant.onnx \
