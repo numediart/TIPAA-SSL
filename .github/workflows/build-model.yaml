@@ -52,12 +52,19 @@ jobs:
         run: |
           set -eux
           free -h
-          if [ ! -f /swapfile ]; then
-            sudo fallocate -l 8G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
+
+          if ! sudo swapon --show=NAME --noheadings | grep -Fxq /swapfile; then
+            if [ ! -f /swapfile ]; then
+              sudo fallocate -l 8G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+            fi
+
+            sudo swapon /swapfile
+          else
+            echo "/swapfile is already active; skipping swapon"
           fi
-          sudo swapon /swapfile
+
           free -h
 
       - name: Start Docker Compose service
