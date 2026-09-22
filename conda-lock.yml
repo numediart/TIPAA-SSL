@@ -14,7 +14,7 @@ version: 1
 metadata:
   content_hash:
     osx-64: 721033a7c05b9b207be2079d9c806ec57d3cc15bf759fdab02726c7efb9859af
-    linux-64: a655c837ee9d8f58ab83bbedb04d9e3c42fd3b130aa7bc16bc231c81e6865535
+    linux-64: fe8d573bf177184d4f1e02b8acf7fc54b0772e1f039b3d0b9cec8747b288fe75
   channels:
   - url: conda-forge
     used_env_vars: []
@@ -1693,18 +1693,6 @@ package:
   hash:
     md5: f3ad426304898027fc619827ff428eca
     sha256: f0016cbab6ac4138a429e28dbcb904a90305b34b3fe41a9b89d697c90401caec
-  category: main
-  optional: false
-- name: cloudpickle
-  version: 3.1.2
-  manager: conda
-  platform: linux-64
-  dependencies:
-    python: '>=3.10'
-  url: https://conda.anaconda.org/conda-forge/noarch/cloudpickle-3.1.2-pyhcf101f3_1.conda
-  hash:
-    md5: 61b8078a0905b12529abc622406cb62c
-    sha256: 4c287c2721d8a34c94928be8fe0e9a85754e90189dd4384a31b1806856b50a67
   category: main
   optional: false
 - name: colorama
@@ -4524,16 +4512,16 @@ package:
   category: main
   optional: false
 - name: joblib
-  version: 1.6.0
+  version: 1.5.2
   manager: conda
   platform: linux-64
   dependencies:
-    cloudpickle: '>=3.0'
     python: '>=3.10'
-  url: https://conda.anaconda.org/conda-forge/noarch/joblib-1.6.0-pyhcf101f3_0.conda
+    setuptools: ''
+  url: https://conda.anaconda.org/conda-forge/noarch/joblib-1.5.2-pyhd8ed1ab_0.conda
   hash:
-    md5: 4ebc70ef1af2e21cdc8edb1bfa1ec28d
-    sha256: 96b76ace583404ce4fbc234baa6cdb3de485887913104d4ac51994f9b6656696
+    md5: 4e717929cfa0d49cef92d911e31d0e90
+    sha256: 6fc414c5ae7289739c2ba75ff569b79f72e38991d61eb67426a8a4b92f90462c
   category: main
   optional: false
 - name: joblib
