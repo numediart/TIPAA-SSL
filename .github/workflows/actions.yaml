@@ -45,7 +45,10 @@ jobs:
 
       - name: Build images
         run: |
+          set -eux
+
           docker buildx create --use --driver=docker-container
+
           docker buildx bake \
             --set '*.cache-to=type=gha,mode=max' \
             --set '*.cache-from=type=gha' \
@@ -82,31 +85,35 @@ jobs:
               if id -u mambauser >/dev/null 2>&1; then
                 chown -R mambauser:mambauser /home/mambauser/code/hf_models
               fi
+
               chmod -R u+rwX /home/mambauser/code/hf_models
             '
+
+      - name: Verify Python and pytest environment
+        env:
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+        run: |
+          set -eux
+
+          docker compose exec -T flowspeech \
+            micromamba run -n base \
+            python --version
+
+          docker compose exec -T flowspeech \
+            micromamba run -n base \
+            python -m pytest --version
 
       - name: Run pytest
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: |
+          set -eux
+
           docker compose exec -T flowspeech \
             micromamba run -n base \
-            bash -lc '
-              set -e
-
-              cd /home/mambauser/code
-              echo "Current directory: $(pwd)"
-
-              TESTS=$(find . -maxdepth 3 -type f \
-                \( -name "test_*.py" -o -name "*_test.py" \) | sort)
-
-              if [ -n "$TESTS" ]; then
-                python -m pytest -p no:cacheprovider $TESTS
-              else
-                echo "No pytest files found under /home/mambauser/code"
-                exit 5
-              fi
-            '
+            python -m pytest \
+              -p no:cacheprovider \
+              tests
 
       - name: Stop Docker Compose services
         if: always()

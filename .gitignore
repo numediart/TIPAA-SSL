@@ -30,7 +30,7 @@ data/scaleway-audio-files/**
 data/**
 syllabipy/__pycache__/**
 server/__pycache__/**
-.*/**
+
 pretrained_models/**
 bin/**
 utils/__pycache__/**
