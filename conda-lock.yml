@@ -14,7 +14,7 @@ version: 1
 metadata:
   content_hash:
     osx-64: 721033a7c05b9b207be2079d9c806ec57d3cc15bf759fdab02726c7efb9859af
-    linux-64: fe8d573bf177184d4f1e02b8acf7fc54b0772e1f039b3d0b9cec8747b288fe75
+    linux-64: b976d9eb9575ed8da4174bf12011c30c7565771ab00f8eff6a152c57d7f0152e
   channels:
   - url: conda-forge
     used_env_vars: []
@@ -4512,16 +4512,16 @@ package:
   category: main
   optional: false
 - name: joblib
-  version: 1.5.2
+  version: 1.4.2
   manager: conda
   platform: linux-64
   dependencies:
-    python: '>=3.10'
+    python: '>=3.9'
     setuptools: ''
-  url: https://conda.anaconda.org/conda-forge/noarch/joblib-1.5.2-pyhd8ed1ab_0.conda
+  url: https://conda.anaconda.org/conda-forge/noarch/joblib-1.4.2-pyhd8ed1ab_1.conda
   hash:
-    md5: 4e717929cfa0d49cef92d911e31d0e90
-    sha256: 6fc414c5ae7289739c2ba75ff569b79f72e38991d61eb67426a8a4b92f90462c
+    md5: bf8243ee348f3a10a14ed0cae323e0c1
+    sha256: 51cc2dc491668af0c4d9299b0ab750f16ccf413ec5e2391b924108c1fbacae9b
   category: main
   optional: false
 - name: joblib
