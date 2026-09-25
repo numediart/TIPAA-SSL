@@ -1,4 +1,5 @@
 import gc
+import inspect
 import logging
 import os
 import resource
@@ -7,7 +8,6 @@ import torch
 from onnxruntime.quantization import QuantType, quantize_dynamic
 from torch import nn
 from transformers import Wav2Vec2Model
-
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,18 @@ class LastHiddenStateModel(nn.Module):
 
 
 def quantize_onnx_model(model_path, quantized_model_path):
-    """Dynamically quantize an ONNX model's weights to int8."""
+    """Dynamically quantize an ONNX model's weights to uint8.
+
+    QUInt8 (unsigned) must be used instead of QInt8: onnxruntime's CPU
+    execution provider has no implementation for the ``ConvInteger`` nodes
+    produced with signed int8 weights, so a QInt8 model loads but crashes on
+    the first inference.
+    """
     log_memory("before ONNX quantization")
     quantize_dynamic(
         model_input=model_path,
         model_output=quantized_model_path,
-        weight_type=QuantType.QInt8,
+        weight_type=QuantType.QUInt8,
     )
     log_memory("after ONNX quantization")
 
@@ -86,19 +92,28 @@ def export_lhs_model_to_onnx(
 
     with torch.inference_mode():
         logger.info("Starting ONNX export to %s", onnx_model_path)
+        export_kwargs = {
+            "export_params": True,
+            "opset_version": 17,
+            "do_constant_folding": True,
+            "input_names": ["input"],
+            "output_names": ["output"],
+            "dynamic_axes": {
+                "input": {1: "audio_len"},
+                "output": {1: "output_len"},
+            },
+        }
+        # The default torch.export-based exporter produces IR version 10+
+        # (and ignores the requested opset), which onnxruntime 1.17.x cannot
+        # load (max supported IR version is 9). The legacy TorchScript
+        # exporter produces an opset-17 model with IR version 8 instead.
+        if "dynamo" in inspect.signature(torch.onnx.export).parameters:
+            export_kwargs["dynamo"] = False
         torch.onnx.export(
             last_hidden_state_model,
             (x,),
             onnx_model_path,
-            export_params=True,
-            opset_version=11,
-            do_constant_folding=True,
-            input_names=["input"],
-            output_names=["output"],
-            dynamic_axes={
-                "input": {1: "audio_len"},
-                "output": {1: "output_len"},
-            },
+            **export_kwargs,
         )
 
     log_memory("after ONNX export")
