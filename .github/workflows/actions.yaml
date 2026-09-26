@@ -4,10 +4,38 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".github/workflows/build-model.yaml"
+      - "docker-compose_jupyter.yml"
+      - "docker-compose_streamlit.yml"
+      - "jupyter_hal.yml"
+      - "production.yml"
+      - "notebooks/**"
+      - "nginx/**"
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".github/workflows/build-model.yaml"
+      - "docker-compose_jupyter.yml"
+      - "docker-compose_streamlit.yml"
+      - "jupyter_hal.yml"
+      - "production.yml"
+      - "notebooks/**"
+      - "nginx/**"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
