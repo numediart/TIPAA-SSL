@@ -30,9 +30,6 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml /tmp/conda-lock.yml
 
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     micromamba install -y -n base -f /tmp/conda-lock.yml \
-    && micromamba run -n base python -m pip install --no-cache-dir \
-         "onnx==1.16.1" \
-         pytest \
     && micromamba run -n base python -c \
          "import onnx, onnxruntime; print('onnx', onnx.__version__, 'onnxruntime', onnxruntime.__version__)"
 
