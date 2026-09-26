@@ -48,6 +48,12 @@ jobs:
 
           git -C hf_models/facebook/wav2vec2-xlsr-53-espeak-cv-ft lfs pull
 
+      # Make the downloaded tree writable by the container user (mambauser):
+      # "docker compose run" runs as the image user, unlike the previous
+      # "docker compose exec -u root".
+      - name: Make model directory writable
+        run: chmod -R 777 hf_models
+
       - name: Add swap space
         run: |
           set -eux
