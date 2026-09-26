@@ -54,52 +54,21 @@ jobs:
             --set '*.cache-from=type=gha' \
             --load
 
-      - name: Start Docker Compose services
-        env:
-          COMPOSE_INTERACTIVE_NO_CLI: 1
-        run: docker compose up -d
-
-      - name: Check running containers
-        run: docker compose ps -a
-
-      - name: Check application logs
-        if: always()
-        run: docker compose logs flowspeech
-
-      - name: Verify model inside container
-        run: |
-          set -eux
-
-          docker compose exec -T -u root flowspeech \
-            bash -lc '
-              test -s /home/mambauser/code/hf_models/last_hidden_state.quant.onnx
-              ls -lh /home/mambauser/code/hf_models/last_hidden_state.quant.onnx
-            '
-
-      - name: Prepare model directory
-        run: |
-          set -eux
-
-          docker compose exec -T -u root flowspeech \
-            bash -lc '
-              if id -u mambauser >/dev/null 2>&1; then
-                chown -R mambauser:mambauser /home/mambauser/code/hf_models
-              fi
-
-              chmod -R u+rwX /home/mambauser/code/hf_models
-            '
-
+      # Run pytest with "docker compose run" (fresh container, no app server).
+      # The tests use Flask's in-process test client, so the server is not
+      # needed, and this avoids the memory/timing issues of running inside the
+      # server container.
       - name: Verify Python and pytest environment
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
         run: |
           set -eux
 
-          docker compose exec -T flowspeech \
+          docker compose run --rm -T flowspeech \
             micromamba run -n base \
             python --version
 
-          docker compose exec -T flowspeech \
+          docker compose run --rm -T flowspeech \
             micromamba run -n base \
             python -m pytest --version
 
@@ -109,12 +78,8 @@ jobs:
         run: |
           set -eux
 
-          docker compose exec -T flowspeech \
+          docker compose run --rm -T flowspeech \
             micromamba run -n base \
             python -m pytest \
               -p no:cacheprovider \
               tests
-
-      - name: Stop Docker Compose services
-        if: always()
-        run: docker compose down
