@@ -21,8 +21,28 @@ The API and tests load the model in ONNX format from `hf_models/last_hidden_stat
 
 You can either:
 
-- take a prebuilt `last_hidden_state.quant.onnx` (e.g. from the Flowchase drive folder) and place it at `hf_models/last_hidden_state.quant.onnx`, or
-- build it yourself from the downloaded model with [scripts/onnx_utils.py](./scripts/onnx_utils.py):
+- download the prebuilt artifact, or
+- build it yourself from the downloaded model.
+
+### Download the prebuilt artifact
+
+The [build-model GitHub Actions workflow](./.github/workflows/build-model.yaml) exports and quantizes the model, then uploads it as an artifact named `last-hidden-state-quantized-onnx` (the file is `hf_models/last_hidden_state.quant.onnx`).
+
+- From the GitHub web UI: go to **Actions → Build XLS-R ONNX model**, open the latest successful run on `main`, and download the `last-hidden-state-quantized-onnx` artifact. Unzip it so the file lands at `hf_models/last_hidden_state.quant.onnx`.
+- From the command line, with the [GitHub CLI](https://cli.github.com):
+
+  ```bash
+  mkdir -p hf_models
+  gh run download --repo numediart/TIPAA-SSL \
+    --name last-hidden-state-quantized-onnx \
+    --dir hf_models
+  ```
+
+  This places `last_hidden_state.quant.onnx` directly in `hf_models/`.
+
+### Build it yourself
+
+From the downloaded model, with [scripts/onnx_utils.py](./scripts/onnx_utils.py):
 
   ```bash
   python -c \
