@@ -1,209 +1,370 @@
-# TIPAA-SSL and MUST&amp;P-SRL implementations
+# TIPAA-SSL & MUST&P-SRL
 
-This repo is a structured Machine Learning pipeline combining self-supervised representations, intermediate linguistic structure, and alignment for real-world applications. It implements the following papers:
+## Open-source implementations for multilingual speech representation, syllabification, and text-independent phonetic alignment
 
-- Text-Independent Phone-to-Audio Alignment Leveraging SSL (TIPAA-SSL) Pre-Trained Model Latent Representation and Knowledge Transfer
-    - https://www.mdpi.com/2624-599X/6/3/42
-    - Algorithm: [flowspeech/wav2vec2_frame_prediction.py](https://github.com/numediart/TIPAA-SSL/blob/main/flowspeech/wav2vec2_frame_prediction.py)
+This repository contains the research implementations behind two publications developed during R&D on AI-based pronunciation analysis:
 
-- MUST&amp;P-SRL: Multi-lingual and Unified Syllabification in Text and Phonetic Domains for Speech Representation Learning
-    - Published at EMNLP 2023: https://aclanthology.org/2023.emnlp-industry.8/
-    - Algorithm: function "prefill_for_sentence" in [flowspeech/text_processing.py](https://github.com/numediart/TIPAA-SSL/blob/main/flowspeech/text_processing.py#L797)
+* **TIPAA-SSL** — *Text-Independent Phone-to-Audio Alignment Leveraging SSL (TIPAA-SSL) Pre-Trained Model Latent Representation and Knowledge Transfer*
+* **MUST&P-SRL** — *Multi-lingual and Unified Syllabification in Text and Phonetic Domains for Speech Representation Learning*
 
-A talk about this work at [ISCA SIG-SLATE](https://sites.google.com/view/sigslate) webinars covering the 2 papers:
+The code combines self-supervised speech representations, phonetic processing, frame-level phoneme classification, forced alignment, dynamic time warping, and multilingual linguistic processing.
 
-[![Alt text](https://img.youtube.com/vi/7_pQ0aQwg-w/0.jpg)](https://www.youtube.com/watch?v=7_pQ0aQwg-w&ab_channel=ISCASIGSLaTE)
+The original research was motivated by pronunciation analysis and language-learning applications, but the techniques are applicable more broadly to **speech analysis, phonetic alignment, pronunciation assessment, speech representation learning, and multilingual speech technology**.
 
+---
 
-## Structure of the repository
+## Research papers
 
-- The `flowspeech` package contains the actual implementation of the tech:
-  - `DL_speech_tech` contains the pronunciation aspect function with intermediary steps that are common between different pronunciation aspects
-  - text and phonetics processing, pronunciation dictionaries, audio processing, ...
-  - `wav2vec2_frame_prediction` that contains a class that wraps the model pipeline of wav2vec2 finetuned model, dimension reduction, frame classification, and dtw forced alignment (itself defined in another class)
-  - some data processing and loading functions and other utilities
-- `app` contains the definition of the API endpoints that call the `DL_speech_tech` functions
-- `nginx` contains the configuration and Docker files for the deployment server
-- `data` contains different datasets: syllables, phonetics, and some audio files
-- `models` contains trained model checkpoints for the part of the processing pipeline which we train ourselves (dimensionality reduction + frame classifier)
-- `syllabipy` contains a tweaked version of the syllabipy package, used to syllabify sentences
-- `scripts` folder contains scripts that are used "offline", i.e. not used behind the API endpoints. E.g. script for
-  - download pretrained models
-  - extract forced alignments, i.e. time-aligned phonetic transcriptions, thanks to "Montreal Forced Aligner" (MFA)
-  - experiment different frame reduction and frame classifiers (where a frame is an output vector of the wav2vec2 model)
-  - ...
-- `content_tools` contains a simple streamlit-based web interface related to exploring phonetic dictionaries, using linguistic data extraction (phonetization + syllabification in text and phonetics) and other related content processing tools
+### 1. TIPAA-SSL
 
-## Web service
+**Text-Independent Phone-to-Audio Alignment Leveraging SSL (TIPAA-SSL) Pre-Trained Model Latent Representation and Knowledge Transfer**
 
-A Flask API is provided to access the speech analysis features by pronunciation aspect.
-**To learn more about making requests to the Speech Processing API**, please see [this documentation file](/API_v2.md).
+Noé Tits, Prernna Bhatnagar, Thierry Dutoit
+*Acoustics*, 2024, 6(3), 772–781.
 
-## Docker application on server: deployment and update instructions
+* [Paper — MDPI](https://www.mdpi.com/2624-599X/6/3/42)
+* [DOI](https://doi.org/10.3390/acoustics6030042)
+* [Implementation](flowspeech/wav2vec2_frame_prediction.py)
+* [Technical implementation notes](INFO.md)
 
-Please see [this documentation file](/DEPLOYMENT.md).
+### What is TIPAA-SSL?
 
-## Local Installation
+TIPAA-SSL investigates how the latent representations of a multilingual self-supervised speech model can be used for **frame-level phonetic analysis and text-independent phone-to-audio alignment**.
 
-### Download codes and models
+Instead of directly using the phoneme sequence predicted by a CTC-based wav2vec 2.0 model, the approach extracts its intermediate/last-layer representations and uses them as a learned phonetic representation.
 
+A lightweight downstream pipeline then performs:
+
+1. self-supervised speech representation extraction;
+2. dimensionality reduction;
+3. frame-level phoneme classification;
+4. phoneme probability estimation for each audio frame;
+5. optional alignment against an expected phoneme sequence using Dynamic Time Warping (DTW).
+
+This provides access to phonetic information while retaining explicit frame-level timing information.
+
+---
+
+## 2. MUST&P-SRL
+
+**MUST&P-SRL: Multi-lingual and Unified Syllabification in Text and Phonetic Domains for Speech Representation Learning**
+
+Noé Tits
+*Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing: Industry Track*, pages 74–82.
+
+* [Paper — ACL Anthology](https://aclanthology.org/2023.emnlp-industry.8/)
+* [DOI](https://doi.org/10.18653/v1/2023.emnlp-industry.8)
+* [Implementation](flowspeech/text_processing.py)
+* Main function: `prefill_for_sentence`
+
+### What is MUST&P-SRL?
+
+MUST&P-SRL provides multilingual linguistic processing for extracting structured information from text and phonetic representations.
+
+The approach includes:
+
+* multilingual phonetic transcription;
+* syllabification;
+* stress information;
+* unified representations in text and phonetic domains;
+* processing compatible with speech alignment workflows;
+* integration with open-source linguistic and speech-processing tools.
+
+The method was evaluated on English, French, and Spanish data and was designed to support speech representation learning and downstream speech-analysis applications.
+
+---
+
+# Why these two pieces of research are together
+
+The two publications address complementary parts of a speech-analysis pipeline.
+
+**MUST&P-SRL** provides structured linguistic and phonetic representations, including syllable-level information.
+
+**TIPAA-SSL** provides a way of mapping learned speech representations to frame-level phonetic information and, when an expected phonetic sequence is available, aligning that representation with the audio.
+
+Together, they form part of a broader speech-processing stack for pronunciation analysis and related applications.
+
+---
+
+# System overview
+
+The TIPAA-SSL pipeline can be summarized as:
+
+```text
+                         Audio
+                           │
+                           ▼
+                 ┌────────────────────┐
+                 │   wav2vec 2.0 /    │
+                 │      XLS-R          │
+                 └─────────┬──────────┘
+                           │
+                           ▼
+                 Frame-level latent
+                    representations
+                           │
+                           ▼
+                 ┌────────────────────┐
+                 │ Dimension          │
+                 │ reduction          │
+                 └─────────┬──────────┘
+                           │
+                           ▼
+                 ┌────────────────────┐
+                 │ Frame-level        │
+                 │ phoneme classifier │
+                 └─────────┬──────────┘
+                           │
+                           ▼
+                 Phoneme probability
+                      per frame
+                           │
+                    ┌──────┴──────┐
+                    │             │
+                    ▼             ▼
+             Frame-level      Expected
+              phonetic        phoneme
+              analysis         sequence
+                                  │
+                                  ▼
+                         Dynamic Time Warping
+                                  │
+                                  ▼
+                       Phone-to-audio alignment
 ```
-git clone https://github.com/numediart/TIPAA-SSL
+
+The key idea is to use the learned phonetic space of a multilingual self-supervised model while retaining access to frame-level information instead of relying only on the final collapsed CTC phoneme sequence.
+
+---
+
+# Repository structure
+
+The repository contains the implementation and supporting material for the speech-processing pipeline.
+
+```text
+.
+├── flowspeech/              # Main speech and linguistic processing package
+├── models/                  # Trained downstream model components
+├── data/                    # Data and processing resources
+├── scripts/                 # Offline processing and experiments
+├── syllabipy/               # Modified syllabification component
+├── content_tools/           # Linguistic/content-processing interface
+├── app/                     # API application
+├── nginx/                   # Deployment configuration
+├── notebooks/               # Experimental notebooks
+├── README.md                # This file
+├── INFO.md                  # Technical implementation notes
+├── API_v2.md                # API documentation
+├── DEPLOYMENT.md            # Deployment information
+├── INSTALLATION.md          # Installation instructions (incl. macOS)
+├── MODELS.md                # Pretrained model download and setup
+├── DATASETS.md              # Speech dataset download instructions
+├── TESTING.md               # How to run the tests
+└── DEVELOPMENT.md           # Best practices, notebooks and TODO
 ```
 
-A script is available to build the `last_hidden_state.quant.onnx` in [scripts/onnx_utils.py](./scripts/onnx_utils.py).
-This makes a compressed version of a pretrained wav2vec2 model from hugginface.
-Create a folder `hf_models` and put that file into it.
-Note: the dimensionality reduction and frame classifiers that run on top of the base wav2vec2 model are stored in this repository in [models](./models).
+The most relevant implementation files for the two papers are:
 
-### Install micromamba and python dependencies
+* **TIPAA-SSL:** `flowspeech/wav2vec2_frame_prediction.py`
+* **MUST&P-SRL:** `flowspeech/text_processing.py`
 
-First install all necessary packages listed in [./Dockerfile](/Dockerfile#L12):
+---
+
+# Getting started
+
+## Requirements
+
+The project currently targets Python 3.10+.
+
+Some components additionally require:
+
+* Git LFS
+* eSpeak / eSpeak NG
+* Festival
+* micromamba / conda-compatible environment management
+
+The repository contains the downstream model components (dimensionality reduction and frame classifier) in `models/`. The base wav2vec2 models are downloaded separately, see [MODELS.md](MODELS.md).
+
+## Clone the repository
+
+```bash
+git clone https://github.com/numediart/TIPAA-SSL.git
+cd TIPAA-SSL
+```
+
+## Install dependencies
+
+Install the system dependencies:
 
 ```bash
 sudo apt-get install git-lfs espeak-ng festival
 git lfs install
 ```
 
-To setup the micromamba environment, you first have to install micromamba: https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html
+Then create the project environment:
 
-```
-"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
-```
-
-Then, create the environment (this will install all dependencies),
-activate it, and finally install the project.
-
-```
+```bash
 micromamba create -n flowspeech_mm -f env.yml
 micromamba activate flowspeech_mm
 pip install -e .
 ```
 
-### Notes for MacOS and Apple M1/... chips
+For Apple Silicon / macOS, see the platform-specific instructions in [INSTALLATION.md](INSTALLATION.md).
 
-A few adjustments are needed to be able to run on Apple Silicon, as some of the dependencies
-on conda are not available for ARM architectures.
+See [INSTALLATION.md](INSTALLATION.md) for the full instructions, [MODELS.md](MODELS.md) for the pretrained models, [DATASETS.md](DATASETS.md) for the speech datasets, and [TESTING.md](TESTING.md) for how to run the tests.
 
-Install basic dependencies:
+---
 
-```bash
-brew install git-lfs micromamba
+# Models
+
+The pipeline builds on multilingual wav2vec 2.0 / XLS-R representations.
+
+The main pretrained representations used by the research are based on:
+
+* `facebook/wav2vec2-large-xlsr-53`
+* `facebook/wav2vec2-xlsr-53-espeak-cv-ft`
+
+The latter model was trained for multilingual phoneme recognition. In TIPAA-SSL, its learned representation is reused as a phonetic representation rather than simply taking its final phoneme sequence prediction.
+
+The downstream dimensionality-reduction and frame-classification components used by the pipeline are included in this repository under:
+
+```text
+models/
 ```
 
-Install homebrew for x86 and install dependencies:
+See [MODELS.md](MODELS.md) for how to download the base wav2vec2 models and set up the quantized ONNX model used by the API and tests.
 
-```bash
-arch -x86_64 zsh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install espeak
-exit
+---
+
+# Data and forced alignment
+
+Training the downstream frame-level classifier requires audio frames associated with phoneme labels.
+
+For this purpose, the research pipeline uses forced alignment tools such as the **Montreal Forced Aligner (MFA)** to obtain phoneme-level timing information.
+
+The resulting aligned data can then be associated with the frame-level representations extracted from the self-supervised speech model.
+
+This makes it possible to train a lightweight classifier on top of the pretrained representation.
+
+See [DATASETS.md](DATASETS.md) for instructions on downloading the speech datasets used for training and evaluation.
+
+---
+
+# Text-independent vs. text-conditioned alignment
+
+One important distinction in this work is between:
+
+### Frame-level phonetic analysis
+
+The model can produce phoneme probability distributions for successive audio frames without requiring a transcript to be provided to the frame classifier.
+
+### Alignment with an expected pronunciation
+
+When an expected phoneme sequence is available, Dynamic Time Warping can be used to align the expected phonemes with the frame-level probability sequence.
+
+This distinction is important for understanding the TIPAA-SSL method and its potential use in pronunciation analysis.
+
+---
+
+# Relation to pronunciation analysis
+
+The research was originally developed in the context of AI-based pronunciation analysis and feedback.
+
+A pronunciation-analysis system can use the resulting phonetic information to investigate questions such as:
+
+* Which phoneme was produced?
+* When does a phoneme occur in the audio?
+* Was an expected phoneme omitted or substituted?
+* How closely does the pronunciation follow an expected phonetic sequence?
+* Which parts of a pronunciation require further analysis?
+
+The released implementation is therefore useful not only as a pronunciation-training system, but also as a research platform for experimenting with **phonetic representations and alignment**.
+
+---
+
+# Documentation
+
+| Document | Description |
+|----------|-------------|
+| [INFO.md](INFO.md) | Detailed explanation of the TIPAA-SSL implementation |
+| [API_v2.md](API_v2.md) | API endpoints documentation |
+| [INSTALLATION.md](INSTALLATION.md) | Installation instructions, incl. macOS/Apple Silicon |
+| [MODELS.md](MODELS.md) | Pretrained model download and setup (`hf_models/`, quantized ONNX) |
+| [DATASETS.md](DATASETS.md) | Speech dataset download instructions (actor recordings, LibriSpeech, MAILABS) |
+| [TESTING.md](TESTING.md) | How to run the tests and what they need |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Best practices, Jupyter notebooks, TODO |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Deployment information |
+
+---
+
+# Research talk
+
+A presentation covering the two research contributions was given as part of the **ISCA SIG-SLATE webinar series**.
+
+[Watch the presentation on YouTube](https://www.youtube.com/watch?v=7_pQ0aQwg-w)
+
+---
+
+# Citation
+
+If you use this repository in academic work, please cite the relevant paper(s).
+
+### TIPAA-SSL
+
+```bibtex
+@Article{acoustics6030042,
+  author  = {Tits, Noé and Bhatnagar, Prernna and Dutoit, Thierry},
+  title   = {Text-Independent Phone-to-Audio Alignment Leveraging SSL (TIPAA-SSL) Pre-Trained Model Latent Representation and Knowledge Transfer},
+  journal = {Acoustics},
+  volume  = {6},
+  number  = {3},
+  pages   = {772--781},
+  year    = {2024},
+  doi     = {10.3390/acoustics6030042}
+}
 ```
 
-Setup the conda environment for x86:
+### MUST&P-SRL
 
-```bash
-CONDA_SUBDIR=osx-64 micromamba create -n flowspeech_mm -f env.yml
-micromamba activate flowspeech_mm
-conda env config vars set PHONEMIZER_ESPEAK_PATH=/usr/local/bin/espeak
-conda env config vars set PHONEMIZER_ESPEAK_LIBRARY=/usr/local/lib/libespeak.dylib
+```bibtex
+@inproceedings{tits-2023-must,
+  title     = {MUST\&P-SRL: Multi-lingual and Unified Syllabification in Text and Phonetic Domains for Speech Representation Learning},
+  author    = {Tits, Noé},
+  booktitle = {Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing: Industry Track},
+  pages     = {74--82},
+  year      = {2023},
+  doi       = {10.18653/v1/2023.emnlp-industry.8}
+}
 ```
 
-## Test modules
+A software citation will also be provided through the repository's `CITATION.cff` and archived software release.
 
-The unit tests should work after these step: just run `pytest`
+---
 
-## Download datasets
+# License
 
-To test the tech's performance, develop new features, ..., you will need speech datasets.
+The repository is distributed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
-### Data of actor recordings
-Go in this [drive folder](https://drive.google.com/drive/folders/1-c34uCaNL8PvokYFPaqWYin6FGPXq-3t?usp=share_link)
+Please also consult the license and attribution information associated with individual third-party components included in or used by the project.
 
-- Download the folder "audio-with-analysis-ids"
-Paste it inside "data/" folder of this repo.
-You can now use `actor_recordings()` function in "flowspeech/label_data_processing.py".
-- Create a folder called "synth_audio" in "data/" and drop the folder "cmu_words" in it after extracting the zip
-- Drop "flwc-phrase-audios" after extracting the zip
+In particular, some dependencies and adapted components have their own licenses and attribution requirements.
 
-For extracting a big zip, windows zip extractor might crash (although it was able to create it...). If that's the case "unzip" command on a WSL Ubuntu (install with `sudo apt install unzip`) should work.
+---
 
-### Librispeech data
-https://www.openslr.org/12/
+# Status
 
-I use dev-clean and test-clean sets.
-```
-cd data
-wget https://www.openslr.org/resources/12/dev-clean.tar.gz
-tar xvfz dev-clean.tar.gz
-rm dev-clean.tar.gz
-wget https://www.openslr.org/resources/12/test-clean.tar.gz
-tar xvfz test-clean.tar.gz
-rm test-clean.tar.gz
-cd ..
-```
+This repository is a public research release of software developed for speech and language technology research.
 
-Get phonetic alignments data:
-```
-sudo apt install unzip
-cd data
-mkdir librispeech_alignments
-cd librispeech_alignments
-curl https://zenodo.org/record/2619474/files/librispeech_alignments.zip?download=1 --output librispeech_alignments.zip
-unzip librispeech_alignments.zip
-rm librispeech_alignments.zip
-cd ..
-cd ..
-```
+Some parts of the original production system were developed for a larger application and may require adaptation before being used as a standalone research package.
 
-### MAILABS dataset
+The repository is therefore intended primarily as a **research and experimentation resource**, rather than as a polished production-ready speech API.
 
-Download data archives from [MAILABS website](https://www.caito.de/2019/01/03/the-m-ailabs-speech-dataset/#:~:text=Statistics%20%26%20Download%20Links)
-Download the ones with the tags "en_UK", "en_US" in priority. (You can also download "es_ES" and "fr_FR" for experimenting later, but not necessary right now)
+Contributions, experiments, issues, and discussion are welcome.
 
-Commands for doing it for "en_UK" if you are at the root of the repo:
-```
-cd data
-mkdir MAILABS
-cd MAILABS
-wget https://data.solak.de/data/Training/stt_tts/en_UK.tgz
-tar xvfz en_UK.tgz
-rm en_UK.tgz
-cd ../..
-```
+---
 
-### Other sets of data
+# Acknowledgements
 
-There are other useful sets of data, we don't have a place for them online yet. Ask Noé
+This work was developed in the context of research and development at **Flowchase** and the **Numediart Institute of UMONS**.
 
-## Best practices
-
-We should strive to follow these guidelines:
-
-- Clear organization of modules, with [separation of concerns](https://en.wikipedia.org/wiki/Separation_of_concerns)
-- Use python type hints as much as possible, see [here](https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html) and [here](https://peps.python.org/pep-0483/)
-- Write docstrings, if possible following the [numpy format standard](https://numpydoc.readthedocs.io/en/latest/format.html#docstring-standard)
-- Use a linter and formatter with the Ruff and Black Formatter (plugins for VSCode). Make sure you configure VSCode to use Black as the active formatter.
-- The environment for running the app in production should be reproducible. For us this means using a lock file generated by [conda-lock](https://conda.github.io/conda-lock), see e.g. [here](https://pythonspeed.com/articles/conda-dependency-management/) and [here](https://uwekorn.com/2021/03/01/deploying-conda-environments-in-docker-how-to-do-it-right.html).
-
-## Running Jupyter noteboooks
-
-If you like experimenting with notebooks, start a jupyter server in the conda environment:
-```
-$ jupyter lab
-```
-
-Have a look at the helpers in [here](./flowspeech/notebook_utils.py) for recording and playing audio in notebooks.
-
-### TODO
-
-The following have not yet been implemented but should be:
-
-- Manage production and developments environments separately. The production one could be much leaner. E.g. use conda-lock [categories](https://conda.github.io/conda-lock/src_environment_yml/#categories)
-  and Docker multi-stage builds.
-- Specify the major/minor versions of all dependencies in the [env.yml] environment file. This would make it easier to regenerate a lock file whenever we want to update a dependency.
-- Use [pre-commit](https://pre-commit.com/) to automatically run the linter and formatter whenever a commit is done (to avoid relying on the VSCode extensions).
-  The difficulty is that `pre-commit` needs to be installed, and `git commit` always be ran where `pre-commit` is installed.
-- Perhaps using a tool such as [poetry](https://python-poetry.org/) for dependency management, but this [doesn't play super nice with conda](https://stackoverflow.com/questions/70851048/does-it-make-sense-to-use-conda-poetry).
-- The code often assumes that modules are imported or scripts are from the project's root folder. If not, files under `data/` or `models/` will not be found.
-  It should be easy to make it independent of the location by finding the root folder of the installed `flowspeech` package.
+The research builds on open-source speech and language technologies including wav2vec 2.0 / XLS-R, the Montreal Forced Aligner, eSpeak, and related open-source resources.
