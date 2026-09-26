@@ -469,7 +469,7 @@ def n_vowels(word="coffee", lang="en_GB"):
     # words like science -> 's_ˈaɪə_n_s', client -> 'k_l_ˈaɪə_n_t'  have a weird phoneme separation in espeak. The schwa is glued to a vowel. I prefer cmudict's conventions.
     # I therefore make the assumption that en_GB and en_US have the same number of syllables for now, and I hope we can actually choose alternatives accordingly
     if lang.split('_')[0] == "en":
-        if len(cmudict_dict[word]) > 0:
+        if word in cmudict_dict and len(cmudict_dict[word]) > 0:
             d = define_categories(mode="CMU")
             phonetics = cmudict_dict[word][0]
             n = 0
